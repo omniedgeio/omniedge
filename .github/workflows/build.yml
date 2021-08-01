@@ -1,0 +1,88 @@
+name: omniedge compile
+
+on:
+  push:
+    branches: dev
+
+jobs:
+  create-release:
+    name: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assemble Artifact
+        id: assemble_artifact
+        env:
+          TZ: Asia/Shanghai
+        run: |
+          time=$(date +%Y%m%d%H%M)
+          release_tag=$time
+          echo "##[set-output name=release_tag;]$release_tag"
+      - name: create-release
+        id: create-release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_HUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.assemble_artifact.outputs.release_tag }}
+
+  build:
+    name: Build on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-16.04,ubuntu-18.04,ubuntu-20.04 ]
+    #        include:
+    #          - os: ubuntu-16.04
+    #            TARGET: x86_64-unknown-linux-musl
+    #            COMPILER: gcc
+    #            LINKER: gcc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Show CPU Model and Free Space
+        run: |
+          echo -e "Total CPU cores\t: $(nproc)"
+          cat /proc/cpuinfo | grep 'model name'
+          free -h
+
+      - name: Show system info
+        run: |
+          echo -e "system info: $(uname -a)"
+
+      - name: setup golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: '^1.13.1'
+
+      - name: go mod download
+        run: |
+          go mod download
+
+      - name: make
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y openssl
+          sudo -E apt-get install -y build-essential
+          sudo -E apt-get install -y libssl-dev
+          sudo -E apt-get install -y zip
+          make generate
+          make build
+          zip -j ./omniedgecli-${{ matrix.os }}.zip ./out/omniedge
+
+      - name: Assemble Artifact
+        id: assemble_artifact
+        env:
+          TZ: Asia/Shanghai
+        run: |
+          time=$(date +%Y%m%d%H%M)
+          release_tag=$time
+          echo "##[set-output name=release_tag;]$release_tag"
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_HUB_TOKEN }}
+        with:
+          files: ./omniedgecli-${{ matrix.os }}.zip
+          tag_name: ${{ steps.assemble_artifact.outputs.release_tag }}

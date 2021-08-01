@@ -1,0 +1,18 @@
+#ubuntu:16.04 linux/arm/v7
+FROM ubuntu:16.04@sha256:c9c392b914d8167963b25fcc0c350546e154de3bd37583f698d69237b44335d1
+
+# install golang
+RUN apt update
+RUN apt -y install wget make git autoconf automake build-essential
+RUN wget https://golang.org/dl/go1.16.4.linux-armv6l.tar.gz
+RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.4.linux-armv6l.tar.gz
+RUN chmod +x /usr/local/go/bin/go
+ENV PATH "$PATH:/usr/local/go/bin"
+RUN go version
+
+WORKDIR /app
+
+COPY . .
+
+RUN make generate
+RUN make build
