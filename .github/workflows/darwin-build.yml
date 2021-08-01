@@ -1,0 +1,79 @@
+name: omniedge macos build
+
+on:
+  push:
+    branches:
+      - dev
+      - feature-build
+jobs:
+  create-release:
+    name: create-release
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.assemble_artifact.outputs.release_tag }}
+    steps:
+      - name: Assemble Artifact
+        id: assemble_artifact
+        env:
+          TZ: Asia/Shanghai
+        run: |
+          time=$(date +%Y%m%d%H)
+          release_tag="$time-${GITHUB_REF#refs/heads/}"
+          echo "::set-output name=release_tag::$release_tag"
+
+      - name: create-release
+        id: create-release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_HUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.assemble_artifact.outputs.release_tag }}
+
+  build:
+    name: Build on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ macos-latest ]
+    runs-on: ${{ matrix.os }}
+    needs: create-release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Assemble Artifact
+        id: assemble_artifact
+        env:
+          TZ: Asia/Shanghai
+        run: |
+          time=$(date +%Y%m%d%H)
+          release_tag="$time-${GITHUB_REF#refs/heads/}"
+          echo "::set-output name=release_tag::$release_tag"
+
+      - name: Show system info
+        run: |
+          echo -e "system info: $(uname -a)"
+
+      - name: setup golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: '^1.13.1'
+
+      - name: go mod download
+        run: |
+          go mod download
+
+      - name: make
+        run: |
+          brew install autoconf automake libtool
+          make generate
+          make build-darwin
+          zip -j ./omniedgecli-${{ matrix.os }}.zip ./out/omniedge
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_HUB_TOKEN }}
+        with:
+          files: ./omniedgecli-${{ matrix.os }}.zip
+          tag_name: ${{ needs.create-release.outputs.release_tag }}
