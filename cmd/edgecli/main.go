@@ -11,6 +11,6 @@ func main() {
 		FullTimestamp:          true,
 		DisableLevelTruncation: true,
 	})
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.InfoLevel)
 	rootCmd.Execute()
 }
