@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -16,23 +15,28 @@ var registerCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
 		edge.LoadClientConfig()
+
 		if err := loadAuthFile(); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
 		endpointUrl := edge.ConfigV.GetString(RestEndpointUrl)
+		hardwareId, err := edge.RevealHardwareUUID()
+		if err != nil {
+			log.Errorf("%+v", err)
+			return
+		}
 		registerOption := edge.RegisterOption{
 			Token:        fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
 			BaseUrl:      endpointUrl,
 			Name:         edge.RevealHostName(),
-			HardwareUUID: uuid.NewString(),
+			HardwareUUID: hardwareId,
 			OS:           edge.RevealOS(),
 		}
 		registerService := edge.RegisterService{
 			RegisterOption: registerOption,
 		}
 		var device *edge.DeviceResponse
-		var err error
 		if device, err = registerService.Register(); err != nil {
 			log.Errorf("%+v", err)
 			return

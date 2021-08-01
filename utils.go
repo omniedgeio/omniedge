@@ -3,8 +3,11 @@ package edgecli
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"github.com/denisbrodbeck/machineid"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"os"
@@ -88,7 +91,19 @@ func getMacAddress() (string, error) {
 }
 
 func RevealHardwareUUID() (string, error) {
-	return machineid.ProtectedID("omniedge")
+	id, err := machineid.ID()
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("Fail to generate hardware id, err is %+v", err))
+	}
+	idBytes, err := hex.DecodeString(id)
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("Fail to generate hardware id, err is %+v", err))
+	}
+	hardwareUUID, err := uuid.FromBytes(idBytes)
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("Fail to generate hardware id, err is %+v", err))
+	}
+	return hardwareUUID.String(), nil
 }
 
 func RevealHostName() string {
