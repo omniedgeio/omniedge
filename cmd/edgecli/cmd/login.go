@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	edge "gitlab.com/omniedge/omniedge-linux-saas-cli"
+	"golang.org/x/crypto/ssh/terminal"
 	"os"
 	"strings"
 )
@@ -17,14 +19,32 @@ var loginCmd = &cobra.Command{
 		bindFlags(cmd)
 		edge.LoadClientConfig()
 		var username = viper.GetString(cliUsername)
-		//var password string
+		var password string
 		var secretKey string
-		//password = viper.GetString(cliPassword)
+		password = viper.GetString(cliPassword)
 		secretKey = viper.GetString(cliSecretKey)
 		endpointUrl := edge.ConfigV.GetString(RestEndpointUrl)
 		// login by username
+
 		if username != "" {
-			log.Errorf("Not support login by username and password, please use login by secret key.")
+			if password = viper.GetString(cliPassword); password == "" {
+				fmt.Print("Enter Password:")
+				bytePassword, err := terminal.ReadPassword(0)
+				if err != nil {
+					log.Panic(err)
+				}
+				password = string(bytePassword)
+			}
+			authOption := edge.AuthOption{
+				BaseUrl:    endpointUrl,
+				Username:   username,
+				Password:   password,
+				AuthMethod: edge.LoginByPassword,
+			}
+			authService := edge.AuthService{
+				AuthOption: authOption,
+			}
+			authService.Login()
 		} else {
 			if secretKey == "" {
 				for _, e := range os.Environ() {

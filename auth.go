@@ -58,7 +58,7 @@ func (s *AuthService) Login() {
 		if err := json.Unmarshal(authJson, &auth); err != nil {
 			log.Errorf("Fail to unmarshal response's data ,err is %+v", err)
 		}
-		log.Tracef("auth token is %+v", auth)
+		log.Debugf("auth token is %+v", auth)
 		log.Infof("successful to login")
 	case *ErrorResponse:
 		log.Errorf("Fail to login, error message: %s", resp.(*ErrorResponse).Message)
@@ -66,28 +66,3 @@ func (s *AuthService) Login() {
 		log.Error("This client has some unpredictable problems, please contact the omniedge team.")
 	}
 }
-
-//func (s *AuthService) LoginBySecretKey() {
-//	url := s.BaseUrl + "auth/login/security-key"
-//	postBody, _ := json.Marshal(map[string]string{
-//		"key": s.SecretKey,
-//	})
-//	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
-//	req.Header.Set("content-type", "application/json")
-//	_, resp := HandleCall(req)
-//	log.Tracef("LoginBySecretKey response %+v", resp)
-//	switch resp.(type) {
-//	case *SuccessResponse:
-//		authJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
-//		auth := AuthResp{}
-//		if err := json.Unmarshal(authJson, &auth); err != nil {
-//			log.Errorf("Fail to unmarshal response's data ,err is %+v", err)
-//		}
-//		log.Tracef("auth token is %+v", auth)
-//		log.Infof("Success to login")
-//	case *ErrorResponse:
-//		log.Errorf("Fail to login, error message: %s", resp.(*ErrorResponse).Message)
-//	default:
-//		log.Error("This client has some unpredictable problems, please contact the omniedge team.")
-//	}
-//}
