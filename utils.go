@@ -95,6 +95,7 @@ func RevealHardwareUUID() (string, error) {
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("Fail to generate hardware id, err is %+v", err))
 	}
+	id = strings.ToLower(strings.Replace(id, "-", "", -1))
 	idBytes, err := hex.DecodeString(id)
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("Fail to generate hardware id, err is %+v", err))
