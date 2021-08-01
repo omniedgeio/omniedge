@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -29,6 +31,23 @@ func bindFlags(cmd *cobra.Command) {
 	if err := viper.BindPFlags(cmd.LocalFlags()); err != nil {
 		log.Fatal(CouldNotBindFlags)
 	}
+}
+
+func loadAuthFile() error {
+	var authFile = viper.GetString(cliAuthConfigFile)
+	if authFile == "" {
+		authFile = authFileDefault
+	}
+	handledAuthFile, err := edge.HandleAuthFile(authFile)
+	if err != nil {
+		return errors.New("fail to parse the path of the auth file")
+	}
+	viper.SetConfigFile(handledAuthFile)
+	viper.SetConfigType("json")
+	if err = viper.ReadInConfig(); err != nil {
+		return errors.New(fmt.Sprintf("fail to read omniedge file, please login first. err is %s", err.Error()))
+	}
+	return nil
 }
 
 func persistAuthFile() {

@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"github.com/denisbrodbeck/machineid"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -85,6 +87,20 @@ func getMacAddress() (string, error) {
 	return mac, err
 }
 
-//func getHardwareUUID() (string, error) {
-//
-//}
+func RevealHardwareUUID() (string, error) {
+	return machineid.ProtectedID("omniedge")
+}
+
+func RevealHostName() string {
+	name, err := os.Hostname()
+	if err != nil {
+		return ""
+	}
+	return name
+
+}
+
+func RevealOS() string {
+	return runtime.GOOS
+
+}

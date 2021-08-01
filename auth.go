@@ -3,6 +3,8 @@ package edgecli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 )
@@ -30,7 +32,7 @@ type AuthService struct {
 	AuthOption
 }
 
-func (s *AuthService) Login() {
+func (s *AuthService) Login() (*AuthResp, error) {
 	var url string
 	var body map[string]string
 	if s.AuthMethod == LoginByPassword {
@@ -56,13 +58,13 @@ func (s *AuthService) Login() {
 		authJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
 		auth := AuthResp{}
 		if err := json.Unmarshal(authJson, &auth); err != nil {
-			log.Errorf("Fail to unmarshal response's data ,err is %+v", err)
+			return nil, errors.New(fmt.Sprintf("Fail to unmarshal response's data ,err is %+v", err))
 		}
 		log.Debugf("auth token is %+v", auth)
-		log.Infof("successful to login")
+		return &auth, nil
 	case *ErrorResponse:
-		log.Errorf("Fail to login, error message: %s", resp.(*ErrorResponse).Message)
+		return nil, errors.New(fmt.Sprintf("Fail to login, error message: %s", resp.(*ErrorResponse).Message))
 	default:
-		log.Error("This client has some unpredictable problems, please contact the omniedge team.")
+		return nil, errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
 	}
 }

@@ -7,18 +7,6 @@ import (
 	"net/http"
 )
 
-type SuccessResponse struct {
-	Code    int         `json:"-"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data"`
-}
-
-type ErrorResponse struct {
-	Code    int         `json:"-"`
-	Message string      `json:"message"`
-	Errors  interface{} `json:"errors"`
-}
-
 func HandleCall(req *http.Request) (error, interface{}) {
 	client := &http.Client{}
 	resp, err := client.Do(req)

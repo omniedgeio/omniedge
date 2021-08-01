@@ -25,7 +25,8 @@ var loginCmd = &cobra.Command{
 		secretKey = viper.GetString(cliSecretKey)
 		endpointUrl := edge.ConfigV.GetString(RestEndpointUrl)
 		// login by username
-
+		var authResp *edge.AuthResp
+		var err error
 		if username != "" {
 			if password = viper.GetString(cliPassword); password == "" {
 				fmt.Print("Enter Password:")
@@ -44,7 +45,7 @@ var loginCmd = &cobra.Command{
 			authService := edge.AuthService{
 				AuthOption: authOption,
 			}
-			authService.Login()
+			authResp, err = authService.Login()
 		} else {
 			if secretKey == "" {
 				for _, e := range os.Environ() {
@@ -66,8 +67,16 @@ var loginCmd = &cobra.Command{
 			authService := edge.AuthService{
 				AuthOption: authOption,
 			}
-			authService.Login()
+			authResp, err = authService.Login()
 		}
+		if err != nil {
+			log.Errorf("%+v", err)
+			return
+		}
+		viper.Set(cliSecretKey, "")
+		viper.Set(keyAuthResponse, authResp)
+		persistAuthFile()
+		log.Infof("successful to login")
 	},
 }
 

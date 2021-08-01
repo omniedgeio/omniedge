@@ -8,6 +8,8 @@ const (
 	cliAuthConfigFile = "file"
 
 	cliInterface = "interface"
+
+	cliVirtualNetworkId = "network"
 )
 
 const (
@@ -19,11 +21,14 @@ const (
 )
 
 var (
-	keyAuthResponse             = "authresponse"
-	keyAuthResponseIdToken      = "authresponse.idtoken"
-	keyAuthResponseRefreshToken = "authresponse.refreshtoken"
-	keyVirtualNetworkIds        = "virtualnetworkids"
-	keyHostname                 = "keyHostname"
+	keyAuthResponse      = "authresponse"
+	keyAuthResponseToken = "authresponse.token"
+	keyVirtualNetworkIds = "virtualnetworkids"
+	keyHostname          = "keyHostname"
+	keyDevice            = "device"
+	KeyDeviceUUID        = "device.uuid"
+
+	keyJoinVirtualNetwork = "joinVirtualNetwork"
 )
 
 const (
