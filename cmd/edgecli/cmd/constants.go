@@ -26,9 +26,15 @@ var (
 	keyVirtualNetworkIds = "virtualnetworkids"
 	keyHostname          = "keyHostname"
 	keyDevice            = "device"
+	keyDeviceName        = "device.name"
 	KeyDeviceUUID        = "device.uuid"
 
-	keyJoinVirtualNetwork = "joinVirtualNetwork"
+	keyJoinVirtualNetwork              = "joinVirtualNetwork"
+	keyJoinVirtualNetworkCommunityName = "joinVirtualNetwork.community_name"
+	keyJoinVirtualNetworkSecretKey     = "joinVirtualNetwork.secret_key"
+	keyJoinVirtualNetworkVirtualIP     = "joinVirtualNetwork.virtual_ip"
+	keyJoinVirtualNetworkNetMask       = "joinVirtualNetwork.subnet_mask"
+	keyJoinVirtualNetworkSuperNode     = "joinVirtualNetwork.server.host"
 )
 
 const (
