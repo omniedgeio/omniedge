@@ -23,14 +23,6 @@ jobs:
           release_tag="$time-${GITHUB_REF#refs/heads/}"
           echo "::set-output name=release_tag::$release_tag"
 
-      - name: create-release
-        id: create-release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GIT_HUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.assemble_artifact.outputs.release_tag }}
-
   build:
     name: Build on ${{ matrix.os }}
     strategy:
@@ -73,9 +65,10 @@ jobs:
 
       - name: Upload Release Asset
         id: upload-release-asset
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GIT_HUB_TOKEN }}
+        uses: svenstaro/upload-release-action@v2
         with:
-          files: ./omniedgecli-${{ matrix.os }}.zip
-          tag_name: ${{ needs.create-release.outputs.release_tag }}
+          repo_token:  ${{ secrets.GIT_HUB_TOKEN }}
+          file: ./omniedgecli-${{ matrix.os }}.zip
+          asset_name: omniedgecli-${{ matrix.os }}.zip
+          overwrite: true
+          tag: ${{ needs.create-release.outputs.release_tag }}
