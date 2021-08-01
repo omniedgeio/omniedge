@@ -50,6 +50,7 @@ func init() {
 		authConfigPath string
 	)
 	joinCmd.Flags().StringVarP(&networkId, cliVirtualNetworkId, "n", "", "id of the virtual network which you want to join")
+	_ = registerCmd.MarkFlagRequired(cliVirtualNetworkId)
 	joinCmd.Flags().StringVarP(&authConfigPath, cliAuthConfigFile, "f", "", "position to store the auth and config")
 	rootCmd.AddCommand(joinCmd)
 }

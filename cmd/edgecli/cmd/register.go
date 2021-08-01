@@ -46,15 +46,8 @@ var registerCmd = &cobra.Command{
 
 func init() {
 	var (
-		username       string
-		password       string
-		secretKey      string
 		authConfigPath string
 	)
-	registerCmd.Flags().StringVarP(&username, cliInterface, "i", "", "the interface")
-	//registerCmd.MarkFlagRequired(cliInterface)
-	registerCmd.Flags().StringVarP(&password, cliPassword, "p", "", "password of omniedge ( not recommend text password here)")
-	registerCmd.Flags().StringVarP(&secretKey, cliSecretKey, "s", "", "secret-key of omniedge")
 	registerCmd.Flags().StringVarP(&authConfigPath, cliAuthConfigFile, "f", "", "position to store the auth and config")
 	rootCmd.AddCommand(registerCmd)
 }
