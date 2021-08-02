@@ -15,14 +15,12 @@ type VirtualNetwork struct {
 }
 
 type JoinOption struct {
-	Token            string
-	BaseUrl          string
 	VirtualNetworkId string
 	DeviceId         string
 }
 
 type VirtualNetworkService struct {
-	JoinOption
+	HttpOption
 }
 
 func (s *VirtualNetworkService) List() ([]VirtualNetworkResponse, error) {
@@ -48,8 +46,8 @@ func (s *VirtualNetworkService) List() ([]VirtualNetworkResponse, error) {
 
 }
 
-func (s *VirtualNetworkService) Join() (*JoinVirtualNetworkResponse, error) {
-	var url = fmt.Sprintf(s.BaseUrl+"/virtual-networks/%s/devices/%s/join", s.VirtualNetworkId, s.DeviceId)
+func (s *VirtualNetworkService) Join(opt *JoinOption) (*JoinVirtualNetworkResponse, error) {
+	var url = fmt.Sprintf(s.BaseUrl+"/virtual-networks/%s/devices/%s/join", opt.VirtualNetworkId, opt.DeviceId)
 	req, _ := http.NewRequest("POST", url, nil)
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Authorization", s.Token)

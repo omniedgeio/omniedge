@@ -25,12 +25,12 @@ var joinCmd = &cobra.Command{
 		var vnId = viper.GetString(cliVirtualNetworkId)
 		var deviceId = viper.GetString(KeyDeviceUUID)
 
-		var joinOption = edgecli.JoinOption{
+		var httpOption = edgecli.HttpOption{
 			Token:   fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
 			BaseUrl: endpointUrl,
 		}
 		var service = edgecli.VirtualNetworkService{
-			JoinOption: joinOption,
+			HttpOption: httpOption,
 		}
 		if vnId == "" {
 			var resp []edgecli.VirtualNetworkResponse
@@ -54,18 +54,16 @@ var joinCmd = &cobra.Command{
 				viper.Set(keyVirtualNetworks, resp)
 			}
 		}
-		joinOption = edgecli.JoinOption{
-			Token:            fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
-			BaseUrl:          endpointUrl,
+		var joinOption = &edgecli.JoinOption{
 			VirtualNetworkId: vnId,
 			DeviceId:         deviceId,
 		}
 		service = edgecli.VirtualNetworkService{
-			JoinOption: joinOption,
+			HttpOption: httpOption,
 		}
 		var resp *edgecli.JoinVirtualNetworkResponse
 		var err error
-		if resp, err = service.Join(); err != nil {
+		if resp, err = service.Join(joinOption); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
