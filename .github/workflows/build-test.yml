@@ -1,33 +1,17 @@
-name: omniedge arm64v8 build
+name: omniedge armv7 build
 
 on:
   push:
     branches:
-      - dev
+      - feature-build
 
 jobs:
-  create-release:
-    name: create-release
-    runs-on: ubuntu-latest
-    outputs:
-      release_tag: ${{ steps.assemble_artifact.outputs.release_tag }}
-    steps:
-      - name: Assemble Artifact
-        id: assemble_artifact
-        env:
-          TZ: Asia/Shanghai
-        run: |
-          time=$(date +%Y%m%d%H)
-          release_tag="$time-${GITHUB_REF#refs/heads/}"
-          echo "::set-output name=release_tag::$release_tag"
-
   build:
     name: Build on ${{ matrix.os }}
     strategy:
       matrix:
         os: [ ubuntu-20.04 ]
     runs-on: ${{ matrix.os }}
-    needs: create-release
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -49,7 +33,7 @@ jobs:
       - name: Cache
         uses: actions/cache@v2
         env:
-          cache-name: omniedge-saas-cli-arm64v8
+          cache-name: omniedge-saas-cli-armv7
         with:
           path: |
             /tmp/.buildx-cache
@@ -61,10 +45,10 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          platforms: linux/arm64
+          platforms: linux/arm/v7
           push: false
           load: true
-          file: docker/Dockerfile-ubuntu-arm64v8
+          file: docker/Dockerfile-ubuntu-armv7
           tags: cli:0.1
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
@@ -86,15 +70,4 @@ jobs:
           docker cp omniedge:/app/out/omniedge .
       - name: zip
         run: |
-          zip -j ./omniedgecli-arm64v8.zip ./omniedge
-
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GIT_HUB_TOKEN }}
-          file: ./omniedgecli-arm64v8.zip
-          asset_name: omniedgecli-arm64v8.zip
-          overwrite: true
-          tag: ${{ needs.create-release.outputs.release_tag }}
-
+          zip -j ./omniedgecli-armv7.zip ./omniedge

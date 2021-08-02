@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - dev
-      - feature-build
 jobs:
   create-release:
     name: create-release
