@@ -35,17 +35,20 @@ var loginCmd = &cobra.Command{
 					log.Panic(err)
 				}
 				password = string(bytePassword)
+				fmt.Println()
 			}
-			authOption := edge.AuthOption{
-				BaseUrl:    endpointUrl,
+			httpOption := edge.HttpOption{
+				BaseUrl: endpointUrl,
+			}
+			authOption := &edge.AuthOption{
 				Username:   username,
 				Password:   password,
 				AuthMethod: edge.LoginByPassword,
 			}
 			authService := edge.AuthService{
-				AuthOption: authOption,
+				HttpOption: httpOption,
 			}
-			authResp, err = authService.Login()
+			authResp, err = authService.Login(authOption)
 		} else {
 			if secretKey == "" {
 				for _, e := range os.Environ() {
@@ -59,15 +62,17 @@ var loginCmd = &cobra.Command{
 				log.Errorf("Please input secret key or set system variable %s", omniedgeSecretKey)
 				return
 			}
-			authOption := edge.AuthOption{
-				BaseUrl:    endpointUrl,
+			httpOption := edge.HttpOption{
+				BaseUrl: endpointUrl,
+			}
+			authOption := &edge.AuthOption{
 				SecretKey:  secretKey,
 				AuthMethod: edge.LoginBySecretKey,
 			}
 			authService := edge.AuthService{
-				AuthOption: authOption,
+				HttpOption: httpOption,
 			}
-			authResp, err = authService.Login()
+			authResp, err = authService.Login(authOption)
 		}
 		if err != nil {
 			log.Errorf("%+v", err)

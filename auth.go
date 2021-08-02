@@ -21,7 +21,6 @@ const (
 )
 
 type AuthOption struct {
-	BaseUrl    string
 	Username   string
 	Password   string
 	SecretKey  string
@@ -29,23 +28,23 @@ type AuthOption struct {
 }
 
 type AuthService struct {
-	AuthOption
+	HttpOption
 }
 
-func (s *AuthService) Login() (*AuthResp, error) {
+func (s *AuthService) Login(opt *AuthOption) (*AuthResp, error) {
 	var url string
 	var body map[string]string
-	if s.AuthMethod == LoginByPassword {
+	if opt.AuthMethod == LoginByPassword {
 		url = s.BaseUrl + "/auth/login/password"
 		body = map[string]string{
-			"email":    s.Username,
-			"password": s.Password,
+			"email":    opt.Username,
+			"password": opt.Password,
 		}
 	}
-	if s.AuthMethod == LoginBySecretKey {
+	if opt.AuthMethod == LoginBySecretKey {
 		url = s.BaseUrl + "/auth/login/security-key"
 		body = map[string]string{
-			"key": s.SecretKey,
+			"key": opt.SecretKey,
 		}
 	}
 	postBody, _ := json.Marshal(body)

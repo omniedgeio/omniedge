@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+type HttpOption struct {
+	Token   string
+	BaseUrl string
+}
+
 func HandleCall(req *http.Request) (interface{}, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
