@@ -4,8 +4,8 @@ go 1.16
 
 require (
 	github.com/denisbrodbeck/machineid v1.0.1
-	github.com/go-bindata/go-bindata v3.1.2+incompatible // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.3.0
+	github.com/manifoldco/promptui v0.8.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/viper v1.7.1

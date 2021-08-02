@@ -23,7 +23,7 @@ const (
 var (
 	keyAuthResponse      = "authresponse"
 	keyAuthResponseToken = "authresponse.token"
-	keyVirtualNetworkIds = "virtualnetworkids"
+	keyVirtualNetworks   = "virtualNetworks"
 	keyHostname          = "keyHostname"
 	keyDevice            = "device"
 	keyDeviceName        = "device.name"

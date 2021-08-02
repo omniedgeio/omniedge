@@ -7,31 +7,31 @@ import (
 	"net/http"
 )
 
-func HandleCall(req *http.Request) (error, interface{}) {
+func HandleCall(req *http.Request) (interface{}, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Errorf("Fail to call backend API [%s]. err is %s\n", req.URL, err.Error())
-		return err, nil
+		return nil, err
 	}
 	return handle(resp)
 }
 
-func handle(resp *http.Response) (error, interface{}) {
+func handle(resp *http.Response) (interface{}, error) {
 	body, code := handleResp(resp)
 	if code == 200 {
 		successResponse := &SuccessResponse{}
 		if err := handleSuccessResp(body, successResponse, resp.Request.URL.String()); err != nil {
-			return err, nil
+			return nil, err
 		} else {
-			return nil, successResponse
+			return successResponse, nil
 		}
 	} else {
 		errorResponse := &ErrorResponse{}
 		if err := handleErrorResp(body, errorResponse, resp.Request.URL.String()); err != nil {
-			return err, nil
+			return nil, err
 		} else {
-			return nil, errorResponse
+			return errorResponse, nil
 		}
 	}
 }

@@ -35,7 +35,7 @@ func (s *RegisterService) Register() (*DeviceResponse, error) {
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Authorization", s.Token)
-	_, resp := HandleCall(req)
+	resp, _ := HandleCall(req)
 	log.Tracef("Register response %+v", resp)
 	switch resp.(type) {
 	case *SuccessResponse:

@@ -51,7 +51,7 @@ func (s *AuthService) Login() (*AuthResp, error) {
 	postBody, _ := json.Marshal(body)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
 	req.Header.Set("content-type", "application/json")
-	_, resp := HandleCall(req)
+	resp, _ := HandleCall(req)
 	log.Tracef("LoginByPassword response %+v", resp)
 	switch resp.(type) {
 	case *SuccessResponse:
