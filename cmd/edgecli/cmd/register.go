@@ -26,18 +26,20 @@ var registerCmd = &cobra.Command{
 			log.Errorf("%+v", err)
 			return
 		}
-		registerOption := edge.RegisterOption{
-			Token:        fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
-			BaseUrl:      endpointUrl,
+		httpOption := edge.HttpOption{
+			Token:   fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
+			BaseUrl: endpointUrl,
+		}
+		registerOption := &edge.RegisterOption{
 			Name:         edge.RevealHostName(),
 			HardwareUUID: hardwareId,
 			OS:           edge.RevealOS(),
 		}
 		registerService := edge.RegisterService{
-			RegisterOption: registerOption,
+			HttpOption: httpOption,
 		}
 		var device *edge.DeviceResponse
-		if device, err = registerService.Register(); err != nil {
+		if device, err = registerService.Register(registerOption); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}

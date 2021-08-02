@@ -10,26 +10,24 @@ import (
 )
 
 type RegisterOption struct {
-	Token        string
-	BaseUrl      string
 	Name         string
 	HardwareUUID string
 	OS           string
 }
 
 type RegisterService struct {
-	RegisterOption
+	HttpOption
 }
 
-func (s *RegisterService) Register() (*DeviceResponse, error) {
+func (s *RegisterService) Register(opt *RegisterOption) (*DeviceResponse, error) {
 	var url string
 	var body map[string]string
 	url = s.BaseUrl + "/devices/register"
 
 	body = map[string]string{
-		"name":          s.Name,
-		"hardware_uuid": s.HardwareUUID,
-		"os":            s.OS,
+		"name":          opt.Name,
+		"hardware_uuid": opt.HardwareUUID,
+		"os":            opt.OS,
 	}
 	postBody, _ := json.Marshal(body)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
