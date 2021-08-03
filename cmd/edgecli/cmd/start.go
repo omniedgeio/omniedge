@@ -14,13 +14,19 @@ var startCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
 		edgecli.LoadClientConfig()
-		if err := loadAuthFile(); err != nil {
+		var err error
+		if err = loadAuthFile(); err != nil {
+			log.Errorf("%+v", err)
+			return
+		}
+		var randomMac string
+		if randomMac, err = edgecli.GenerateRandomMac(); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
 		var startOption = edgecli.StartOption{
 			Hostname:      viper.GetString(keyDeviceName),
-			DeviceMac:     viper.GetString(KeyDeviceUUID),
+			DeviceMac:     randomMac,
 			CommunityName: viper.GetString(keyJoinVirtualNetworkCommunityName),
 			VirtualIP:     viper.GetString(keyJoinVirtualNetworkVirtualIP),
 			SecretKey:     viper.GetString(keyJoinVirtualNetworkSecretKey),
