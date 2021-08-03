@@ -129,6 +129,6 @@ func GenerateRandomMac() (string, error) {
 		return "", errors.New(fmt.Sprintf("Fail to generate random buf, err: %+v", err))
 	}
 	// Set the local bit
-	buf[0] |= 2
+	buf[0] &= 252
 	return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]), nil
 }
