@@ -26,10 +26,8 @@ func LoadClientConfig() {
 	}
 }
 
-/**
-parse user input of auth file path
-*/
-func HandleAuthFile(authFile string) (string, error) {
+// HandleFilePrefix /** parse user input of auth file path
+func HandleFilePrefix(authFile string) (string, error) {
 	// todo fix auth file handle
 	upperAuthFile := strings.ToUpper(authFile)
 	if strings.HasPrefix(authFile, "~") || strings.HasPrefix(upperAuthFile, "$HOME") {
@@ -58,9 +56,9 @@ func GenerateInstanceId() string {
 	return ""
 }
 
-func HandleAuthFileStatus(authFile string) error {
-	dir := filepath.Dir(authFile)
-	if _, err := os.Stat(authFile); err != nil {
+func HandleFileStatus(file string) error {
+	dir := filepath.Dir(file)
+	if _, err := os.Stat(file); err != nil {
 		if os.IsNotExist(err) {
 			return os.MkdirAll(dir, os.ModePerm)
 		} else {

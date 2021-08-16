@@ -2,6 +2,7 @@ package cmd
 
 const (
 	authFileDefault   = "/root/.omniedge/auth.json"
+	scanResultDefault = "/root/.omniedge/scan.json"
 	cliUsername       = "username"
 	cliPassword       = "password"
 	cliSecretKey      = "secretKey"
@@ -10,6 +11,10 @@ const (
 	cliInterface = "interface"
 
 	cliVirtualNetworkId = "network"
+
+	cliScanTimeout = "timeout"
+	cliCidr        = "cidr"
+	cliScanResult  = "scan-result"
 )
 
 const (
@@ -35,6 +40,8 @@ var (
 	keyJoinVirtualNetworkVirtualIP     = "joinVirtualNetwork.virtual_ip"
 	keyJoinVirtualNetworkNetMask       = "joinVirtualNetwork.subnet_mask"
 	keyJoinVirtualNetworkSuperNode     = "joinVirtualNetwork.server.host"
+
+	keyScanResult = "keyScanResult"
 )
 
 const (

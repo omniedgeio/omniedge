@@ -3,6 +3,7 @@ module gitlab.com/omniedge/omniedge-linux-saas-cli
 go 1.16
 
 require (
+	github.com/Ullaakut/nmap/v2 v2.1.1
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/google/uuid v1.3.0
 	github.com/manifoldco/promptui v0.8.0

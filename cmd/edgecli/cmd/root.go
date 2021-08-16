@@ -38,7 +38,7 @@ func loadAuthFile() error {
 	if authFile == "" {
 		authFile = authFileDefault
 	}
-	handledAuthFile, err := edge.HandleAuthFile(authFile)
+	handledAuthFile, err := edge.HandleFilePrefix(authFile)
 	if err != nil {
 		return errors.New("fail to parse the path of the auth file")
 	}
@@ -55,14 +55,49 @@ func persistAuthFile() {
 	if authFile == "" {
 		authFile = authFileDefault
 	}
-	handledAuthFile, err := edge.HandleAuthFile(authFile)
+	handledAuthFile, err := edge.HandleFilePrefix(authFile)
 	if err != nil {
 		log.Fatalf("Fail to parse the path of the auth file")
 	}
-	if err = edge.HandleAuthFileStatus(handledAuthFile); err != nil {
+	if err = edge.HandleFileStatus(handledAuthFile); err != nil {
 		log.Fatalf("Fail to create omniedge file, err is %s", err.Error())
 	}
 	if err := viper.WriteConfigAs(handledAuthFile); err != nil {
+		log.Fatalf("Fail to write config into file, err is %s", err.Error())
+	}
+}
+
+func loadScanResult() error {
+	var scanResult = viper.GetString(cliScanResult)
+	if scanResult == "" {
+		scanResult = scanResultDefault
+	}
+	handledScanResultFile, err := edge.HandleFilePrefix(scanResult)
+	if err != nil {
+		return errors.New("fail to parse the path of the auth file")
+	}
+	viper.SetConfigFile(handledScanResultFile)
+	viper.SetConfigType("json")
+	if err = viper.ReadInConfig(); err != nil {
+		return errors.New(fmt.Sprintf("fail to read omniedge scan result, please scan first."))
+	}
+	return nil
+}
+
+func persistScanResult() {
+	var scanResult = viper.GetString(cliScanResult)
+	if scanResult == "" {
+		scanResult = scanResultDefault
+	}
+	handledScanResultFile, err := edge.HandleFilePrefix(scanResult)
+	if err != nil {
+		log.Fatalf("Fail to parse the path of the scan result")
+	}
+	log.Infof("result %+v", handledScanResultFile)
+	if err = edge.HandleFileStatus(handledScanResultFile); err != nil {
+		log.Fatalf("Fail to create scan result, err is %s", err.Error())
+	}
+	if err := viper.WriteConfigAs(handledScanResultFile); err != nil {
 		log.Fatalf("Fail to write config into file, err is %s", err.Error())
 	}
 }
