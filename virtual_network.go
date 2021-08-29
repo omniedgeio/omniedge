@@ -1,6 +1,7 @@
 package edgecli
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,8 +20,26 @@ type JoinOption struct {
 	DeviceId         string
 }
 
+type UploadOption struct {
+	DeviceId    string
+	ScanResults []*ScanResult
+}
+
 type VirtualNetworkService struct {
 	HttpOption
+}
+
+type RegisterDeviceSubnetRouteRequest struct {
+	IP         string                      `json:"ip" validate:"required,ipv4"`
+	MacAddr    string                      `json:"mac_addr" validate:"required,mac"`
+	SubnetMask string                      `json:"subnet_mask" validate:"required,ipv4"`
+	Devices    []*SubnetRouteDeviceRequest `json:"devices"`
+}
+
+type SubnetRouteDeviceRequest struct {
+	Name    string `json:"name"`
+	IP      string `json:"ip" validate:"required,ipv4"`
+	MacAddr string `json:"mac_addr" validate:"required,mac"`
 }
 
 func (s *VirtualNetworkService) List() ([]VirtualNetworkResponse, error) {
@@ -66,4 +85,34 @@ func (s *VirtualNetworkService) Join(opt *JoinOption) (*JoinVirtualNetworkRespon
 	default:
 		return nil, errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
 	}
+}
+
+func (s *VirtualNetworkService) Upload(opt *UploadOption) error {
+	var url = fmt.Sprintf(s.BaseUrl+"/devices/%s/subnets", opt.DeviceId)
+	body := map[string]interface{}{
+		"ip":          "192.168.32.1",
+		"mac-addr":    "B8:27:EB:A8:DC:E3",
+		"subnet_mask": "255.255.255.0",
+		"devices":     nil,
+	}
+	postBody, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Authorization", s.Token)
+	resp, _ := HandleCall(req)
+	log.Infof("Upload Subnet response %+v", resp)
+	//switch resp.(type) {
+	//case *SuccessResponse:
+	//	joinVNJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
+	//	joinVNResp := JoinVirtualNetworkResponse{}
+	//	if err := json.Unmarshal(joinVNJson, &joinVNResp); err != nil {
+	//		return nil, errors.New(fmt.Sprintf("Fail to unmarshal response's data ,err is %+v", err))
+	//	}
+	//	return &joinVNResp, nil
+	//case *ErrorResponse:
+	//	return nil, errors.New(fmt.Sprintf("Fail to join, error message: %s", resp.(*ErrorResponse).Message))
+	//default:
+	//	return nil, errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
+	//}
+	return nil
 }

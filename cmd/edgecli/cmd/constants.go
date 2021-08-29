@@ -41,7 +41,7 @@ var (
 	keyJoinVirtualNetworkNetMask       = "joinVirtualNetwork.subnet_mask"
 	keyJoinVirtualNetworkSuperNode     = "joinVirtualNetwork.server.host"
 
-	keyScanResult = "keyScanResult"
+	keyScanResult = "scanResult"
 )
 
 const (

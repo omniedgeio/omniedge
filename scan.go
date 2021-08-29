@@ -18,12 +18,12 @@ type ScanService struct {
 }
 
 type ScanResult struct {
-	HostName   string
-	IPv4       string
-	IPv6       string
-	MacAddress string
-	Vendor     string
-	OS         string
+	HostName   string `mapstructure:"hostName"`
+	IPv4       string `mapstructure:"ipv4"`
+	IPv6       string `mapstructure:"ipv6"`
+	MacAddress string `mapstructure:"macAddress"`
+	Vendor     string `mapstructure:"vendor"`
+	OS         string `mapstructure:"os"`
 }
 
 func (s *ScanService) Scan(option *ScanOption) (*[]ScanResult, error) {
