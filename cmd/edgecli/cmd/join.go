@@ -50,7 +50,7 @@ var joinCmd = &cobra.Command{
 		var service = edge.VirtualNetworkService{
 			HttpOption: httpOption,
 		}
-		{
+		if vnId == "" {
 			var resp []edge.VirtualNetworkResponse
 			var err error
 			if resp, err = service.List(); err != nil {
@@ -84,6 +84,8 @@ var joinCmd = &cobra.Command{
 			log.Errorf("%+v", err)
 			return
 		}
+		// not persist cliVirtualNetworkId
+		viper.Set(cliVirtualNetworkId, "")
 		viper.Set(keyJoinVirtualNetwork, joinResp)
 		persistAuthFile()
 		log.Infof("Success to join virtual network")
