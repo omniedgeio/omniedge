@@ -32,7 +32,7 @@ var joinCmd = &cobra.Command{
 		var service = edgecli.VirtualNetworkService{
 			HttpOption: httpOption,
 		}
-		if vnId == "" {
+		{
 			var resp []edgecli.VirtualNetworkResponse
 			var err error
 			if resp, err = service.List(); err != nil {
