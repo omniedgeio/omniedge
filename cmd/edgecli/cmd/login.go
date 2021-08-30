@@ -18,6 +18,10 @@ var loginCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
 		edge.LoadClientConfig()
+		if err := loadAuthFile(); err != nil {
+			log.Errorf("%+v", err)
+			return
+		}
 		var username = viper.GetString(cliUsername)
 		var password string
 		var secretKey string
