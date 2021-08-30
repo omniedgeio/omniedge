@@ -47,5 +47,5 @@ func init() {
 		authConfigPath string
 	)
 	startCmd.Flags().StringVarP(&authConfigPath, cliAuthConfigFile, "f", "", "position to store the auth and config")
-	rootCmd.AddCommand(startCmd)
+	//rootCmd.AddCommand(startCmd)
 }

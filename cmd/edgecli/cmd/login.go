@@ -14,14 +14,10 @@ import (
 var loginCmd = &cobra.Command{
 	Use:     "login",
 	Aliases: []string{},
-	Short:   "",
+	Short:   "Login Omniedge network",
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
 		edge.LoadClientConfig()
-		if err := loadAuthFile(); err != nil {
-			log.Errorf("%+v", err)
-			return
-		}
 		var username = viper.GetString(cliUsername)
 		var password string
 		var secretKey string

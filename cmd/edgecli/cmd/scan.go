@@ -10,7 +10,8 @@ import (
 var scanCmd = &cobra.Command{
 	Use:     "scan",
 	Aliases: []string{},
-	Short:   "",
+	Short:   "Scan local subnet",
+	Example: "scan -c 192.168.32.0/24 -t 20",
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
 		edgecli.LoadClientConfig()

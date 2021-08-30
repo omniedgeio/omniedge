@@ -12,7 +12,7 @@ import (
 var uploadCmd = &cobra.Command{
 	Use:     "upload",
 	Aliases: []string{},
-	Short:   "",
+	Short:   "Upload local subnet to omniedge",
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
 		edgecli.LoadClientConfig()

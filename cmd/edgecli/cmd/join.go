@@ -6,34 +6,52 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	edgecli "gitlab.com/omniedge/omniedge-linux-saas-cli"
+	edge "gitlab.com/omniedge/omniedge-linux-saas-cli"
 	"strings"
 )
 
 var joinCmd = &cobra.Command{
 	Use:     "join",
 	Aliases: []string{},
-	Short:   "",
+	Short:   "Join omniedge network",
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
-		edgecli.LoadClientConfig()
+		edge.LoadClientConfig()
 		if err := loadAuthFile(); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
-		endpointUrl := edgecli.ConfigV.GetString(RestEndpointUrl)
+		endpointUrl := edge.ConfigV.GetString(RestEndpointUrl)
 		var vnId = viper.GetString(cliVirtualNetworkId)
 		var deviceId = viper.GetString(KeyDeviceUUID)
+		var deviceName = viper.GetString(keyDeviceName)
 
-		var httpOption = edgecli.HttpOption{
+		var device *edge.DeviceResponse
+		var err error
+
+		var httpOption = edge.HttpOption{
 			Token:   fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
 			BaseUrl: endpointUrl,
 		}
-		var service = edgecli.VirtualNetworkService{
+		//check device id exists in config
+		if deviceId == "" || deviceName == "" {
+			if device, err = register(httpOption); err != nil {
+				log.Errorf("%+v", err)
+				return
+			}
+		} else {
+			device = &edge.DeviceResponse{
+				Name: deviceName,
+				UUID: deviceId,
+			}
+		}
+		deviceId = device.UUID
+
+		var service = edge.VirtualNetworkService{
 			HttpOption: httpOption,
 		}
 		{
-			var resp []edgecli.VirtualNetworkResponse
+			var resp []edge.VirtualNetworkResponse
 			var err error
 			if resp, err = service.List(); err != nil {
 				log.Errorf("%+v", err)
@@ -54,26 +72,74 @@ var joinCmd = &cobra.Command{
 				viper.Set(keyVirtualNetworks, resp)
 			}
 		}
-		var joinOption = &edgecli.JoinOption{
+		var joinOption = &edge.JoinOption{
 			VirtualNetworkId: vnId,
 			DeviceId:         deviceId,
 		}
-		service = edgecli.VirtualNetworkService{
+		service = edge.VirtualNetworkService{
 			HttpOption: httpOption,
 		}
-		var resp *edgecli.JoinVirtualNetworkResponse
-		var err error
-		if resp, err = service.Join(joinOption); err != nil {
+		var joinResp *edge.JoinVirtualNetworkResponse
+		if joinResp, err = service.Join(joinOption); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
-		viper.Set(keyJoinVirtualNetwork, resp)
+		viper.Set(keyJoinVirtualNetwork, joinResp)
 		persistAuthFile()
 		log.Infof("Success to join virtual network")
+		log.Infof("Start to connect omniedge")
+		if err = start(device, joinResp); err != nil {
+			log.Errorf("%+v", err)
+			return
+		}
 	},
 }
 
-func prompt(networks []edgecli.VirtualNetworkResponse) (string, error) {
+func register(httpOption edge.HttpOption) (*edge.DeviceResponse, error) {
+	hardwareId, err := edge.RevealHardwareUUID()
+	if err != nil {
+		return nil, err
+	}
+	registerOption := &edge.RegisterOption{
+		Name:         edge.RevealHostName(),
+		HardwareUUID: hardwareId,
+		OS:           edge.RevealOS(),
+	}
+	registerService := edge.RegisterService{
+		HttpOption: httpOption,
+	}
+	var device *edge.DeviceResponse
+	if device, err = registerService.Register(registerOption); err != nil {
+		return nil, err
+	}
+	return device, err
+}
+
+func start(device *edge.DeviceResponse, joinResponse *edge.JoinVirtualNetworkResponse) error {
+	var randomMac string
+	var err error
+	if randomMac, err = edge.GenerateRandomMac(); err != nil {
+		return err
+	}
+	var startOption = edge.StartOption{
+		Hostname:      device.Name,
+		DeviceMac:     randomMac,
+		CommunityName: joinResponse.CommunityName,
+		VirtualIP:     joinResponse.VirtualIP,
+		SecretKey:     joinResponse.SecretKey,
+		DeviceMask:    joinResponse.SubnetMask,
+		SuperNode:     joinResponse.Server.Host,
+	}
+	var service = edge.StartService{
+		StartOption: startOption,
+	}
+	if err := service.Start(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func prompt(networks []edge.VirtualNetworkResponse) (string, error) {
 	templates := &promptui.SelectTemplates{
 		Label:    "choose the network",
 		Active:   "\U0001F336 {{ .Name | cyan }}",
