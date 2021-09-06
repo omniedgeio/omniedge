@@ -19,6 +19,7 @@ var uploadCmd = &cobra.Command{
 
 		if err := loadAuthFile(); err != nil {
 			log.Errorf("%+v", err)
+			log.Error("Please try login first")
 			return
 		}
 		endpointUrl := edgecli.ConfigV.GetString(RestEndpointUrl)
@@ -28,6 +29,11 @@ var uploadCmd = &cobra.Command{
 		}
 
 		deviceID := viper.GetString(KeyDeviceUUID)
+		if deviceID == "" {
+			log.Errorf("Please run join first")
+			return
+		}
+
 		if err := loadScanResult(); err != nil {
 			log.Errorf("%+v", err)
 			return
@@ -51,11 +57,18 @@ var uploadCmd = &cobra.Command{
 			HttpOption: httpOption,
 		}
 		uploadOption := &edgecli.UploadOption{
+			IP:          viper.GetString(keyScanIP),
+			MacAddress:  viper.GetString(keyScanMacAddress),
+			SubnetMask:  viper.GetString(keyScanSubnetMask),
 			DeviceId:    deviceID,
 			ScanResults: scanResults,
 		}
-		uploadService.Upload(uploadOption)
-		log.Infof("Success to upload subnet")
+		err := uploadService.Upload(uploadOption)
+		if err == nil {
+			log.Infof("Success to upload subnet")
+		} else {
+			log.Fatalf("%+v", err)
+		}
 	},
 }
 

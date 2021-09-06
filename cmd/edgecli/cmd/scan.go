@@ -22,6 +22,11 @@ var scanCmd = &cobra.Command{
 			Cidr:    cidr,
 			Timeout: timeout,
 		}
+		var deviceNet *edgecli.DeviceNet
+		deviceNet, err = edgecli.GetCurrentDeviceNetStatus(cidr)
+		if err != nil {
+			log.Errorf("%+v", err)
+		}
 		var service = edgecli.ScanService{
 			ScanOption: scanOption,
 		}
@@ -31,6 +36,9 @@ var scanCmd = &cobra.Command{
 		if scanResult, err = service.Scan(&scanOption); err != nil {
 			log.Errorf("%+v", err)
 		}
+		viper.Set(keyScanIP, deviceNet.IP)
+		viper.Set(keyScanMacAddress, deviceNet.MacAddress)
+		viper.Set(keyScanSubnetMask, deviceNet.SubnetMask)
 		viper.Set(keyScanResult, scanResult)
 		log.Infof("scan result %+v", scanResult)
 		persistScanResult()

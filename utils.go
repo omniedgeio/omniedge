@@ -130,3 +130,44 @@ func GenerateRandomMac() (string, error) {
 	buf[0] &= 252
 	return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]), nil
 }
+
+type DeviceNet struct {
+	IP         string
+	MacAddress string
+	SubnetMask string
+}
+
+func GetCurrentDeviceNetStatus(cidrStr string) (*DeviceNet, error) {
+	netInterfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	cidr, err := ParseCIDR(cidrStr)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("Fail to parse cidr, %+v", err))
+	}
+	var ip, mac string
+	for _, netInterface := range netInterfaces {
+		addrs, _ := netInterface.Addrs()
+		for _, addr := range addrs {
+			tc, err := ParseCIDR(addr.String())
+			if err != nil {
+				continue
+			}
+			if cidr.Mask() == tc.Mask() {
+				ip = tc.Ip()
+				mac = netInterface.HardwareAddr.String()
+				break
+			}
+		}
+		if ip != "" || mac != "" {
+			break
+		}
+	}
+	return &DeviceNet{
+		IP:         ip,
+		MacAddress: mac,
+		SubnetMask: cidr.Mask(),
+	}, nil
+
+}

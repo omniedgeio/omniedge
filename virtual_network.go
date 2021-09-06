@@ -21,6 +21,9 @@ type JoinOption struct {
 }
 
 type UploadOption struct {
+	IP          string
+	MacAddress  string
+	SubnetMask  string
 	DeviceId    string
 	ScanResults []*ScanResult
 }
@@ -90,29 +93,34 @@ func (s *VirtualNetworkService) Join(opt *JoinOption) (*JoinVirtualNetworkRespon
 func (s *VirtualNetworkService) Upload(opt *UploadOption) error {
 	var url = fmt.Sprintf(s.BaseUrl+"/devices/%s/subnets", opt.DeviceId)
 	body := map[string]interface{}{
-		"ip":          "192.168.32.1",
-		"mac-addr":    "B8:27:EB:A8:DC:E3",
-		"subnet_mask": "255.255.255.0",
-		"devices":     nil,
+		"ip":          opt.IP,
+		"mac_addr":    opt.MacAddress,
+		"subnet_mask": opt.SubnetMask,
+		"devices":     make([]map[string]string, 0),
+	}
+	for _, scan := range opt.ScanResults {
+		if scan.MacAddress == "" {
+			continue
+		}
+		d := map[string]string{
+			"name":     scan.HostName,
+			"ip":       scan.IPv4,
+			"mac_addr": scan.MacAddress,
+		}
+		body["devices"] = append(body["devices"].([]map[string]string), d)
 	}
 	postBody, _ := json.Marshal(body)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Authorization", s.Token)
 	resp, _ := HandleCall(req)
-	log.Infof("Upload Subnet response %+v", resp)
-	//switch resp.(type) {
-	//case *SuccessResponse:
-	//	joinVNJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
-	//	joinVNResp := JoinVirtualNetworkResponse{}
-	//	if err := json.Unmarshal(joinVNJson, &joinVNResp); err != nil {
-	//		return nil, errors.New(fmt.Sprintf("Fail to unmarshal response's data ,err is %+v", err))
-	//	}
-	//	return &joinVNResp, nil
-	//case *ErrorResponse:
-	//	return nil, errors.New(fmt.Sprintf("Fail to join, error message: %s", resp.(*ErrorResponse).Message))
-	//default:
-	//	return nil, errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
-	//}
-	return nil
+	log.Tracef("Upload Subnet response %+v", resp)
+	switch resp.(type) {
+	case *SuccessResponse:
+		return nil
+	case *ErrorResponse:
+		return errors.New(fmt.Sprintf("Fail to join, error message: %s", resp.(*ErrorResponse).Message))
+	default:
+		return errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
+	}
 }

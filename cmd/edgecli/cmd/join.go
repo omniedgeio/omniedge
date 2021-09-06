@@ -87,6 +87,7 @@ var joinCmd = &cobra.Command{
 		// not persist cliVirtualNetworkId
 		viper.Set(cliVirtualNetworkId, "")
 		viper.Set(keyJoinVirtualNetwork, joinResp)
+		viper.Set(KeyDeviceUUID, deviceId)
 		persistAuthFile()
 		log.Infof("Success to join virtual network")
 		log.Infof("Start to connect omniedge")
