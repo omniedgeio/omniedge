@@ -12,5 +12,5 @@ generate-bindata:
 	GOOS=linux  go-bindata -pkg edgecli -o bindata.go ./config
 
 generate:
-	go generate ./...
+	GOOS=linux go generate ./...
 

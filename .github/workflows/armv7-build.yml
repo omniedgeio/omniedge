@@ -76,7 +76,7 @@ jobs:
 
       - name: run binfmt
         run: |
-          docker run --rm --privileged docker/binfmt:a7996909642ee92942dcd6cff44b9b95f08dad64
+          docker run --privileged --rm tonistiigi/binfmt --install all
 
       - name: run cli
         run: |
