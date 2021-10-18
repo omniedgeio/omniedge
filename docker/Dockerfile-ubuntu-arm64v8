@@ -1,19 +1,14 @@
-#ubuntu:16.04 linux/arm64/v8
-FROM ubuntu:16.04@sha256:e8eb681cb9e01f339e1d68a47bf6d08a876f875ecf68f263891770bdc3400485
+#golang:arm64v8
+FROM golang:buster@sha256:f60460ca6896db2269a4ec3fa25ddc0f3523706b2fae304b44693a7fd61fd5d5
 
 # install golang
 RUN apt update
 RUN apt -y install wget make git autoconf automake build-essential
-RUN wget https://golang.org/dl/go1.16.4.linux-arm64.tar.gz
-RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.4.linux-arm64.tar.gz
-
-RUN chmod +x /usr/local/go/bin/go
-ENV PATH "$PATH:/usr/local/go/bin"
-RUN go version
 
 WORKDIR /app
 
 COPY . .
 
-RUN make generate
-RUN make build
+ENV GOARCH=arm64
+RUN go generate ./...
+RUN go build -o out/omniedge cmd/edgecli/main.go

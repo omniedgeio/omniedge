@@ -1,4 +1,4 @@
-#ubuntu:16.04 linux/arm64/v8
+#golang:ppc64le
 FROM golang:buster@sha256:a1a70dddce2dfeea71e00c42b0255bef07da915f714a2d82b74040f97f060459
 
 # install golang
