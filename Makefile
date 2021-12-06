@@ -1,16 +1,18 @@
-generate:
-	go generate ./...
-
-build:
+build: go.sum generate
 	rm -rf ./out
-	GOOS=linux  go  build -o out/omniedge cmd/edgecli/main.go
+	GOOS=linux go build -o out/omniedge cmd/edgecli/main.go
 
-build-darwin:
+build-darwin: go.sum generate
 	rm -rf ./out
-	go  build -o out/omniedge cmd/edgecli/main.go
-
+	GOOS=darwin go build -o out/omniedge cmd/edgecli/main.go
 
 generate-bindata:
 	go get -u github.com/go-bindata/go-bindata/...
-	go-bindata -pkg edgecli -o bindata.go ./config
+	GOOS=linux  go-bindata -pkg omniedge -o bindata.go ./config
 
+generate:
+	go generate ./...
+
+go.sum: go.mod
+	@echo "--> Ensure dependencies have not been modified"
+	GO111MODULE=on go mod verify
