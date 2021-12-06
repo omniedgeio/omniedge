@@ -36,13 +36,15 @@ var scanCmd = &cobra.Command{
 		if scanResult, err = service.Scan(&scanOption); err != nil {
 			log.Errorf("%+v", err)
 		}
-		viper.Set(keyScanIP, deviceNet.IP)
-		viper.Set(keyScanMacAddress, deviceNet.MacAddress)
-		viper.Set(keyScanSubnetMask, deviceNet.SubnetMask)
-		viper.Set(keyScanResult, scanResult)
-		log.Infof("scan result %+v", scanResult)
-		persistScanResult()
-		log.Infof("Success to scan subnet")
+		if deviceNet != nil {
+			viper.Set(keyScanIP, deviceNet.IP)
+			viper.Set(keyScanMacAddress, deviceNet.MacAddress)
+			viper.Set(keyScanSubnetMask, deviceNet.SubnetMask)
+			viper.Set(keyScanResult, scanResult)
+			log.Infof("scan result %+v", scanResult)
+			persistScanResult()
+			log.Infof("Success to scan subnet")
+		}
 	},
 }
 
