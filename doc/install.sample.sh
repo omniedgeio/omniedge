@@ -24,6 +24,11 @@ download_and_verify() {
     setup_binary
 }
 
+output_usage(){
+    echo ""
+}
+
+
 # --- create temporary directory and cleanup when done ---
 setup_tmp() {
     TMP_DIR=$(mktemp -d -t omniedge-install.XXXXXXXXXX)
@@ -146,4 +151,5 @@ fatal() {
 {
     setup_env
     download_and_verify
+    output_usage
 }
