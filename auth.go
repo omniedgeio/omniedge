@@ -10,7 +10,8 @@ import (
 )
 
 type AuthResp struct {
-	Token string `json:"token"`
+	Token        string `json:"token"`
+	RefreshToken string `json:"refreshToken"`
 }
 
 type AuthMethod string

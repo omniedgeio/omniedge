@@ -18,8 +18,18 @@ import (
 	"strings"
 )
 
+var Env string
+
 func LoadClientConfig() {
-	data, _ := Asset("config/dev.yml")
+	var data []byte
+	switch Env {
+	case "dev":
+		data, _ = Asset("config/dev.yml")
+	case "prod":
+		data, _ = Asset("config/prod.yml")
+	default:
+		data, _ = Asset("config/dev.yml")
+	}
 	ConfigV.SetConfigType("yaml")
 	if err := ConfigV.ReadConfig(bytes.NewReader(data)); err != nil {
 		log.Fatalf("Fail to load client config, please cotact team omniedge")

@@ -78,7 +78,7 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
-var _configDevYml = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2a\x4a\x2d\x2e\xd1\x4d\xcd\x4b\x29\xc8\xcf\xcc\x2b\xd1\x2d\x2d\xca\xb1\x52\xc8\x28\x29\x29\x28\xb6\xd2\xd7\x4f\x49\x2d\xd3\xcb\xcf\xcd\xcb\x4c\x4d\x49\x4f\xd5\xcb\xcc\xd7\x4f\x2c\xc8\x04\x04\x00\x00\xff\xff\x0d\xcd\x6d\x58\x2e\x00\x00\x00")
+var _configDevYml = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\xd1\x0d\x80\x30\x08\x04\xd0\x55\x5c\x80\xf2\xdf\x6d\x9a\x70\xd1\x4b\x14\x48\x41\xe7\xf7\x6d\x54\x0b\xdc\x32\xe8\x2d\xef\xbe\xe7\x71\x75\x67\x4d\x55\xc3\x27\xcb\xc2\x59\x23\x1e\x27\xec\xc4\x60\xe8\x4a\xfe\x01\x00\x00\xff\xff\xc3\xc2\x98\x4a\x35\x00\x00\x00")
 
 func configDevYmlBytes() ([]byte, error) {
 	return bindataRead(
@@ -93,7 +93,7 @@ func configDevYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/dev.yml", size: 46, mode: os.FileMode(420), modTime: time.Unix(1627744942, 0)}
+	info := bindataFileInfo{name: "config/dev.yml", size: 53, mode: os.FileMode(420), modTime: time.Unix(1642084739, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -113,7 +113,7 @@ func configProdYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/prod.yml", size: 0, mode: os.FileMode(420), modTime: time.Unix(1616685625, 0)}
+	info := bindataFileInfo{name: "config/prod.yml", size: 0, mode: os.FileMode(420), modTime: time.Unix(1642085933, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
