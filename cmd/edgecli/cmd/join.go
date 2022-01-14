@@ -62,7 +62,7 @@ var joinCmd = &cobra.Command{
 				return
 			}
 			if cap(resp) == 1 {
-				vnId = resp[0].UUID
+				vnId = resp[0].ID
 			} else {
 				vnId, err = prompt(resp)
 				if err != nil {
@@ -154,7 +154,7 @@ func prompt(networks []edge.VirtualNetworkResponse) (string, error) {
 {{ "Name:" | faint }}	{{ .Name }}
 {{ "Cidr:" | faint }}	{{ .IPRange}}
 {{ "Role:" | faint }}	{{ .Role}}
-{{ "UUID:" | faint }}	{{ .UUID}}`,
+{{ "ID:" | faint }}	{{ .ID}}`,
 	}
 
 	searcher := func(input string, index int) bool {
@@ -179,7 +179,7 @@ func prompt(networks []edge.VirtualNetworkResponse) (string, error) {
 		return "", err
 	}
 	fmt.Printf("You choose number %d: %s\n", i+1, networks[i].Name)
-	return networks[i].UUID, nil
+	return networks[i].ID, nil
 }
 
 func init() {

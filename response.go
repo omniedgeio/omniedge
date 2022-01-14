@@ -70,7 +70,7 @@ type DeviceResponse struct {
 }
 
 type DeviceVirtualNetworkResponse struct {
-	UUID      string    `json:"uuid"`
+	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	VirtualIP string    `json:"virtual_ip"`
 	LastSeen  time.Time `json:"last_seen"`
@@ -78,7 +78,7 @@ type DeviceVirtualNetworkResponse struct {
 }
 
 type DeviceSubnetRouteResponse struct {
-	UUID       string                       `json:"uuid"`
+	ID         string                       `json:"id"`
 	IP         string                       `json:"ip"`
 	MacAddr    string                       `json:"mac_addr"`
 	SubnetMask string                       `json:"subnet_mask"`
@@ -86,7 +86,7 @@ type DeviceSubnetRouteResponse struct {
 }
 
 type SubnetRouteDeviceResponse struct {
-	UUID         string `json:"uuid"`
+	ID           string `json:"id"`
 	Name         string `json:"name"`
 	IP           string `json:"ip"`
 	MacAddr      string `json:"mac_addr"`
@@ -94,14 +94,14 @@ type SubnetRouteDeviceResponse struct {
 }
 
 type ServerResponse struct {
-	UUID    string `json:"uuid,omitempty"`
+	ID      string `json:"id,omitempty"`
 	Name    string `json:"name"`
 	Country string `json:"country"`
 	Host    string `json:"host,omitempty"`
 }
 
 type VirtualNetworkResponse struct {
-	UUID    string                          `json:"uuid"`
+	ID      string                          `json:"id"`
 	Name    string                          `json:"name"`
 	IPRange string                          `json:"ip_range"`
 	Role    int                             `json:"role"`
@@ -111,7 +111,7 @@ type VirtualNetworkResponse struct {
 }
 
 type VirtualNetworkDeviceResponse struct {
-	UUID      string    `json:"uuid"`
+	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	VirtualIP string    `json:"virtual_ip"`
 	LastSeen  time.Time `json:"last_seen"`
