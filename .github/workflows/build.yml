@@ -59,7 +59,7 @@ jobs:
           sudo -E apt-get install -y libssl-dev
           sudo -E apt-get install -y zip
           make generate
-          make build
+          BUILD_ENV=prod make build
           zip -j ./omniedgecli-${{ matrix.os }}.zip ./out/omniedge
 
       - name: Upload Release Asset

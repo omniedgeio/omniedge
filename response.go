@@ -54,7 +54,7 @@ type IdentityResponse struct {
 }
 
 type ProfileResponse struct {
-	UUID       string              `json:"uuid"`
+	ID         string              `json:"id"`
 	Name       string              `json:"name"`
 	Email      string              `json:"email"`
 	Picture    string              `json:"picture"`
@@ -62,7 +62,7 @@ type ProfileResponse struct {
 }
 
 type DeviceResponse struct {
-	UUID            string                          `json:"uuid"`
+	ID              string                          `json:"id"`
 	Name            string                          `json:"name"`
 	OS              string                          `json:"os"`
 	VirtualNetworks []*DeviceVirtualNetworkResponse `json:"virtual_networks,omitempty"`
@@ -104,7 +104,7 @@ type VirtualNetworkResponse struct {
 	UUID    string                          `json:"uuid"`
 	Name    string                          `json:"name"`
 	IPRange string                          `json:"ip_range"`
-	Role    string                          `json:"role"`
+	Role    int                             `json:"role"`
 	Server  *ServerResponse                 `json:"server,omitempty"`
 	Devices []*VirtualNetworkDeviceResponse `json:"devices,omitempty"`
 	Users   []*VirtualNetworkUserResponse   `json:"users,omitempty"`
@@ -138,7 +138,7 @@ type VirtualNetworkUserResponse struct {
 	UUID     string    `json:"uuid"`
 	Email    string    `json:"email"`
 	Name     string    `json:"name"`
-	Role     string    `json:"role,omitempty"`
+	Role     int       `json:"role,omitempty"`
 	JoinedAt time.Time `json:"joined_at,omitempty"`
 }
 

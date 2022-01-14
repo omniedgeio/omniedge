@@ -27,7 +27,7 @@ func (s *RegisterService) Register(opt *RegisterOption) (*DeviceResponse, error)
 	body = map[string]string{
 		"name":          opt.Name,
 		"hardware_uuid": opt.HardwareUUID,
-		"os":            opt.OS,
+		"platform":      opt.OS,
 	}
 	postBody, _ := json.Marshal(body)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))

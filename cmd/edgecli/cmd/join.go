@@ -42,10 +42,10 @@ var joinCmd = &cobra.Command{
 		} else {
 			device = &edge.DeviceResponse{
 				Name: deviceName,
-				UUID: deviceId,
+				ID:   deviceId,
 			}
 		}
-		deviceId = device.UUID
+		deviceId = device.ID
 
 		var service = edge.VirtualNetworkService{
 			HttpOption: httpOption,
