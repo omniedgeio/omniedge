@@ -119,7 +119,7 @@ func (s *VirtualNetworkService) Upload(opt *UploadOption) error {
 	case *SuccessResponse:
 		return nil
 	case *ErrorResponse:
-		return errors.New(fmt.Sprintf("Fail to join, error message: %s", resp.(*ErrorResponse).Message))
+		return errors.New(fmt.Sprintf("Fail to upload, error message: %s", resp.(*ErrorResponse).Message))
 	default:
 		return errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
 	}
