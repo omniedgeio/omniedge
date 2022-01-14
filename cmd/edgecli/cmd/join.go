@@ -23,7 +23,7 @@ var joinCmd = &cobra.Command{
 		}
 		endpointUrl := edge.ConfigV.GetString(RestEndpointUrl)
 		var vnId = viper.GetString(cliVirtualNetworkId)
-		var deviceId = viper.GetString(KeyDeviceUUID)
+		var deviceId = viper.GetString(keyDeviceUUID)
 		var deviceName = viper.GetString(keyDeviceName)
 
 		var device *edge.DeviceResponse
@@ -88,7 +88,7 @@ var joinCmd = &cobra.Command{
 		viper.Set(cliVirtualNetworkId, "")
 		// not to persist join response (for security issue)
 		//viper.Set(keyJoinVirtualNetwork, joinResp)
-		viper.Set(KeyDeviceUUID, deviceId)
+		viper.Set(keyDeviceUUID, deviceId)
 		persistAuthFile()
 		log.Infof("Success to join virtual network")
 		log.Infof("Start to connect omniedge")

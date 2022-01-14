@@ -36,7 +36,7 @@ func bindFlags(cmd *cobra.Command) {
 func loadAuthFile() error {
 	var authFile = viper.GetString(cliAuthConfigFile)
 	if authFile == "" {
-		authFile = authFileDefault
+		authFile = Option.AuthFileDefaultPath
 	}
 	handledAuthFile, err := edge.HandleFilePrefix(authFile)
 	if err != nil {
@@ -53,7 +53,7 @@ func loadAuthFile() error {
 func persistAuthFile() {
 	var authFile = viper.GetString(cliAuthConfigFile)
 	if authFile == "" {
-		authFile = authFileDefault
+		authFile = Option.AuthFileDefaultPath
 	}
 	handledAuthFile, err := edge.HandleFilePrefix(authFile)
 	if err != nil {
@@ -70,7 +70,7 @@ func persistAuthFile() {
 func loadScanResult() error {
 	var scanResult = viper.GetString(cliScanResult)
 	if scanResult == "" {
-		scanResult = scanResultDefault
+		scanResult = Option.ScanResultDefaultPath
 	}
 	handledScanResultFile, err := edge.HandleFilePrefix(scanResult)
 	if err != nil {
@@ -87,7 +87,7 @@ func loadScanResult() error {
 func persistScanResult() {
 	var scanResult = viper.GetString(cliScanResult)
 	if scanResult == "" {
-		scanResult = scanResultDefault
+		scanResult = Option.ScanResultDefaultPath
 	}
 	handledScanResultFile, err := edge.HandleFilePrefix(scanResult)
 	if err != nil {

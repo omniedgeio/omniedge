@@ -1,8 +1,16 @@
 package cmd
 
+type CliOption struct {
+	AuthFileDefaultPath   string
+	ScanResultDefaultPath string
+}
+
+var Option = CliOption{
+	AuthFileDefaultPath:   "~/.omniedge/auth.json",
+	ScanResultDefaultPath: "~/.omniedge/scan.json",
+}
+
 const (
-	authFileDefault   = "/root/.omniedge/auth.json"
-	scanResultDefault = "/root/.omniedge/scan.json"
 	cliUsername       = "username"
 	cliPassword       = "password"
 	cliSecretKey      = "secretKey"
@@ -32,7 +40,7 @@ var (
 	keyHostname          = "keyHostname"
 	keyDevice            = "device"
 	keyDeviceName        = "device.name"
-	KeyDeviceUUID        = "device.uuid"
+	keyDeviceUUID        = "device.uuid"
 
 	keyJoinVirtualNetwork              = "joinVirtualNetwork"
 	keyJoinVirtualNetworkCommunityName = "joinVirtualNetwork.community_name"

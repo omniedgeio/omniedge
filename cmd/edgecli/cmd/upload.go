@@ -28,7 +28,7 @@ var uploadCmd = &cobra.Command{
 			BaseUrl: endpointUrl,
 		}
 
-		deviceID := viper.GetString(KeyDeviceUUID)
+		deviceID := viper.GetString(keyDeviceUUID)
 		if deviceID == "" {
 			log.Errorf("Please run join first")
 			return

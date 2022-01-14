@@ -11,6 +11,7 @@ build-darwin: go.sum generate
 generate-bindata:
 	go get -u github.com/go-bindata/go-bindata/...
 	GOOS=linux  go-bindata -pkg edgecli -o bindata.go ./config
+	go mod tidy
 
 generate:
 	go generate ./...
