@@ -4,11 +4,19 @@ on:
   push:
     branches:
       - dev
+  workflow_dispatch:
+    inputs:
+      envName:
+        description: env of the action
+        default: dev
+        required: true
 
 jobs:
   create-release:
     name: create-release
     runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.envName || 'dev' }}
     outputs:
       release_tag: ${{ steps.assemble_artifact.outputs.release_tag }}
     steps:
@@ -18,11 +26,13 @@ jobs:
           TZ: Asia/Shanghai
         run: |
           time=$(date +%Y%m%d%H)
-          release_tag="$time-${GITHUB_REF#refs/heads/}"
+          release_tag="$time-${{ env.ENVIRONMENT }}"
           echo "::set-output name=release_tag::$release_tag"
 
   build:
     name: Build on ${{ matrix.os }}
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.envName || 'dev' }}
     strategy:
       matrix:
         os: [ ubuntu-20.04 ]
@@ -65,6 +75,8 @@ jobs:
           push: false
           load: true
           file: docker/Dockerfile-ubuntu-arm64v8
+          build-args: |
+            BUILD_ENV=${{ env.ENVIRONMENT }}
           tags: cli:0.1
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new

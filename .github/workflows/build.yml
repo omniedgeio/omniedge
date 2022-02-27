@@ -4,12 +4,19 @@ on:
   push:
     branches:
       - dev
-
+  workflow_dispatch:
+    inputs:
+      envName:
+        description: env of the action
+        default: dev
+        required: true
 
 jobs:
   create-release:
     name: create-release
     runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.envName || 'dev' }}
     outputs:
       release_tag: ${{ steps.assemble_artifact.outputs.release_tag }}
     steps:
@@ -19,11 +26,13 @@ jobs:
           TZ: Asia/Shanghai
         run: |
           time=$(date +%Y%m%d%H)
-          release_tag="$time-${GITHUB_REF#refs/heads/}"
+          release_tag="$time-${{ env.ENVIRONMENT }}"
           echo "::set-output name=release_tag::$release_tag"
 
   build:
     name: Build on ${{ matrix.os }}
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.envName || 'dev' }}
     strategy:
       matrix:
         os: [ ubuntu-18.04,ubuntu-20.04 ]
@@ -59,7 +68,7 @@ jobs:
           sudo -E apt-get install -y libssl-dev
           sudo -E apt-get install -y zip
           make generate
-          BUILD_ENV=prod make build
+          BUILD_ENV=${{ env.ENVIRONMENT }} make build
           zip -j ./omniedgecli-${{ matrix.os }}.zip ./out/omniedge
 
       - name: Upload Release Asset

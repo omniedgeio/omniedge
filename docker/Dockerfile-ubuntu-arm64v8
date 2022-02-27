@@ -8,7 +8,8 @@ RUN apt -y install wget make git autoconf automake build-essential
 WORKDIR /app
 
 COPY . .
+ARG BUILD_ENV
 
 ENV GOARCH=arm64
 RUN go generate ./...
-RUN BUILD_ENV=prod make build
+RUN BUILD_ENV=$BUILD_ENV make build
