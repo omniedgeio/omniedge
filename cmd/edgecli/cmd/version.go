@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -10,7 +11,7 @@ var versionCmd = &cobra.Command{
 	Aliases: []string{},
 	Short:   "",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Omniedge 0.2.1")
+		fmt.Println("Omniedge 0.2.2")
 		return nil
 	},
 }
