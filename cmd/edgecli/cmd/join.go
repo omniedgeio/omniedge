@@ -29,6 +29,28 @@ var joinCmd = &cobra.Command{
 		var device *edge.DeviceResponse
 		var err error
 
+		refreshToken := viper.GetString(keyAuthResponseRefreshToken)
+		if refreshToken != "" {
+			refreshTokenOption := &edge.RefreshTokenOption{
+				RefreshToken: refreshToken,
+			}
+			var refreshTokenHttpOption = edge.HttpOption{
+				BaseUrl: endpointUrl,
+			}
+			authService := edge.AuthService{
+				HttpOption: refreshTokenHttpOption,
+			}
+			if authResp, err := authService.Refresh(refreshTokenOption); err != nil {
+				log.Errorf("%+v", err)
+				return
+			} else {
+				viper.Set(keyAuthResponse, authResp)
+				log.Infof("%+v", authResp)
+				viper.Set(keyAuthResponseToken, authResp.Token)
+				viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
+			}
+		}
+
 		var httpOption = edge.HttpOption{
 			Token:   fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
 			BaseUrl: endpointUrl,

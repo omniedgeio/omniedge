@@ -46,7 +46,7 @@ type SubnetRouteDeviceRequest struct {
 }
 
 func (s *VirtualNetworkService) List() ([]VirtualNetworkResponse, error) {
-	var url = s.BaseUrl + "/virtual-networks"
+	var url = s.BaseUrl + "/virtual-networks/all/list"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Authorization", s.Token)
@@ -69,7 +69,7 @@ func (s *VirtualNetworkService) List() ([]VirtualNetworkResponse, error) {
 }
 
 func (s *VirtualNetworkService) Join(opt *JoinOption) (*JoinVirtualNetworkResponse, error) {
-	var url = fmt.Sprintf(s.BaseUrl+"/virtual-networks/%s/devices/%s/join", opt.VirtualNetworkId, opt.DeviceId)
+	var url = fmt.Sprintf(s.BaseUrl+"/virtual-networks/%s/devices/%s", opt.VirtualNetworkId, opt.DeviceId)
 	req, _ := http.NewRequest("POST", url, nil)
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Authorization", s.Token)

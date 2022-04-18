@@ -22,7 +22,7 @@ type RegisterService struct {
 func (s *RegisterService) Register(opt *RegisterOption) (*DeviceResponse, error) {
 	var url string
 	var body map[string]string
-	url = s.BaseUrl + "/devices/register"
+	url = s.BaseUrl + "/devices"
 
 	body = map[string]string{
 		"name":          opt.Name,

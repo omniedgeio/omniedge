@@ -34,13 +34,14 @@ const (
 )
 
 var (
-	keyAuthResponse      = "authresponse"
-	keyAuthResponseToken = "authresponse.token"
-	keyVirtualNetworks   = "virtualNetworks"
-	keyHostname          = "keyHostname"
-	keyDevice            = "device"
-	keyDeviceName        = "device.name"
-	keyDeviceUUID        = "device.uuid"
+	keyAuthResponse             = "authresponse"
+	keyAuthResponseToken        = "authresponse.token"
+	keyAuthResponseRefreshToken = "authresponse.refreshtoken"
+	keyVirtualNetworks          = "virtualNetworks"
+	keyHostname                 = "keyHostname"
+	keyDevice                   = "device"
+	keyDeviceName               = "device.name"
+	keyDeviceUUID               = "device.uuid"
 
 	keyJoinVirtualNetwork              = "joinVirtualNetwork"
 	keyJoinVirtualNetworkCommunityName = "joinVirtualNetwork.community_name"
