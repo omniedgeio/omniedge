@@ -11,7 +11,7 @@ var versionCmd = &cobra.Command{
 	Aliases: []string{},
 	Short:   "",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Omniedge 0.2.2")
+		fmt.Println("Omniedge 0.2.3")
 		return nil
 	},
 }
