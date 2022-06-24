@@ -3,10 +3,10 @@ package cmd
 import (
 	"fmt"
 	"github.com/mitchellh/mapstructure"
+	edgecli "github.com/omniedgeio/omniedge-cli"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	edgecli "gitlab.com/omniedge/omniedge-linux-saas-cli"
 )
 
 var uploadCmd = &cobra.Command{

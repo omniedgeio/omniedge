@@ -3,10 +3,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	edge "github.com/omniedgeio/omniedge-cli"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	edge "gitlab.com/omniedge/omniedge-linux-saas-cli"
 	"strings"
 )
 

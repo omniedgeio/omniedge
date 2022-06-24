@@ -1,9 +1,9 @@
 package main
 
 import (
+	edgecli "github.com/omniedgeio/omniedge-cli"
+	rootCmd "github.com/omniedgeio/omniedge-cli/cmd/edgecli/cmd"
 	log "github.com/sirupsen/logrus"
-	edgecli "gitlab.com/omniedge/omniedge-linux-saas-cli"
-	rootCmd "gitlab.com/omniedge/omniedge-linux-saas-cli/cmd/edgecli/cmd"
 	"os"
 	"os/user"
 )

@@ -2,8 +2,8 @@ package edgecli
 
 import (
 	"github.com/google/uuid"
+	omnin2n "github.com/omniedgeio/omniedge-cli/internal"
 	log "github.com/sirupsen/logrus"
-	omnin2n "gitlab.com/omniedge/omniedge-linux-saas-cli/internal"
 )
 
 type StartOption struct {
