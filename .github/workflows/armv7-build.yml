@@ -2,8 +2,8 @@ name: omniedge armv7 build
 
 on:
   push:
-    branches:
-      - dev
+    tags:
+      - "*"
   workflow_dispatch:
     inputs:
       envName:
@@ -25,9 +25,13 @@ jobs:
         env:
           TZ: Asia/Shanghai
         run: |
-          time=$(date +%Y%m%d%H)
-          release_tag="$time-${{ env.ENVIRONMENT }}"
-          echo "::set-output name=release_tag::$release_tag"
+          if [[ '${{ github.ref_type }}' == 'tag' ]]; then 
+            echo "::set-output name=release_tag::${{github.ref_name}}"
+          else
+            time=$(date +%Y%m%d%H)
+            release_tag="$time-${{ env.ENVIRONMENT }}"
+            echo "::set-output name=release_tag::$release_tag"
+          fi 
 
   build:
     name: Build on ${{ matrix.os }}
@@ -39,8 +43,31 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: create-release
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: |
+          echo ""
+
+      - name: setup env to prod if tag is not empty
+        if: ${{ github.ref_type == 'tag' }}
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+
+      - name: setup env if input env is not empty
+        if: ${{ github.event.inputs.env }}
+        run: |
+          echo "ENVIRONMENT=${{ github.event.inputs.env }}" >> $GITHUB_ENV
+
+      - name: Checkout without tag
+        if: ${{ !github.event.release.tag_name }}
+        uses: actions/checkout@master
+
+      - name: Checkout with tag
+        uses: actions/checkout@master
+        if: ${{ github.event.release.tag_name }}
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Show CPU Model and Free Space
         run: |
@@ -100,6 +127,14 @@ jobs:
         run: |
           zip -j ./omniedgecli-armv7.zip ./omniedge
 
+      - name: setup prerelease
+        run: |
+          if [[ '${{ github.ref_type }}' == 'tag' ]]; then
+            echo "PRE_RELEASE=false" >> $GITHUB_ENV
+          else
+            echo "PRE_RELEASE=true" >> $GITHUB_ENV
+          fi
+
       - name: Upload Release Asset
         id: upload-release-asset
         uses: svenstaro/upload-release-action@v2
@@ -109,4 +144,4 @@ jobs:
           asset_name: omniedgecli-armv7.zip
           overwrite: true
           tag: ${{ needs.create-release.outputs.release_tag }}
-
+          prerelease: ${{ env.PRE_RELEASE }}
