@@ -1,4 +1,4 @@
-# Omniedge-windows
+# Omniedge Cli
 
 OmniEdge CLi for macOS (Intel, M1/M2 MacBook), Linux Distributions, and ARM, Raspberry PI, Nvidia Jetson Embedded System. 
 
