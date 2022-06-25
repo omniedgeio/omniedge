@@ -101,4 +101,5 @@ Just visit https://omniedge.io/download and download the apps for your platform.
 6. `git push`
 
 # Contributors
-
+  
+@ivyxjc
