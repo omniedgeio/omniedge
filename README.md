@@ -42,3 +42,6 @@ Sign up an account via https://omniedge.io and download the apps for your platfo
 
 ![OmniEdgeComparison-5](https://user-images.githubusercontent.com/93888/175798777-3a44b163-ce68-463d-b236-5053eee06238.gif)
 
+----
+
+If you have more questions, feel free to [contact us](support@omniedge.io).
