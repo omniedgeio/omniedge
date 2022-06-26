@@ -1,8 +1,8 @@
 # OmniEdge
 
-OmniEdge Apps for Windows, macOS (Intel, M1/M2 MacBook), iOS, Android, Synology and Linux Distributions, and ARM, Raspberry PI, Nvidia JetSon Embedded System. 
+**Bring the intranet on the internet**
 
->Bring the intranet on the internet
+>Omniedge's Peer-to-Peer and Zero-Config Layer 2 VPN solutions are not only a great and affordable network solution for a small team but also for big companies with thousands of computers all around the world. What happens in intranet, stayin in intranet.
 
 <!-- [![Build Status]() -->
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0)
@@ -11,9 +11,13 @@ OmniEdge Apps for Windows, macOS (Intel, M1/M2 MacBook), iOS, Android, Synology 
 [💬 Twitter](https://twitter.com/omniedgeio)
 [😇 Discord](https://discord.gg/d4faRPYj)
 
-A cross-platform private network tool for developers.
+OmniEdge Apps for Windows, macOS (Intel, M1/M2 MacBook), iOS, Android, Synology and Linux Distributions, and ARM, Raspberry PI, Nvidia JetSon Embedded System. 
+
+![OmniEdge-clients](https://user-images.githubusercontent.com/93888/175798762-3437c322-643e-4df0-b6e6-0840fc9455c3.png)
 
 ## Install OmniEdge
+
+Sign up an account via https://omniedge.io and download the apps for your platform. 
 
 -   [Windows](https://omniedge.io/install/download/0.2.3/omniedge-setup-0.2.3.exe)
 -   [iOS & M1 Mac on App Store](https://apps.apple.com/us/app/omniedgenew/id1603005893)
@@ -23,10 +27,6 @@ A cross-platform private network tool for developers.
     curl https://omniedge.io/install/omniedge-install.sh | bash
     ```
 -   [Synology](https://omniedge.io/download/synology)
-
-## Protocol
-
-[n2n](https://github.com/ntop/n2n)
 
 ## Resources
 
@@ -38,14 +38,7 @@ A cross-platform private network tool for developers.
 - Dashboard: https://omniedge.io/docs/article/admin
 - [n2n](https://github.com/ntop/n2n)
 
+## The unique of OmniEdge
 
-## Contributing Guidelines
+![OmniEdgeComparison-5](https://user-images.githubusercontent.com/93888/175798777-3a44b163-ce68-463d-b236-5053eee06238.gif)
 
-Check the template into .github folder to report an issue or submit a PR: 
-1. ISSUE_TEMPLATE.md 
-2. PULL_REQUEST_TEMPLATE.md 
-
-## How to get started? 
-
-1. If you only need a convenient connectivity service 
-Just visit https://omniedge.io/download and download the apps for your platform. 
