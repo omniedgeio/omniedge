@@ -1,102 +1,114 @@
-name: omniedge amd64 compile
+name: omniedge docker cross build
 
 on:
-  push:
-    tags:
-      - "*"
   workflow_dispatch:
     inputs:
-      envName:
+      env:
         description: env of the action
-        default: dev
-        required: true
+        default: prod
+        required: false
+      tag:
+        description: tag ( if tag is not empty, env is always prod)
+        required: false
 
 jobs:
-  create-release:
-    name: create-release
-    runs-on: ubuntu-latest
-    env:
-      ENVIRONMENT: ${{ github.event.inputs.envName || 'dev' }}
-    outputs:
-      release_tag: ${{ steps.assemble_artifact.outputs.release_tag }}
-    steps:
-      - name: Assemble Artifact
-        id: assemble_artifact
-        env:
-          TZ: Asia/Shanghai
-        run: |
-          if [[ '${{ github.ref_type }}' == 'tag' ]]; then 
-            echo "::set-output name=release_tag::${{github.ref_name}}"
-          else
-            time=$(date +%Y%m%d%H)
-            release_tag="$time-${{ env.ENVIRONMENT }}"
-            echo "::set-output name=release_tag::$release_tag"
-          fi 
-
   build:
-    name: Build on ${{ matrix.os }}
+    name: Docker cross build
     env:
-      ENVIRONMENT: ${{ github.event.inputs.envName || 'dev' }}
+      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        os: [ ubuntu-18.04,ubuntu-20.04 ]
-    runs-on: ${{ matrix.os }}
-    needs: create-release
+        platform: [ arm64v8,armv7,ppc64le ]
+    runs-on: ubuntu-latest
     steps:
-      - name: Dump GitHub context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: |
-          echo ""
-
       - name: setup env to prod if tag is not empty
-        if: ${{ github.ref_type == 'tag' }}
+        if: ${{ env.TAG }}
         run: |
           echo "ENVIRONMENT=prod" >> $GITHUB_ENV
 
-      - name: setup env if input env is not empty
-        if: ${{ github.event.inputs.env }}
-        run: |
-          echo "ENVIRONMENT=${{ github.event.inputs.env }}" >> $GITHUB_ENV
-
       - name: Checkout without tag
-        if: ${{ !github.event.release.tag_name }}
+        if: ${{ !env.TAG }}
         uses: actions/checkout@master
 
       - name: Checkout with tag
         uses: actions/checkout@master
-        if: ${{ github.event.release.tag_name }}
+        if: ${{ env.TAG }}
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.TAG }}
 
       - name: Show CPU Model and Free Space
         run: |
           echo -e "Total CPU cores\t: $(nproc)"
           cat /proc/cpuinfo | grep 'model name'
           free -h
+
       - name: Show system info
         run: |
           echo -e "system info: $(uname -a)"
 
-      - name: setup golang
-        uses: actions/setup-go@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Cache
+        uses: actions/cache@v2
+        env:
+          cache-name: omniedge-saas-cli-${{ matrix.platform }}
         with:
-          go-version: '^1.13.1'
+          path: |
+            /tmp/.buildx-cache
+          key: ${{ matrix.os }}-build-${{ env.cache-name }}
+          restore-keys: |
+            ${{ matrix.os }}-build-${{ env.cache-name }}
 
-      - name: go mod download
+      - name: dockerx platform
         run: |
-          go mod download
+          case ${{ matrix.platform }} in
+            arm64v8)
+            echo "DOCKER_PLATFORM=linux/arm64" >> $GITHUB_ENV
+            ;;
+            armv7)
+            echo "DOCKER_PLATFORM=linux/arm/v7" >> $GITHUB_ENV
+            ;;
+            ppc64le)
+            echo "DOCKER_PLATFORM=linux/ppc64le" >> $GITHUB_ENV
+            ;;
+          esac
 
-      - name: make
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          platforms: ${{ env.DOCKER_PLATFORM }}
+          push: false
+          load: true
+          file: docker/Dockerfile-ubuntu-${{ matrix.platform }}
+          build-args: |
+            BUILD_ENV=${{ env.ENVIRONMENT }}
+          tags: cli:0.1
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+
+      - name: Move cache
         run: |
-          sudo -E apt-get -y update
-          sudo -E apt-get install -y openssl
-          sudo -E apt-get install -y build-essential
-          sudo -E apt-get install -y libssl-dev
-          sudo -E apt-get install -y zip
-          make generate
-          BUILD_ENV=${{ env.ENVIRONMENT }} make build
-          zip -j ./omniedgecli-${{ matrix.os }}.zip ./out/omniedge
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: run binfmt
+        run: |
+          docker run --privileged --rm tonistiigi/binfmt --install all
+
+      - name: run cli
+        run: |
+          docker run --name omniedge -t -d cli:0.1
+      - name: copy file
+        run: |
+          docker cp omniedge:/app/out/omniedge .
+      - name: zip
+        run: |
+          zip -j ./omniedgecli-${{ matrix.platform }}.zip ./omniedge
 
       - name: setup prerelease
         run: |
@@ -106,13 +118,10 @@ jobs:
             echo "PRE_RELEASE=true" >> $GITHUB_ENV
           fi
 
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: svenstaro/upload-release-action@v2
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ env.TAG }}
         with:
-          repo_token:  ${{ secrets.GIT_HUB_TOKEN }}
-          file: ./omniedgecli-${{ matrix.os }}.zip
-          asset_name: omniedgecli-${{ matrix.os }}.zip
-          overwrite: true
-          tag: ${{ needs.create-release.outputs.release_tag }}
-          prerelease: ${{ env.PRE_RELEASE }}
+          token: ${{ secrets.GIT_HUB_TOKEN}}
+          files: omniedgecli-${{ matrix.platform }}.zip
+          tag_name: ${{ env.TAG }}
