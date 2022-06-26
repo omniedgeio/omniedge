@@ -36,7 +36,7 @@ Sign up an account via https://omniedge.io and download the apps for your platfo
 - Compare: https://omniedge.io/docs/article/compare
 - Performance: https://omniedge.io/docs/article/performance
 - Dashboard: https://omniedge.io/docs/article/admin
-- [n2n](https://github.com/ntop/n2n)
+- Protocol: https://github.com/ntop/n2n
 
 ## The unique of OmniEdge
 
