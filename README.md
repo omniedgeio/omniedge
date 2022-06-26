@@ -2,7 +2,7 @@
 
 **Bring the intranet on the internet**
 
->Omniedge's Peer-to-Peer and Zero-Config Layer 2 VPN solutions are not only a great and affordable network solution for a small team but also for big companies with thousands of computers all around the world. What happens in intranet, stayin in intranet.
+>Omniedge's Peer-to-Peer and Zero-Config Layer 2 VPN solutions are not only a great and affordable network solution for a small team but also for big companies with thousands of computers all around the world. What happens in intranet, stays in in intranet.
 
 <!-- [![Build Status]() -->
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0)
@@ -13,7 +13,7 @@
 
 OmniEdge Apps for Windows, macOS (Intel, M1/M2 MacBook), iOS, Android, Synology and Linux Distributions, and ARM, Raspberry PI, Nvidia JetSon Embedded System. 
 
-![OmniEdge-clients](https://user-images.githubusercontent.com/93888/175798762-3437c322-643e-4df0-b6e6-0840fc9455c3.png)
+![OmniEdge-clients](OmniEdge-clients.png)
 
 ## Install OmniEdge
 
@@ -40,7 +40,7 @@ Sign up an account via https://omniedge.io and download the apps for your platfo
 
 ## The unique of OmniEdge
 
-![OmniEdgeComparison-5](https://user-images.githubusercontent.com/93888/175798777-3a44b163-ce68-463d-b236-5053eee06238.gif)
+![OmniEdgeComparison](OmniEdgeComparison.gif)
 
 ----
 
