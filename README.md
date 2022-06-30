@@ -1,8 +1,11 @@
 # OmniEdge 
 
-[【English】](README-ZH.md) [【中文】](README-ZH.md)
-
 **Bring intranet on the internet**
+
+[【English】](README-ZH.md) [【繁体中文】](README/README-zh-Hant.md) [【简体中文】](README/README-zh-Hans.md) 
+
+We need your help to translate this README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages) and [Docs](https://github.com/omniedgeio/docs) to your native language
+
 
 >Omniedge's Peer-to-Peer and Zero-Config Layer 2 VPN solutions are not only a great and affordable network solution for a small team but also for big companies with thousands of computers all around the world. What happens in intranet, stays in in intranet.
 

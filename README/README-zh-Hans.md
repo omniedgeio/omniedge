@@ -1,8 +1,11 @@
 # OmniEdge 
 
-[【中文】](README-ZH.md) [【English】](README-ZH.md)
-
 **因特网上的私有网络时代**
+
+[【简体中文】](README-zh-Hans.md)  [【繁体中文】](README-zh-Hant.md) [【English】](../README-ZH.md)
+
+我们需要您用您的语言翻译本 README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages) 和 [Docs](https://github.com/omniedgeio/docs) 。
+
 
 >OmniEdge 的端到端企业 VPN 解决方案，无需公网 IP，无需端口转发，无需反向代理，零配置，不仅适用于初创业团队、个人，也适用于需要弹性扩张，在世界各地拥有成千上万台电脑的大公司。局域网的事情，就要放在局域网。
 
