@@ -7,11 +7,11 @@
 <!-- [![Build Status]() -->
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0)
 
-[🤝 Website](https://omniedge.io)
-[💬 Twitter](https://twitter.com/omniedgeio)
-[😇 Discord](https://discord.gg/d4faRPYj)
+Chat with us: [🤝 Website](https://omniedge.io) [💬 Twitter](https://twitter.com/omniedgeio) [😇 Discord](https://discord.gg/d4faRPYj)
 
-OmniEdge Apps for Windows, macOS (Intel, M1/M2 MacBook), iOS, Android, Synology and Linux Distributions, and ARM, Raspberry PI, Nvidia JetSon Embedded System. 
+
+OmniEdge Apps source code for [Windows](https://github.com/omniedgeio/omniedge-windows), [macOS (Intel, M1/M2 MacBook)](https://github.com/omniedgeio/omniedge-macOS), [iOS](https://github.com/omniedgeio/omniedge-iOS), [Android](https://github.com/omniedgeio/omniedge-android), [Synology](https://github.com/omniedgeio/omniedge-synology) and [Linux Distributions, and ARM, Raspberry PI, Nvidia JetSon Embedded System](https://github.com/omniedgeio/omniedge-cli). 
+
 
 ![OmniEdge-clients](OmniEdge-clients.png)
 
