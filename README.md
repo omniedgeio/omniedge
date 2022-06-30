@@ -1,16 +1,24 @@
-# OmniEdge
+# OmniEdge 
 
-**Bring the intranet on the internet**
+[【English】](README-ZH.md) [【中文】](README-ZH.md)
+
+**Bring intranet on the internet**
 
 >Omniedge's Peer-to-Peer and Zero-Config Layer 2 VPN solutions are not only a great and affordable network solution for a small team but also for big companies with thousands of computers all around the world. What happens in intranet, stays in in intranet.
 
-<!-- [![Build Status]() -->
-[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0)
-
 Chat with us: [🤝 Website](https://omniedge.io) [💬 Twitter](https://twitter.com/omniedgeio) [😇 Discord](https://discord.gg/d4faRPYj)
 
+## Source Code
 
-OmniEdge Apps source code for [Windows](https://github.com/omniedgeio/omniedge-windows), [macOS (Intel, M1/M2 MacBook)](https://github.com/omniedgeio/omniedge-macOS), [iOS](https://github.com/omniedgeio/omniedge-iOS), [Android](https://github.com/omniedgeio/omniedge-android), [Synology](https://github.com/omniedgeio/omniedge-synology) and [Linux Distributions, and ARM, Raspberry PI, Nvidia JetSon Embedded System](https://github.com/omniedgeio/omniedge-cli). 
+- OmniEdge customize supernode：https://github.com/omniedgeio/docker-customize-supernode
+- OmniEdge Apps source code：
+    - [Windows](https://github.com/omniedgeio/omniedge-windows) 
+    - [macOS (Intel, M1/M2 MacBook)](https://github.com/omniedgeio/omniedge-macOS)
+    - [iOS](https://github.com/omniedgeio/omniedge-iOS) 
+    - [Android ](https://github.com/omniedgeio/omniedge-android)
+    - [Synology](https://github.com/omniedgeio/omniedge-synology)  
+    - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
+- Protocol：https://github.com/omniedgeio/n2n
 
 
 ![OmniEdge-clients](OmniEdge-clients.png)
@@ -44,4 +52,4 @@ Sign up an account via https://omniedge.io and download the apps for your platfo
 
 ----
 
-If you have more questions, feel free to [contact us](support@omniedge.io).
+If you have more questions, feel free to talk to us at [Discord](https://discord.gg/d4faRPYj).
