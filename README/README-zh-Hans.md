@@ -24,7 +24,7 @@ Chat with us: [🤝 网站](https://omniedge.io) [💬 Twitter](https://twitter.
 - 协议： https://github.com/omniedgeio/n2n
 
 
-![OmniEdge-clients](OmniEdge-clients.png)
+![OmniEdge-clients](../OmniEdge-clients.png)
 
 ## 安装 OmniEdge
 
@@ -42,7 +42,7 @@ Chat with us: [🤝 网站](https://omniedge.io) [💬 Twitter](https://twitter.
 
 ## OmniEdge的优势
 
-![OmniEdgeComparison](OmniEdgeComparison.gif)
+![OmniEdgeComparison](../OmniEdgeComparison.gif)
 
 ----
 
