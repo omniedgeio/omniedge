@@ -1,12 +1,15 @@
+**慶祝 OmniEdge 開源，我們推出了7天免費活動，從7月1號到7月7號，couponcode “opensource". 任何新用戶都可參與，免費時間一年，任何plan都可以。使用: https://omniedge.io**
+
 # OmniEdge 
 
 **因特網上的私有網路時代**
 
+>OmniEdge 的端到端企業 VPN 解決方案，無需公網 IP，無需端口轉發，無需反嚮代理，零配置，不僅適用於初創業團隊、個人，也適用於需要彈性擴張，在世界各地擁有成仟上萬臺電腦的大公司。局域網的事情，就要放在局域網。
+
+
 [【正體中文】](README-zh-Hant.md) [【簡體中文】](README-zh-Hans.md)  [【English】](README-ZH.md)
 
 我們需要您用您的語言翻譯本 README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages) 和 [Docs](https://github.com/omniedgeio/docs) 。
-
->OmniEdge 的端到端企業 VPN 解決方案，無需公網 IP，無需端口轉發，無需反嚮代理，零配置，不僅適用於初創業團隊、個人，也適用於需要彈性擴張，在世界各地擁有成仟上萬臺電腦的大公司。局域網的事情，就要放在局域網。
 
 Chat with us: [🤝 網站](https://omniedge.io) [💬 Twitter](https://twitter.com/omniedgeio) [😇 Discord](https://discord.gg/d4faRPYj)
 
