@@ -4,14 +4,11 @@ OmniEdge CLi for macOS (Intel, M1/M2 MacBook), Linux Distributions, and ARM, Ras
 
 >Bring the intranet on the internet
 
-<!-- [![Build Status]() -->
-[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0)
-
 [🤝 Website](https://omniedge.io)
 [💬 Twitter](https://twitter.com/omniedgeio)
 [😇 Discord](https://discord.gg/d4faRPYj)
 
-A cross-platform private network tool for developers.
+Main repo: https://github.com/omniedgeio/omniedge
 
 ## Install OmniEdge Cli
 
@@ -62,9 +59,6 @@ omniedge join
 omniedge join -n "virtual-network-id" 
 ```
 
-## Protocol
-
-[n2n](https://github.com/ntop/n2n)
 
 ## Resources
 
@@ -87,18 +81,6 @@ Check the tempalte into .github folder to report an issue or submit a PR:
 
 1. If you only need a convenient connectivity service 
 Just visit https://omniedge.io/download and download the apps for your platform. 
-
-# Compiler and debugger
-
-
-# Promoting updates
-
-1. Copy all required files to release/packages/<package-name>/data
-2. cd to release folder
-3. Re-create repo `repogen.exe --update -p packages -i com.omniedge-inc.omniedge-windows repository`
-4. Re-create installer `binarycreator.exe -c config\config.xml -p packages Omniedge.exe`
-5. cd to repository folder
-6. `git push`
 
 # Contributors
   
