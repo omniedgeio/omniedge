@@ -52,7 +52,7 @@ Sign up an account via https://omniedge.io and download the apps for your platfo
     - [Synology](https://github.com/omniedgeio/omniedge-synology)  
     - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
 - Protocol：https://github.com/omniedgeio/n2n
-- The OmniEdge Protocol : [OmniEdge Protocol](/OmniEdge-Protocol/README.md)
+- The OmniEdge Protocol : [OmniEdge protocol design](/omniedge-protocol/README.md)
 
 ----
 
