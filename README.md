@@ -4,7 +4,7 @@
 
 **Bring intranet on the internet**
 
-OmniEdge is an Open source p2p layer 2 VPN infrastructure, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet.
+OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet.
 
 [【English】](README-ZH.md) [【繁体中文】](README/README-zh-Hant.md) [【简体中文】](README/README-zh-Hans.md) 
 
