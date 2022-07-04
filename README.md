@@ -12,19 +12,6 @@ We need your help to translate this README, [OmniEdge Windows UI](https://github
 
 Chat with us: [🤝 Website](https://omniedge.io) [💬 Twitter](https://twitter.com/omniedgeio) [😇 Discord](https://discord.gg/d4faRPYj)
 
-## Source Code
-
-- OmniEdge customize supernode：https://github.com/omniedgeio/docker-customize-supernode
-- OmniEdge Apps source code：
-    - [Windows](https://github.com/omniedgeio/omniedge-windows) 
-    - [macOS (Intel, M1/M2 MacBook)](https://github.com/omniedgeio/omniedge-macOS)
-    - [iOS](https://github.com/omniedgeio/omniedge-iOS) 
-    - [Android ](https://github.com/omniedgeio/omniedge-android)
-    - [Synology](https://github.com/omniedgeio/omniedge-synology)  
-    - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
-- Protocol：https://github.com/omniedgeio/n2n
-
-
 ![OmniEdge-clients](OmniEdge-clients.png)
 
 ## Install OmniEdge
@@ -53,6 +40,19 @@ Sign up an account via https://omniedge.io and download the apps for your platfo
 ## The unique of OmniEdge
 
 ![OmniEdgeComparison](OmniEdgeComparison.gif)
+
+## The submodule Source Code links
+
+- OmniEdge customize supernode：https://github.com/omniedgeio/docker-customize-supernode
+- OmniEdge Apps source code：
+    - [Windows](https://github.com/omniedgeio/omniedge-windows) 
+    - [macOS (Intel, M1/M2 MacBook)](https://github.com/omniedgeio/omniedge-macOS)
+    - [iOS](https://github.com/omniedgeio/omniedge-iOS) 
+    - [Android ](https://github.com/omniedgeio/omniedge-android)
+    - [Synology](https://github.com/omniedgeio/omniedge-synology)  
+    - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
+- Protocol：https://github.com/omniedgeio/n2n
+- The OmniEdge Protocol : [OmniEdge Protocol](/OmniEdge-Protocol/README.md)
 
 ----
 
