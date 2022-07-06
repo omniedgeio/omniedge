@@ -6,6 +6,8 @@
 
 OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet.
 
+[How omniedge works](https://omniedge.io/docs/article/architecture)
+
 [【English】](README-ZH.md) [【繁体中文】](README/README-zh-Hant.md) [【简体中文】](README/README-zh-Hans.md) 
 
 We need your help to translate this README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages) and [Docs](https://github.com/omniedgeio/docs) to your native language
@@ -14,18 +16,34 @@ Chat with us: [🤝 Website](https://omniedge.io) [💬 Twitter](https://twitter
 
 ![OmniEdge-clients](OmniEdge-clients.png)
 
-## Install OmniEdge
+## Download OmniEdge Apps
 
 Sign up an account via https://omniedge.io and download the apps for your platform. 
-
--   [Windows](https://omniedge.io/install/download/0.2.3/omniedge-setup-0.2.3.exe)
--   [iOS & M1 Mac on App Store](https://apps.apple.com/us/app/omniedgenew/id1603005893)
--   [Android: OmniEdge.apk](https://omniedge.io/install/download/0.2.2/omniedge-release-v0.2.2.apk)
--   [CLi for macOS, Linux, Raspberry Pi, ARM and Nvidia Jetson](https://omniedge.io/install/download/0.2.3/omniedgecli-macos-latest.zip)
+-   [CLi for macOS, Linux](https://omniedge.io/install/download/0.2.3/omniedgecli-macos-latest.zip)
     ```bash
     curl https://omniedge.io/install/omniedge-install.sh | bash
     ```
+-   [Windows](https://omniedge.io/install/download/0.2.3/omniedge-setup-0.2.3.exe)
+-   [iOS & M1 Mac on App Store](https://apps.apple.com/us/app/omniedgenew/id1603005893)
+-   [Android: OmniEdge.apk](https://omniedge.io/install/download/0.2.2/omniedge-release-v0.2.2.apk)
 -   [Synology](https://omniedge.io/download/synology)
+
+## Free public supernode
+
+We offer public supernodes you are using for starter plans, allocated automatically by your registered IP address via GeoIP. You network may be slow if your IP location is different from your devices. But you can [use your own supernode](https://omniedge.io/docs/article/install/customize-supernode) with [pro & team plans](https://omniedge.io/pricing). 
+
+|Location|Cloud Vendor|Specification|Version|
+|--|--|--|--|
+|Hong Kong,CN|AWS| 2vCPUs / 1GB RAM|2.6-stable-omni|
+|Singapore,SG|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Tokyo,JP|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Oregon,US|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Ohio,US|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Mumbai,IN|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Sao Paulo,BR|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Frankfurt,DE|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Milan,IT|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Sydney,AU|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
 
 ## Resources
 

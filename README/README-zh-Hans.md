@@ -6,24 +6,13 @@
 
 >OmniEdge 的端到端企业 VPN 解决方案，无需公网 IP，无需端口转发，无需反向代理，零配置，不仅适用于初创业团队、个人，也适用于需要弹性扩张，在世界各地拥有成千上万台电脑的大公司。局域网的事情，就要放在局域网。
 
+[OmniEdge 如何工作](https://omniedge.io/docs/article/architecture)
+
 [【简体中文】](README-zh-Hans.md)  [【繁体中文】](README-zh-Hant.md) [【English】](../README-ZH.md)
 
 我们需要您用您的语言翻译本 README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages) 和 [Docs](https://github.com/omniedgeio/docs) 。
 
 Chat with us: [🤝 网站](https://omniedge.io) [💬 Twitter](https://twitter.com/omniedgeio) [😇 Discord](https://discord.gg/d4faRPYj)
-
-## 源代码
-
-- 自定义认证节点：https://github.com/omniedgeio/docker-customize-supernode
-- 客户端原代码: 
-    - [Windows](https://github.com/omniedgeio/omniedge-windows)
-    - [macOS (Intel, M1/M2 MacBook)](https://github.com/omniedgeio/omniedge-macOS)
-    - [iOS](https://github.com/omniedgeio/omniedge-iOS) 
-    - [Android 安卓](https://github.com/omniedgeio/omniedge-android)
-    - [群晖版本](https://github.com/omniedgeio/omniedge-synology)  
-    - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
-- 协议： https://github.com/omniedgeio/n2n
-
 
 ![OmniEdge-clients](../OmniEdge-clients.png)
 
@@ -40,10 +29,40 @@ Chat with us: [🤝 网站](https://omniedge.io) [💬 Twitter](https://twitter.
     ```
 -   [群晖](https://omniedge.io/download/synology)
 
+## 免费的公共超级节点
+
+我们提供免费的公共超级节点为免费用户使用，节点会随点用户注册时的IP地理位置自动分配。如果您注册的时候使用的IP地址与您的设备不同，p2p的连接可能会慢，您也可以使用[专业和团队]((https://omniedge.io/pricing))版本的[自定义超级节点]((https://omniedge.io/docs/article/install/customize-supernode) )，使用自建的超级节点，更快更安全 . 
+
+|位置|云服务商|配置|超级节点版本|
+|--|--|--|--|
+|Hong Kong,CN|AWS| 2vCPUs / 1GB RAM|2.6-stable-omni|
+|Singapore,SG|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Tokyo,JP|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Oregon,US|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Ohio,US|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Mumbai,IN|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Sao Paulo,BR|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Frankfurt,DE|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Milan,IT|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+|Sydney,AU|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
 
 ## OmniEdge的优势
 
 ![OmniEdgeComparison](../OmniEdgeComparison.gif)
+
+## 源代码
+
+- 自定义认证节点：https://github.com/omniedgeio/docker-customize-supernode
+- 客户端原代码: 
+    - [Windows](https://github.com/omniedgeio/omniedge-windows)
+    - [macOS (Intel, M1/M2 MacBook)](https://github.com/omniedgeio/omniedge-macOS)
+    - [iOS](https://github.com/omniedgeio/omniedge-iOS) 
+    - [Android 安卓](https://github.com/omniedgeio/omniedge-android)
+    - [群晖版本](https://github.com/omniedgeio/omniedge-synology)  
+    - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
+- 协议： https://github.com/omniedgeio/n2n
+
+
 
 ----
 
