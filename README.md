@@ -1,5 +1,3 @@
-**1Y free to celebrate opensource OmniEdge with Coupon "opensource", 7 days only from 1st, July 2022 to 7th, July 2022! First time users only ! Visit: https://omniedge.io**
-
 # OmniEdge 
 
 **Bring intranet on the internet**
@@ -45,16 +43,6 @@ We offer public supernodes you are using for starter plans, allocated automatica
 |Milan,IT|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
 |Sydney,AU|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
 
-## Resources
-
-- Architecture: https://omniedge.io/docs/article/architecture
-- Install: https://omniedge.io/docs/article/install
-- Cases: https://omniedge.io/docs/article/cases
-- Compare: https://omniedge.io/docs/article/compare
-- Performance: https://omniedge.io/docs/article/performance
-- Dashboard: https://omniedge.io/docs/article/admin
-- Protocol: https://github.com/ntop/n2n
-
 ## The unique of OmniEdge
 
 ![OmniEdgeComparison](OmniEdgeComparison.gif)
@@ -71,6 +59,19 @@ We offer public supernodes you are using for starter plans, allocated automatica
     - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
 - Protocol：https://github.com/omniedgeio/n2n
 - The OmniEdge Protocol : [OmniEdge protocol design](/omniedge-protocol/README.md)
+
+## Who are talking about us
+
+- [Founded by a Single Tweet Startup OmniEdge’s effort to let connect without concern](https://threat.technology/founded-by-a-single-tweet-startup-omniedges-effort-to-let-connect-without-concern/)
+- [voonze: OmniEdge, to access your Intranet from the Internet using P2P](https://voonze.com/omniedge-to-access-your-intranet-from-the-internet-using-p2p/)
+- [wwwhatsnew: OMNIEDGE, PARA ACCEDER A TU INTRANET DESDE INTERNET USANDO P2P](https://wwwhatsnew.com/2022/03/03/omniedge-para-acceder-a-tu-intranet-desde-internet-usando-p2p/)
+- [l'Entrepreneur: OmniEdge, pour accéder à votre Intranet depuis Internet en P2P](https://lentrepreneur.co/style/technologie/omniedge-pour-acceder-a-votre-intranet-depuis-internet-en-p2p-04032022)
+- [RunaCapital: Awesome OSS alternatives](https://github.com/RunaCapital/awesome-oss-alternatives)
+- [OmniEdge 虚拟组网工具使用及原理简介](https://einverne.github.io/post/2021/11/omniedge-usage.html)
+- [群晖新套件：OmniEdge 轻松连接任何平台上的所有设备](https://imnks.com/5768.html)
+- [发了一条消息，我创建了一个服务全球26个国家用户的开源项目](https://zhuanlan.zhihu.com/p/535614999)
+
+>feel free to tell us about any posts related us via issue or PR. 
 
 ----
 

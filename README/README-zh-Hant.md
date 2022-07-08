@@ -1,5 +1,3 @@
-**慶祝 OmniEdge 開源，我們推出了7天免費活動，從7月1號到7號。coupon code “opensource". 任何新用戶都可參與，免費時間一年，任何plan都可以。使用網站：https://omniedge.io**
-
 # OmniEdge 
 
 **因特網上的私有網路時代**
@@ -62,7 +60,18 @@ Chat with us: [🤝 網站](https://omniedge.io) [💬 Twitter](https://twitter.
     - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
 - 協議： https://github.com/omniedgeio/n2n
 
+## 誰在談論 OmniEdge
 
+- [Founded by a Single Tweet Startup OmniEdge’s effort to let connect without concern](https://threat.technology/founded-by-a-single-tweet-startup-omniedges-effort-to-let-connect-without-concern/)
+- [voonze: OmniEdge, to access your Intranet from the Internet using P2P](https://voonze.com/omniedge-to-access-your-intranet-from-the-internet-using-p2p/)
+- [wwwhatsnew: OMNIEDGE, PARA ACCEDER A TU INTRANET DESDE INTERNET USANDO P2P](https://wwwhatsnew.com/2022/03/03/omniedge-para-acceder-a-tu-intranet-desde-internet-usando-p2p/)
+- [l'Entrepreneur: OmniEdge, pour accéder à votre Intranet depuis Internet en P2P](https://lentrepreneur.co/style/technologie/omniedge-pour-acceder-a-votre-intranet-depuis-internet-en-p2p-04032022)
+- [RunaCapital: Awesome OSS alternatives](https://github.com/RunaCapital/awesome-oss-alternatives)
+- [OmniEdge 虛擬組網工具使用及原理簡介](https://einverne.github.io/post/2021/11/omniedge-usage.html)
+- [群暉新套件：OmniEdge 輕鬆連接任何平臺上的所有設備](https://imnks.com/5768.html)
+- [發了一條消息，我創建了一個服務全球26個國家用戶的開源項目](https://zhuanlan.zhihu.com/p/535614999)
+
+>如果您看到了任何有關於 OmniEdge 的文章，請給我們提PR或者發issue
 
 ----
 
