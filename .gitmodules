@@ -1,18 +1,24 @@
 [submodule "omniedge-android"]
 	path = omniedge-android
 	url = https://github.com/omniedgeio/omniedge-android.git
+	branch = main
 [submodule "omniedge-windows"]
 	path = omniedge-windows
 	url = https://github.com/omniedgeio/omniedge-windows.git
+	branch = main
 [submodule "omniedge-iOS"]
 	path = omniedge-iOS
 	url = https://github.com/omniedgeio/omniedge-iOS.git
+	branch = main
 [submodule "omniedge-macOS"]
 	path = omniedge-macOS
 	url = https://github.com/omniedgeio/omniedge-macOS.git
+	branch = main
 [submodule "omniedge-cli"]
 	path = omniedge-cli
 	url = https://github.com/omniedgeio/omniedge-cli.git
+	branch = master
 [submodule "docker-customize-supernode"]
 	path = docker-customize-supernode
 	url = https://github.com/omniedgeio/docker-customize-supernode.git
+	branch = main
