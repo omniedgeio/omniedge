@@ -2,13 +2,13 @@
 
 **因特网上的私有网络时代**
 
->OmniEdge 的端到端企业 VPN 解决方案，无需公网 IP，无需端口转发，无需反向代理，零配置，不仅适用于初创业团队、个人，也适用于需要弹性扩张，在世界各地拥有成千上万台电脑的大公司。局域网的事情，就要放在局域网。
-
-[OmniEdge 如何工作](https://omniedge.io/docs/article/architecture)
-
 [【简体中文】](README-zh-Hans.md)  [【繁体中文】](README-zh-Hant.md) [【English】](../README-ZH.md)
 
-我们需要您用您的语言翻译本 README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages) 和 [Docs](https://github.com/omniedgeio/docs) 。
+>OmniEdge 的端到端企业 VPN 解决方案，无需公网 IP，无需端口转发，无需反向代理，零配置，不仅适用于初创业团队、个人，也适用于需要弹性扩张，在世界各地拥有成千上万台电脑的大公司。局域网的事情，就要放在局域网。
+
+[【OmniEdge 如何工作】](https://omniedge.io/docs/article/architecture) [【下载】](#安装-omniedge) [【公共超级节点】](#免费的公共超级节点) [【编译】](#编译) [【优势】](#omniedge的优势) [【媒体】](#谁在谈论-omniedge)
+
+我们需要您用您的语言翻译本 README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages),[OmniEdge Android UI](https://github.com/omniedgeio/omniedge-android/tree/main/app/src/main/res/values) 和 [Docs](https://github.com/omniedgeio/docs) 。
 
 Chat with us: [🤝 网站](https://omniedge.io) [💬 Twitter](https://twitter.com/omniedgeio) [😇 Discord](https://discord.gg/d4faRPYj)
 
@@ -59,6 +59,47 @@ Chat with us: [🤝 网站](https://omniedge.io) [💬 Twitter](https://twitter.
     - [群晖版本](https://github.com/omniedgeio/omniedge-synology)  
     - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
 - 协议： https://github.com/omniedgeio/n2n
+
+## 编译
+
+### 编译 OmniEdge Cli
+
+1. 环境: Golang 1.16.6
+2. 依赖: 
+
+```bash
+#ubuntu/linux
+sudo -E apt-get -y update
+sudo -E apt-get install -y openssl
+sudo -E apt-get install -y build-essential
+sudo -E apt-get install -y libssl-dev
+sudo -E apt-get install -y zip
+```
+
+```bash
+#macOS
+brew install autoconf automake libtool
+```
+3. 编译
+
+```bash
+#ubuntu/linux
+cd omniedge-cli
+go mod download
+go generate
+BUILD_ENV=prod make build
+```
+
+```bash
+# MacOS
+cd omniedge-cli
+go mod download
+go generate
+BUILD_ENV=prod make build-darwin
+```
+
+编译好的文件可以在 **/out/** 找到。
+您也可以使用自带的 Github Workflow 自动化编译。
 
 ## 谁在谈论 OmniEdge
 

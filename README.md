@@ -2,13 +2,13 @@
 
 **Bring intranet on the internet**
 
-OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet.
-
-[How omniedge works](https://omniedge.io/docs/article/architecture)
-
 [【English】](README-ZH.md) [【繁体中文】](README/README-zh-Hant.md) [【简体中文】](README/README-zh-Hans.md) 
 
-We need your help to translate this README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages) and [Docs](https://github.com/omniedgeio/docs) to your native language
+OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet.
+
+[【How omniedge works】](https://omniedge.io/docs/article/architecture) [【Download】](#download-omniedge-apps) [【Public Supernode】](#free-public-supernode) [【Compile】](#compile) [【Unique](#the-unique-of-omniedge) [【Press】](#who-are-talking-about-us)
+
+We need your help to translate this README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages),[OmniEdge Android UI](https://github.com/omniedgeio/omniedge-android/tree/main/app/src/main/res/values) and [Docs](https://github.com/omniedgeio/docs) to your native language
 
 Chat with us: [🤝 Website](https://omniedge.io) [💬 Twitter](https://twitter.com/omniedgeio) [😇 Discord](https://discord.gg/d4faRPYj)
 
@@ -59,6 +59,50 @@ We offer public supernodes you are using for starter plans, allocated automatica
     - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
 - Protocol：https://github.com/omniedgeio/n2n
 - The OmniEdge Protocol : [OmniEdge protocol design](/omniedge-protocol/README.md)
+
+## Compile
+
+### OmniEdge Cli
+
+1. Environment: Golang 1.16.6
+2. Dependency: 
+
+```bash
+#ubuntu/linux
+sudo -E apt-get -y update
+sudo -E apt-get install -y openssl
+sudo -E apt-get install -y build-essential
+sudo -E apt-get install -y libssl-dev
+sudo -E apt-get install -y zip
+```
+
+```bash
+#macOS
+brew install autoconf automake libtool
+```
+3. Compile
+
+```bash
+#ubuntu/linux
+cd omniedge-cli
+go mod download
+go generate
+BUILD_ENV=prod make build
+```
+
+```bash
+# MacOS
+cd omniedge-cli
+go mod download
+go generate
+BUILD_ENV=prod make build-darwin
+```
+
+The compiled omniedge-cli will be found in **/out/**
+
+You can also use the workflow to compile automatically. 
+
+
 
 ## Who are talking about us
 
