@@ -6,7 +6,7 @@
 
 OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet.
 
-[【How omniedge works】](https://omniedge.io/docs/article/architecture) [【Download】](#download-omniedge-apps) [【Public Supernode】](#free-public-supernode) [【Compile】](#compile) [【Unique](#the-unique-of-omniedge) [【Press】](#who-are-talking-about-us)
+[【How omniedge works】](https://omniedge.io/docs/article/architecture) [【Download】](#download-omniedge-apps) [【Public Supernode】](#free-public-supernode) [Setup Customize Supernode](#setup-customize-supernode) [【Compile】](#compile) [【Unique](#the-unique-of-omniedge) [【Press】](#who-are-talking-about-us)
 
 We need your help to translate this README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages),[OmniEdge Android UI](https://github.com/omniedgeio/omniedge-android/tree/main/app/src/main/res/values) and [Docs](https://github.com/omniedgeio/docs) to your native language
 
@@ -42,6 +42,33 @@ We offer public supernodes you are using for starter plans, allocated automatica
 |Frankfurt,DE|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
 |Milan,IT|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
 |Sydney,AU|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
+
+## Setup customize supernode 
+
+OmniEdge offers customize supernode, You can setup your own Supernode server to increase security and speed for your Virtual Network, here you can setup a supernode server with docker.
+
+### Installation By run a command 
+
+```bash
+curl https://raw.githubusercontent.com/omniedgeio/docker-customize-supernode/main/install.sh | bash
+
+1) 2.6-stable-omni
+2) 3.0-stable
+3) Quit
+Please enter your choice: 1
+
+#Select 1 with 2.6-stable-omni for current version
+#Default port is 443
+
+```
+
+### Setting in the Omniedge Dashboard
+
+Login in your OmniEdge account, and setting in the dashboard with your own **Server IP** and **port**, the defualt port of this Dockerfile is **443**.
+
+![](Customizesupernode.png)
+
+**Attention: you have to re-login all omniedge clients after changing supernode**
 
 ## The unique of OmniEdge
 
