@@ -22,3 +22,6 @@
 	path = docker-customize-supernode
 	url = https://github.com/omniedgeio/docker-customize-supernode.git
 	branch = main
+[submodule "omniedge-synology"]
+	path = omniedge-synology
+	url = https://github.com/omniedgeio/omniedge-synology.git
