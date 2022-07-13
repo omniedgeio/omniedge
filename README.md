@@ -6,7 +6,7 @@
 
 OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet.
 
-[【How omniedge works】](https://omniedge.io/docs/article/architecture) [【Download】](#download-omniedge-apps) [【Public Supernode】](#free-public-supernode) [【Setup Customize Supernode】](#setup-customize-supernode) [【Compile】](#compile) [【Unique】](#the-unique-of-omniedge) [【Press】](#who-are-talking-about-us)
+[【How omniedge works】](https://omniedge.iohttps://omniedge.io/docs/article/architecture) [【Download】](#download-omniedge-apps) [【Public Supernode】](#free-public-supernode) [【Setup Customize Supernode】](#setup-customize-supernode) [【Compile】](#compile) [【Usage】](#usage) [【Use cases】](#use-cases) [【Compare】](#compare) [【Unique】](#the-unique-of-omniedge) [【Press】](#who-are-talking-about-us)
 
 We need your help to translate this README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages),[OmniEdge Android UI](https://github.com/omniedgeio/omniedge-android/tree/main/app/src/main/res/values) and [Docs](https://github.com/omniedgeio/docs) to your native language
 
@@ -28,7 +28,7 @@ Sign up an account via https://omniedge.io and download the apps for your platfo
 
 ## Free public supernode
 
-We offer public supernodes you are using for starter plans, allocated automatically by your registered IP address via GeoIP. You network may be slow if your IP location is different from your devices. But you can [use your own supernode](https://omniedge.io/docs/article/install/customize-supernode) with [pro & team plans](https://omniedge.io/pricing). 
+We offer public supernodes you are using for starter plans, allocated automatically by your registered IP address via GeoIP. You network may be slow if your IP location is different from your devices. But you can [use your own supernode](https://omniedge.iohttps://omniedge.io/docs/article/install/customize-supernode) with [pro & team plans](https://omniedge.io/pricing). 
 
 |Location|Cloud Vendor|Specification|Version|
 |--|--|--|--|
@@ -51,14 +51,16 @@ OmniEdge offers customize supernode, You can setup your own Supernode server to 
 
 ```bash
 curl https://raw.githubusercontent.com/omniedgeio/docker-customize-supernode/main/install.sh | bash
+```
 
-1) 2.6-stable-omni
-2) 3.0-stable
-3) Quit
-Please enter your choice: 1
 
-#Select 1 with 2.6-stable-omni for current version
-#Default port is 443
+>1) 2.6-stable-omni
+>2) 3.0-stable
+>3) Quit
+>
+>Please enter your choice: **1**
+
+**Select 1 with 2.6-stable-omni for current version, Default port is 443**
 
 ```
 
@@ -129,7 +131,35 @@ The compiled omniedge-cli will be found in **/out/**
 
 You can also use the workflow to compile automatically. 
 
+## Usage
 
+- [Virtual Network, Devices, Security Key, and Settings](https://omniedge.io/docs/article/admin)
+- [Windows 7,10,11 for Intel or Arm](https://omniedge.io/docs/article/Install/windows)
+- [Android](https://omniedge.io/docs/article/Install/android)
+- [Linux Cli for raspberry Pi, Nvidia Jeston,and more](https://omniedge.io/docs/article/Install/cli)
+- [MacOS Cli](https://omniedge.io/docs/article/Install/macoscli)
+- [Synology](https://omniedge.io/docs/article/Install/synology)
+- [iOS](https://omniedge.io/docs/article/Install/ios)
+- [Setup custom supernode](https://omniedge.io/docs/article/Install/customize-supernode)
+
+## Use Cases
+
+> Tell us your use-case, so we can share to others
+
+- [Remote connect windows without exposing public IP with Omniedge](https://omniedge.io/docs/article/Cases/RDP)
+- [Display and control macOS, Linux and Windows ](https://omniedge.io/docs/article/Cases/VNC)
+- [Keep connection with your AI based Project on Jetson](https://omniedge.io/docs/article/Cases/jetson)
+- [Display and control your Android device with Omniedge from anywhere on MacOS, Windows and Linux](https://omniedge.io/docs/article/Cases/android-remote)
+- [Talk to your family and share photos in a LAN on the internet](https://omniedge.io/docs/article/Cases/lan-messenger)
+- [Air Drop Any Files between MacOS, Windows, Routers, Linux and Android with Omniedge from anywhere](https://omniedge.io/docs/article/Cases/landrop)
+
+## Compare
+
+- [VPN vs. OmniEdge](https://omniedge.io/docs/article/compare/vpn-vs-omniedge)
+- [Express VPN vs. OmniEdge](https://omniedge.io/docs/article/compare/expressvpn-vs-omniedge)
+- [frp/ngrok vs. OmniEdge](https://omniedge.io/docs/article/compare/frp-ngrok-vs-omniedge)
+- [ZeroTier vs. OmniEdge](https://omniedge.io/docs/article/compare/zerotier-vs-omniedge)
+- [n2n vs. OmniEdge](https://omniedge.io/docs/article/compare/n2n-vs-omniedge)
 
 ## Who are talking about us
 

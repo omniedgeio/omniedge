@@ -6,7 +6,7 @@
 
 >OmniEdge 的端到端企业 VPN 解决方案，无需公网 IP，无需端口转发，无需反向代理，零配置，不仅适用于初创业团队、个人，也适用于需要弹性扩张，在世界各地拥有成千上万台电脑的大公司。局域网的事情，就要放在局域网。
 
-[【OmniEdge 如何工作】](https://omniedge.io/docs/article/architecture) [【下载】](#安装-omniedge) [【公共超级节点】](#免费的公共超级节点) [【自建超级节点】](#自建超级节点)[【编译】](#编译) [【优势】](#omniedge的优势) [【媒体】](#谁在谈论-omniedge)
+[【OmniEdge 如何工作】](https://omniedge.io/docs/article/architecture) [【下载】](#安装-omniedge) [【公共超级节点】](#免费的公共超级节点) [【自建超级节点】](#自建超级节点)[【编译】](#编译) [【使用】](#使用安装-omniedge) [【应用场景】](#应用场景)[【比较】](#比较) [【优势】](#omniedge的优势) [【媒体】](#谁在谈论-omniedge)
 
 我们需要您用您的语言翻译本 README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages),[OmniEdge Android UI](https://github.com/omniedgeio/omniedge-android/tree/main/app/src/main/res/values) 和 [Docs](https://github.com/omniedgeio/docs) 。
 
@@ -52,16 +52,17 @@ OmniEdge 可以让用户自建超级节点，使用自建的超级节点，可�
 
 ```bash
 curl https://raw.githubusercontent.com/omniedgeio/docker-customize-supernode/main/install.sh | bash
+```
 
-1) 2.6-stable-omni
-2) 3.0-stable
-3) Quit
-Please enter your choice: 1
+>1) 2.6-stable-omni
+>2) 3.0-stable
+>3) Quit
+
+>Please enter your choice: 1
 
 #请输入 1 选择 2.6-stable-omni，这是目前客户端支持的版本，3.0稍后推出
 #默认端口是 443，也可以选择其他端口，请确认服务器和端口的可用性。
 
-```
 
 ### 在 OmniEdge 的管理界面设置自建超级节点
 
@@ -127,6 +128,37 @@ BUILD_ENV=prod make build-darwin
 
 编译好的文件可以在 **/out/** 找到。
 您也可以使用自带的 Github Workflow 自动化编译。
+
+## 使用安装 OmniEdge
+
+- [Virtual Network, Devices, Security Key, and Settings](https://omniedge.io/docs/article/admin)
+- [Windows 7,10,11 for Intel or Arm](https://omniedge.io/docs/article/Install/windows)
+- [Android](https://omniedge.io/docs/article/Install/android)
+- [Linux Cli for raspberry Pi, Nvidia Jeston,and more](https://omniedge.io/docs/article/Install/cli)
+- [MacOS Cli](https://omniedge.io/docs/article/Install/macoscli)
+- [Synology](https://omniedge.io/docs/article/Install/synology)
+- [iOS](https://omniedge.io/docs/article/Install/ios)
+- [Setup custom supernode](https://omniedge.io/docs/article/Install/customize-supernode)
+
+## 应用场景
+
+> 如果您有以下没有列出的应用，欢迎提PR，分享给更多的人
+
+- [Remote connect windows without exposing public IP with Omniedge](https://omniedge.io/docs/article/Cases/RDP)
+- [Display and control macOS, Linux and Windows ](https://omniedge.io/docs/article/Cases/VNC)
+- [Keep connection with your AI based Project on Jetson](https://omniedge.io/docs/article/Cases/jetson)
+- [Display and control your Android device with Omniedge from anywhere on MacOS, Windows and Linux](https://omniedge.io/docs/article/Cases/android-remote)
+- [Talk to your family and share photos in a LAN on the internet](https://omniedge.io/docs/article/Cases/lan-messenger)
+- [Air Drop Any Files between MacOS, Windows, Routers, Linux and Android with Omniedge from anywhere](https://omniedge.io/docs/article/Cases/landrop)
+
+## 比较
+
+- [VPN vs. OmniEdge](https://omniedge.io/docs/article/compare/vpn-vs-omniedge)
+- [Express VPN vs. OmniEdge](https://omniedge.io/docs/article/compare/expressvpn-vs-omniedge)
+- [frp/ngrok vs. OmniEdge](https://omniedge.io/docs/article/compare/frp-ngrok-vs-omniedge)
+- [ZeroTier vs. OmniEdge](https://omniedge.io/docs/article/compare/zerotier-vs-omniedge)
+- [n2n vs. OmniEdge](https://omniedge.io/docs/article/compare/n2n-vs-omniedge)
+
 
 ## 谁在谈论 OmniEdge
 
