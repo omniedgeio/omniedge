@@ -16,15 +16,9 @@ Chat with us: [🤝 Website](https://omniedge.io) [💬 Twitter](https://twitter
 
 ## Download OmniEdge Apps
 
-Sign up an account via https://omniedge.io and download the apps for your platform. 
--   [CLi for macOS, Linux](https://omniedge.io/install/download/0.2.3/omniedgecli-macos-latest.zip)
-    ```bash
-    curl https://omniedge.io/install/omniedge-install.sh | bash
-    ```
--   [Windows](https://omniedge.io/install/download/0.2.3/omniedge-setup-0.2.3.exe)
--   [iOS & M1 Mac on App Store](https://apps.apple.com/us/app/omniedgenew/id1603005893)
--   [Android: OmniEdge.apk](https://omniedge.io/install/download/0.2.2/omniedge-release-v0.2.2.apk)
--   [Synology](https://omniedge.io/download/synology)
+- Sign up an account via https://omniedge.io and download the apps for your platform. 
+- [Download Binary](https://github.com/omniedgeio/omniedge/releases)
+
 
 ## Free public supernode
 

@@ -16,16 +16,8 @@ Chat with us: [🤝 网站](https://omniedge.io) [💬 Twitter](https://twitter.
 
 ## 安装 OmniEdge
 
-在官方网站 https://omniedge.io 注册账号，同时下载对应设备的客户端： 
-
--   [Windows](https://omniedge.io/install/download/0.2.3/omniedge-setup-0.2.3.exe)
--   [iOS & M1 Mac on App Store](https://apps.apple.com/us/app/omniedgenew/id1603005893)
--   [Android: OmniEdge.apk](https://omniedge.io/install/download/0.2.2/omniedge-release-v0.2.2.apk)
--   [CLi for macOS, Linux, Raspberry Pi, ARM and Nvidia Jetson](https://omniedge.io/install/download/0.2.3/omniedgecli-macos-latest.zip)
-    ```bash
-    curl https://omniedge.io/install/omniedge-install.sh | bash
-    ```
--   [群晖](https://omniedge.io/download/synology)
+- 在官方网站 https://omniedge.io 注册账号，同时下载对应设备的客户端。
+- [下载](https://github.com/omniedgeio/omniedge/releases)
 
 ## 免费的公共超级节点
 
