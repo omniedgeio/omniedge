@@ -67,7 +67,7 @@ jobs:
           sudo -E apt-get install -y zip
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
-          zip -j ./omniedgecli-${{ matrix.os }}.zip ./out/omniedge
+          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
 
       - name: make
         if: startsWith(matrix.os, 'macos')
@@ -75,7 +75,7 @@ jobs:
           brew install autoconf automake libtool
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin
-          zip -j ./omniedgecli-${{ matrix.os }}.zip ./out/omniedge
+          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
 
       - uses: actions/upload-artifact@v3
         with:
@@ -87,5 +87,5 @@ jobs:
         if: ${{ env.TAG }}
         with:
           token: ${{ secrets.GIT_HUB_TOKEN}}
-          files: omniedgecli-${{ matrix.os }}.zip
+          files: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
           tag_name: ${{ env.TAG }}
