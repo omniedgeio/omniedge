@@ -4,6 +4,8 @@
 
 [【English】](README.md) [【繁体中文】](README/README-zh-Hant.md) [【简体中文】](README/README-zh-Hans.md) 
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/I2I6DUGQY)
+
 OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet.
 
 [【How omniedge works】](https://omniedge.iohttps://omniedge.io/docs/article/architecture) [【Download】](#download-omniedge-apps) [【Public Supernode】](#free-public-supernode) [【Setup Customize Supernode】](#setup-customize-supernode) [【Compile】](#compile) [【Usage】](#usage) [【Use cases】](#use-cases) [【Compare】](#compare) [【Unique】](#the-unique-of-omniedge) [【Press】](#who-are-talking-about-us)
