@@ -86,37 +86,44 @@ Login in your OmniEdge account, and setting in the dashboard with your own **Ser
 ### OmniEdge Cli
 
 1. Environment: Golang 1.16.6
-2. Dependency: 
+2. Compile: 
+
+- 2.1. Ubuntu /linux
 
 ```bash
-#ubuntu/linux
 sudo -E apt-get -y update
 sudo -E apt-get install -y openssl
 sudo -E apt-get install -y build-essential
 sudo -E apt-get install -y libssl-dev
 sudo -E apt-get install -y zip
-```
-
-```bash
-#macOS
-brew install autoconf automake libtool
-```
-3. Compile
-
-```bash
-#ubuntu/linux
+git clone https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
 go generate
 BUILD_ENV=prod make build
 ```
 
+- 2.2. macOS
+
 ```bash
-# MacOS
+brew install autoconf automake libtool
+https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
 go generate
 BUILD_ENV=prod make build-darwin
+```
+
+- 2.3. freebsd
+
+```bash
+su
+pkg update && pkg install go gmake git openssl zip autoconf automake libtool
+https://github.com/omniedgeio/omniedge-cli
+cd omniedge-cli
+go mod download
+go generate
+BUILD_ENV=prod make build-freebsd
 ```
 
 The compiled omniedge-cli will be found in **/out/**

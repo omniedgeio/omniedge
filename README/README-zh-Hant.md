@@ -85,37 +85,45 @@ OmniEdge允許為不同的虛擬網路設定不同的超級節點。登入你的
 ### 編譯 OmniEdge Cli
 
 1. 環境: Golang 1.16.6
-2. 依賴: 
+2. 編譯: 
+
+- 2.1. Ubuntu /linux
 
 ```bash
-#ubuntu/linux
 sudo -E apt-get -y update
 sudo -E apt-get install -y openssl
 sudo -E apt-get install -y build-essential
 sudo -E apt-get install -y libssl-dev
 sudo -E apt-get install -y zip
-```
-
-```bash
-#macOS
-brew install autoconf automake libtool
-```
-3. 編譯
-
-```bash
-#ubuntu/linux
+git clone https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
 go generate
 BUILD_ENV=prod make build
 ```
 
+- 2.2. macOS
+
 ```bash
-# MacOS
+brew install autoconf automake libtool
+https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
 go generate
 BUILD_ENV=prod make build-darwin
+```
+
+- 2.3. freebsd
+
+```bash
+#freebsd
+su
+pkg update && pkg install go gmake git openssl zip autoconf automake libtool
+https://github.com/omniedgeio/omniedge-cli
+cd omniedge-cli
+go mod download
+go generate
+BUILD_ENV=prod make build-freebsd
 ```
 
 編譯好的文件可以在 **/out/** 找到。
