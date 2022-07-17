@@ -94,7 +94,7 @@ sudo -E apt-get install -y openssl
 sudo -E apt-get install -y build-essential
 sudo -E apt-get install -y libssl-dev
 sudo -E apt-get install -y zip
-git clone https://github.com/omniedgeio/omniedge-cli
+git clone git clone https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
 go generate
@@ -105,7 +105,7 @@ BUILD_ENV=prod make build
 
 ```bash
 brew install autoconf automake libtool
-https://github.com/omniedgeio/omniedge-cli
+git clone https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
 go generate

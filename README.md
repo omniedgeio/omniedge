@@ -109,7 +109,7 @@ BUILD_ENV=prod make build
 
 ```bash
 brew install autoconf automake libtool
-https://github.com/omniedgeio/omniedge-cli
+git clone https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
 go generate
@@ -121,7 +121,7 @@ BUILD_ENV=prod make build-darwin
 ```bash
 su
 pkg update && pkg install go gmake git openssl zip autoconf automake libtool
-https://github.com/omniedgeio/omniedge-cli
+git clone https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
 go generate
