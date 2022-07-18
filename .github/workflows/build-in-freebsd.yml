@@ -46,11 +46,9 @@ jobs:
         uses: vmactions/freebsd-vm@v0.1.8
         with:
           usesh: true
-          prepare: pkg install -y curl go gmake git openssl zip autoconf automake libtool
           run: |
-            git clone https://github.com/omniedgeio/omniedge-cli.git
-            cd omniedge-cli
-            go mod download
+            pkg update
+            pkg install -y curl go gmake git openssl zip autoconf automake libtool
             make generate
             BUILD_ENV=${{ env.ENVIRONMENT }} make build-freebsd
             zip -j ./omniedgecli-${{ github.ref_name }}-freebsd.zip ./out/omniedge
