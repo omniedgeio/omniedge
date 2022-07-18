@@ -48,6 +48,8 @@ jobs:
           usesh: true
           prepare: pkg install -y curl go gmake git openssl zip autoconf automake libtool
           run: |
+            git clone https://github.com/omniedgeio/omniedge-cli.git
+            cd omniedge-cli
             go mod download
             make generate
             BUILD_ENV=${{ env.ENVIRONMENT }} make build-freebsd
