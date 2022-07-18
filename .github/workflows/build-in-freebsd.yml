@@ -49,6 +49,7 @@ jobs:
           run: |
             pkg update
             pkg install -y curl go gmake git openssl zip autoconf automake libtool
+            git rm --cached -- internal/n2n
             make generate
             BUILD_ENV=${{ env.ENVIRONMENT }} make build-freebsd
             zip -j ./omniedgecli-${{ github.ref_name }}-freebsd.zip ./out/omniedge
