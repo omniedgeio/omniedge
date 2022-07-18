@@ -1,0 +1,67 @@
+name: omniedge freebsd build
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: env of the action
+        default: prod
+        required: false
+      tag:
+        description: tag ( if tag is not empty, env is always prod)
+        required: false
+jobs:
+  testfreebsd:
+    runs-on: macos-12
+    name: A job to run test FreeBSD
+    steps:
+      - name: setup env to prod if tag is not empty
+        if: ${{ env.TAG }}
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+      
+      - name: Checkout without tag
+        if: ${{ !env.TAG }}
+        uses: actions/checkout@master
+
+      - name: Checkout with tag
+        uses: actions/checkout@master
+        if: ${{ env.TAG }}
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Show CPU Model and Free Space
+        if: ${{ !matrix.os == 'macos-latest' }}
+        run: |
+          echo -e "Total CPU cores\t: $(nproc)"
+          cat /proc/cpuinfo | grep 'model name'
+          free -h
+      - name: Show system info
+        run: |
+          echo -e "system info: $(uname -a)"
+
+      - uses: actions/checkout@v2
+      - name: prepare
+        id: test
+        uses: vmactions/freebsd-vm@v0.1.8
+        with:
+          usesh: true
+          prepare: pkg install -y curl go gmake git openssl zip autoconf automake libtool
+          run: |
+            go mod download
+            make generate
+            BUILD_ENV=${{ env.ENVIRONMENT }} make build-freebsd
+            zip -j ./omniedgecli-${{ github.ref_name }}-freebsd.zip ./out/omniedge
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: my-artifact
+          path: ./out/omniedge
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ env.TAG }}
+        with:
+          token: ${{ secrets.GIT_HUB_TOKEN}}
+          files: omniedgecli-${{ github.ref_name }}-freebsd.zip
+          tag_name: ${{ env.TAG }}
