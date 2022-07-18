@@ -1,6 +1,6 @@
 package omnin2n
 
-//go:generate sh -c "rm -rf n2n; git clone https://github.com/omniedgeio/n2n.git; cp make_n2n n2n/; cd n2n; git checkout 2.6-stable-omni; ./autogen.sh; ./configure; ./make_n2n"
+//go:generate sh -c "rm -rf n2n; git clone https://github.com/omniedgeio/n2n.git; cp make_n2n n2n/; cd n2n; chmod +x make_n2n; git checkout 2.6-stable-omni; ./autogen.sh; ./configure; ./make_n2n"
 
 /*
 #cgo CFLAGS: -g3 -Wall
