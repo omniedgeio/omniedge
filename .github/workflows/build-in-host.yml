@@ -110,14 +110,19 @@ jobs:
           BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
 
+      - name: Copy out file from volume
+        run: |
+          sudo cp ./*.deb /home/
+          sudo cp ./*.rpm /home/
+
       - uses: actions/upload-artifact@v3
         if: startsWith(matrix.os, 'ubuntu')
         with:
           name: artifact-package
           path: |
-            ./*.deb
-            ./*.rpm
-            !./*-debuginfo-*.rpm
+            /home/*.deb
+            /home/*.rpm
+            !/home/*-debuginfo-*.rpm
 
       - uses: actions/upload-artifact@v3
         with:
@@ -139,7 +144,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: artifact-package  
-          
+
       - name: Download binary build
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/download-artifact@v3
