@@ -113,7 +113,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         if: startsWith(matrix.os, 'ubuntu')
         with:
-          name: artifact-ubuntu
+          name: artifact-package
           path: |
             ./*.deb
             ./*.rpm
@@ -138,12 +138,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/download-artifact@v3
         with:
-          name: deb  
-      - name: Download deb & from build
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/download-artifact@v3
-        with:
-          name: rpm
+          name: artifact-package  
+          
       - name: Download binary build
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/download-artifact@v3
