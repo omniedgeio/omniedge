@@ -144,10 +144,18 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/download-artifact@v3
         with:
-          name: |
-            deb  
-            rpm
-            binary
+          name: deb  
+      - name: Download deb & from build
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/download-artifact@v3
+        with:
+          name: rpm
+      - name: Download binary build
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/download-artifact@v3
+        with:
+          name: binary
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
