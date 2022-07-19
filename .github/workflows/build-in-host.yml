@@ -4,7 +4,11 @@ env:
   APP_NAME: 'OmniEdge'
   MAINTAINER: 'OmniEdge.io'
   DESC: 'Bring intranet on the internet'
+
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       env:
