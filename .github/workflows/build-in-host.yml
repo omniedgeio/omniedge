@@ -82,6 +82,7 @@ jobs:
           cp -p ./out/omniedge .rpmpkg/usr/bin/
 
       - uses: jiro4989/build-deb-action@v2
+        if: startsWith(matrix.os, 'ubuntu')
         with:
           package: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
           package_root: .debpkg
@@ -91,6 +92,7 @@ jobs:
           desc: '${{ env.DESC }}'
 
       - uses: jiro4989/build-rpm-action@v2
+        if: startsWith(matrix.os, 'ubuntu')
         with:
           summary: '${{ env.DESC }}'
           package: ${{ env.APP_NAME }}
@@ -109,14 +111,16 @@ jobs:
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
 
       - uses: actions/upload-artifact@v3
+        if: startsWith(matrix.os, 'ubuntu')
         with:
-          name: artifact-deb
+          name: my-artifact
           path: |
             ./*.deb
 
       - uses: actions/upload-artifact@v3
+        if: startsWith(matrix.os, 'ubuntu')
         with:
-          name: artifact-rpm
+          name: my-artifact
           path: |
             ./*.rpm
             !./*-debuginfo-*.rpm
