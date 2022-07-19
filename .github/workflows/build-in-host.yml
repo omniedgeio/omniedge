@@ -113,25 +113,24 @@ jobs:
       - uses: actions/upload-artifact@v3
         if: startsWith(matrix.os, 'ubuntu')
         with:
-          name: my-artifact
+          name: deb
           path: |
             ./*.deb
 
       - uses: actions/upload-artifact@v3
         if: startsWith(matrix.os, 'ubuntu')
         with:
-          name: my-artifact
+          name: rpm
           path: |
             ./*.rpm
             !./*-debuginfo-*.rpm
 
       - uses: actions/upload-artifact@v3
         with:
-          name: my-artifact
+          name: binary
           path: ./out/omniedge
 
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v1
         if: ${{ env.TAG }}
         with:
           token: ${{ secrets.GIT_HUB_TOKEN}}
@@ -140,3 +139,30 @@ jobs:
             ./*.deb
             ./*.rpm
           tag_name: ${{ env.TAG }}
+
+      - name: Download deb & from build
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/download-artifact@v3
+        with:
+          name: |
+            deb  
+            rpm
+            binary
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: OmniEdgecli-${{ github.ref }} 
+      - name: Upload Release 
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
+          asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
+          asset_content_type: application/zip
