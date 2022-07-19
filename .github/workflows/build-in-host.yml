@@ -1,5 +1,9 @@
 name: omniedge build in host machine
 
+env:
+  APP_NAME: 'OmniEdge'
+  MAINTAINER: 'OmniEdge.io'
+  DESC: 'Bring intranet on the internet'
 on:
   workflow_dispatch:
     inputs:
@@ -68,7 +72,30 @@ jobs:
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
+          mkdir -p .debpkg/usr/bin
+          mkdir -p .rpmpkg/usr/bin
+          cp -p ./out/omniedge .debpkg/usr/bin/
+          cp -p ./out/omniedge .rpmpkg/usr/bin/
 
+      - uses: jiro4989/build-deb-action@v2
+        with:
+          package: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
+          package_root: .debpkg
+          maintainer: ${{ env.MAINTAINER }}
+          version: ${{ github.ref }}
+          arch: 'amd64'
+          desc: '${{ env.DESC }}'
+
+      - uses: jiro4989/build-rpm-action@v2
+        with:
+          summary: '${{ env.DESC }}'
+          package: ${{ env.APP_NAME }}
+          package_root: .rpmpkg
+          maintainer: ${{ env.MAINTAINER }}
+          version: ${{ github.ref }}
+          arch: 'x86_64'
+          desc: '${{ env.DESC }}'
+              
       - name: make
         if: startsWith(matrix.os, 'macos')
         run: |
@@ -76,6 +103,19 @@ jobs:
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: artifact-deb
+          path: |
+            ./*.deb
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: artifact-rpm
+          path: |
+            ./*.rpm
+            !./*-debuginfo-*.rpm
 
       - uses: actions/upload-artifact@v3
         with:
@@ -87,5 +127,8 @@ jobs:
         if: ${{ env.TAG }}
         with:
           token: ${{ secrets.GIT_HUB_TOKEN}}
-          files: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
+          files: |
+            omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
+            ./*.deb
+            ./*.rpm
           tag_name: ${{ env.TAG }}
