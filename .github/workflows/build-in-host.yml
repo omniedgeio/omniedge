@@ -111,6 +111,7 @@ jobs:
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
 
       - name: Copy out file from volume
+        if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo cp ./*.deb /home/
           sudo cp ./*.rpm /home/
