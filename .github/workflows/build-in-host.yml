@@ -113,17 +113,17 @@ jobs:
       - name: Copy out file from volume
         if: startsWith(matrix.os, 'ubuntu')
         run: |
-          sudo cp ./*.deb /home/
-          sudo cp ./*.rpm /home/
+          sudo cp ./*.deb ./out/
+          sudo cp ./*.rpm ./out/
 
       - uses: actions/upload-artifact@v3
         if: startsWith(matrix.os, 'ubuntu')
         with:
           name: artifact-package
           path: |
-            /home/*.deb
-            /home/*.rpm
-            !/home/*-debuginfo-*.rpm
+            ./out/*.deb
+            ./out/*.rpm
+            !./out/*-debuginfo-*.rpm
 
       - uses: actions/upload-artifact@v3
         with:
