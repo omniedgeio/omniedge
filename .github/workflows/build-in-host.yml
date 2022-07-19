@@ -1,7 +1,7 @@
 name: omniedge build in host machine
 
 env:
-  APP_NAME: 'OmniEdge'
+  APP_NAME: 'omniedgecli'
   MAINTAINER: 'OmniEdge.io'
   DESC: 'Bring intranet on the internet'
 
@@ -84,7 +84,7 @@ jobs:
       - uses: jiro4989/build-deb-action@v2
         if: startsWith(matrix.os, 'ubuntu')
         with:
-          package: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
+          package: ${{ env.APP_NAME }}-${{ matrix.os }}
           package_root: .debpkg
           maintainer: ${{ env.MAINTAINER }}
           version: ${{ github.ref }}
@@ -95,7 +95,7 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu')
         with:
           summary: '${{ env.DESC }}'
-          package: ${{ env.APP_NAME }}
+          package: ${{ env.APP_NAME }}-${{ matrix.os }}
           package_root: .rpmpkg
           maintainer: ${{ env.MAINTAINER }}
           version: ${{ github.ref }}
@@ -113,15 +113,9 @@ jobs:
       - uses: actions/upload-artifact@v3
         if: startsWith(matrix.os, 'ubuntu')
         with:
-          name: deb
+          name: artifact-ubuntu
           path: |
             ./*.deb
-
-      - uses: actions/upload-artifact@v3
-        if: startsWith(matrix.os, 'ubuntu')
-        with:
-          name: rpm
-          path: |
             ./*.rpm
             !./*-debuginfo-*.rpm
 
@@ -136,8 +130,8 @@ jobs:
           token: ${{ secrets.GIT_HUB_TOKEN}}
           files: |
             omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
-            ./*.deb
-            ./*.rpm
+            *.deb
+            *.rpm
           tag_name: ${{ env.TAG }}
 
       - name: Download deb & from build
