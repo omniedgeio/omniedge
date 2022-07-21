@@ -109,6 +109,9 @@ jobs:
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
+          
+      - name: Create sha256 Checksums
+        run: sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
 
       - name: Copy out file from volume
         if: startsWith(matrix.os, 'ubuntu')
