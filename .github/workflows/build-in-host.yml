@@ -162,6 +162,7 @@ jobs:
           asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
           asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
           asset_content_type: application/zip
+          
       - name: Upload sha
         id: upload_release_sha
         uses: actions/upload-release-asset@v1.0.1
@@ -172,27 +173,19 @@ jobs:
           asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
           asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}.sha256
           asset_content_type: application/txt
-      
-    # - name: Upload deb
-      #   id: upload_release_deb
-      #   uses: actions/upload-release-asset@v1.0.1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
-      #     # omniedgecli-ubuntu-20.04_0.2.4_amd64.deb
-      #     asset_path: ./${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}_amd64.deb
-      #     asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}_amd64
-      #     asset_content_type: application/zip
-      # - name: Upload rpm
-      #   id: upload_release_rpm
-      #   uses: actions/upload-release-asset@v1.0.1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
-      #     # omniedgecli-ubuntu-20.04-0.2.4-1.el7.x86_64.rpm
-      #     asset_path: ./${{ env.APP_NAME }}-${{ github.ref_name }}-1.el7.x86_64.rpm
-      #     asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-1.el7.x86_64
-      #     asset_content_type: application/zip
-      
+          
+      - name: Create Release Draft
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          name: OmniEdgecli-${{ github.ref }} 
+          body: "TODO: Fill this changelog. Sorry for the inconvenience!"
+          draft: ${{ github.event.inputs.is-draft }}
+          prerelease: ${{ github.event.inputs.is-pre-release }}
+          files: |
+            ./*.sha256
+            ./*.deb
+            ./*.rpm
+            ./*.zip
