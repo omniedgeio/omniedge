@@ -8,7 +8,7 @@
 
 OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet.
 
-[【How omniedge works】](https://omniedge.iohttps://omniedge.io/docs/article/architecture) [【Download】](#download-omniedge-apps) [【Public Supernode】](#free-public-supernode) [【Setup Customize Supernode】](#setup-customize-supernode) [【Compile】](#compile) [【Usage】](#usage) [【Use cases】](#use-cases) [【Compare】](#compare) [【Unique】](#the-unique-of-omniedge) [【Press】](#who-are-talking-about-us)
+[【How omniedge works】](https://omniedge.iohttps://omniedge.io/docs/article/architecture) [【Download】](#download-omniedge-apps) [【Public Supernode】](#free-public-supernode) [【Setup Customize Supernode】](#setup-customize-supernode) [【Compile】](#compile) [【Usage】](#usage) [【Use cases】](#use-cases) [【Compare】](#compare) [【Unique】](#the-unique-of-omniedge) [【Press】](#who-are-talking-about-us) [【Figma Design Resource】](https://www.figma.com/file/2wuYjRDfOZwB6TAJpbxlL8/Omniedge-V2?node-id=608%3A619)
 
 We need your help to translate this README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages),[OmniEdge Android UI](https://github.com/omniedgeio/omniedge-android/tree/main/app/src/main/res/values) and [Docs](https://github.com/omniedgeio/docs) to your native language
 
