@@ -78,10 +78,11 @@ jobs:
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
-          mkdir -p .debpkg/usr/bin
-          mkdir -p .rpmpkg/usr/bin
-          cp -p ./out/omniedge .debpkg/usr/bin/
-          cp -p ./out/omniedge .rpmpkg/usr/bin/
+          mkdir -p ./.debpkg/usr/bin
+          mkdir -p ./.rpmpkg/usr/bin
+          cp -p ./out/omniedge ./.debpkg/usr/bin/
+          cp -p ./out/omniedge ./.rpmpkg/usr/bin/
+          
 
       - uses: jiro4989/build-deb-action@v2
         if: startsWith(matrix.os, 'ubuntu')
@@ -113,13 +114,16 @@ jobs:
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
           
       - name: Create sha256 Checksums
-        run: sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+        run: |
+          sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          
 
       - name: Copy out file from volume
         if: startsWith(matrix.os, 'ubuntu')
         run: |
-          sudo cp ./*.deb ./out/
-          sudo cp ./*.rpm ./out/
+          sudo cp ./*.deb ./
+          sudo cp ./*.rpm ./
 
       - uses: actions/upload-artifact@v3
         if: startsWith(matrix.os, 'ubuntu')
