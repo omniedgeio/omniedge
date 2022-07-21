@@ -118,21 +118,14 @@ jobs:
           sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
           cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
           
-
-      - name: Copy out file from volume
-        if: startsWith(matrix.os, 'ubuntu')
-        run: |
-          sudo cp ./*.deb ./
-          sudo cp ./*.rpm ./
-
       - uses: actions/upload-artifact@v3
         if: startsWith(matrix.os, 'ubuntu')
         with:
           name: artifact-package
           path: |
-            ./out/*.deb
-            ./out/*.rpm
-            !./out/*-debuginfo-*.rpm
+            ./*.deb
+            ./*.rpm
+            !./*-debuginfo-*.rpm
 
       - uses: actions/upload-artifact@v3
         with:
@@ -148,18 +141,6 @@ jobs:
             *.deb
             *.rpm
           tag_name: ${{ env.TAG }}
-
-      - name: Download deb & from build
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/download-artifact@v3
-        with:
-          name: artifact-package  
-
-      - name: Download binary build
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/download-artifact@v3
-        with:
-          name: binary
 
       - name: Create Release
         id: create_release
