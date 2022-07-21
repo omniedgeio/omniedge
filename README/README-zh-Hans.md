@@ -6,7 +6,7 @@
 
 >OmniEdge 的端到端企业 VPN 解决方案，无需公网 IP，无需端口转发，无需反向代理，零配置，不仅适用于初创业团队、个人，也适用于需要弹性扩张，在世界各地拥有成千上万台电脑的大公司。局域网的事情，就要放在局域网。
 
-[【OmniEdge 如何工作】](https://omniedge.io/docs/article/architecture) [【下载】](#安装-omniedge) [【公共超级节点】](#免费的公共超级节点) [【自建超级节点】](#自建超级节点)[【编译】](#编译) [【使用】](#使用安装-omniedge) [【应用场景】](#应用场景)[【比较】](#比较) [【优势】](#omniedge的优势) [【媒体】](#谁在谈论-omniedge)
+[【OmniEdge 如何工作】](https://omniedge.io/docs/article/architecture) [【下载】](#安装-omniedge) [【公共超级节点】](#免费的公共超级节点) [【自建超级节点】](#自建超级节点)[【编译】](#编译) [【使用】](#使用安装-omniedge) [【应用场景】](#应用场景)[【比较】](#比较) [【优势】](#omniedge的优势) [【媒体】](#谁在谈论-omniedge)  [【Figma 设计源文件】](https://www.figma.com/file/2wuYjRDfOZwB6TAJpbxlL8/Omniedge-V2?node-id=608%3A619)
 
 我们需要您用您的语言翻译本 README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages),[OmniEdge Android UI](https://github.com/omniedgeio/omniedge-android/tree/main/app/src/main/res/values) 和 [Docs](https://github.com/omniedgeio/docs) 。
 
