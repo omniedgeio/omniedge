@@ -150,13 +150,34 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: OmniEdgecli-${{ github.ref }} 
-      - name: Upload Release 
+      - name: Upload zip 
         id: upload_release_asset
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
+          asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
           asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
           asset_content_type: application/zip
+      - name: Upload deb
+        id: upload_release_deb
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.APP_NAME }}-${{ matrix.os }}-${{ github.ref }}.deb
+          asset_name: ${{ env.APP_NAME }}-${{ matrix.os }}-${{ github.ref }}
+          asset_content_type: application/zip
+      - name: Upload rpm
+        id: upload_release_rpm
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.APP_NAME }}-${{ matrix.os }}-${{ github.ref }}.rpm
+          asset_name: ${{ env.APP_NAME }}-${{ matrix.os }}-${{ github.ref }}
+          asset_content_type: application/zip
+      
