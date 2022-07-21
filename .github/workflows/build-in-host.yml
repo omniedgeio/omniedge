@@ -167,8 +167,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./*.deb
-          asset_name: ${{ env.APP_NAME }}-${{ matrix.os }}-${{ github.ref }}
+          # omniedgecli-ubuntu-20.04_0.2.4_amd64.deb
+          asset_path: ${{ env.APP_NAME }}-${{ github.ref }}_*.deb
+          asset_name: ${{ env.APP_NAME }}-${{ matrix.os }}_${{ github.ref }}_*
           asset_content_type: application/zip
       - name: Upload rpm
         id: upload_release_rpm
@@ -177,7 +178,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./*.rpm
-          asset_name: ${{ env.APP_NAME }}-${{ matrix.os }}-${{ github.ref }}
+          # omniedgecli-ubuntu-20.04-0.2.4-1.el7.x86_64.rpm
+          asset_path: ${{ env.APP_NAME }}-${{ github.ref }}_*.rpm
+          asset_name: ${{ env.APP_NAME }}-${{ matrix.os }}_${{ github.ref }}_*
           asset_content_type: application/zip
       
