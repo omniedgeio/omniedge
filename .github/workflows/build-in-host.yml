@@ -161,10 +161,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
           asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
           asset_content_type: application/zip
-      # - name: Upload deb
+      - name: Upload sha
+        id: upload_release_sha
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}.sha256
+          asset_content_type: application/txt
+      
+    # - name: Upload deb
       #   id: upload_release_deb
       #   uses: actions/upload-release-asset@v1.0.1
       #   env:
