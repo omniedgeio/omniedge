@@ -108,7 +108,7 @@ jobs:
       - name: make
         if: startsWith(matrix.os, 'macos')
         run: |
-          brew install autoconf automake libtool
+          brew install autoconf automake libtool coreutils
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
