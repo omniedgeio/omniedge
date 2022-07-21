@@ -167,7 +167,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.APP_NAME }}-${{ matrix.os }}-${{ github.ref }}.deb
+          asset_path: ./*.deb
           asset_name: ${{ env.APP_NAME }}-${{ matrix.os }}-${{ github.ref }}
           asset_content_type: application/zip
       - name: Upload rpm
@@ -177,7 +177,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.APP_NAME }}-${{ matrix.os }}-${{ github.ref }}.rpm
+          asset_path: ./*.rpm
           asset_name: ${{ env.APP_NAME }}-${{ matrix.os }}-${{ github.ref }}
           asset_content_type: application/zip
       
