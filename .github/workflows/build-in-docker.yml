@@ -19,7 +19,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        platform: [ arm64v8,armv7,ppc64le ]
+        platform: [ arm64v8,armv7,ppc64le,riscv ]
     runs-on: ubuntu-latest
     steps:
       - name: setup env to prod if tag is not empty
