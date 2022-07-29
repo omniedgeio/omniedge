@@ -67,10 +67,8 @@ jobs:
           sudo -E apt-get install -y g++-riscv64-linux-gnu 
           sudo -E apt-get install -y gcc-riscv64-linux-gnu
           go version
-          export GOARCH=riscv64
-          export CC=riscv64-linux-gnu-gcc
           make generate
-          BUILD_ENV=${{ env.ENVIRONMENT }} make build
+          BUILD_ENV=${{ env.ENVIRONMENT }} make build-riscv64
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
           cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
