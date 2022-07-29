@@ -69,7 +69,7 @@ jobs:
           go version
           make generate
           export GOARCH=riscv64
-	        export CC=riscv64-linux-gnu-gcc
+	  export CC=riscv64-linux-gnu-gcc
           BUILD_ENV=${{ env.ENVIRONMENT }} make build-riscv64
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
