@@ -125,6 +125,31 @@ go generate
 BUILD_ENV=prod make build-freebsd
 ```
 
+3. Cross Compile
+
+- 3.1 RISC-V 
+
+Host OS: Ubuntu 20.04
+
+```bash
+apt-get update
+apt-get install -y openssl autoconf build-essential libssl-dev zip wget g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+
+wget https://go.dev/dl/go1.18.4.linux-amd64.tar.gz
+rm -rf /usr/local/go && tar -C /usr/local -xzf go1.18.4.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+go version
+export GOOS=linux
+export GOARCH=riscv64
+export CGO_ENABLED=1
+export CC=riscv64-linux-gnu-gcc
+git clone https://github.com/omniedgeio/omniedge-cli.git
+cd omniedge-cli
+go mod download
+go generate
+BUILD_ENV=prod make build-riscv64
+```
+
 编译好的文件可以在 **/out/** 找到。
 您也可以使用自带的 Github Workflow 自动化编译。
 
