@@ -10,7 +10,6 @@ WORKDIR /
 RUN wget https://go.dev/dl/go1.18.4.linux-amd64.tar.gz
 RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.18.4.linux-amd64.tar.gz
 RUN export PATH=$PATH:/usr/local/go/bin
-RUN go version
 RUN export GOOS=linux
 RUN export GOARCH=riscv64
 RUN export CGO_ENABLED=1
