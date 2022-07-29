@@ -50,7 +50,7 @@ jobs:
       - name: setup golang
         uses: actions/setup-go@v2
         with:
-          go-version: '1.16.6'
+          go-version: '1.18.4'
 
       - name: go mod download
         run: |
@@ -66,8 +66,7 @@ jobs:
           sudo -E apt-get install -y autoconf
           sudo -E apt-get install -y g++-riscv64-linux-gnu 
           sudo -E apt-get install -y gcc-riscv64-linux-gnu
-          export GOOS=linux
-          export GOARCH=riscv64
+          go version
           export CC=riscv64-linux-gnu-gcc
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build-riscv64
