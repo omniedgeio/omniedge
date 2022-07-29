@@ -8,6 +8,11 @@ build-darwin: go.sum generate
 	rm -rf ./out
 	GOOS=darwin go build -ldflags "-X main.Env=${BUILD_ENV}" -o out/omniedge cmd/edgecli/main.go
 
+
+build-riscv64: go.sum generate
+	rm -rf ./out
+	GOOS=linux GOARCH=riscv64 go build -ldflags "-X main.Env=${BUILD_ENV}" -o out/omniedge cmd/edgecli/main.go
+
 build-freebsd: go.sum generate
 	rm -rf ./out
 	GOOS=freebsd go build -ldflags "-X main.Env=${BUILD_ENV}" -o out/omniedge cmd/edgecli/main.go

@@ -1,0 +1,136 @@
+name: omniedge build in host machine
+
+env:
+  APP_NAME: 'omniedgecli'
+  MAINTAINER: 'OmniEdge.io'
+  DESC: 'Bring intranet on the internet'
+
+on:
+  push:
+    branches:
+      - dev
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      env:
+        description: env of the action
+        default: prod
+        required: false
+      tag:
+        description: tag ( if tag is not empty, env is always prod)
+        required: false
+
+jobs:
+  build:
+    name: Build on ${{ matrix.platform }}
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      TAG: ${{ github.event.inputs.tag }}
+    strategy:
+      matrix:
+        platform: [ riscv64 ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: setup env to prod if tag is not empty
+        if: ${{ env.TAG }}
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+
+      - name: Checkout without tag
+        if: ${{ !env.TAG }}
+        uses: actions/checkout@master
+
+      - name: Checkout with tag
+        uses: actions/checkout@master
+        if: ${{ env.TAG }}
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: setup golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.16.6'
+
+      - name: go mod download
+        run: |
+          go mod download
+
+      - name: make
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y openssl
+          sudo -E apt-get install -y build-essential
+          sudo -E apt-get install -y libssl-dev
+          sudo -E apt-get install -y zip
+          sudo -E apt-get install -y autoconf
+          sudo -E apt-get install -y g++-riscv64-linux-gnu 
+          sudo -E apt-get install -y gcc-riscv64-linux-gnu
+          export GOOS=linux
+          export GOARCH=riscv64
+          export CC=riscv64-linux-gnu-gcc
+          make generate
+          BUILD_ENV=${{ env.ENVIRONMENT }} make build-riscv64
+          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
+          sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+          cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: binary
+          path: |
+            ./out/omniedge
+            ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+
+      - uses: softprops/action-gh-release@v1
+        if: ${{ env.TAG }}
+        with:
+          token: ${{ secrets.GIT_HUB_TOKEN}}
+          files: |
+            omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip
+            omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+          tag_name: ${{ env.TAG }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: OmniEdgecli-${{ github.ref }} 
+
+      - name: Upload zip 
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.platform }}
+          asset_content_type: application/zip
+          
+      - name: Upload sha
+        id: upload_release_sha
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+          asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.platform }}.sha256
+          asset_content_type: application/txt
+          
+      - name: Create Release Draft
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          name: OmniEdgecli-${{ github.ref }} 
+          body: "TODO: Fill this changelog. Sorry for the inconvenience!"
+          draft: ${{ github.event.inputs.is-draft }}
+          prerelease: ${{ github.event.inputs.is-pre-release }}
+          files: |
+            ./*.zip
