@@ -89,7 +89,7 @@ git clone https://github.com/yongqianme/omniedge-cli.git
 cd omniedge-cli
 go mod download
 go generate
-BUILD_ENV=prod make build
+BUILD_ENV=prod make build-riscv64
 ```
 
 
