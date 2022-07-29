@@ -1,0 +1,15 @@
+FROM golang:buster@sha256:f60460ca6896db2269a4ec3fa25ddc0f3523706b2fae304b44693a7fd61fd5d5
+
+# Install all needed packages
+RUN apt-get update && \
+apt-get install -y wget git autoconf automake openssl autoconf build-essential libssl-dev zip wget g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+
+WORKDIR /app
+
+COPY . .
+ARG BUILD_ENV
+
+ENV GOARCH=riscv64
+ENV CC=riscv64-linux-gnu-gcc
+RUN go generate ./...
+RUN BUILD_ENV=$BUILD_ENV make build-riscv64
