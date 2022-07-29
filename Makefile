@@ -9,10 +9,7 @@ build-darwin: go.sum generate
 	GOOS=darwin go build -ldflags "-X main.Env=${BUILD_ENV}" -o out/omniedge cmd/edgecli/main.go
 
 
-build-riscv64: 
-	export GOARCH=riscv64
-	export CC=riscv64-linux-gnu-gcc
-	go.sum generate
+build-riscv64: go.sum generate
 	rm -rf ./out
 	GOOS=linux go build -ldflags "-X main.Env=${BUILD_ENV}" -o out/omniedge cmd/edgecli/main.go
 
