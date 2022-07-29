@@ -71,6 +71,28 @@ omniedge join -n "virtual-network-id"
 - [n2n](https://github.com/ntop/n2n)
 
 
+## Compile for riscv64
+
+```bash
+apt-get update
+apt-get install -y openssl autoconf build-essential libssl-dev zip wget g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+
+wget https://go.dev/dl/go1.18.4.linux-amd64.tar.gz
+rm -rf /usr/local/go && tar -C /usr/local -xzf go1.18.4.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+go version
+export GOOS=linux
+export GOARCH=riscv64
+export CGO_ENABLED=1
+export CC=riscv64-linux-gnu-gcc
+git clone https://github.com/yongqianme/omniedge-cli.git
+cd omniedge-cli
+go mod download
+go generate
+BUILD_ENV=prod make build
+```
+
+
 ## Contributing Guildlines
 
 Check the tempalte into .github folder to report an issue or submit a PR: 
