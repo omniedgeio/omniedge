@@ -19,7 +19,26 @@ jobs:
         if: ${{ env.TAG }}
         run: |
           echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+          
+      - name: Checkout without tag
+        if: ${{ !env.TAG }}
+        uses: actions/checkout@master
 
+      - name: Checkout with tag
+        uses: actions/checkout@master
+        if: ${{ env.TAG }}
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Show CPU Model and Free Space
+        if: ${{ !matrix.os == 'macos-latest' }}
+        run: |
+          echo -e "Total CPU cores\t: $(nproc)"
+          cat /proc/cpuinfo | grep 'model name'
+          free -h
+      - name: Show system info
+        run: |
+          echo -e "system info: $(uname -a)"
       - uses: actions/checkout@v2
       - name: prepare
         id: test
@@ -27,8 +46,10 @@ jobs:
         with:
           usesh: true
           run: |
+            pkg update
             free -h
-            pkg install -y go gmake git openssl zip autoconf automake libtool
+            pkg install -y bash go gmake git openssl zip autoconf automake libtool
+            chsh -s bash
             make generate
             BUILD_ENV=${{ env.ENVIRONMENT }} make build-freebsd
             zip -j ./omniedgecli-${{ github.ref_name }}-freebsd.zip ./out/omniedge
