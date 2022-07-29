@@ -19,7 +19,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        platform: [ arm64v8,armv7,ppc64le,riscv64 ]
+        platform: [ arm64v8,armv7,ppc64le ]
     runs-on: ubuntu-latest
     steps:
       - name: setup env to prod if tag is not empty
@@ -74,9 +74,6 @@ jobs:
             ;;
             ppc64le)
             echo "DOCKER_PLATFORM=linux/ppc64le" >> $GITHUB_ENV
-            ;;
-            riscv64)
-            echo "DOCKER_PLATFORM=linux/riscv64" >> $GITHUB_ENV
             ;;
           esac
 
