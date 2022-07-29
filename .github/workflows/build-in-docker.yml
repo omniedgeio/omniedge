@@ -75,7 +75,7 @@ jobs:
             ppc64le)
             echo "DOCKER_PLATFORM=linux/ppc64le" >> $GITHUB_ENV
             ;;
-            riscv)
+            riscv64)
             echo "DOCKER_PLATFORM=linux/riscv64" >> $GITHUB_ENV
             ;;
           esac
