@@ -40,7 +40,7 @@
 [【English】](../README.md) [【繁体中文】](README-zh-Hant.md) [【简体中文】](README-zh-Hans.md) [【日本语】](README-JP.md) [【Español】](README-ES.md) [【Italiano】](README-IT.md) [【한국어】](README-KR.md) 
 [【العربي】](README-AR.md) [【Tiếng Việt】](README-VN.md) [【แบบไทย】](README-TH.md)
 
-OmniEdge là cơ sở hạ tầng VPN lớp 2 p2p mã nguồn mở dựa trên giao thức [n2n] (https://github.com/ntop/n2n), một giải pháp thay thế VPN truyền thống. Không có máy chủ trung tâm, dễ mở rộng quy mô với ít bảo trì hơn. Điều gì xảy ra trong mạng nội bộ, vẫn ở trong mạng nội bộ.
+OmniEdge là cơ sở hạ tầng VPN lớp 2 p2p mã nguồn mở dựa trên giao thức [n2n](https://github.com/ntop/n2n), một giải pháp thay thế VPN truyền thống. Không có máy chủ trung tâm, dễ mở rộng quy mô với ít bảo trì hơn. Điều gì xảy ra trong mạng nội bộ, vẫn ở trong mạng nội bộ.
    
 ![OmniEdge-clients](../OmniEdge-clients.png)
 

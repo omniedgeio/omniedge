@@ -40,7 +40,7 @@
 [【English】](../README.md) [【繁体中文】](README-zh-Hant.md) [【简体中文】](README-zh-Hans.md) [【日本语】](README-JP.md) [【Español】](README-ES.md) [【Italiano】](README-IT.md) [【한국어】](README-KR.md) 
 [【العربي】](README-AR.md) [【Tiếng Việt】](README-VN.md) [【แบบไทย】](README-TH.md)
 
-OmniEdge عبارة عن بنية أساسية لشبكة VPN من الطبقة الثانية من p2p مفتوحة المصدر تعتمد على بروتوكول [n2n] (https://github.com/ntop/n2n) ، وهو بديل تقليدي للشبكات الظاهرية الخاصة. لا يوجد خادم مركزي ، سهل القياس مع صيانة أقل. ما يحدث في الإنترانت ، يبقى في الإنترانت.
+OmniEdge عبارة عن بنية أساسية لشبكة VPN من الطبقة الثانية من p2p مفتوحة المصدر تعتمد على بروتوكول [n2n](https://github.com/ntop/n2n) ، وهو بديل تقليدي للشبكات الظاهرية الخاصة. لا يوجد خادم مركزي ، سهل القياس مع صيانة أقل. ما يحدث في الإنترانت ، يبقى في الإنترانت.
    
 ![OmniEdge-clients](../OmniEdge-clients.png)
 
