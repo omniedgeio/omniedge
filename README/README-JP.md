@@ -56,7 +56,7 @@ OmniEdgeは、従来のVPNの代替手段である[n2n]（https://github.com/nto
 |セルフホストスーパーノード|暗号化接続リレー|iPad、Androidタブレット、AndroidTV用のタブレットアプリ|
 |仮想ネットワークの共有|ハイブリッドクラウドのサポート|Synology用のNASアプリ|
 |セキュリティキー| Zero-Config|自動パブリックスーパーノード割り当て|
-| [リモートデバイス制御]（https://omniedge.io/docs/article/Cases/VNC）| [ファイルをリモートでドロップ]（https://omniedge.io/docs/article/Cases/landrop）|自動IP割り当て |
+| [リモートデバイス制御](https://omniedge.io/docs/article/Cases/VNC)| [ファイルをリモートでドロップ](https://omniedge.io/docs/article/Cases/landrop)|自動IP割り当て |
 
 
 その他の機能については、エンタープライズ向けの[価格設定]（https://omniedge.io/pricing）ページをご覧ください。
