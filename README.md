@@ -1,87 +1,62 @@
-# OmniEdge 
+<p align="center">
+<h1 align="center"> OmniEdge </h1>
+<p align="center">What happens in intranet, stays in intranet.</p>
+</p>
 
-**Bring intranet on the internet**
+<p align="center">
+<a href="https://omniedge.io">
+<img alt="Website" src="https://img.shields.io/website?label=omniedge.io&url=https%3A%2F%2Fomniedge.io">
+</a>
+<a href="https://github.com/omniedgeio/omniedge">
+<img src="https://img.shields.io/github/license/omniedgeio/omniedge">
+</a>
+<a href="https://github.com/omniedgeio/omniedge">
+<img src="https://img.shields.io/github/downloads/omniedgeio/app-release/total">
+</a>
+
+<a href="https://twitter.com/intent/follow?screen_name=omniedgeio">
+<img src="https://img.shields.io/twitter/follow/omniedgeio?label=follows&style=social" />
+</a>
+  <a href="https://github.com/omniedgeio/omniedge-cli">
+    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-cli" />
+  </a> 
+    <a href="https://github.com/omniedgeio/omniedge-iOS">
+    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-iOS" />
+  </a>
+      <a href="https://github.com/omniedgeio/omniedge-macOS">
+    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-macOS" />
+  </a> 
+      <a href="https://github.com/omniedgeio/omniedge-windows">
+    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-windows" />
+  </a> 
+        <a href="https://github.com/omniedgeio/omniedge-android">
+<img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-android"
+</a>
+          <a href="https://github.com/omniedgeio/omniedge-synology">
+    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-synology" />
+  </a> 
+</p>
 
 [【English】](README.md) [【繁体中文】](README/README-zh-Hant.md) [【简体中文】](README/README-zh-Hans.md) 
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/I2I6DUGQY)
 
-OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet.
-
-[【How omniedge works】](https://omniedge.iohttps://omniedge.io/docs/article/architecture) [【Download】](#download-omniedge-apps) [【Public Supernode】](#free-public-supernode) [【Setup Customize Supernode】](#setup-customize-supernode) [【Compile】](#compile) [【Usage】](#usage) [【Use cases】](#use-cases) [【Compare】](#compare) [【Unique】](#the-unique-of-omniedge) [【Press】](#who-are-talking-about-us) [【Figma Design Resource】](https://www.figma.com/file/2wuYjRDfOZwB6TAJpbxlL8/Omniedge-V2?node-id=608%3A619)
-
-We need your help to translate this README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages),[OmniEdge Android UI](https://github.com/omniedgeio/omniedge-android/tree/main/app/src/main/res/values) and [Docs](https://github.com/omniedgeio/docs) to your native language
-
-Chat with us: [🤝 Website](https://omniedge.io) [💬 Twitter](https://twitter.com/omniedgeio) [😇 Discord](https://discord.gg/d4faRPYj)
-
+OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet. 
+   
 ![OmniEdge-clients](OmniEdge-clients.png)
 
-## Download OmniEdge Apps
+## Get Started in 5 minutes 
 
-- Sign up an account via https://omniedge.io and download the apps for your platform. 
-- [Download Binary](https://github.com/omniedgeio/omniedge/releases)
-
-
-## Free public supernode
-
-We offer public supernodes you are using for starter plans, allocated automatically by your registered IP address via GeoIP. You network may be slow if your IP location is different from your devices. But you can [use your own supernode](https://omniedge.iohttps://omniedge.io/docs/article/install/customize-supernode) with [pro & team plans](https://omniedge.io/pricing). 
-
-|Location|Cloud Vendor|Specification|Version|
-|--|--|--|--|
-|Hong Kong,CN|AWS| 2vCPUs / 1GB RAM|2.6-stable-omni|
-|Singapore,SG|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Tokyo,JP|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Oregon,US|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Ohio,US|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Mumbai,IN|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Sao Paulo,BR|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Frankfurt,DE|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Milan,IT|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Sydney,AU|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-
-## Setup customize supernode 
-
-OmniEdge offers customize supernode, You can setup your own Supernode server to increase security and speed for your Virtual Network, here you can setup a supernode server with docker.
-
-### Installation By run a command 
-
+1. Sign up your account: [Sign up](https://omniedge.io/register)
+2. [Download](https://omniedge.io/download) OmniEdge apps for your platform 
+3. Or run the following command if you want to use cli version:
 ```bash
-curl https://raw.githubusercontent.com/omniedgeio/docker-customize-supernode/main/install.sh | bash
+curl https://omniedge.io/install/omniedge-install.sh | bash
 ```
+4. Login with your Email and password, select your virutal network, connect! 
 
+You are all set! 
 
->1) 2.6-stable-omni
->2) 3.0-stable
->3) Quit
->
->Please enter your choice: **1**
-
-**Select 1 with 2.6-stable-omni for current version, Default port is 443**
-
-### Setting in the Omniedge Dashboard
-
-Login in your OmniEdge account, and setting in the dashboard with your own **Server IP** and **port**, the defualt port of this Dockerfile is **443**.
-
-![](Customizesupernode.png)
-
-**Attention: you have to re-login all omniedge clients after changing supernode**
-
-## The unique of OmniEdge
-
-![OmniEdgeComparison](OmniEdgeComparison.gif)
-
-## The submodule Source Code links
-
-- OmniEdge customize supernode：https://github.com/omniedgeio/docker-customize-supernode
-- OmniEdge Apps source code：
-    - [Windows](https://github.com/omniedgeio/omniedge-windows) 
-    - [macOS (Intel, M1/M2 MacBook)](https://github.com/omniedgeio/omniedge-macOS)
-    - [iOS](https://github.com/omniedgeio/omniedge-iOS) 
-    - [Android ](https://github.com/omniedgeio/omniedge-android)
-    - [Synology](https://github.com/omniedgeio/omniedge-synology)  
-    - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
-- Protocol：https://github.com/omniedgeio/n2n
-- The OmniEdge Protocol : [OmniEdge protocol design](/omniedge-protocol/README.md)
+And if you want to login with **security key**, or manage your devices, go and check [Documenation](https://omniedge.io/docs) for more.
 
 ## Compile
 
@@ -128,9 +103,32 @@ go generate
 BUILD_ENV=prod make build-freebsd
 ```
 
-The compiled omniedge-cli will be found in **/out/**
+3. Cross Compile
 
-You can also use the workflow to compile automatically. 
+- 3.1 RISC-V 
+
+Host OS: Ubuntu 20.04
+
+```bash
+apt-get update
+apt-get install -y openssl autoconf build-essential libssl-dev zip wget g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+
+wget https://go.dev/dl/go1.18.4.linux-amd64.tar.gz
+rm -rf /usr/local/go && tar -C /usr/local -xzf go1.18.4.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+go version
+export GOOS=linux
+export GOARCH=riscv64
+export CGO_ENABLED=1
+export CC=riscv64-linux-gnu-gcc
+git clone https://github.com/omniedgeio/omniedge-cli.git
+cd omniedge-cli
+go mod download
+go generate
+BUILD_ENV=prod make build-riscv64
+```
+
+The compiled omniedge-cli will be found in **/out/**
 
 ## Usage
 

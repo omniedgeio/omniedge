@@ -102,7 +102,11 @@ go generate
 BUILD_ENV=prod make build-freebsd
 ```
 
+<<<<<<< HEAD
 3. 交叉編譯
+=======
+3. Cross Compile
+>>>>>>> 3b1cc53853e58a28648cc869686d7d44063f2927
 
 - 3.1 RISC-V 
 
@@ -127,6 +131,10 @@ go generate
 BUILD_ENV=prod make build-riscv64
 ```
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 3b1cc53853e58a28648cc869686d7d44063f2927
 編譯好的文件可以在 **/out/** 找到。
 您也可以使用自帶的 Github Workflow 自動化編譯。
 
