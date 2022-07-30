@@ -38,7 +38,7 @@
 </p>
 
 
-[【簡體中文】](README-zh-Hans.md)  [【正體中文】](README-zh-Hant.md) [【English】](../README-ZH.md)
+[【English】](../README.md) [【繁体中文】](README-zh-Hant.md) [【简体中文】](README-zh-Hans.md) [【日本语】](README-JP.md) [【Español】](README-ES.md) [【Italiano】](README-IT.md) 
 
 >OmniEdge 的端到端企業 VPN 解決方案，無需公網 IP，無需端口轉發，無需反嚮代理，零配置，不僅適用於初創業團隊、個人，也適用於需要彈性擴張，在世界各地擁有成仟上萬臺電腦的大公司。局域網的事情，就要放在局域網。
 

@@ -37,33 +37,33 @@
   </a> 
 </p>
 
-[【English】](README.md) [【繁体中文】](README/README-zh-Hant.md) [【简体中文】](README/README-zh-Hans.md) [【日本语】](README/README-JP.md) [【Español】](README/README-ES.md) [【Italiano】](README/README-IT.md) 
+[【English】](../README.md) [【繁体中文】](README-zh-Hant.md) [【简体中文】](README-zh-Hans.md) [【日本语】](README-JP.md) [【Español】](README-ES.md) [【Italiano】](README-IT.md) 
 
 
-OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet. 
+OmniEdge es una infraestructura VPN p2p de código abierto de capa 2 basada en el protocolo [n2n](https://github.com/ntop/n2n), una alternativa VPN tradicional. Sin servidor central, fácil de escalar con menos mantenimiento. Lo que pasa en la intranet, se queda en la intranet.
    
 ![OmniEdge-clients](OmniEdge-clients.png)
 
-## Get Started in 5 minutes 
+## Comience en 5 minutos
 
-1. Sign up your account: [Sign up](https://omniedge.io/register)
-2. [Download](https://omniedge.io/download) OmniEdge apps for your platform 
-3. Or run the following command if you want to use cli version:
+1. Registre su cuenta: [Registrarse](https://omniedge.io/register)
+2. [Descargar](https://omniedge.io/download) Aplicaciones OmniEdge para su plataforma
+3. O ejecute el siguiente comando si desea usar la versión cli:
 ```bash
-curl https://omniedge.io/install/omniedge-install.sh | bash
+curl https://omniedge.io/install/omniedge-install.sh | intento
 ```
-4. Login with your Email and password, select your virutal network, connect! 
+4. Inicie sesión con su correo electrónico y contraseña, seleccione su red virtual, ¡conéctese!
 
-You are all set! 
+¡Estas listo!
 
-And if you want to login with **security key**, or manage your devices, go and check [Documenation](https://omniedge.io/docs) for more.
+Y si desea iniciar sesión con **clave de seguridad** o administrar sus dispositivos, consulte [Documentación](https://omniedge.io/docs) para obtener más información.
 
-## Compile
+## Compilar
 
-### OmniEdge Cli
+### OmniEdge Clip
 
-1. Environment: Golang 1.16.6
-2. Compile: 
+1. Medio ambiente: Golang 1.16.6
+2. Compilar:
 
 - 2.1. Ubuntu /linux
 
@@ -102,12 +102,11 @@ go mod download
 go generate
 BUILD_ENV=prod make build-freebsd
 ```
+3. Compilación cruzada
 
-3. Cross Compile
+- 3.1 RISC-V
 
-- 3.1 RISC-V 
-
-Host OS: Ubuntu 20.04
+Sistema operativo anfitrión: Ubuntu 20.04
 
 ```bash
 apt-get update
@@ -128,12 +127,12 @@ go generate
 BUILD_ENV=prod make build-riscv64
 ```
 
-The compiled omniedge-cli will be found in **/out/**
+El omniedge-cli compilado se encontrará en **/out/**
 
 ### OmniEdge Android
 
-1. Download Android Studio: https://developer.android.com/studio
-2. Get the repo and compile
+1. Descarga Android Studio: https://developer.android.com/studio
+2. Obtener el repositorio y compilar
 
 ```bash
 git clone https://github.com/omniedgeio/omniedge-android.git`
@@ -141,7 +140,7 @@ git clone https://github.com/omniedgeio/omniedge-android.git`
 ./gradlew assembleDebug --stacktrace
 ```
 
-We have also prepared the CI for Github and Gitlab for building automatically. 
+También hemos preparado el CI para Github y Gitlab para construir automáticamente.
 
 1. Github: https://github.com/omniedgeio/omniedge-android/blob/main/.github/workflows/build.yml
 2. GitLab: https://github.com/omniedgeio/omniedge-android/blob/main/.gitlab-ci.yml
@@ -149,8 +148,8 @@ We have also prepared the CI for Github and Gitlab for building automatically.
 
 ### OmniEdge iOS
 
-1. Download and install Xcode
-2. Get the repo and compile
+1. Descarga e instala Xcode
+2. Obtener el repositorio y compilar
 
 ```bash
 git clone https://github.com/omniedgeio/omniedge-iOS.git
@@ -158,14 +157,14 @@ cd omniedge-iOS
 open OmniEdgeNew/OmniEdgeNew.xcworkspace
 ```
 
-Xcode will open automatically, you have to set your developer account to start the compile. We recommend compiling the package on your devices separately, specially the **Tunnel** package. 
+Xcode se abrirá automáticamente, debe configurar su cuenta de desarrollador para iniciar la compilación. Recomendamos compilar el paquete en sus dispositivos por separado, especialmente el paquete **Tunnel**.
 
 <img width="902" alt="image" src="https://user-images.githubusercontent.com/93888/180374544-0ae0fbd8-3413-427f-8e9b-ec0c49249f0e.png">
 
 ### OmniEdge-macOS
 
-1. Download and install Xcode
-2. Get the repo and compile
+1. Descarga e instala Xcode
+2. Obtener el repositorio y compilar
 
 ```bash
 git clone https://github.com/omniedgeio/omniedge-macOS.git
@@ -173,22 +172,22 @@ cd omniedge-macOS
 open Omniedge.xcodeproj
 ```
 
-Xcode will open automatically, you have to set your developer account to start the compile.
+Xcode se abrirá automáticamente, debe configurar su cuenta de desarrollador para iniciar la compilación.
 
 ### OmniEdge-windows
 
-1. Download and install QT
-2. Get the repo and compile
+1. Descarga e instala QT
+2. Obtener el repositorio y compilar
 
 ```bash
 git clone https://github.com/omniedgeio/omniedge-windows.git
 cd omniedge-windows
 ```
 
-open **OmniEdge.pro** and start to compile.
+abre **OmniEdge.pro** y comienza a compilar.
 
 
-## Usage
+## Uso
 
 - [Virtual Network, Devices, Security Key, and Settings](https://omniedge.io/docs/article/admin)
 - [Windows 7,10,11 for Intel or Arm](https://omniedge.io/docs/article/Install/windows)
@@ -199,9 +198,9 @@ open **OmniEdge.pro** and start to compile.
 - [iOS](https://omniedge.io/docs/article/Install/ios)
 - [Setup custom supernode](https://omniedge.io/docs/article/Install/customize-supernode)
 
-## Use Cases
+## Casos de uso
 
-> Tell us your use-case, so we can share to others
+> Cuéntenos su caso de uso, para que podamos compartirlo con otros
 
 - [Remote connect windows without exposing public IP with Omniedge](https://omniedge.io/docs/article/Cases/RDP)
 - [Display and control macOS, Linux and Windows ](https://omniedge.io/docs/article/Cases/VNC)
@@ -210,7 +209,7 @@ open **OmniEdge.pro** and start to compile.
 - [Talk to your family and share photos in a LAN on the internet](https://omniedge.io/docs/article/Cases/lan-messenger)
 - [Air Drop Any Files between MacOS, Windows, Routers, Linux and Android with Omniedge from anywhere](https://omniedge.io/docs/article/Cases/landrop)
 
-## Compare
+## Comparar
 
 - [VPN vs. OmniEdge](https://omniedge.io/docs/article/compare/vpn-vs-omniedge)
 - [Express VPN vs. OmniEdge](https://omniedge.io/docs/article/compare/expressvpn-vs-omniedge)
@@ -218,7 +217,7 @@ open **OmniEdge.pro** and start to compile.
 - [ZeroTier vs. OmniEdge](https://omniedge.io/docs/article/compare/zerotier-vs-omniedge)
 - [n2n vs. OmniEdge](https://omniedge.io/docs/article/compare/n2n-vs-omniedge)
 
-## Who are talking about us
+## Quien esta hablando de nosotros
 
 - [Founded by a Single Tweet Startup OmniEdge’s effort to let connect without concern](https://threat.technology/founded-by-a-single-tweet-startup-omniedges-effort-to-let-connect-without-concern/)
 - [voonze: OmniEdge, to access your Intranet from the Internet using P2P](https://voonze.com/omniedge-to-access-your-intranet-from-the-internet-using-p2p/)
@@ -229,8 +228,8 @@ open **OmniEdge.pro** and start to compile.
 - [群晖新套件：OmniEdge 轻松连接任何平台上的所有设备](https://imnks.com/5768.html)
 - [发了一条消息，我创建了一个服务全球26个国家用户的开源项目](https://zhuanlan.zhihu.com/p/535614999)
 
->feel free to tell us about any posts related us via issue or PR. 
+> siéntase libre de informarnos sobre cualquier publicación relacionada con nosotros a través de un problema o relaciones públicas.
 
 ----
 
-If you have more questions, feel free to talk to us at [Discord](https://discord.gg/d4faRPYj).
+Si tiene más preguntas, no dude en comunicarse con nosotros en [Discord](https://discord.gg/d4faRPYj).
