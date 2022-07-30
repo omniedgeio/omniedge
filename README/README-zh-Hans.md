@@ -101,12 +101,8 @@ go mod download
 go generate
 BUILD_ENV=prod make build-freebsd
 ```
-
-<<<<<<< HEAD
+  
 3. 交叉编译
-=======
-3. Cross Compile
->>>>>>> 3b1cc53853e58a28648cc869686d7d44063f2927
 
 - 3.1 RISC-V 
 
