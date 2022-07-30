@@ -45,7 +45,7 @@ OmniEdgeは、従来のVPNの代替手段である[n2n]（https://github.com/nto
 
 ![OmniEdge-clients](../OmniEdge-clients.png)
 
-##主な機能：
+## 主な機能：
 
 ||||
 | ---- | ---- | ---- |
