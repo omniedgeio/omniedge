@@ -44,6 +44,22 @@ OmniEdge là cơ sở hạ tầng VPN lớp 2 p2p mã nguồn mở dựa trên g
    
 ![OmniEdge-clients](../OmniEdge-clients.png)
 
+## Các tính năng chính:
+
+||||
+| ---- | ---- | ---- |
+| Quản lý quản trị bảng điều khiển | Mesh VPN | Ứng dụng GUI trên máy tính để bàn cho MacOS (menubar) và Windows (systray) |
+| Nhiều mạng ảo | VPN Site-to-Site | Các ứng dụng cli dòng lệnh cho Linux, FreeBSD, Raspbian và MacOS |
+| Nhiều người dùng | Truyền dữ liệu không giới hạn | Các ứng dụng cli dòng lệnh cho armv7, arm64, RISC-V64, x86_64 và amd64 |
+| Nhiều thiết bị | Kết nối ngang hàng được mã hóa | Ứng dụng di động cho iOS và Android |
+| Supernode tự lưu trữ | Chuyển tiếp kết nối được mã hóa | Ứng dụng máy tính bảng cho iPad, Android Tablet và Android TV |
+| Chia sẻ mạng ảo | Hỗ trợ đám mây lai | Ứng dụng NAS cho Synology |
+| Khóa bảo mật | Zero-Config | Phân bổ supernode công khai tự động |
+| [Điều khiển thiết bị từ xa](https://omniedge.io/docs/article/Cases/VNC) | [Thả tệp từ xa](https://omniedge.io/docs/article/Cases/landrop) | Phân bổ IP tự động |
+
+
+Bạn có thể tìm thêm các tính năng trong Trang [Định giá] (https://omniedge.io/pricing) dành cho Doanh nghiệp.
+
 ## Bắt đầu sau 5 phút
 
 1. Đăng ký tài khoản của bạn: [Đăng ký] (https://omniedge.io/register)

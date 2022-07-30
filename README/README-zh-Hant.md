@@ -38,12 +38,28 @@
 </p>
 
 
-[【English】](../README.md) [【繁体中文】](README-zh-Hant.md) [【简体中文】](README-zh-Hans.md) [【日本语】](README-JP.md) [【Español】](README-ES.md) [【Italiano】](README-IT.md) [【한국어】](README-KR.md) 
+[【English】](../README.md) [【正體中文】](README-zh-Hant.md) [【簡體中文】](README-zh-Hans.md) [【日本語】](README-JP.md) [【Español】](README-ES.md) [【Italiano】](README-IT.md) [【한국어】](README-KR.md) 
 [【العربي】](README-AR.md) [【Tiếng Việt】](README-VN.md) [【แบบไทย】](README-TH.md)
 
 >OmniEdge 的端到端企業 VPN 解決方案，無需公網 IP，無需端口轉發，無需反嚮代理，零配置，不僅適用於初創業團隊、個人，也適用於需要彈性擴張，在世界各地擁有成仟上萬臺電腦的大公司。局域網的事情，就要放在局域網。
 
 ![OmniEdge-clients](../OmniEdge-clients.png)
+
+## 關鍵功能:
+
+||||
+|----|----|----|
+|控製管理平臺| :fire: Mesh VPNs|桌麵 GUI 客戶端支援: MacOS(menubar) 和 Windows(systray)|
+| :fire: 多私有網路 | :fire: Site-to-Site VPNs|命令行客戶端支援: Linux,FreeBSD, Raspian 和 MacOS|
+|多用戶|無限流量|命令行客戶端支援:armv7,arm64,RISC-V64,x86_64 和 amd64|
+|多設備|加密的端到端連接|手機客戶端支援: iOS 和 Android|
+| :fire: 自建超級節點 |加密relay|平闆客戶端支援: iPad, Android Tablet 和 Android TV|
+| :fire: 分享私有網路|混合雲支援|NAS GUI 客戶端支援: 群暉|
+|安全碼登入| :fire: 零配置|自動分配公共超級節點|
+| :fire: [遠程控製](https://omniedge.io/docs/article/Cases/VNC)|[遠程 Drop 文件](https://omniedge.io/docs/article/Cases/landrop) |自動IP分配|
+
+
+您也可以查閱 [Pricing](https://omniedge.io/pricing) 頁麵獲取更多的企業版功能。
 
 ## 5分鍾啓用OmniEdge
 

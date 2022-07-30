@@ -45,6 +45,22 @@ OmniEdgeは、従来のVPNの代替手段である[n2n]（https://github.com/nto
 
 ![OmniEdge-clients](../OmniEdge-clients.png)
 
+##主な機能：
+
+||||
+| ---- | ---- | ---- |
+|ダッシュボード管理管理|メッシュVPN|MacOS（メニューバー）およびWindows（システムトレイ）用のデスクトップGUIアプリ|
+|マルチ仮想ネットワーク|サイト間VPN|Linux、FreeBSD、Raspbian、MacOS用のコマンドラインCLIアプリ|
+|マルチユーザー|無制限のデータ転送|armv7、arm64、RISC-V64、x86_64およびamd64用のコマンドラインCLIアプリ|
+|マルチデバイス|暗号化されたピアツーピア接続|iOSおよびAndroid用のモバイルアプリ|
+|セルフホストスーパーノード|暗号化接続リレー|iPad、Androidタブレット、AndroidTV用のタブレットアプリ|
+|仮想ネットワークの共有|ハイブリッドクラウドのサポート|Synology用のNASアプリ|
+|セキュリティキー| Zero-Config|自動パブリックスーパーノード割り当て|
+| [リモートデバイス制御]（https://omniedge.io/docs/article/Cases/VNC）| [ファイルをリモートでドロップ]（https://omniedge.io/docs/article/Cases/landrop）|自動IP割り当て |
+
+
+その他の機能については、エンタープライズ向けの[価格設定]（https://omniedge.io/pricing）ページをご覧ください。
+
 ## 5分で始めましょう
 
 1. アカウントにサインアップします：[サインアップ]（https://omniedge.io/register）
@@ -189,7 +205,7 @@ git clone https://github.com/omniedgeio/omniedge-windows.git
 cd omniedge-windows
 ```
 
-** OmniEdge.pro **を開き、コンパイルを開始します。
+**OmniEdge.pro**を開き、コンパイルを開始します。
 
 ## 使用法
 

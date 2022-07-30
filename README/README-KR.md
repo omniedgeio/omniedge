@@ -45,6 +45,22 @@ OmniEdge는 기존 VPN의 대안인 [n2n](https://github.com/ntop/n2n) 프로토
 
 ![OmniEdge-clients](../OmniEdge-clients.png)
 
+## 주요 특징들:
+
+||||
+|----|----|----|
+|대시보드 관리 관리|메시 VPN|MacOS(메뉴 모음) 및 Windows(시스템 트레이)용 데스크탑 GUI 앱|
+|다중 가상 네트워크|사이트 간 VPN|Linux, FreeBSD, Raspbian 및 MacOS용 명령줄 cli 앱|
+|다중 사용자|무제한 데이터 전송|armv7,arm64,RISC-V64,x86_64 및 amd64용 명령줄 cli 앱|
+|다중 장치|암호화된 P2P 연결|iOS 및 Android용 모바일 앱|
+|자체 호스팅 슈퍼노드 |암호화된 연결 릴레이|iPad, Android 태블릿 및 Android TV용 태블릿 앱|
+|가상 네트워크 공유|하이브리드 클라우드 지원|Synology용 NAS 앱|
+|보안 키| Zero-Config|자동 공개 슈퍼노드 할당|
+|[Remote Device Control](https://omniedge.io/docs/article/Cases/VNC)|[Drop Files remote](https://omniedge.io/docs/article/Cases/landdrop) |자동 IP 할당 |
+
+
+기업용 [가격](https://omniedge.io/pricing) 페이지에서 더 많은 기능을 찾을 수 있습니다.
+
 ## 5분으로 시작하자
 
 1. 계정에 가입합니다. 가입(https://omniedge.io/register)

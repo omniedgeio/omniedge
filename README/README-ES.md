@@ -45,6 +45,22 @@ OmniEdge es una infraestructura VPN p2p de código abierto de capa 2 basada en e
    
 ![OmniEdge-clients](../OmniEdge-clients.png)
 
+## Características clave:
+
+||||
+|----|----|----|
+|Gestión de la administración del panel de control|VPN en malla|Aplicaciones GUI de escritorio para MacOS (barra de menú) y Windows (bandeja del sistema)|
+|Multiredes virtuales|VPN de sitio a sitio|Aplicaciones CLI de línea de comando para Linux, FreeBSD, Raspbian y MacOS|
+|Usuarios múltiples|Transferencia de datos ilimitada|Aplicaciones CLI de línea de comandos para armv7,arm64,RISC-V64,x86_64 y amd64|
+|Dispositivos múltiples|Conexión punto a punto cifrada|Aplicaciones móviles para iOS y Android|
+|Supernodo autohospedado |Retransmisión de conexión cifrada|Aplicaciones de tableta para iPad, tableta Android y Android TV|
+|Compartir red virtual|Compatibilidad con nube híbrida|Aplicación NAS para Synology|
+|Llaves de seguridad| Zero-Config|Asignación automática de supernodos públicos|
+|[Control remoto de dispositivos](https://omniedge.io/docs/article/Cases/VNC)|[Soltar archivos de forma remota](https://omniedge.io/docs/article/Cases/landdrop) |Asignación automática de IP |
+
+
+Puede encontrar más funciones en la página de [Precios](https://omniedge.io/pricing) para empresas.
+
 ## Comience en 5 minutos
 
 1. Registre su cuenta: [Registrarse](https://omniedge.io/register)

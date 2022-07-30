@@ -45,6 +45,22 @@
 
 ![OmniEdge-clients](../OmniEdge-clients.png)
 
+## 关键功能:
+
+||||
+|----|----|----|
+|控制管理平台| :fire: Mesh VPNs|桌面 GUI 客户端支持: MacOS(menubar) 和 Windows(systray)|
+| :fire: 多私有网络 | :fire: Site-to-Site VPNs|命令行客户端支持: Linux,FreeBSD, Raspian 和 MacOS|
+|多用户|无限流量|命令行客户端支持:armv7,arm64,RISC-V64,x86_64 和 amd64|
+|多设备|加密的端到端连接|手机客户端支持: iOS 和 Android|
+| :fire: 自建超级节点 |加密relay|平板客户端支持: iPad, Android Tablet 和 Android TV|
+| :fire: 分享私有网络|混合云支持|NAS GUI 客户端支持: 群晖|
+|安全码登录| :fire: 零配置|自动分配公共超级节点|
+| :fire: [远程控制](https://omniedge.io/docs/article/Cases/VNC)|[远程 Drop 文件](https://omniedge.io/docs/article/Cases/landrop) |自动IP分配|
+
+
+您也可以查阅 [Pricing](https://omniedge.io/pricing) 页面获取更多的企业版功能。
+
 ## 5分钟启用OmniEdge
 
 1. 注册您的个人帐号: [注册](https://omniedge.io/register)
