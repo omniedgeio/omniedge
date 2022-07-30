@@ -38,7 +38,7 @@
 </p>
 
 [【English】](../README.md) [【繁体中文】](README-zh-Hant.md) [【简体中文】](README-zh-Hans.md) [【日本语】](README-JP.md) [【Español】](README-ES.md) [【Italiano】](README-IT.md) [【한국어】](README-KR.md) 
-
+[【العربي】](README-AR.md) [【Tiếng Việt】](README-VN.md) [【แบบไทย】](README-TH.md)
 
 OmniEdge è un'infrastruttura VPN di livello 2 p2p open source basata sul protocollo [n2n](https://github.com/ntop/n2n), un'alternativa VPN tradizionale. Nessun server centrale, facile da scalare con meno manutenzione. Ciò che accade in intranet, rimane in intranet.
    

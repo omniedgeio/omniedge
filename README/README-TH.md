@@ -37,35 +37,33 @@
   </a> 
 </p>
 
-
 [【English】](../README.md) [【繁体中文】](README-zh-Hant.md) [【简体中文】](README-zh-Hans.md) [【日本语】](README-JP.md) [【Español】](README-ES.md) [【Italiano】](README-IT.md) [【한국어】](README-KR.md) 
 [【العربي】](README-AR.md) [【Tiếng Việt】](README-VN.md) [【แบบไทย】](README-TH.md)
 
-OmniEdge는 기존 VPN의 대안인 [n2n](https://github.com/ntop/n2n) 프로토콜을 기반으로 하는 오픈 소스 p2p 레이어 2VPN 인프라입니다. 중앙 서버가 없고 유지 보수가 적고 쉽게 확장할 수 있습니다. 인트라넷에서 일어나는 일은 인트라넷에 남아 있습니다.
-
+OmniEdge เป็นโครงสร้างพื้นฐาน VPN แบบโอเพ่นซอร์ส p2p เลเยอร์ 2 ที่ใช้โปรโตคอล [n2n](https://github.com/ntop/n2n) ซึ่งเป็นทางเลือก VPN แบบดั้งเดิม ไม่มีเซิร์ฟเวอร์กลาง ปรับขนาดได้ง่ายพร้อมการบำรุงรักษาน้อย เกิดอะไรขึ้นในอินทราเน็ต อยู่ในอินทราเน็ต
+   
 ![OmniEdge-clients](../OmniEdge-clients.png)
 
-## 5분으로 시작하자
+## เริ่มต้นใน 5 นาที
 
-1. 계정에 가입합니다. 가입(https://omniedge.io/register)
-2. [다운로드](https://omniedge.io/download) 플랫폼용 OmniEdge 앱
-3. 또는 cli 버전을 사용하는 경우 다음 명령을 실행합니다.
-```bash
-curl https://omniedge.io/install/omniedge-install.sh | bash
-``
-4. 이메일 주소와 암호로 로그인하고 가상 네트워크를 선택하여 연결합니다.
+1. ลงทะเบียนบัญชีของคุณ: [สมัคร](https://omniedge.io/register)
+2. [ดาวน์โหลด](https://omniedge.io/download) แอป OmniEdge สำหรับแพลตฟอร์มของคุณ
+3. หรือเรียกใช้คำสั่งต่อไปนี้หากคุณต้องการใช้เวอร์ชัน cli:
+``` ทุบตี
+curl https://omniedge.io/install/omniedge-install.sh | ทุบตี
+```
+4. เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน เลือกเครือข่ายไวรัส เชื่อมต่อ!
 
-준비 만단입니다!
+คุณพร้อมแล้ว!
 
-또한 **보안 키**로 로그인하거나 기기를 관리하려면 문서(https://omniedge.io/docs)로 이동하여 자세한 내용을 확인하세요.
+และหากคุณต้องการเข้าสู่ระบบด้วย **คีย์ความปลอดภัย** หรือจัดการอุปกรณ์ของคุณ ให้ไปที่ [เอกสารประกอบ](https://omniedge.io/docs) เพื่อดูข้อมูลเพิ่มเติม
 
-
-## 컴파일
+## รวบรวม
 
 ### OmniEdge Cli
 
-1. 환경: Golang 1.16.6
-2. 컴파일:
+1. สิ่งแวดล้อม: Golang 1.16.6
+2. รวบรวม:
 
 - 2.1. Ubuntu /linux
 
@@ -75,7 +73,7 @@ sudo -E apt-get install -y openssl
 sudo -E apt-get install -y build-essential
 sudo -E apt-get install -y libssl-dev
 sudo -E apt-get install -y zip
-git clone git clone https://github.com/omniedgeio/omniedge-cli
+git clone https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
 go generate
@@ -96,21 +94,20 @@ BUILD_ENV=prod make build-darwin
 - 2.3. freebsd
 
 ```bash
-#freebsd
 su
 pkg update && pkg install go gmake git openssl zip autoconf automake libtool
-https://github.com/omniedgeio/omniedge-cli
+git clone https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
 go generate
 BUILD_ENV=prod make build-freebsd
 ```
-  
-3. 크로스 컴파일
 
-- 3.1 RISC-V 
+3. ข้ามคอมไพล์
 
-호스트 OS: Ubuntu 20.04
+- 3.1 RISC-V
+
+โฮสต์ระบบปฏิบัติการ: Ubuntu 20.04
 
 ```bash
 apt-get update
@@ -131,13 +128,12 @@ go generate
 BUILD_ENV=prod make build-riscv64
 ```
 
-컴파일된 omniedge-cli는 **/out/**에 있습니다.
-
+omniedge-cli ที่คอมไพล์แล้วจะอยู่ใน **/out/**
 
 ### OmniEdge Android
 
-1. Android Studio 다운로드: https://developer.android.com/studio
-2. 리포지토리를 검색하고 컴파일합니다.
+1. ดาวน์โหลด Android Studio: https://developer.android.com/studio
+2. รับ repo และคอมไพล์
 
 ```bash
 git clone https://github.com/omniedgeio/omniedge-android.git`
@@ -145,16 +141,16 @@ git clone https://github.com/omniedgeio/omniedge-android.git`
 ./gradlew assembleDebug --stacktrace
 ```
 
-또한 Github과 Gitlab의 CI를 자동으로 빌드하기 위해 준비했습니다.
+เราได้เตรียม CI สำหรับ Github และ Gitlab สำหรับการสร้างโดยอัตโนมัติ
 
-- Github: https://github.com/omniedgeio/omniedge-android/blob/main/.github/workflows/build.yml
-- GitLab: https://github.com/omniedgeio/omniedge-android/blob/main/.gitlab-ci.yml
+1. Github: https://github.com/omniedgeio/omniedge-android/blob/main/.github/workflows/build.yml
+2. GitLab: https://github.com/omniedgeio/omniedge-android/blob/main/.gitlab-ci.yml
 
 
 ### OmniEdge iOS
 
-1. Xcode를 다운로드하여 설치합니다.
-2. 리포지토리를 검색하고 컴파일합니다.
+1. ดาวน์โหลดและติดตั้ง Xcode
+2. รับ repo และคอมไพล์
 
 ```bash
 git clone https://github.com/omniedgeio/omniedge-iOS.git
@@ -162,14 +158,14 @@ cd omniedge-iOS
 open OmniEdgeNew/OmniEdgeNew.xcworkspace
 ```
 
-Xcode가 자동으로 열립니다. 컴파일을 시작하려면 개발자 계정을 설정해야 합니다. 패키지, 특히 **Tunnel** 패키지를 기기에서 개별적으로 컴파일하는 것이 좋습니다.
+Xcode จะเปิดขึ้นโดยอัตโนมัติ คุณต้องตั้งค่าบัญชีนักพัฒนาเพื่อเริ่มคอมไพล์ เราแนะนำให้รวบรวมแพ็คเกจบนอุปกรณ์ของคุณแยกกัน โดยเฉพาะแพ็คเกจ **Tunnel**
 
 <img width="902" alt="image" src="https://user-images.githubusercontent.com/93888/180374544-0ae0fbd8-3413-427f-8e9b-ec0c49249f0e.png">
 
 ### OmniEdge-macOS
 
-1. Xcode를 다운로드하여 설치합니다.
-2. 리포지토리를 검색하고 컴파일합니다.
+1. ดาวน์โหลดและติดตั้ง Xcode
+2. รับ repo และคอมไพล์
 
 ```bash
 git clone https://github.com/omniedgeio/omniedge-macOS.git
@@ -177,21 +173,22 @@ cd omniedge-macOS
 open Omniedge.xcodeproj
 ```
 
-Xcode가 자동으로 열립니다. 컴파일을 시작하려면 개발자 계정을 설정해야 합니다.
+Xcode จะเปิดขึ้นโดยอัตโนมัติ คุณต้องตั้งค่าบัญชีนักพัฒนาเพื่อเริ่มคอมไพล์
 
 ### OmniEdge-windows
 
-1. QT를 다운로드하여 설치합니다.
-2. 리포지토리를 검색하고 컴파일합니다.
+1. ดาวน์โหลดและติดตั้ง QT
+2. รับ repo และคอมไพล์
 
 ```bash
 git clone https://github.com/omniedgeio/omniedge-windows.git
 cd omniedge-windows
 ```
 
-**OmniEdge.pro**를 열고 컴파일을 시작합니다.
+เปิด **OmniEdge.pro** และเริ่มคอมไพล์
 
-## 사용법
+
+## การใช้งาน
 
 - [Virtual Network, Devices, Security Key, and Settings](https://omniedge.io/docs/article/admin)
 - [Windows 7,10,11 for Intel or Arm](https://omniedge.io/docs/article/Install/windows)
@@ -202,9 +199,9 @@ cd omniedge-windows
 - [iOS](https://omniedge.io/docs/article/Install/ios)
 - [Setup custom supernode](https://omniedge.io/docs/article/Install/customize-supernode)
 
-## 유스 케이스
+## กรณีการใช้งาน
 
-> 다른 사람들과 공유 할 수 있도록 유스 케이스를 알려주세요.
+> บอกกรณีการใช้งานของคุณให้เราทราบ เพื่อที่เราจะสามารถแบ่งปันให้ผู้อื่นได้
 
 - [Remote connect windows without exposing public IP with Omniedge](https://omniedge.io/docs/article/Cases/RDP)
 - [Display and control macOS, Linux and Windows ](https://omniedge.io/docs/article/Cases/VNC)
@@ -213,7 +210,7 @@ cd omniedge-windows
 - [Talk to your family and share photos in a LAN on the internet](https://omniedge.io/docs/article/Cases/lan-messenger)
 - [Air Drop Any Files between MacOS, Windows, Routers, Linux and Android with Omniedge from anywhere](https://omniedge.io/docs/article/Cases/landrop)
 
-## 비교
+## เปรียบเทียบ
 
 - [VPN vs. OmniEdge](https://omniedge.io/docs/article/compare/vpn-vs-omniedge)
 - [Express VPN vs. OmniEdge](https://omniedge.io/docs/article/compare/expressvpn-vs-omniedge)
@@ -221,8 +218,7 @@ cd omniedge-windows
 - [ZeroTier vs. OmniEdge](https://omniedge.io/docs/article/compare/zerotier-vs-omniedge)
 - [n2n vs. OmniEdge](https://omniedge.io/docs/article/compare/n2n-vs-omniedge)
 
-
-## 누가 우리에 대해 이야기하는지
+## ใครพูดถึงเราบ้าง
 
 - [Founded by a Single Tweet Startup OmniEdge’s effort to let connect without concern](https://threat.technology/founded-by-a-single-tweet-startup-omniedges-effort-to-let-connect-without-concern/)
 - [voonze: OmniEdge, to access your Intranet from the Internet using P2P](https://voonze.com/omniedge-to-access-your-intranet-from-the-internet-using-p2p/)
@@ -233,9 +229,8 @@ cd omniedge-windows
 - [群晖新套件：OmniEdge 轻松连接任何平台上的所有设备](https://imnks.com/5768.html)
 - [发了一条消息，我创建了一个服务全球26个国家用户的开源项目](https://zhuanlan.zhihu.com/p/535614999)
 
-> 문제 또는 PR을 통해 Google과 관련된 게시물에 대해 언제든지 알려주십시오.
-
+>อย่าลังเลที่จะบอกเราเกี่ยวกับโพสต์ใด ๆ ที่เกี่ยวข้องกับเราผ่านทางปัญหาหรือประชาสัมพันธ์
 
 ----
 
-궁금한 점이 있으시면 [Discord](https://discord.gg/d4faRPYj)로 문의해 주십시오.
+หากมีคำถามเพิ่มเติม สามารถพูดคุยกับเราได้ที่ [Discord](https://discord.gg/d4faRPYj)
