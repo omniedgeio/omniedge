@@ -42,7 +42,7 @@
 
 OmniEdge es una infraestructura VPN p2p de código abierto de capa 2 basada en el protocolo [n2n](https://github.com/ntop/n2n), una alternativa VPN tradicional. Sin servidor central, fácil de escalar con menos mantenimiento. Lo que pasa en la intranet, se queda en la intranet.
    
-![OmniEdge-clients](OmniEdge-clients.png)
+![OmniEdge-clients](../OmniEdge-clients.png)
 
 ## Comience en 5 minutos
 
