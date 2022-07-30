@@ -38,7 +38,7 @@
 </p>
 
 
-[【English】](../README.md) [【繁体中文】](README-zh-Hant.md) [【简体中文】](README-zh-Hans.md) [【日本语】](README-JP.md) [【Español】](README-ES.md) [【Italiano】](README-IT.md) 
+[【English】](../README.md) [【繁体中文】](README-zh-Hant.md) [【简体中文】](README-zh-Hans.md) [【日本语】](README-JP.md) [【Español】](README-ES.md) [【Italiano】](README-IT.md) [【한국어】](README-KR.md) 
 
 OmniEdgeは、従来のVPNの代替手段である[n2n]（https://github.com/ntop/n2n）プロトコルに基づくオープンソースのp2pレイヤー2VPNインフラストラクチャです。 中央サーバーがなく、メンテナンスが少なくて簡単に拡張できます。 イントラネットで何が起こるかは、イントラネットにとどまります。
 
