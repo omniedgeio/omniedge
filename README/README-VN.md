@@ -158,7 +158,7 @@ cd omniedge-iOS
 open OmniEdgeNew/OmniEdgeNew.xcworkspace
 ```
 
-Xcode sẽ tự động mở, bạn phải đặt tài khoản nhà phát triển của mình để bắt đầu biên dịch. Chúng tôi khuyên bạn nên biên dịch gói trên các thiết bị của mình một cách riêng biệt, đặc biệt là gói ** Tunnel **.
+Xcode sẽ tự động mở, bạn phải đặt tài khoản nhà phát triển của mình để bắt đầu biên dịch. Chúng tôi khuyên bạn nên biên dịch gói trên các thiết bị của mình một cách riêng biệt, đặc biệt là gói **Tunnel**.
 
 <img width="902" alt="image" src="https://user-images.githubusercontent.com/93888/180374544-0ae0fbd8-3413-427f-8e9b-ec0c49249f0e.png">
 

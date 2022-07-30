@@ -158,7 +158,7 @@ cd omniedge-iOS
 open OmniEdgeNew/OmniEdgeNew.xcworkspace
 ```
 
-سيتم فتح Xcode تلقائيًا ، يجب عليك تعيين حساب المطور الخاص بك لبدء الترجمة. نوصي بتجميع الحزمة على أجهزتك بشكل منفصل ، خاصة حزمة ** Tunnel **.
+سيتم فتح Xcode تلقائيًا ، يجب عليك تعيين حساب المطور الخاص بك لبدء الترجمة. نوصي بتجميع الحزمة على أجهزتك بشكل منفصل ، خاصة حزمة **Tunnel**.
 
 <img width="902" alt="image" src="https://user-images.githubusercontent.com/93888/180374544-0ae0fbd8-3413-427f-8e9b-ec0c49249f0e.png">
 
