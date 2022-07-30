@@ -1,84 +1,61 @@
-# OmniEdge 
+<p align="center">
+<h1 align="center"> OmniEdge </h1>
+<p align="center">What happens in intranet, stays in intranet.</p>
+</p>
 
-**因特网上的私有网络时代**
+<p align="center">
+<a href="https://omniedge.io">
+<img alt="Website" src="https://img.shields.io/website?label=omniedge.io&url=https%3A%2F%2Fomniedge.io">
+</a>
+<a href="https://github.com/omniedgeio/omniedge">
+<img src="https://img.shields.io/github/license/omniedgeio/omniedge">
+</a>
+<a href="https://github.com/omniedgeio/omniedge">
+<img src="https://img.shields.io/github/downloads/omniedgeio/app-release/total">
+</a>
+
+<a href="https://twitter.com/intent/follow?screen_name=omniedgeio">
+<img src="https://img.shields.io/twitter/follow/omniedgeio?label=follows&style=social" />
+</a>
+  <a href="https://github.com/omniedgeio/omniedge-cli">
+    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-cli" />
+  </a> 
+    <a href="https://github.com/omniedgeio/omniedge-iOS">
+    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-iOS" />
+  </a>
+      <a href="https://github.com/omniedgeio/omniedge-macOS">
+    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-macOS" />
+  </a> 
+      <a href="https://github.com/omniedgeio/omniedge-windows">
+    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-windows" />
+  </a> 
+        <a href="https://github.com/omniedgeio/omniedge-android">
+<img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-android"
+</a>
+          <a href="https://github.com/omniedgeio/omniedge-synology">
+    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-synology" />
+  </a> 
+</p>
+
 
 [【简体中文】](README-zh-Hans.md)  [【繁体中文】](README-zh-Hant.md) [【English】](../README-ZH.md)
 
 >OmniEdge 的端到端企业 VPN 解决方案，无需公网 IP，无需端口转发，无需反向代理，零配置，不仅适用于初创业团队、个人，也适用于需要弹性扩张，在世界各地拥有成千上万台电脑的大公司。局域网的事情，就要放在局域网。
 
-[【OmniEdge 如何工作】](https://omniedge.io/docs/article/architecture) [【下载】](#安装-omniedge) [【公共超级节点】](#免费的公共超级节点) [【自建超级节点】](#自建超级节点)[【编译】](#编译) [【使用】](#使用安装-omniedge) [【应用场景】](#应用场景)[【比较】](#比较) [【优势】](#omniedge的优势) [【媒体】](#谁在谈论-omniedge)  [【Figma 设计源文件】](https://www.figma.com/file/2wuYjRDfOZwB6TAJpbxlL8/Omniedge-V2?node-id=608%3A619)
-
-我们需要您用您的语言翻译本 README, [OmniEdge Windows UI](https://github.com/omniedgeio/omniedge-windows/tree/dev/languages),[OmniEdge Android UI](https://github.com/omniedgeio/omniedge-android/tree/main/app/src/main/res/values) 和 [Docs](https://github.com/omniedgeio/docs) 。
-
-Chat with us: [🤝 网站](https://omniedge.io) [💬 Twitter](https://twitter.com/omniedgeio) [😇 Discord](https://discord.gg/d4faRPYj)
-
 ![OmniEdge-clients](../OmniEdge-clients.png)
 
-## 安装 OmniEdge
+## 5分钟启用OmniEdge
 
-- 在官方网站 https://omniedge.io 注册账号，同时下载对应设备的客户端。
-- [下载](https://github.com/omniedgeio/omniedge/releases)
-
-## 免费的公共超级节点
-
-我们提供免费的公共超级节点为免费用户使用，节点会随点用户注册时的IP地理位置自动分配。如果您注册的时候使用的IP地址与您的设备不同，p2p的连接可能会慢，您也可以使用[专业和团队]((https://omniedge.io/pricing))版本的[自定义超级节点]((https://omniedge.io/docs/article/install/customize-supernode) )，使用自建的超级节点，更快更安全 . 
-
-|位置|云服务商|配置|超级节点版本|
-|--|--|--|--|
-|Hong Kong,CN|AWS| 2vCPUs / 1GB RAM|2.6-stable-omni|
-|Singapore,SG|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Tokyo,JP|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Oregon,US|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Ohio,US|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Mumbai,IN|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Sao Paulo,BR|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Frankfurt,DE|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Milan,IT|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-|Sydney,AU|AWS|1vCPU / 0.5GB RAM|2.6-stable-omni|
-
-## 自建超级节点
-
-OmniEdge 可以让用户自建超级节点，使用自建的超级节点，可以最大限度的提高速度，降低延时。这里我们提供了一个脚本，可以非常方便的使用 Docker 设置一个超级节点。
-
-### 安装
-
+1. 注册您的个人帐号: [注册](https://omniedge.io/register)
+2. [下载](https://omniedge.io/download) OmniEdge 客户端
+3. 如果您想使用命令行版本，可以使用以下命令安装 Cli 版本：
 ```bash
-curl https://raw.githubusercontent.com/omniedgeio/docker-customize-supernode/main/install.sh | bash
+curl https://omniedge.io/install/omniedge-install.sh | bash
 ```
+4. 使用邮箱和密码登录客户端，选择需要加入的虚拟网络，点击加入，一切就准备好了。
 
->1) 2.6-stable-omni
->2) 3.0-stable
->3) Quit
+如果您想使用**安全码**登录或者想要管理设备和虚拟网络，请查阅[官方文档](https://omniedge.io/docs)
 
->Please enter your choice: 1
-
-#请输入 1 选择 2.6-stable-omni，这是目前客户端支持的版本，3.0稍后推出
-#默认端口是 443，也可以选择其他端口，请确认服务器和端口的可用性。
-
-
-### 在 OmniEdge 的管理界面设置自建超级节点
-
-OmniEdge允许为不同的虚拟网络设置不同的超级节点。登录你的帐号，到管理界面，选择对应的虚拟网络，输入自建超级节点的 **IP 地址** 和 **端口**。
-
-![](../Customizesupernode.png)
-
-**注意：更改超级节点后，各个客户端需要重新登录以更新超级节点信息。**
-
-## OmniEdge的优势
-
-![OmniEdgeComparison](../OmniEdgeComparison.gif)
-
-## 源代码
-
-- 自定义认证节点：https://github.com/omniedgeio/docker-customize-supernode
-- 客户端原代码: 
-    - [Windows](https://github.com/omniedgeio/omniedge-windows)
-    - [macOS (Intel, M1/M2 MacBook)](https://github.com/omniedgeio/omniedge-macOS)
-    - [iOS](https://github.com/omniedgeio/omniedge-iOS) 
-    - [Android 安卓](https://github.com/omniedgeio/omniedge-android)
-    - [群晖版本](https://github.com/omniedgeio/omniedge-synology)  
-    - [Linux Cli](https://github.com/omniedgeio/omniedge-cli)
-- 协议： https://github.com/omniedgeio/n2n
 
 ## 编译
 
@@ -123,6 +100,31 @@ cd omniedge-cli
 go mod download
 go generate
 BUILD_ENV=prod make build-freebsd
+```
+
+3. 交叉编译
+
+- 3.1 RISC-V 
+
+Host OS: Ubuntu 20.04
+
+```bash
+apt-get update
+apt-get install -y openssl autoconf build-essential libssl-dev zip wget g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+
+wget https://go.dev/dl/go1.18.4.linux-amd64.tar.gz
+rm -rf /usr/local/go && tar -C /usr/local -xzf go1.18.4.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+go version
+export GOOS=linux
+export GOARCH=riscv64
+export CGO_ENABLED=1
+export CC=riscv64-linux-gnu-gcc
+git clone https://github.com/omniedgeio/omniedge-cli.git
+cd omniedge-cli
+go mod download
+go generate
+BUILD_ENV=prod make build-riscv64
 ```
 
 编译好的文件可以在 **/out/** 找到。
