@@ -187,7 +187,6 @@ cd omniedge-windows
 
 افتح **OmniEdge.pro** وابدأ في التجميع.
 
-
 ## الاستخدام
 
 - [Virtual Network, Devices, Security Key, and Settings](https://omniedge.io/docs/article/admin)
