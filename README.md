@@ -130,6 +130,64 @@ BUILD_ENV=prod make build-riscv64
 
 The compiled omniedge-cli will be found in **/out/**
 
+### OmniEdge Android
+
+1. Download Android Studio: https://developer.android.com/studio
+2. Get the repo and compile
+
+```bash
+git clone https://github.com/omniedgeio/omniedge-android.git`
+./gradlew test --stacktrace
+./gradlew assembleDebug --stacktrace
+```
+
+We have also prepared the CI for Github and Gitlab for building automatically. 
+
+1. Github: https://github.com/omniedgeio/omniedge-android/blob/main/.github/workflows/build.yml
+2. GitLab: https://github.com/omniedgeio/omniedge-android/blob/main/.gitlab-ci.yml
+
+
+### OmniEdge iOS
+
+1. Download and install Xcode
+2. Get the repo and compile
+
+```bash
+git clone https://github.com/omniedgeio/omniedge-iOS.git
+cd omniedge-iOS
+open OmniEdgeNew/OmniEdgeNew.xcworkspace
+```
+
+Xcode will open automatically, you have to set your developer account to start the compile. We recommend compiling the package on your devices separately, specially the **Tunnel** package. 
+
+<img width="902" alt="image" src="https://user-images.githubusercontent.com/93888/180374544-0ae0fbd8-3413-427f-8e9b-ec0c49249f0e.png">
+
+### OmniEdge-macOS
+
+1. Download and install Xcode
+2. Get the repo and compile
+
+```bash
+git clone https://github.com/omniedgeio/omniedge-macOS.git
+cd omniedge-macOS
+open Omniedge.xcodeproj
+```
+
+Xcode will open automatically, you have to set your developer account to start the compile.
+
+### OmniEdge-windows
+
+1. Download and install QT
+2. Get the repo and compile
+
+```bash
+git clone https://github.com/omniedgeio/omniedge-windows.git
+cd omniedge-windows
+```
+
+open **OmniEdge.pro** and start to compile.
+
+
 ## Usage
 
 - [Virtual Network, Devices, Security Key, and Settings](https://omniedge.io/docs/article/admin)

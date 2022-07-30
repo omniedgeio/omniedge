@@ -130,6 +130,64 @@ BUILD_ENV=prod make build-riscv64
 编译好的文件可以在 **/out/** 找到。
 您也可以使用自带的 Github Workflow 自动化编译。
 
+
+### 编译 OmniEdge Android
+
+1. 下载并安装 Android Studio: https://developer.android.com/studio
+2. 下载源代码开始编译
+
+```bash
+git clone https://github.com/omniedgeio/omniedge-android.git`
+./gradlew test --stacktrace
+./gradlew assembleDebug --stacktrace
+```
+
+我们也针对 Github 和 Gitlab 准备了自动化编译脚本，可以直接使用：
+
+- Github: https://github.com/omniedgeio/omniedge-android/blob/main/.github/workflows/build.yml
+- GitLab: https://github.com/omniedgeio/omniedge-android/blob/main/.gitlab-ci.yml
+
+
+### 编译 OmniEdge iOS
+
+1. 下载并安装 Xcode
+2. 下载源代码开始编译
+
+```bash
+git clone https://github.com/omniedgeio/omniedge-iOS.git
+cd omniedge-iOS
+open OmniEdgeNew/OmniEdgeNew.xcworkspace
+```
+
+Xcode 会自动打开，开始编译前请先设置开发者帐号。我们建议您单独编译以下每一个包，特别是**Tunnel**。
+
+<img width="902" alt="image" src="https://user-images.githubusercontent.com/93888/180374544-0ae0fbd8-3413-427f-8e9b-ec0c49249f0e.png">
+
+### 编译 OmniEdge-macOS
+
+1. 下载并安装 Xcode
+2. 下载源代码开始编译
+
+```bash
+git clone https://github.com/omniedgeio/omniedge-macOS.git
+cd omniedge-macOS
+open Omniedge.xcodeproj
+```
+
+Xcode 会自动打开，开始编译前请先设置开发者帐号。
+
+### OmniEdge-windows
+
+1. 下载并安装 QT
+2. 下载源代码开始编译
+
+```bash
+git clone https://github.com/omniedgeio/omniedge-windows.git
+cd omniedge-windows
+```
+
+打开 **OmniEdge.pro** 开始编译.
+
 ## 使用安装 OmniEdge
 
 - [Virtual Network, Devices, Security Key, and Settings](https://omniedge.io/docs/article/admin)
