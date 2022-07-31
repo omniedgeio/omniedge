@@ -1,0 +1,18 @@
+#!/bin/sh
+./autogen.sh
+
+arch=$GOARCH
+OS_V=$(uname)
+
+if [ "$arch" = 'riscv64' ]; then
+        ./configure --target=riscv64-unknow-linux-gnu --host x86_64-linux-gnu
+else
+        ./configure
+fi
+
+
+if [ "$OS_V" = 'FreeBSD' ]; then
+        gmake
+else
+        make
+fi

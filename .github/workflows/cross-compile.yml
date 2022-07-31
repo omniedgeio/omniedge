@@ -1,0 +1,90 @@
+name: omniedge build in host machine
+
+env:
+  APP_NAME: 'omniedgecli'
+  MAINTAINER: 'OmniEdge.io'
+  DESC: 'Bring intranet on the internet'
+
+on:
+  push:
+    branches:
+      - dev
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      env:
+        description: env of the action
+        default: prod
+        required: false
+      tag:
+        description: tag ( if tag is not empty, env is always prod)
+        required: false
+
+jobs:
+  build:
+    name: Build on ${{ matrix.platform }}
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      TAG: ${{ github.event.inputs.tag }}
+    strategy:
+      matrix:
+        platform: [ riscv64 ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: setup env to prod if tag is not empty
+        if: ${{ env.TAG }}
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+
+      - name: Checkout without tag
+        if: ${{ !env.TAG }}
+        uses: actions/checkout@master
+
+      - name: Checkout with tag
+        uses: actions/checkout@master
+        if: ${{ env.TAG }}
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: setup golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.18.4'
+
+      - name: go mod download
+        run: |
+          go mod download
+
+      - name: make
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y openssl
+          sudo -E apt-get install -y build-essential
+          sudo -E apt-get install -y libssl-dev
+          sudo -E apt-get install -y zip
+          sudo -E apt-get install -y autoconf
+          sudo -E apt-get install -y g++-riscv64-linux-gnu 
+          sudo -E apt-get install -y gcc-riscv64-linux-gnu
+          go version
+          GOARCH=riscv64
+	  CC=riscv64-linux-gnu-gcc
+	  make generate
+          BUILD_ENV=${{ env.ENVIRONMENT }} make build-riscv64
+          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
+          sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+          cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: my-artifact
+          path: ./out/omniedge
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ env.TAG }}
+        with:
+          token: ${{ secrets.GIT_HUB_TOKEN}}
+          files: omniedgecli-${{ github.ref_name }}-freebsd.zip
+          tag_name: ${{ env.TAG }}
+

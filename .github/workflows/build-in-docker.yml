@@ -108,7 +108,7 @@ jobs:
           docker cp omniedge:/app/out/omniedge .
       - name: zip
         run: |
-          zip -j ./omniedgecli-${{ matrix.platform }}.zip ./omniedge
+          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip ./omniedge
 
       - name: setup prerelease
         run: |
@@ -123,5 +123,5 @@ jobs:
         if: ${{ env.TAG }}
         with:
           token: ${{ secrets.GIT_HUB_TOKEN}}
-          files: omniedgecli-${{ matrix.platform }}.zip
+          files: omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag_name: ${{ env.TAG }}
