@@ -49,7 +49,7 @@ OmniEdgeは、従来のVPNの代替手段である[n2n]（https://github.com/nto
 
 ||||
 | ---- | ---- | ---- |
-|ダッシュボード管理管理|メッシュVPN|MacOS（メニューバー）およびWindows（システムトレイ）用のデスクトップGUIアプリ|
+|ダッシュボード管理|メッシュVPN|MacOS（メニューバー）およびWindows（システムトレイ）用のデスクトップGUIアプリ|
 |マルチ仮想ネットワーク|サイト間VPN|Linux、FreeBSD、Raspbian、MacOS用のコマンドラインCLIアプリ|
 |マルチユーザー|無制限のデータ転送|armv7、arm64、RISC-V64、x86_64およびamd64用のコマンドラインCLIアプリ|
 |マルチデバイス|暗号化されたピアツーピア接続|iOSおよびAndroid用のモバイルアプリ|
@@ -238,7 +238,7 @@ cd omniedge-windows
 - [n2n vs. OmniEdge](https://omniedge.io/docs/article/compare/n2n-vs-omniedge)
 
 
-## 誰が私たちについて話しているのか
+## Media
 
 - [Founded by a Single Tweet Startup OmniEdge’s effort to let connect without concern](https://threat.technology/founded-by-a-single-tweet-startup-omniedges-effort-to-let-connect-without-concern/)
 - [voonze: OmniEdge, to access your Intranet from the Internet using P2P](https://voonze.com/omniedge-to-access-your-intranet-from-the-internet-using-p2p/)
