@@ -20,7 +20,6 @@ on:
       tag:
         description: tag ( if tag is not empty, env is always prod)
         required: false
-
 jobs:
   build:
     name: Build on ${{ matrix.platform }}
@@ -46,7 +45,6 @@ jobs:
         if: ${{ env.TAG }}
         with:
           ref: ${{ env.TAG }}
-
       - name: setup golang
         uses: actions/setup-go@v2
         with:
@@ -55,18 +53,23 @@ jobs:
       - name: go mod download
         run: |
           go mod download
-	  
       - name: go set arch
         run: |
-	  GOARCH=riscv64
-
+          
+      - name: Prepare Cross Compile
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
+          sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+          GOARCH=riscv64
+          CC=riscv64-linux-gnu-gcc
+          
       - name: make
         run: |
           sudo -E apt-get -y update
           sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
           sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
-	  CC=riscv64-linux-gnu-gcc
-	  BUILD_ENV=${{ env.ENVIRONMENT }} make build-riscv64
+          BUILD_ENV=${{ env.ENVIRONMENT }} make build
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
           cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
