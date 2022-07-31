@@ -79,33 +79,7 @@ jobs:
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
           sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
-          cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
-          mkdir -p ./.debpkg/usr/bin
-          mkdir -p ./.rpmpkg/usr/bin
-          cp -p ./out/omniedge ./.debpkg/usr/bin/
-          cp -p ./out/omniedge ./.rpmpkg/usr/bin/
-          
-      - uses: jiro4989/build-deb-action@v2
-        if: startsWith(matrix.os, 'ubuntu')
-        with:
-          package: ${{ env.APP_NAME }}-${{ matrix.os }}
-          package_root: .debpkg
-          maintainer: ${{ env.MAINTAINER }}
-          version: ${{ github.ref }}
-          arch: 'amd64'
-          desc: '${{ env.DESC }}'
-
-      - uses: jiro4989/build-rpm-action@v2
-        if: startsWith(matrix.os, 'ubuntu')
-        with:
-          summary: '${{ env.DESC }}'
-          package: ${{ env.APP_NAME }}
-          package_root: .rpmpkg
-          maintainer: ${{ env.MAINTAINER }}
-          version: ${{ github.ref }}
-          arch: 'x86_64'
-          desc: '${{ env.DESC }}'
-              
+      
       - name: make
         if: startsWith(matrix.os, 'macos')
         run: |
@@ -115,15 +89,6 @@ jobs:
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
           sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
           cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
-
-      - uses: actions/upload-artifact@v3
-        if: startsWith(matrix.os, 'ubuntu')
-        with:
-          name: artifact-package
-          path: |
-            ./*.deb
-            ./*.rpm
-            !./*-debuginfo-*.rpm
 
       - uses: actions/upload-artifact@v3
         with:
@@ -139,8 +104,6 @@ jobs:
           files: |
             omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
             omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
-            *.deb
-            *.rpm
           tag_name: ${{ env.TAG }}
 
       - name: Create Release
@@ -186,6 +149,4 @@ jobs:
           prerelease: ${{ github.event.inputs.is-pre-release }}
           files: |
             ./*.sha256
-            ./*.deb
-            ./*.rpm
             ./*.zip
