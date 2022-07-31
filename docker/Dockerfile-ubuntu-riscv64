@@ -1,9 +1,18 @@
-#golang:arm64v8
-FROM golang:buster@sha256:f60460ca6896db2269a4ec3fa25ddc0f3523706b2fae304b44693a7fd61fd5d5
+FROM ubuntu:20.04
 
-# install golang
+# Install all needed packages
 RUN apt-get update && \
 apt-get install -y wget git autoconf automake openssl autoconf build-essential libssl-dev zip wget g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+
+WORKDIR /
+
+RUN wget https://go.dev/dl/go1.18.4.linux-amd64.tar.gz
+RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.18.4.linux-amd64.tar.gz
+RUN export PATH=$PATH:/usr/local/go/bin
+RUN export GOOS=linux
+RUN export GOARCH=riscv64
+RUN export CGO_ENABLED=1
+RUN export CC=riscv64-linux-gnu-gcc
 
 WORKDIR /app
 
@@ -13,4 +22,4 @@ ARG BUILD_ENV
 ENV GOARCH=riscv64
 ENV CC=riscv64-linux-gnu-gcc
 RUN go generate ./...
-RUN BUILD_ENV=$BUILD_ENV make build
+RUN BUILD_ENV=$BUILD_ENV make build-riscv64
