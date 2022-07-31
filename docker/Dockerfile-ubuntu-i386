@@ -10,6 +10,6 @@ WORKDIR /app
 COPY . .
 ARG BUILD_ENV
 
-ENV GOARCH=arm64
+ENV GOARCH=386
 RUN go generate ./...
 RUN BUILD_ENV=$BUILD_ENV make build
