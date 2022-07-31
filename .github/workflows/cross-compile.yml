@@ -55,22 +55,18 @@ jobs:
       - name: go mod download
         run: |
           go mod download
+	  
+      - name: go set arch
+        run: |
+	  GOARCH=riscv64
 
       - name: make
         run: |
           sudo -E apt-get -y update
-          sudo -E apt-get install -y openssl
-          sudo -E apt-get install -y build-essential
-          sudo -E apt-get install -y libssl-dev
-          sudo -E apt-get install -y zip
-          sudo -E apt-get install -y autoconf
-          sudo -E apt-get install -y g++-riscv64-linux-gnu 
-          sudo -E apt-get install -y gcc-riscv64-linux-gnu
-          go version
-          GOARCH=riscv64
+          sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
+          sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
 	  CC=riscv64-linux-gnu-gcc
-	  make generate
-          BUILD_ENV=${{ env.ENVIRONMENT }} make build-riscv64
+	  BUILD_ENV=${{ env.ENVIRONMENT }} make build-riscv64
           zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
           cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
