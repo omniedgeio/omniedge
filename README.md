@@ -76,12 +76,21 @@ And if you want to login with **security key**, or manage your devices, go and c
 
 ## Compile
 
-### OmniEdge Cli
+### Linux
 
-1. Environment: Golang 1.16.6
-2. Compile: 
+1. Install golang for your distribution
 
-- 2.1. Ubuntu /linux
+Follow the [instruction](https://go.dev/doc/install) to install golang, we use **1.16.6**, or running the following command:
+
+```bash
+wget https://go.dev/dl/go1.16.6.linux-amd64.tar.gz
+rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.6.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+go version
+```
+
+
+2. Build for Ubuntu 18.04, 20.04, 22.04/Debian 10, 11
 
 ```bash
 sudo -E apt-get -y update
@@ -96,18 +105,36 @@ go generate
 BUILD_ENV=prod make build
 ```
 
-- 2.2. macOS
+3. Build for Fedora 36, CentOS 8
 
 ```bash
-brew install autoconf automake libtool
+sudo yum update
+sudo yum -y install gcc-c++ curl wget zip wget git openssl-devel net-tools automake autoconf make
 git clone https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
 go generate
-BUILD_ENV=prod make build-darwin
+chmod +x internal/make
+BUILD_ENV=prod make build
 ```
 
-- 2.3. freebsd
+4. Build for Arch(Manjaro)
+
+```bash
+sudo pacman -Syu --needed unzip git gcc curl wget zip make pkg-config openssl net-tools automake autoconf make
+git clone https://github.com/omniedgeio/omniedge-cli
+cd omniedge-cli
+go mod download
+go generate
+chmod +x internal/make
+BUILD_ENV=prod make build
+```
+
+The compiled omniedge-cli will be found in **/out/**
+
+### BSD
+
+1. FreeBSD
 
 ```bash
 su
@@ -119,9 +146,11 @@ go generate
 BUILD_ENV=prod make build-freebsd
 ```
 
-3. Cross Compile
+The compiled omniedge-cli will be found in **/out/**
 
-- 3.1 RISC-V 
+### Cross Compile
+
+1. Compile for RISCV64
 
 Host OS: Ubuntu 20.04
 
@@ -146,7 +175,7 @@ BUILD_ENV=prod make build-riscv64
 
 The compiled omniedge-cli will be found in **/out/**
 
-### OmniEdge Android
+### Android
 
 1. Download Android Studio: https://developer.android.com/studio
 2. Get the repo and compile
@@ -163,7 +192,7 @@ We have also prepared the CI for Github and Gitlab for building automatically.
 2. GitLab: https://github.com/omniedgeio/omniedge-android/blob/main/.gitlab-ci.yml
 
 
-### OmniEdge iOS
+###  iOS
 
 1. Download and install Xcode
 2. Get the repo and compile
@@ -178,7 +207,9 @@ Xcode will open automatically, you have to set your developer account to start t
 
 <img width="902" alt="image" src="https://user-images.githubusercontent.com/93888/180374544-0ae0fbd8-3413-427f-8e9b-ec0c49249f0e.png">
 
-### OmniEdge-macOS
+### macOS
+
+#### macOS GUI
 
 1. Download and install Xcode
 2. Get the repo and compile
@@ -191,7 +222,20 @@ open Omniedge.xcodeproj
 
 Xcode will open automatically, you have to set your developer account to start the compile.
 
-### OmniEdge-windows
+#### macOS Cli
+
+```bash
+brew install autoconf automake libtool
+git clone https://github.com/omniedgeio/omniedge-cli
+cd omniedge-cli
+go mod download
+go generate
+BUILD_ENV=prod make build-darwin
+```
+
+The compiled omniedge-cli will be found in **/out/**
+
+### Windows
 
 1. Download [QT 5.12.12 for windows](https://download.qt.io/official_releases/qt/5.12/5.12.12/) and [Inno Setup for windows](https://jrsoftware.org/isdl.php#stable)
 2. Get the repo and compile
