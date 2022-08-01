@@ -78,7 +78,7 @@ And if you want to login with **security key**, or manage your devices, go and c
 
 ### Linux
 
-1. Install golang for your distribution
+**Install golang for your distribution**
 
 Follow the [instruction](https://go.dev/doc/install) to install golang, we use **1.16.6**, or running the following command:
 
@@ -90,7 +90,7 @@ go version
 ```
 
 
-2. Build for Ubuntu 18.04, 20.04, 22.04/Debian 10, 11
+####  Build for Ubuntu 18.04, 20.04, 22.04/Debian 10, 11
 
 ```bash
 sudo -E apt-get -y update
@@ -105,7 +105,7 @@ go generate
 BUILD_ENV=prod make build
 ```
 
-3. Build for Fedora 36, CentOS 8
+#### Build for Fedora 36, CentOS 8
 
 ```bash
 sudo yum update
@@ -118,7 +118,7 @@ chmod +x internal/make
 BUILD_ENV=prod make build
 ```
 
-4. Build for Arch(Manjaro)
+#### Build for Arch(Manjaro)
 
 ```bash
 sudo pacman -Syu --needed unzip git gcc curl wget zip make pkg-config openssl net-tools automake autoconf make
@@ -134,7 +134,7 @@ The compiled omniedge-cli will be found in **/out/**
 
 ### BSD
 
-1. FreeBSD
+#### FreeBSD
 
 ```bash
 su
@@ -150,7 +150,7 @@ The compiled omniedge-cli will be found in **/out/**
 
 ### Cross Compile
 
-1. Compile for RISCV64
+#### Compile for RISCV64
 
 Host OS: Ubuntu 20.04
 
