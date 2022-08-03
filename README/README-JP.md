@@ -252,6 +252,11 @@ cd omniedge-windows
 >問題またはPRを介して私たちに関連する投稿についてお気軽にお知らせください。
 
 
+## Contributors
+
+[harri8807](https://github.com/orgs/omniedgeio/people/harri8807) , [Tex-Tang](https://github.com/Tex-Tang), [ivyxjc](https://github.com/orgs/omniedgeio/people/ivyxjc), [kidylee](https://github.com/kidylee), [EbenDang](https://github.com/orgs/omniedgeio/people/EbenDang)
+,[zteshadow](https://github.com/zteshadow), [ChenYouping](https://github.com/orgs/omniedgeio/people/ChenYouping),[ddrandy](https://github.com/orgs/omniedgeio/people/ddrandy), **Tsingv**, [mtx2d](https://github.com/mtx2d)，[Blackrose](https://github.com/Blackrose), [cheung-chifung](https://github.com/cheung-chifung),[我不是矿神](https://imnks.com/5768.html)
+
 ----
 
-ご不明な点がございましたら、[Discord]（https://discord.gg/d4faRPYj）までお気軽にお問い合わせください。
+ご不明な点がございましたら、[Discord](https://discord.gg/d4faRPYj）までお気軽にお問い合わせください。

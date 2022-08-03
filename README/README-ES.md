@@ -245,8 +245,14 @@ abre **OmniEdge.pro** y comienza a compilar.
 - [群晖新套件：OmniEdge 轻松连接任何平台上的所有设备](https://imnks.com/5768.html)
 - [发了一条消息，我创建了一个服务全球26个国家用户的开源项目](https://zhuanlan.zhihu.com/p/535614999)
 
+## Contributors
+
+[harri8807](https://github.com/orgs/omniedgeio/people/harri8807) , [Tex-Tang](https://github.com/Tex-Tang), [ivyxjc](https://github.com/orgs/omniedgeio/people/ivyxjc), [kidylee](https://github.com/kidylee), [EbenDang](https://github.com/orgs/omniedgeio/people/EbenDang)
+,[zteshadow](https://github.com/zteshadow), [ChenYouping](https://github.com/orgs/omniedgeio/people/ChenYouping),[ddrandy](https://github.com/orgs/omniedgeio/people/ddrandy), **Tsingv**, [mtx2d](https://github.com/mtx2d)，[Blackrose](https://github.com/Blackrose), [cheung-chifung](https://github.com/cheung-chifung),[我不是矿神](https://imnks.com/5768.html)
+
+
 > siéntase libre de informarnos sobre cualquier publicación relacionada con nosotros a través de un problema o relaciones públicas.
 
 ----
 
-Si tiene más preguntas, no dude en comunicarse con nosotros en [Discord](https://discord.gg/d4faRPYj).
+Si tiene más preguntas, no dude en comunicarse con nosotros en [Discussions](https://github.com/omniedgeio/omniedge/discussions).

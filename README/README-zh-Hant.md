@@ -250,6 +250,11 @@ cd omniedge-windows
 >如果您看到了任何有關於 OmniEdge 的文章，請給我們提PR或者發issue
 
 
+## Contributors
+
+[harri8807](https://github.com/orgs/omniedgeio/people/harri8807) , [Tex-Tang](https://github.com/Tex-Tang), [ivyxjc](https://github.com/orgs/omniedgeio/people/ivyxjc), [kidylee](https://github.com/kidylee), [EbenDang](https://github.com/orgs/omniedgeio/people/EbenDang)
+,[zteshadow](https://github.com/zteshadow), [ChenYouping](https://github.com/orgs/omniedgeio/people/ChenYouping),[ddrandy](https://github.com/orgs/omniedgeio/people/ddrandy), **Tsingv**, [mtx2d](https://github.com/mtx2d)，[Blackrose](https://github.com/Blackrose), [cheung-chifung](https://github.com/cheung-chifung),[我不是矿神](https://imnks.com/5768.html)
+
 ----
 
-如果您有更多問題，請去[Discord](https://discord.gg/d4faRPYj) 提問。
+如果您有更多問題，請去[Discussions](https://github.com/omniedgeio/omniedge/discussions) 提問。

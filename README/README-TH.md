@@ -245,8 +245,14 @@ cd omniedge-windows
 - [群晖新套件：OmniEdge 轻松连接任何平台上的所有设备](https://imnks.com/5768.html)
 - [发了一条消息，我创建了一个服务全球26个国家用户的开源项目](https://zhuanlan.zhihu.com/p/535614999)
 
+
+## Contributors
+
+[harri8807](https://github.com/orgs/omniedgeio/people/harri8807) , [Tex-Tang](https://github.com/Tex-Tang), [ivyxjc](https://github.com/orgs/omniedgeio/people/ivyxjc), [kidylee](https://github.com/kidylee), [EbenDang](https://github.com/orgs/omniedgeio/people/EbenDang)
+,[zteshadow](https://github.com/zteshadow), [ChenYouping](https://github.com/orgs/omniedgeio/people/ChenYouping),[ddrandy](https://github.com/orgs/omniedgeio/people/ddrandy), **Tsingv**, [mtx2d](https://github.com/mtx2d)，[Blackrose](https://github.com/Blackrose), [cheung-chifung](https://github.com/cheung-chifung),[我不是矿神](https://imnks.com/5768.html)
+
 >อย่าลังเลที่จะบอกเราเกี่ยวกับโพสต์ใด ๆ ที่เกี่ยวข้องกับเราผ่านทางปัญหาหรือประชาสัมพันธ์
 
 ----
 
-หากมีคำถามเพิ่มเติม สามารถพูดคุยกับเราได้ที่ [Discord](https://discord.gg/d4faRPYj)
+หากมีคำถามเพิ่มเติม สามารถพูดคุยกับเราได้ที่ [Discussions](https://github.com/omniedgeio/omniedge/discussions)
