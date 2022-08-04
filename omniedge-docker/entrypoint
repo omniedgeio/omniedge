@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -e
+cp /proc/sys/kernel/random/uuid /etc/machine-id
+
+# echo 'net.ipv4.ip_forward = 1' | tee -a /etc/sysctl.conf
+# sysctl -p /etc/sysctl.conf
+login() {
+  sleep 5
+  omniedge login -s ${OMNIEDGE_SECURITYKEY}
+}
+
+connect() {
+  sleep 5
+  omniedge join -n ${OMNIEDGE_VIRUTALNETWORK_ID}
+}
+
+login && connect

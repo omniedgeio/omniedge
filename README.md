@@ -68,7 +68,7 @@ You can find more features in the [Pricing](https://omniedge.io/pricing) Page fo
 ```bash
 curl https://omniedge.io/install/omniedge-install.sh | bash
 ```
-4. Login with your Email and password, select your virutal network, connect! 
+4. Login with your Email and password, select your virtual network, connect! 
 
 You are all set! 
 
