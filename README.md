@@ -74,6 +74,17 @@ You are all set!
 
 And if you want to login with **security key**, or manage your devices, go and check [Documenation](https://omniedge.io/docs) for more.
 
+Or you can also run OmniEdge in Docker, with your **OMNIEDGE_SECURITYKEY** and **OMNIEDGE_VIRUTALNETWORK_ID**, both can be found from [Dashboard](https://omniedge.io/dashboard) : 
+
+```bash
+sudo docker run -d \
+  -e OMNIEDGE_SECURITYKEY=OMNIEDGE_SECURITYKEY \
+  -e OMNIEDGE_VIRUTALNETWORK_ID="OMNIEDGE_VIRUTALNETWORK_ID" \
+  --network host \
+  --privileged \
+  omniedge/omniedge:latest
+  ```
+
 ## Compile
 
 ### Linux
