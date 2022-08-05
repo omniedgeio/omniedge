@@ -112,6 +112,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
         with:
+          allowUpdates: "true"
           tag_name: ${{ github.ref }}
           release_name: OmniEdgecli-${{ github.ref }} 
 
@@ -142,6 +143,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          allowUpdates: "true"
           tag_name: ${{ github.ref }}
           name: OmniEdgecli-${{ github.ref }} 
           body: "TODO: Fill this changelog. Sorry for the inconvenience!"

@@ -131,3 +131,4 @@ jobs:
           token: ${{ secrets.GIT_HUB_TOKEN}}
           files: omniedgecli-linux-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag_name: ${{ env.TAG }}
+          allowUpdates: "true"

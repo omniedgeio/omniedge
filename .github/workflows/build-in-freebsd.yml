@@ -66,3 +66,4 @@ jobs:
           token: ${{ secrets.GIT_HUB_TOKEN}}
           files: omniedgecli-${{ github.ref_name }}-freebsd.zip
           tag_name: ${{ env.TAG }}
+          allowUpdates: "true"
