@@ -29,7 +29,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        os: [ ubuntu-18.04,ubuntu-20.04,Ubuntu 22.04,macos-latest ]
+        os: [ ubuntu-18.04,ubuntu-20.04,Ubuntu-22.04,macos-latest ]
     runs-on: ${{ matrix.os }}
     steps:
       - name: setup env to prod if tag is not empty
@@ -105,6 +105,7 @@ jobs:
             omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
             omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
           tag_name: ${{ env.TAG }}
+          allowUpdates: "true"
 
       - name: Create Release
         id: create_release
