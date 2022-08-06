@@ -6,7 +6,7 @@ on:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
     branches:
-      - dev
+      - main
 jobs:
   release:
     runs-on: ubuntu-latest
