@@ -1,6 +1,9 @@
 name: omniedge docker cross build
 
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       env:
@@ -19,7 +22,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        platform: [ arm64v8,armv7,ppc64le ]
+        platform: [ arm64,arm,ppc64le,amd64,386 ]
     runs-on: ubuntu-latest
     steps:
       - name: setup env to prod if tag is not empty
@@ -66,14 +69,20 @@ jobs:
       - name: dockerx platform
         run: |
           case ${{ matrix.platform }} in
-            arm64v8)
+            arm64)
             echo "DOCKER_PLATFORM=linux/arm64" >> $GITHUB_ENV
             ;;
-            armv7)
+            arm)
             echo "DOCKER_PLATFORM=linux/arm/v7" >> $GITHUB_ENV
             ;;
             ppc64le)
             echo "DOCKER_PLATFORM=linux/ppc64le" >> $GITHUB_ENV
+            ;;
+            amd64)
+            echo "DOCKER_PLATFORM=linux/amd64" >> $GITHUB_ENV
+            ;;
+            386)
+            echo "DOCKER_PLATFORM=linux/i386" >> $GITHUB_ENV
             ;;
           esac
 
@@ -108,8 +117,8 @@ jobs:
           docker cp omniedge:/app/out/omniedge .
       - name: zip
         run: |
-          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip ./omniedge
-
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./omniedge
+      
       - name: setup prerelease
         run: |
           if [[ '${{ github.ref_type }}' == 'tag' ]]; then
@@ -117,11 +126,33 @@ jobs:
           else
             echo "PRE_RELEASE=true" >> $GITHUB_ENV
           fi
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      
+      - uses: softprops/action-gh-release@v1
         if: ${{ env.TAG }}
         with:
-          token: ${{ secrets.GIT_HUB_TOKEN}}
-          files: omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          token: ${{ secrets.GITHUB_TOKEN}}
+          files: |
+            omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag_name: ${{ env.TAG }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: true
+          
+      - name: Upload zip 
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          asset_name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          asset_content_type: application/zip

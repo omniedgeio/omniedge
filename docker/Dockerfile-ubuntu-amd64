@@ -1,0 +1,15 @@
+#golang:amd64
+FROM amd64/golang:1.18
+
+# install golang
+RUN apt update
+RUN apt -y install wget make git autoconf automake build-essential
+
+WORKDIR /app
+
+COPY . .
+ARG BUILD_ENV
+
+ENV GOARCH=amd64
+RUN go generate ./...
+RUN BUILD_ENV=$BUILD_ENV make build

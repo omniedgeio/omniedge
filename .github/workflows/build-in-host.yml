@@ -1,6 +1,14 @@
 name: omniedge build in host machine
 
+env:
+  APP_NAME: 'omniedge'
+  MAINTAINER: 'OmniEdge.io'
+  DESC: 'Bring intranet on the internet'
+
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       env:
@@ -19,7 +27,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        os: [ ubuntu-18.04,ubuntu-20.04,macos-latest ]
+        os: [ ubuntu-18.04,ubuntu-20.04,ubuntu-22.04,macos-latest ]
     runs-on: ${{ matrix.os }}
     steps:
       - name: setup env to prod if tag is not empty
@@ -67,25 +75,66 @@ jobs:
           sudo -E apt-get install -y zip
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
-          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
-
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+      
       - name: make
         if: startsWith(matrix.os, 'macos')
         run: |
-          brew install autoconf automake libtool
+          brew install autoconf automake libtool coreutils
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin
-          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          cat ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
 
       - uses: actions/upload-artifact@v3
         with:
-          name: my-artifact
-          path: ./out/omniedge
+          name: binary
+          path: |
+            ./out/omniedge
+            ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
 
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v1
         if: ${{ env.TAG }}
         with:
           token: ${{ secrets.GIT_HUB_TOKEN}}
-          files: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
+          files: |
+            omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip
+            omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
           tag_name: ${{ env.TAG }}
+          allowUpdates: "true"
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: true
+
+      - name: Upload zip 
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip
+          asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
+          asset_content_type: application/zip
+          
+      - name: Upload sha
+        id: upload_release_sha
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}.sha256
+          asset_content_type: application/txt
+          

@@ -1,6 +1,9 @@
 name: omniedge freebsd build
 
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       env:
@@ -19,7 +22,7 @@ jobs:
         if: ${{ env.TAG }}
         run: |
           echo "ENVIRONMENT=prod" >> $GITHUB_ENV
-      
+          
       - name: Checkout without tag
         if: ${{ !env.TAG }}
         uses: actions/checkout@master
@@ -39,29 +42,53 @@ jobs:
       - name: Show system info
         run: |
           echo -e "system info: $(uname -a)"
-
       - uses: actions/checkout@v2
       - name: prepare
         id: test
         uses: vmactions/freebsd-vm@v0.1.8
         with:
           usesh: true
-          prepare: pkg install -y curl go gmake git openssl zip autoconf automake libtool
           run: |
-            go mod download
+            pkg update
+            free -h
+            pkg install -y bash go gmake git openssl zip autoconf automake libtool
+            chsh -s bash
             make generate
             BUILD_ENV=${{ env.ENVIRONMENT }} make build-freebsd
-            zip -j ./omniedgecli-${{ github.ref_name }}-freebsd.zip ./out/omniedge
+            zip -j ./omniedge-${{ github.ref_name }}-freebsd-13.1.zip ./out/omniedge
 
       - uses: actions/upload-artifact@v3
         with:
           name: my-artifact
           path: ./out/omniedge
 
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v1
         if: ${{ env.TAG }}
         with:
           token: ${{ secrets.GIT_HUB_TOKEN}}
-          files: omniedgecli-${{ github.ref_name }}-freebsd.zip
+          files: |
+            omniedge-${{ github.ref_name }}-freebsd-13.1.zip
           tag_name: ${{ env.TAG }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: true
+          
+
+      - name: Upload zip 
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
+          asset_name: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
+          asset_content_type: application/zip

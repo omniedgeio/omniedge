@@ -1,0 +1,108 @@
+name: omniedge build in host machine
+
+env:
+  APP_NAME: 'omniedge'
+  MAINTAINER: 'OmniEdge.io'
+  DESC: 'Bring intranet on the internet'
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      env:
+        description: env of the action
+        default: prod
+        required: false
+      tag:
+        description: tag ( if tag is not empty, env is always prod)
+        required: false
+jobs:
+  build:
+    name: Build on ${{ matrix.platform }}
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      TAG: ${{ github.event.inputs.tag }}
+    strategy:
+      matrix:
+        platform: [ riscv64 ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: setup env to prod if tag is not empty
+        if: ${{ env.TAG }}
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+
+      - name: Checkout without tag
+        if: ${{ !env.TAG }}
+        uses: actions/checkout@master
+
+      - name: Checkout with tag
+        uses: actions/checkout@master
+        if: ${{ env.TAG }}
+        with:
+          ref: ${{ env.TAG }}
+      - name: setup golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.18.4'
+
+      - name: go mod download
+        run: |
+          go mod download
+      - name: go set arch
+        run: |
+          
+      - name: Prepare Cross Compile
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
+          sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+          GOARCH=riscv64
+          CC=riscv64-linux-gnu-gcc
+          
+      - name: make
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
+          sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+          BUILD_ENV=${{ env.ENVIRONMENT }} make build
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+          cat ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: my-artifact
+          path: ./out/omniedge
+          
+      - uses: softprops/action-gh-release@v1
+        if: ${{ env.TAG }}
+        with:
+          token: ${{ secrets.GIT_HUB_TOKEN}}
+          files: |
+            omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          tag_name: ${{ env.TAG }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: true
+          
+      - name: Upload zip 
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          asset_name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          asset_content_type: application/zip
