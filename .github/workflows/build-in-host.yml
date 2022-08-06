@@ -113,9 +113,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
         with:
-          allowUpdates: "true"
           tag_name: ${{ github.ref }}
-          release_name: OmniEdgecli-${{ github.ref }} 
+          release_name: OmniEdgecli-${{ github.ref }
+          draft: true
+          prerelease: true
 
       - name: Upload zip 
         id: upload_release_asset
