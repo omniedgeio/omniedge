@@ -1,14 +1,12 @@
 name: omniedge build in host machine
 
 env:
-  APP_NAME: 'omniedgecli'
+  APP_NAME: 'omniedge'
   MAINTAINER: 'OmniEdge.io'
   DESC: 'Bring intranet on the internet'
 
 on:
   push:
-    branches:
-      - dev
     tags:
       - 'v*.*.*'
   workflow_dispatch:
@@ -29,7 +27,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        os: [ ubuntu-18.04,ubuntu-20.04,macos-latest ]
+        os: [ ubuntu-18.04,ubuntu-20.04,ubuntu-22.04,macos-latest ]
     runs-on: ${{ matrix.os }}
     steps:
       - name: setup env to prod if tag is not empty
@@ -77,71 +75,35 @@ jobs:
           sudo -E apt-get install -y zip
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
-          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
-          sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
-          cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
-          mkdir -p ./.debpkg/usr/bin
-          mkdir -p ./.rpmpkg/usr/bin
-          cp -p ./out/omniedge ./.debpkg/usr/bin/
-          cp -p ./out/omniedge ./.rpmpkg/usr/bin/
-          
-      - uses: jiro4989/build-deb-action@v2
-        if: startsWith(matrix.os, 'ubuntu')
-        with:
-          package: ${{ env.APP_NAME }}-${{ matrix.os }}
-          package_root: .debpkg
-          maintainer: ${{ env.MAINTAINER }}
-          version: ${{ github.ref }}
-          arch: 'amd64'
-          desc: '${{ env.DESC }}'
-
-      - uses: jiro4989/build-rpm-action@v2
-        if: startsWith(matrix.os, 'ubuntu')
-        with:
-          summary: '${{ env.DESC }}'
-          package: ${{ env.APP_NAME }}
-          package_root: .rpmpkg
-          maintainer: ${{ env.MAINTAINER }}
-          version: ${{ github.ref }}
-          arch: 'x86_64'
-          desc: '${{ env.DESC }}'
-              
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+      
       - name: make
         if: startsWith(matrix.os, 'macos')
         run: |
           brew install autoconf automake libtool coreutils
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin
-          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
-          sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
-          cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
-
-      - uses: actions/upload-artifact@v3
-        if: startsWith(matrix.os, 'ubuntu')
-        with:
-          name: artifact-package
-          path: |
-            ./*.deb
-            ./*.rpm
-            !./*-debuginfo-*.rpm
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          cat ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
 
       - uses: actions/upload-artifact@v3
         with:
           name: binary
           path: |
             ./out/omniedge
-            ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+            ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
 
       - uses: softprops/action-gh-release@v1
         if: ${{ env.TAG }}
         with:
           token: ${{ secrets.GIT_HUB_TOKEN}}
           files: |
-            omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
-            omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
-            *.deb
-            *.rpm
+            omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip
+            omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
           tag_name: ${{ env.TAG }}
+          allowUpdates: "true"
 
       - name: Create Release
         id: create_release
@@ -150,7 +112,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
         with:
           tag_name: ${{ github.ref }}
-          release_name: OmniEdgecli-${{ github.ref }} 
+          release_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: true
 
       - name: Upload zip 
         id: upload_release_asset
@@ -159,7 +123,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
+          asset_path: omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip
           asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
           asset_content_type: application/zip
           
@@ -170,22 +134,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          asset_path: omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
           asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}.sha256
           asset_content_type: application/txt
           
-      - name: Create Release Draft
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          name: OmniEdgecli-${{ github.ref }} 
-          body: "TODO: Fill this changelog. Sorry for the inconvenience!"
-          draft: ${{ github.event.inputs.is-draft }}
-          prerelease: ${{ github.event.inputs.is-pre-release }}
-          files: |
-            ./*.sha256
-            ./*.deb
-            ./*.rpm
-            ./*.zip
