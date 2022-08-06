@@ -64,7 +64,7 @@ jobs:
         with:
           token: ${{ secrets.GIT_HUB_TOKEN}}
           files: |
-            omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip
+            omniedge-${{ github.ref_name }}-freebsd.zip
           tag_name: ${{ env.TAG }}
 
       - name: Create Release
