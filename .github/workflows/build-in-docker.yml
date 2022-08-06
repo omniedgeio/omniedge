@@ -22,7 +22,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        platform: [ arm64v8,armv7,ppc64le,amd64,i386 ]
+        platform: [ arm64,arm,ppc64le,amd64,386 ]
     runs-on: ubuntu-latest
     steps:
       - name: setup env to prod if tag is not empty
@@ -69,10 +69,10 @@ jobs:
       - name: dockerx platform
         run: |
           case ${{ matrix.platform }} in
-            arm64v8)
+            arm64)
             echo "DOCKER_PLATFORM=linux/arm64" >> $GITHUB_ENV
             ;;
-            armv7)
+            arm)
             echo "DOCKER_PLATFORM=linux/arm/v7" >> $GITHUB_ENV
             ;;
             ppc64le)
@@ -81,7 +81,7 @@ jobs:
             amd64)
             echo "DOCKER_PLATFORM=linux/amd64" >> $GITHUB_ENV
             ;;
-            i386)
+            386)
             echo "DOCKER_PLATFORM=linux/i386" >> $GITHUB_ENV
             ;;
           esac
@@ -142,7 +142,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
         with:
           tag_name: ${{ github.ref }}
-          release_name: OmniEdge-${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
           draft: true
           prerelease: true
           

@@ -55,7 +55,7 @@ jobs:
             chsh -s bash
             make generate
             BUILD_ENV=${{ env.ENVIRONMENT }} make build-freebsd
-            zip -j ./omniedge-${{ github.ref_name }}-freebsd.zip ./out/omniedge
+            zip -j ./omniedge-${{ github.ref_name }}-freebsd-13.1.zip ./out/omniedge
 
       - uses: actions/upload-artifact@v3
         with:
@@ -67,7 +67,7 @@ jobs:
         with:
           token: ${{ secrets.GIT_HUB_TOKEN}}
           files: |
-            omniedge-${{ github.ref_name }}-freebsd.zip
+            omniedge-${{ github.ref_name }}-freebsd-13.1.zip
           tag_name: ${{ env.TAG }}
 
       - name: Create Release
@@ -77,7 +77,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
         with:
           tag_name: ${{ github.ref }}
-          release_name: OmniEdge-${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
           draft: true
           prerelease: true
           
@@ -89,6 +89,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: omniedge-${{ github.ref_name }}-freebsd.zip
-          asset_name: omniedge-${{ github.ref_name }}-freebsd.zip
+          asset_path: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
+          asset_name: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
           asset_content_type: application/zip
