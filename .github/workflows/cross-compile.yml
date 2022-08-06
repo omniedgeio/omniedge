@@ -70,9 +70,9 @@ jobs:
           sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
           sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
-          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
-          sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
-          cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+          cat ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
 
       - uses: actions/upload-artifact@v3
         with:
@@ -84,7 +84,17 @@ jobs:
         if: ${{ env.TAG }}
         with:
           token: ${{ secrets.GIT_HUB_TOKEN}}
-          files: omniedgecli-${{ github.ref_name }}-freebsd.zip
+          files: omniedge-${{ github.ref_name }}-freebsd.zip
           tag_name: ${{ env.TAG }}
           allowUpdates: "true"
 
+      - name: Upload zip 
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.Release.outputs.upload_url }}
+          asset_path: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          asset_name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          asset_content_type: application/zip

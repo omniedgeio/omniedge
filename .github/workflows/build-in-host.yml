@@ -77,8 +77,8 @@ jobs:
           sudo -E apt-get install -y zip
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
-          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
-          sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
       
       - name: make
         if: startsWith(matrix.os, 'macos')
@@ -86,24 +86,24 @@ jobs:
           brew install autoconf automake libtool coreutils
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin
-          zip -j ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
-          sha256sum ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
-          cat ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          cat ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
 
       - uses: actions/upload-artifact@v3
         with:
           name: binary
           path: |
             ./out/omniedge
-            ./omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+            ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
 
       - uses: softprops/action-gh-release@v1
         if: ${{ env.TAG }}
         with:
           token: ${{ secrets.GIT_HUB_TOKEN}}
           files: |
-            omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
-            omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+            omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip
+            omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
           tag_name: ${{ env.TAG }}
           allowUpdates: "true"
 
@@ -114,7 +114,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
         with:
           tag_name: ${{ github.ref }}
-          release_name: OmniEdgecli-${{ github.ref }}
+          release_name: OmniEdge-${{ github.ref }}
           draft: true
           prerelease: true
 
@@ -125,7 +125,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip
+          asset_path: omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip
           asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}
           asset_content_type: application/zip
           
@@ -136,7 +136,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: omniedgecli-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          asset_path: omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
           asset_name: ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.os }}.sha256
           asset_content_type: application/txt
           
