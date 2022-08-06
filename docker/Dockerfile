@@ -5,9 +5,12 @@ ARG BUILD_ENV
 ARG VERSION=0.2.3
 
 # Install all needed packages
-RUN add-apt-repository ppa:longsleep/golang-backports -y && \
+RUN apt-get update && \
+    apt-get install -y wget make git autoconf automake build-essential software-properties-common
+
+RUN add-apt-repository ppa:longsleep/golang-backports -y && \ 
     apt-get update && \
-    apt-get install -y wget make git autoconf automake build-essential golang-go
+    apt-get install -y golang-go 
 
 WORKDIR /app
 
