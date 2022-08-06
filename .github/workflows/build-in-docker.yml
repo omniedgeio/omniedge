@@ -127,10 +127,9 @@ jobs:
       - uses: softprops/action-gh-release@v1
         if: ${{ env.TAG }}
         with:
-          token: ${{ secrets.GIT_HUB_TOKEN}}
+          token: ${{ secrets.GITHUB_TOKEN}}
           files: |
             omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
-            omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
           tag_name: ${{ env.TAG }}
 
       - name: Create Release

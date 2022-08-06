@@ -83,8 +83,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: ${{ env.TAG }}
         with:
-          token: ${{ secrets.GIT_HUB_TOKEN}}
-          files: omniedge-${{ github.ref_name }}-freebsd.zip
+          token: ${{ secrets.GITHUB_TOKEN}}
+          files: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag_name: ${{ env.TAG }}
           allowUpdates: "true"
 
