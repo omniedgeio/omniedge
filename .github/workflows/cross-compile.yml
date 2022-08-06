@@ -78,23 +78,33 @@ jobs:
         with:
           name: my-artifact
           path: ./out/omniedge
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
+          
+      - uses: softprops/action-gh-release@v1
         if: ${{ env.TAG }}
         with:
-          token: ${{ secrets.GITHUB_TOKEN}}
-          files: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          token: ${{ secrets.GIT_HUB_TOKEN}}
+          files: |
+            omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag_name: ${{ env.TAG }}
-          allowUpdates: "true"
 
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: OmniEdge-${{ github.ref }}
+          draft: true
+          prerelease: true
+          
       - name: Upload zip 
         id: upload_release_asset
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.Release.outputs.upload_url }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           asset_name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           asset_content_type: application/zip
