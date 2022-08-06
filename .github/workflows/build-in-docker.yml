@@ -115,7 +115,7 @@ jobs:
       - name: zip
         run: |
           zip -j ./omniedgecli-linux-${{ github.ref_name }}-${{ matrix.platform }}.zip ./omniedge
-
+      
       - name: setup prerelease
         run: |
           if [[ '${{ github.ref_type }}' == 'tag' ]]; then
@@ -123,7 +123,7 @@ jobs:
           else
             echo "PRE_RELEASE=true" >> $GITHUB_ENV
           fi
-
+      
       - name: Release
         uses: softprops/action-gh-release@v1
         if: ${{ env.TAG }}
@@ -132,3 +132,14 @@ jobs:
           files: omniedgecli-linux-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag_name: ${{ env.TAG }}
           allowUpdates: "true"
+
+      - name: Upload zip 
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.Release.outputs.upload_url }}
+          asset_path: omniedgecli-linux-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          asset_name: omniedgecli-linux-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          asset_content_type: application/zip
