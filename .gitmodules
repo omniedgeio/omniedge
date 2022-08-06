@@ -25,3 +25,6 @@
 [submodule "omniedge-synology"]
 	path = omniedge-synology
 	url = https://github.com/omniedgeio/omniedge-synology.git
+[submodule "omniedge-github-action"]
+	path = omniedge-github-action
+	url = https://github.com/omniedgeio/github-action.git
