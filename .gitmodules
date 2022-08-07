@@ -31,3 +31,6 @@
 [submodule "omniedge-supernode-status"]
 	path = omniedge-supernode-status
 	url = https://github.com/omniedgeio/server-status.git
+[submodule "Documentation"]
+	path = Documentation
+	url = https://github.com/omniedgeio/docs.git
