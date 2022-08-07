@@ -28,3 +28,6 @@
 [submodule "omniedge-github-action"]
 	path = omniedge-github-action
 	url = https://github.com/omniedgeio/github-action.git
+[submodule "omniedge-supernode-status"]
+	path = omniedge-supernode-status
+	url = https://github.com/omniedgeio/server-status.git
