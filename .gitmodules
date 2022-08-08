@@ -34,3 +34,6 @@
 [submodule "Documentation"]
 	path = Documentation
 	url = https://github.com/omniedgeio/docs.git
+[submodule "omniedge-docker"]
+	path = omniedge-docker
+	url = https://github.com/omniedgeio/omniedge-docker.git
