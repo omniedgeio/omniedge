@@ -63,7 +63,7 @@ You can find more features in the [Pricing](https://omniedge.io/pricing) Page fo
 ## Get Started in 5 minutes 
 
 1. Sign up your account: [Sign up](https://omniedge.io/register)
-2. [Download](https://omniedge.io/download) OmniEdge apps for your platform 
+2. [Download](https://omniedge.io/download) OmniEdge apps for your platform: macOS, linux, FreeBSD, iOS, android and more.
 3. Or run the following command if you want to use cli version:
 ```bash
 curl https://omniedge.io/install/omniedge-install.sh | bash
@@ -74,7 +74,9 @@ You are all set!
 
 And if you want to login with **security key**, or manage your devices, go and check [Documenation](https://omniedge.io/docs) for more.
 
-Or you can also run OmniEdge in Docker, with your **OMNIEDGE_SECURITYKEY** and **OMNIEDGE_VIRUTALNETWORK_ID**, both can be found from [Dashboard](https://omniedge.io/dashboard) : 
+### Docker
+
+Bring container into intranet.
 
 ```bash
 sudo docker run -d \
@@ -83,7 +85,18 @@ sudo docker run -d \
   --network host \
   --privileged \
   omniedge/omniedge:latest
-  ```
+```
+### Github Action
+
+Bring Github Action into intranet, access nodes/devices from CI workflows.
+
+```bash
+- name: OmniEdge for Github Action
+  uses: omniedgeio/github-action@v1
+  with:
+    securitykey: ${{ secrets.OMNIEDGE_SECURITY_KEY }}
+    virtualnetworkid: ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }}
+```
 
 ## Compile
 
