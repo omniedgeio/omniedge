@@ -206,13 +206,15 @@ apri **OmniEdge.pro** e inizia a compilare.
 ## Utilizzo
 
 - [Virtual Network, Devices, Security Key, and Settings](https://omniedge.io/docs/article/admin)
-- [Windows 7,10,11 for Intel or Arm](https://omniedge.io/docs/article/Install/windows)
-- [Android](https://omniedge.io/docs/article/Install/android)
-- [Linux Cli for raspberry Pi, Nvidia Jeston,and more](https://omniedge.io/docs/article/Install/cli)
-- [MacOS Cli](https://omniedge.io/docs/article/Install/macoscli)
-- [Synology](https://omniedge.io/docs/article/Install/synology)
-- [iOS](https://omniedge.io/docs/article/Install/ios)
-- [Setup custom supernode](https://omniedge.io/docs/article/Install/customize-supernode)
+- [Windows 7,10,11 for Intel or Arm](https://omniedge.io/docs/article/install/windows)
+- [Android](https://omniedge.io/docs/article/install/android)
+- [Linux Cli for raspberry Pi, Nvidia Jeston,and more](https://omniedge.io/docs/article/install/cli)
+- [MacOS Cli](https://omniedge.io/docs/article/install/macoscli)
+- [Synology](https://omniedge.io/docs/article/install/synology)
+- [Docker](https://omniedge.io/docs/article/install/docker)
+- [Github Action](https://omniedge.io/docs/article/install/github-action)
+- [iOS](https://omniedge.io/docs/article/install/ios)
+- [Setup custom supernode](https://omniedge.io/docs/article/install/customize-supernode)
 
 ## Casi d'uso
 
@@ -240,9 +242,7 @@ apri **OmniEdge.pro** e inizia a compilare.
 - [wwwhatsnew: OMNIEDGE, PARA ACCEDER A TU INTRANET DESDE INTERNET USANDO P2P](https://wwwhatsnew.com/2022/03/03/omniedge-para-acceder-a-tu-intranet-desde-internet-usando-p2p/)
 - [l'Entrepreneur: OmniEdge, pour accéder à votre Intranet depuis Internet en P2P](https://lentrepreneur.co/style/technologie/omniedge-pour-acceder-a-votre-intranet-depuis-internet-en-p2p-04032022)
 - [RunaCapital: Awesome OSS alternatives](https://github.com/RunaCapital/awesome-oss-alternatives)
-- [OmniEdge 虚拟组网工具使用及原理简介](https://einverne.github.io/post/2021/11/omniedge-usage.html)
-- [群晖新套件：OmniEdge 轻松连接任何平台上的所有设备](https://imnks.com/5768.html)
-- [发了一条消息，我创建了一个服务全球26个国家用户的开源项目](https://zhuanlan.zhihu.com/p/535614999)
+
 
 
 ## Contributors
