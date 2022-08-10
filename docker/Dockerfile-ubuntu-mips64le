@@ -6,12 +6,15 @@ RUN apt-get update
 RUN apt-get install -y wget make git autoconf automake build-essential pkg-config
 
 RUN gcc --version
+RUN go version
+RUN go env
 RUN uname -a
 WORKDIR /app
 
 COPY . .
 ARG BUILD_ENV
 
-ENV GOARCH=mips64
+ENV GOARCH=mips64le
+ENV GOOS=linux
 RUN go generate ./...
 RUN BUILD_ENV=$BUILD_ENV make build
