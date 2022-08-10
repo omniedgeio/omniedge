@@ -6,6 +6,13 @@ RUN apt update
 RUN apt -y install wget make git binutils autoconf automake openssl libssl-dev zip build-essential gcc-mips-linux-gnu g++-mips-linux-gnu
 
 RUN mips-linux-gnu-gcc --version
+RUN export GOOS=linux
+RUN export GOARCH=mips64le
+RUN export CGO_ENABLED=1
+RUN export CC=mips-linux-gnu-gcc
+RUN export CXX=mips-linux-gnu-g++ 
+RUN export CC_LD=mips-linux-gnu-ld 
+
 WORKDIR /app
 
 COPY . .
