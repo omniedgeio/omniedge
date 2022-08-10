@@ -1,5 +1,5 @@
 #golang:mips64le
-FROM golang:buster@sha256:09d3ddd6d8629773a05c3b1d484aeaf88469f735bcc12a56588413d43771d936
+FROM mips64le/golang:1.18
 
 # install golang
 RUN apt-get update
