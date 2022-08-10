@@ -7,14 +7,15 @@ OS_V=$(uname)
 # https://github.com/ntop/n2n/issues/1013
 # https://github.com/omniedgeio/omniedge/discussions/17
 
-if [ "$arch" = 'riscv64' ]; then
-        ./configure --target=riscv64-unknow-linux-gnu --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
-elif [ "$arch" = 'mips64le' ]; then
-        ./configure --target=mips-unknow-linux-gnu --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"    
-else
-        ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
-fi
+# if [ "$arch" = 'riscv64' ]; then
+#         ./configure --target=riscv64-unknow-linux-gnu --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+# elif [ "$arch" = 'mips64le' ]; then
+#         ./configure --target=mips-unknow-linux-gnu --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"    
+# else
+#         ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+# fi
 
+./configure --target=mips-unknow-linux-gnu --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 
 if [ "$OS_V" = 'FreeBSD' ]; then
         gmake
