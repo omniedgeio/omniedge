@@ -13,7 +13,6 @@ else
         ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 fi
 
-
 if [ "$OS_V" = 'FreeBSD' ]; then
         gmake
 else
