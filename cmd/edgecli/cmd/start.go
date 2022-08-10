@@ -32,6 +32,7 @@ var startCmd = &cobra.Command{
 			SecretKey:     viper.GetString(keyJoinVirtualNetworkSecretKey),
 			DeviceMask:    viper.GetString(keyJoinVirtualNetworkNetMask),
 			SuperNode:     viper.GetString(keyJoinVirtualNetworkSuperNode),
+			EnableRouting: viper.GetBool(cliEnableRouting),
 		}
 		var service = edgecli.StartService{
 			StartOption: startOption,
@@ -45,7 +46,9 @@ var startCmd = &cobra.Command{
 func init() {
 	var (
 		authConfigPath string
+		enableRoutine  bool
 	)
 	startCmd.Flags().StringVarP(&authConfigPath, cliAuthConfigFile, "f", "", "position to store the auth and config")
+	startCmd.Flags().BoolVarP(&enableRoutine, cliEnableRouting, "r", false, "enable routing")
 	//rootCmd.AddCommand(startCmd)
 }
