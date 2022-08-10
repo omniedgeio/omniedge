@@ -12,6 +12,6 @@ WORKDIR /app
 COPY . .
 ARG BUILD_ENV
 
-ENV GOARCH=mips64le
+ENV GOARCH=mips64
 RUN go generate ./...
 RUN BUILD_ENV=$BUILD_ENV make build
