@@ -14,6 +14,7 @@ type StartOption struct {
 	DeviceMac     string
 	DeviceMask    string
 	SuperNode     string
+	EnableRouting bool
 }
 
 type StartService struct {
@@ -42,6 +43,7 @@ func (s *StartService) Start() error {
 
 func (s *StartService) createEdge() *omnin2n.Edge {
 	edge := new(omnin2n.Edge)
+	edge.AllowRouting = s.EnableRouting
 	edge.CommunityName = s.CommunityName
 	edge.SuperNodeNum = 0
 	edge.RegisterInterval = 20

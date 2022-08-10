@@ -20,9 +20,10 @@ const (
 
 	cliVirtualNetworkId = "network"
 
-	cliScanTimeout = "timeout"
-	cliCidr        = "cidr"
-	cliScanResult  = "scan-result"
+	cliScanTimeout   = "timeout"
+	cliCidr          = "cidr"
+	cliScanResult    = "scan-result"
+	cliEnableRouting = "enable-routing"
 )
 
 const (

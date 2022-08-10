@@ -113,7 +113,7 @@ var joinCmd = &cobra.Command{
 		persistAuthFile()
 		log.Infof("Success to join virtual network")
 		log.Infof("Start to connect omniedge")
-		if err = start(device, joinResp); err != nil {
+		if err = start(device, joinResp, viper.GetBool(cliEnableRouting)); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
@@ -140,7 +140,7 @@ func register(httpOption edge.HttpOption) (*edge.DeviceResponse, error) {
 	return device, err
 }
 
-func start(device *edge.DeviceResponse, joinResponse *edge.JoinVirtualNetworkResponse) error {
+func start(device *edge.DeviceResponse, joinResponse *edge.JoinVirtualNetworkResponse, enableRouting bool) error {
 	var randomMac string
 	var err error
 	if randomMac, err = edge.GenerateRandomMac(); err != nil {
@@ -154,6 +154,7 @@ func start(device *edge.DeviceResponse, joinResponse *edge.JoinVirtualNetworkRes
 		SecretKey:     joinResponse.SecretKey,
 		DeviceMask:    joinResponse.SubnetMask,
 		SuperNode:     joinResponse.Server.Host,
+		EnableRouting: enableRouting,
 	}
 	var service = edge.StartService{
 		StartOption: startOption,
@@ -207,9 +208,11 @@ func init() {
 	var (
 		networkId      string
 		authConfigPath string
+		enableRoutine  bool
 	)
 	joinCmd.Flags().StringVarP(&networkId, cliVirtualNetworkId, "n", "", "id of the virtual network which you want to join")
 	_ = registerCmd.MarkFlagRequired(cliVirtualNetworkId)
 	joinCmd.Flags().StringVarP(&authConfigPath, cliAuthConfigFile, "f", "", "position to store the auth and config")
+	joinCmd.Flags().BoolVarP(&enableRoutine, cliEnableRouting, "r", false, "enable routing")
 	rootCmd.AddCommand(joinCmd)
 }
