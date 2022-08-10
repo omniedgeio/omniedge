@@ -24,7 +24,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        platform: [s390x,mips64le ]
+        platform: [s390x ]
     runs-on: ubuntu-latest
     steps:
       - name: setup env to prod if tag is not empty
@@ -73,9 +73,6 @@ jobs:
           case ${{ matrix.platform }} in
             s390x)
             echo "DOCKER_PLATFORM=linux/s390x" >> $GITHUB_ENV
-            ;;
-            mips64le)
-            echo "DOCKER_PLATFORM=linux/mips64le" >> $GITHUB_ENV
             ;;
           esac
 
