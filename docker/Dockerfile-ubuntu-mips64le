@@ -3,15 +3,18 @@ FROM golang:buster@sha256:09d3ddd6d8629773a05c3b1d484aeaf88469f735bcc12a56588413
 
 # install golang
 RUN apt update
-RUN apt -y install wget make git autoconf automake openssl libssl-dev zip build-essential gcc-mips-linux-gnu g++-mips-linux-gnu
+RUN apt -y install wget make git binutils autoconf automake openssl libssl-dev zip build-essential gcc-mips-linux-gnu g++-mips-linux-gnu
 
-
+RUN mips-linux-gnu-gcc --version
 WORKDIR /app
 
 COPY . .
 ARG BUILD_ENV
 
 ENV GOARCH=mips64le
-ENV CC=gcc-mips-linux-gnu
+ENV CC=mips-linux-gnu-gcc
+ENV CXX=mips-linux-gnu-g++ 
+ENV CC_LD=mips-linux-gnu-ld 
+
 RUN go generate ./...
 RUN BUILD_ENV=$BUILD_ENV make build
