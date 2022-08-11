@@ -26,7 +26,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        platform: [ riscv64,mips64le ]
+        platform: [ mips64le ]
     runs-on: ubuntu-latest
     steps:
       - name: setup env to prod if tag is not empty
@@ -60,9 +60,6 @@ jobs:
           sudo -E apt-get -y update
           sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
           sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
-          
-          gcc-mips64el-linux-gnuabi64 g++-mips64el-linux-gnuabi64
-
           GOARCH=riscv64
           CC=riscv64-linux-gnu-gcc
 
