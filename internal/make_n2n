@@ -8,8 +8,10 @@ OS_V=$(uname)
 # https://github.com/omniedgeio/omniedge/discussions/17
 
 if [ "$arch" = 'mips64el' ]; then
-        ./configure --host=mips64el-linux-gnuabi64 --target=mips64el-linux-gnuabi64 CFLAGS="-B/usr/mips64el-linux-gnuabi64/bin/ -I/usr/mips64el-linux-gnuabi64/include"
+        CC=mips64el-linux-gnu-gcc
+        ./configure --host x86_64-linux-gnu --target=mips64el-linux-gnuabi64 CFLAGS="-B/usr/mips64el-linux-gnuabi64/bin/ -I/usr/mips64el-linux-gnuabi64/include"
 elif [ "$arch" = 'riscv64' ]; then
+        CC=riscv64-linux-gnu-gcc
         ./configure --target=riscv64-unknow-linux-gnu --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 else
         ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"

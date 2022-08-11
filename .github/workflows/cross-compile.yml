@@ -59,23 +59,20 @@ jobs:
       - name: Prepare Cross Compile for riscv64
         if: startsWith(matrix.platform, 'riscv64')
         run: |
-          sudo -E apt-get -y update
-          sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
-          sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
-          GOARCH=riscv64
+          sudo apt-get -y update
+          sudo apt-get install -y openssl build-essential libssl-dev zip autoconf
+          sudo apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
           CC=riscv64-linux-gnu-gcc
 
       - name: Prepare Cross Compile for mips64el
         if: startsWith(matrix.platform, 'mips64el')
         run: |
-          sudo -E apt-get -y update
-          sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
-          sudo -E apt-get install -y gcc-mips64el-linux-gnuabi64 g++-mips64el-linux-gnuabi64
-          GOARCH=mips64el
-          CC=mips64el-linux-gnu-gcc
-
+          sudo apt-get -y update
+          sudo apt-get install -y openssl build-essential libssl-dev zip autoconf
+          sudo apt-get install -y gcc-mips64el-linux-gnuabi64 g++-mips64el-linux-gnuabi64
       - name: make
         run: |
+          GOARCH={{matrix.platform}}
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
           zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
