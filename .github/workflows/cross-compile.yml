@@ -7,6 +7,8 @@ env:
 
 on:
   push:
+    branches:
+      - dev
     tags:
       - 'v*.*.*'
   workflow_dispatch:
@@ -26,7 +28,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        platform: [ mips64le ]
+        platform: [ mips64el ]
     runs-on: ubuntu-latest
     steps:
       - name: setup env to prod if tag is not empty

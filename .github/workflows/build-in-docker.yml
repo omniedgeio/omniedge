@@ -2,8 +2,6 @@ name: omniedge docker cross build
 
 on:
   push:
-    branches:
-      - dev
     tags:
       - 'v*.*.*'
   workflow_dispatch:
