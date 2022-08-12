@@ -1,0 +1,29 @@
+name: sync
+on:
+  push:
+    branches:
+      - main
+  schedule:
+  - cron: "0 */12 * * *"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: update submodule
+        id: update-submodule
+        run: |
+          git submodule update --remote
+      - name: Commit files
+        run: |
+          git config --local user.email "github-actions@omniedge.io"
+          git config --local user.name "github-actions"
+          git add .
+          git commit -m "sync submodule" -a
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          force_with_lease: true
+
