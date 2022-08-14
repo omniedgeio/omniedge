@@ -16,15 +16,17 @@ jobs:
         id: update-submodule
         run: |
           git submodule update --remote
+          echo ::set-output name=commit-status::$(git status --porcelain=v1 2>/dev/null | wc -l)
       - name: Commit files
+        if: ${{ steps.update-submodule.outputs.commit-status==1 }}
+        id: commit
         run: |
           git config --local user.email "github-actions@omniedge.io"
           git config --local user.name "github-actions"
           git add .
           git commit -m "sync submodule" -a
-          git status --porcelain=v1 2>/dev/null | wc -l
-          echo ::set-output name=commit-status::$(git status --porcelain=v1 2>/dev/null | wc -l)
       - name: Push changes
+        id: push
         if: ${{ steps.update-submodule.outputs.commit-status==1 }}
         uses: ad-m/github-push-action@master
         with:
