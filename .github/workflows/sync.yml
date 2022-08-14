@@ -22,8 +22,10 @@ jobs:
           git config --local user.name "github-actions"
           git add .
           git commit -m "sync submodule" -a
+          git status --porcelain=v1 2>/dev/null | wc -l
+          echo ::set-output name=commit-status::$(git status --porcelain=v1 2>/dev/null | wc -l)
       - name: Push changes
-        if: ${{git diff --cached --exit-code HEAD^ > /dev/null && (git ls-files --other --exclude-standard --directory | grep -c -v '/$')}}
+        if: ${{ steps.update-submodule.outputs.commit-status==1 }}
         uses: ad-m/github-push-action@master
         with:
           force_with_lease: true
