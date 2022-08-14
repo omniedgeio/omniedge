@@ -23,6 +23,7 @@ jobs:
           git add .
           git commit -m "sync submodule" -a
       - name: Push changes
+        if: ${{git diff --cached --exit-code HEAD^ > /dev/null && (git ls-files --other --exclude-standard --directory | grep -c -v '/$')}}
         uses: ad-m/github-push-action@master
         with:
           force_with_lease: true
