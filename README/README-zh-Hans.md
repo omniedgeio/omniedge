@@ -73,6 +73,11 @@ curl https://omniedge.io/install/omniedge-install.sh | bash
 
 如果您想使用**安全码**登录或者想要管理设备和虚拟网络，请查阅[官方文档](https://omniedge.io/docs)
 
+## 服务器状态
+
+  >这个服务器状态由 OmniEdge for Github Action 自动生成，每5个小时更新一次。
+  
+  [OmniEdge 服务状态](https://github.com/omniedgeio/server-status#server-status)
 
 ## 编译
 
