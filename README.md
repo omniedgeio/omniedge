@@ -1,6 +1,6 @@
 <p align="center">
 <h1 align="center"> OmniEdge </h1>
-<p align="center">What happens in intranet, stays in intranet.</p>
+<p align="center">Bring intranet on the intenet, bring everything into intranet.</p>
 </p>
 
 <p align="center">
@@ -66,7 +66,6 @@ You can find more features in the [Pricing](https://omniedge.io/pricing) Page fo
 | --------- | ---------- | --- | --- | --- |--- |--- |--- |--- | --- |--- |
 | OmniEdge  | [0.2.3](https://github.com/omniedgeio/omniedge/releases/tag/v0.2.3)  | ✅  | ✅  | ✅  |✅  |✅  |✅  |✅  |✅ |✅ |
 
-
 ## Get Started in 5 minutes 
 
 1. Sign up your account: [Sign up](https://omniedge.io/register)
@@ -104,6 +103,13 @@ Bring Github Action into intranet, access nodes/devices from CI workflows.
     securitykey: ${{ secrets.OMNIEDGE_SECURITY_KEY }}
     virtualnetworkid: ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }}
 ```
+
+## Server status 
+
+  >This Server Status is generated every 5 hours by OmniEdge Github action.
+  
+  [OmniEdge server-status](https://github.com/omniedgeio/server-status#server-status)
+
 
 ## Compile
 
