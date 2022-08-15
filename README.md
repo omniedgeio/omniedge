@@ -1,6 +1,6 @@
 <p align="center">
 <h1 align="center"> OmniEdge </h1>
-<p align="center">Bring intranet on the intenet, bring everything into intranet.</p>
+<p align="center">Bring intranet on the internet, bring everything into intranet.</p>
 </p>
 
 <p align="center">
@@ -130,11 +130,8 @@ go version
 ####  Build for Ubuntu 18.04, 20.04, 22.04/Debian 10, 11
 
 ```bash
-sudo -E apt-get -y update
-sudo -E apt-get install -y openssl
-sudo -E apt-get install -y build-essential
-sudo -E apt-get install -y libssl-dev
-sudo -E apt-get install -y zip
+sudo apt-get -y update
+sudo apt-get install -y openssl build-essential libssl-dev zip autoconf
 git clone https://github.com/omniedgeio/omniedge-cli
 cd omniedge-cli
 go mod download
