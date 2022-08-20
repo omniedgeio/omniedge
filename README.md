@@ -1,41 +1,38 @@
-<p align="center">
-<h1 align="center"> OmniEdge </h1>
-<p align="center">Bring intranet on the internet, bring everything into intranet.</p>
-</p>
 
-<p align="center">
-<a href="https://omniedge.io">
-<img alt="Website" src="https://img.shields.io/website?label=omniedge.io&url=https%3A%2F%2Fomniedge.io">
-</a>
-<a href="https://github.com/omniedgeio/omniedge">
-<img src="https://img.shields.io/github/license/omniedgeio/omniedge">
-</a>
-<a href="https://github.com/omniedgeio/omniedge">
-<img src="https://img.shields.io/github/downloads/omniedgeio/app-release/total">
-</a>
+![OmniEdge](https://user-images.githubusercontent.com/93888/185755146-a79ad5d6-7901-4855-9efb-ae108dbdcdf6.png)
 
-<a href="https://twitter.com/intent/follow?screen_name=omniedgeio">
-<img src="https://img.shields.io/twitter/follow/omniedgeio?label=follows&style=social" />
-</a>
-  <a href="https://github.com/omniedgeio/omniedge-cli">
-    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-cli" />
-  </a> 
-    <a href="https://github.com/omniedgeio/omniedge-iOS">
-    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-iOS" />
-  </a>
-      <a href="https://github.com/omniedgeio/omniedge-macOS">
-    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-macOS" />
-  </a> 
-      <a href="https://github.com/omniedgeio/omniedge-windows">
-    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-windows" />
-  </a> 
-        <a href="https://github.com/omniedgeio/omniedge-android">
-<img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-android"
-</a>
-          <a href="https://github.com/omniedgeio/omniedge-synology">
-    <img src="https://img.shields.io/github/languages/top/omniedgeio/omniedge-synology" />
-  </a> 
-</p>
+<div align="center">
+  <h1>OmniEdge</h1>
+<a href="https://omniedge.io"><img alt="Website" src="https://img.shields.io/website?label=omniedge.io&url=https%3A%2F%2Fomniedge.io"></a>
+<a href="https://github.com/omniedgeio/omniedge"><img src="https://img.shields.io/github/workflow/status/omniedgeio/omniedge/sync"></a>
+<a href="https://github.com/omniedgeio/omniedge"><img src="https://img.shields.io/github/license/omniedgeio/omniedge"></a>
+<a href="https://github.com/omniedgeio/omniedge/releases"><img src="https://img.shields.io/github/v/release/omniedgeio/omniedge"></a>
+<a href="https://hub.docker.com/r/omniedge/omniedge"><img src="https://img.shields.io/docker/v/omniedge/omniedge?label=Docker"></a>
+<a href="https://hub.docker.com/r/omniedge/omniedge"><img src="https://img.shields.io/docker/image-size/omniedge/omniedge?label=Docker%20image%20size"></a>
+
+
+
+
+  <br />
+  <br />
+  <a href="https://omniedge.io/docs/article/install#get-started">Get Started</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://omniedge.io/">Website</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://omniedge.io/docs">Docs</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://omniedge.io/docs/article/development">Development</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://omniedge.io/docs/article/cases/">Examples Cases</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://discord.gg/FY6Yd6jcPu">Discord</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://twitter.com/omniedgeio">Twitter</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://github.com/omniedgeio/omniedge">OmniEdge</a>
+  <br />
+  <hr />
+</div>
 
 [【English】](README.md) [【繁体中文】](README/README-zh-Hant.md) [【简体中文】](README/README-zh-Hans.md) [【日本语】](README/README-JP.md) [【Español】](README/README-ES.md) [【Italiano】](README/README-IT.md) [【한국어】](README/README-KR.md) 
 [【العربي】](README/README-AR.md) [【Tiếng Việt】](README/README-VN.md) [【แบบไทย】](README/README-TH.md)
