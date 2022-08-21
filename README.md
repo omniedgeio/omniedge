@@ -55,8 +55,6 @@ OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https:/
 | :fire: [Remote Device Control](https://omniedge.io/docs/article/Cases/VNC)|[Drop Files remotely](https://omniedge.io/docs/article/Cases/landrop) |Automatic IP allocation|
 
 
-You can find more features in the [Pricing](https://omniedge.io/pricing) Page for Enterprise.
-
 ## Supported
 
 | App| Version | Linux | Windows | MacOS | FreeBSD |iOS | Android | Synology |  Docker | Github Action |
@@ -340,6 +338,11 @@ cd omniedge-windows
 - [wwwhatsnew: OMNIEDGE, PARA ACCEDER A TU INTRANET DESDE INTERNET USANDO P2P](https://wwwhatsnew.com/2022/03/03/omniedge-para-acceder-a-tu-intranet-desde-internet-usando-p2p/)
 - [l'Entrepreneur: OmniEdge, pour accéder à votre Intranet depuis Internet en P2P](https://lentrepreneur.co/style/technologie/omniedge-pour-acceder-a-votre-intranet-depuis-internet-en-p2p-04032022)
 - [RunaCapital: Awesome OSS alternatives](https://github.com/RunaCapital/awesome-oss-alternatives)
+- [OmniEdge in ntopconf 2022](https://www.ntop.org/ntopconf2022/)
+
+## Advisor
+
+[lucaderi](https://github.com/lucaderi)
 
 ## Contributors
 
