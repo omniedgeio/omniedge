@@ -54,7 +54,7 @@ jobs:
       - name: go mod download
         run: |
           go mod download
-          
+
       - name: prepare openwrt
         run: |
           wget https://downloads.openwrt.org/releases/19.07.9/targets/ar71xx/generic/openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
@@ -69,7 +69,7 @@ jobs:
           go version
       - name: make
         run: |
-          GOOS=linux GOARCH={{matrix.platform}} GOMIPS=softfloat BUILD_ENV=${{ env.ENVIRONMENT }} make build
+          GOOS=linux GOARCH=${{matrix.platform}} GOMIPS=softfloat BUILD_ENV=${{ env.ENVIRONMENT }} make build
           upx -9 -k ./out/omniedge
           zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
