@@ -64,11 +64,11 @@ jobs:
         run: |
           export GOROOT_BOOTSTRAP=/go
           export STAGING_DIR=/openwrt_19.07.09-ar71xx/staging_dir
-          wget https://go.dev/dl/go1.18.5.src.tar.gz
+          wget https://go.dev/dl/go1.16.6.src.tar.gz
           mkdir golang
-          mv go1.18.5.src.tar.gz golang/
+          mv go1.16.6.src.tar.gz golang/
           cd golang/
-          tar -xvf go1.18.5.src.tar.gz
+          tar -xvf go1.16.6.src.tar.gz
           cd go/src/
           CGO_ENABLED=1 GOOS=linux GOARCH=mips GOMIPS=softfloat ./make.bash
           cd ..
