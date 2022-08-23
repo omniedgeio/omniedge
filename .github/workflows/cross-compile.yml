@@ -63,8 +63,8 @@ jobs:
           rm openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz 
       - name: Compile go for mips
         run: |
-          export GOROOT_BOOTSTRAP=/go
-          export STAGING_DIR=/openwrt_19.07.09-ar71xx/staging_dir
+          export GOROOT_BOOTSTRAP=./go
+          export STAGING_DIR=./openwrt_19.07.09-ar71xx/staging_dir
           wget https://go.dev/dl/go1.16.6.src.tar.gz
           mkdir golang
           mv go1.16.6.src.tar.gz golang/
@@ -78,13 +78,11 @@ jobs:
           cd ..
       - name: Prepare the environment variable
         run: |
-          export GOROOT_BOOTSTRAP=/golang/go
-          export CC=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-gcc
-          export CXX=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-g++
-          export GOROOT=/golang/go
+          export GOROOT_BOOTSTRAP=./golang/go
+          export CC=./openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-gcc
+          export CXX=./openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-g++
+          export GOROOT=./golang/go
           export GOBIN=$GOROOT/bin
-          export GOPATH=/omniedge
-          export PATH=$PATH:$GOBIN:GOPATH/bin
           echo $PATH
           go version
       - name: make
