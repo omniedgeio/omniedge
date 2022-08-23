@@ -54,12 +54,12 @@ jobs:
       - name: go mod download
         run: |
           go mod download
+          
       - name: prepare openwrt
         run: |
           wget https://downloads.openwrt.org/releases/19.07.9/targets/ar71xx/generic/openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
           tar -xf openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz 
           mv openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64 openwrt_19.07.09-ar71xx
-          rm go1.4-bootstrap-20171003.tar.gz 
           rm openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz 
 
       - name: Prepare the environment variable
