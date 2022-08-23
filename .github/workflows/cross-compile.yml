@@ -47,7 +47,6 @@ jobs:
           ref: ${{ env.TAG }}
       - name: setup golang bootstrap
         run: |
-          mkdir -p /home/ubuntu
           curl -# -O https://dl.google.com/go/go1.4-bootstrap-20171003.tar.gz
           tar -zxvf go1.4-bootstrap-20171003.tar.gz 
           cd go/src/
@@ -63,8 +62,8 @@ jobs:
 
       - name: Compile go for mips
         run: |
-          export GOROOT_BOOTSTRAP=/home/ubuntu/go
-          export STAGING_DIR=/home/ubuntu/openwrt_19.07.09-ar71xx/staging_dir
+          export GOROOT_BOOTSTRAP=/go
+          export STAGING_DIR=/openwrt_19.07.09-ar71xx/staging_dir
           wget https://go.dev/dl/go1.18.5.src.tar.gz
           mkdir golang
           mv go1.18.5.src.tar.gz golang/
@@ -78,12 +77,12 @@ jobs:
           cd ..
       - name: Prepare the environment variable
         run: |
-          export GOROOT_BOOTSTRAP=/home/ubuntu/golang/go
-          export CC=/home/ubuntu/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-gcc
-          export CXX=/home/ubuntu/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-g++
-          export GOROOT=/home/ubuntu/golang/go
+          export GOROOT_BOOTSTRAP=/golang/go
+          export CC=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-gcc
+          export CXX=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-g++
+          export GOROOT=/golang/go
           export GOBIN=$GOROOT/bin
-          export GOPATH=/home/ubuntu/omniedge
+          export GOPATH=/omniedge
           export PATH=$PATH:$GOBIN:GOPATH/bin
           echo $PATH
           go version
