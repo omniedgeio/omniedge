@@ -28,7 +28,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        platform: [ mips64el ]
+        platform: [ mips ]
     runs-on: ubuntu-latest
     steps:
       - name: setup env to prod if tag is not empty
@@ -45,35 +45,52 @@ jobs:
         if: ${{ env.TAG }}
         with:
           ref: ${{ env.TAG }}
-      - name: setup golang
-        uses: actions/setup-go@v2
-        with:
-          go-version: '1.18.4'
+      - name: setup golang bootstrap
+        run: |
+          mkdir -p /home/ubuntu
+          curl -# -O https://dl.google.com/go/go1.4-bootstrap-20171003.tar.gz
+          tar -zxvf go1.4-bootstrap-20171003.tar.gz 
+          cd go/src/
+          GOOS=linux GOARCH=amd64 ./make.bash
+          cd .. && cd ..
+      - name: prepare openwrt
+        run: |
+          wget https://downloads.openwrt.org/releases/19.07.9/targets/ar71xx/generic/openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
+          tar -xf openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz 
+          mv openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64 openwrt_19.07.09-ar71xx
+          rm go1.4-bootstrap-20171003.tar.gz 
+          rm openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz 
 
-      - name: go mod download
+      - name: Compile go for mips
         run: |
-          go mod download
-      - name: go set arch
+          export GOROOT_BOOTSTRAP=/home/ubuntu/go
+          export STAGING_DIR=/home/ubuntu/openwrt_19.07.09-ar71xx/staging_dir
+          wget https://go.dev/dl/go1.18.5.src.tar.gz
+          mkdir golang
+          mv go1.18.5.src.tar.gz golang/
+          cd golang/
+          tar -xvf go1.18.5.src.tar.gz
+          cd go/src/
+          CGO_ENABLED=1 GOOS=linux GOARCH=mips GOMIPS=softfloat ./make.bash
+          cd ..
+          ls /pkg
+          ls /bin
+          cd ..
+      - name: Prepare the environment variable
         run: |
-          
-      - name: Prepare Cross Compile for riscv64
-        if: startsWith(matrix.platform, 'riscv64')
-        run: |
-          sudo apt-get -y update
-          sudo apt-get install -y openssl build-essential libssl-dev zip autoconf
-          sudo apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
-          CC=riscv64-linux-gnu-gcc
-
-      - name: Prepare Cross Compile for mips64el
-        if: startsWith(matrix.platform, 'mips64el')
-        run: |
-          sudo apt-get -y update
-          sudo apt-get install -y openssl build-essential libssl-dev zip autoconf
-          sudo apt-get install -y gcc-mips64el-linux-gnuabi64 g++-mips64el-linux-gnuabi64
+          export GOROOT_BOOTSTRAP=/home/ubuntu/golang/go
+          export CC=/home/ubuntu/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-gcc
+          export CXX=/home/ubuntu/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-g++
+          export GOROOT=/home/ubuntu/golang/go
+          export GOBIN=$GOROOT/bin
+          export GOPATH=/home/ubuntu/omniedge
+          export PATH=$PATH:$GOBIN:GOPATH/bin
+          echo $PATH
+          go version
       - name: make
         run: |
-          GOARCH={{matrix.platform}}
-          BUILD_ENV=${{ env.ENVIRONMENT }} make build
+          GOOS=linux GOARCH={{matrix.platform}} GOMIPS=softfloat BUILD_ENV=${{ env.ENVIRONMENT }} make build
+          upx -9 -k ./out/omniedge
           zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
           cat ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
