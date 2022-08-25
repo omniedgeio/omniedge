@@ -8,12 +8,18 @@ OS_V=$(uname)
 # https://github.com/omniedgeio/omniedge/discussions/17
 
 
+
 if [ "$arch" = 'mips' ]; then
         # for GL.iNet MIFI
         ./configure --host x86_64-linux-gnu --target=ar71xx-ath79
 elif [ "$arch" = 'arm' ]; then
-        # arm-openwrt-linux-muslgnueabi
         ./configure --target=arm-openwrt-linux-muslgnueabi --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+elif [ "$arch" = 'arm64' ]; then
+        ./configure --target=aarch64-openwrt-linux-musl --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+elif [ "$arch" = '386' ]; then
+        ./configure --target=i386-pentium4-openwrt-linux-musl --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+elif [ "$arch" = 'amd64' ]; then
+        ./configure --target=x86-64-openwrt-linux-musl --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 elif [ "$arch" = 'riscv64' ]; then
         ./configure --target=riscv64-unknow-linux-gnu --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 else
