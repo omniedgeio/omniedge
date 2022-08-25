@@ -11,7 +11,7 @@ if [ "$arch" = 'mips' ]; then
         # for GL.iNet MIFI
         ./configure --host x86_64-linux-gnu --target=ar71xx-ath79
 elif [ "$arch" = 'arm' ]; then
-        ./configure --target=arm_cortex-a7+neon-vfpv4_musl_eabi --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+        ./configure --target=ipq40xx --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 elif [ "$arch" = 'riscv64' ]; then
         ./configure --target=riscv64-unknow-linux-gnu --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 else
