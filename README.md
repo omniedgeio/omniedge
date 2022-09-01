@@ -57,9 +57,9 @@ OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https:/
 
 ## Supported
 
-| App| Version | Linux | Windows | MacOS | FreeBSD |iOS | Android | Synology |  Docker | Github Action |
-| --------- | ---------- | --- | --- | --- |--- |--- |--- |--- | --- |--- |
-| OmniEdge  | [0.2.3](https://github.com/omniedgeio/omniedge/releases/tag/v0.2.3)  | ✅  | ✅  | ✅  |✅  |✅  |✅  |✅  |✅ |✅ |
+| App| Version | Linux | Windows | MacOS | FreeBSD |iOS | Android | Synology |  OpenWrt |Docker | Github Action |
+| --------- | ---------- | --- | --- | --- |--- |--- |--- |--- | --- |--- | --- |
+| OmniEdge  | [0.2.3](https://github.com/omniedgeio/omniedge/releases/tag/v0.2.3)  | ✅  | ✅  | ✅  | ✅  |✅  |✅  |✅  |✅  |✅ |✅ |
 
 ## Get Started in 5 minutes 
 
