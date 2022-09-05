@@ -120,7 +120,6 @@ jobs:
           docker cp omniedge:/app/out/omniedge .
       - name: zip
         run: |
-          upx -9 -k ./omniedge
           zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./omniedge
 
       - name: Archive package
