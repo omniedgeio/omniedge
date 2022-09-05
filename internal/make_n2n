@@ -9,7 +9,7 @@ CC_V=$CC
 # https://github.com/omniedgeio/omniedge/discussions/17
 
 
-if ["$CC_V"='gcc']; then
+if ["$CC_V"!='gcc']; then
         if [ "$arch" = 'mips' ]; then
                 # for GL.iNet MIFI
                 ./configure --target=mips-openwrt-linux-musl --host x86_64-linux-gnu
