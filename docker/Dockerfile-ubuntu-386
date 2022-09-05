@@ -13,3 +13,4 @@ ARG BUILD_ENV
 ENV GOARCH=386
 RUN go generate ./...
 RUN BUILD_ENV=$BUILD_ENV make build
+RUN upx -9 -k ./out/omniedge

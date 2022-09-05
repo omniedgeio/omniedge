@@ -45,3 +45,4 @@ ARG BUILD_ENV
 
 RUN go generate ./...
 RUN GOOS=linux GOARCH=mips GOMIPS=softfloat BUILD_ENV=$BUILD_ENV make build
+RUN upx -9 -k ./out/omniedge
