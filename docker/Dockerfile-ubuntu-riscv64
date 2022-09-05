@@ -2,7 +2,7 @@ FROM ubuntu:20.04
 
 # Install all needed packages
 RUN apt-get update && \
-apt-get install -y wget git autoconf automake openssl autoconf build-essential libssl-dev zip wget g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+apt-get install -y wget git autoconf automake openssl autoconf build-essential libssl-dev zip wget g++-riscv64-linux-gnu gcc-riscv64-linux-gnu upx
 
 WORKDIR /
 

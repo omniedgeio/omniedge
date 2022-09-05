@@ -3,7 +3,7 @@ FROM golang:buster@sha256:4c5a1dead04f13777610d1691ae6e4a376a2a1d938a6ef40d1f258
 
 # install golang
 RUN apt update
-RUN apt -y install wget make git autoconf automake build-essential
+RUN apt -y install wget make git autoconf automake build-essential upx
 
 WORKDIR /app
 

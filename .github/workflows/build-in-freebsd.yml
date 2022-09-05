@@ -51,44 +51,26 @@ jobs:
           run: |
             pkg update
             free -h
-            pkg install -y bash go gmake git openssl zip autoconf automake libtool
+            pkg install -y bash go gmake git openssl zip autoconf automake libtool upx
             chsh -s bash
             make generate
             BUILD_ENV=${{ env.ENVIRONMENT }} make build-freebsd
+            upx -9 -k ./out/omniedge
             zip -j ./omniedge-${{ github.ref_name }}-freebsd-13.1.zip ./out/omniedge
-
-      - uses: actions/upload-artifact@v3
+      
+      - name: Archive package
+        uses: actions/upload-artifact@v2
         with:
-          name: my-artifact
-          path: ./out/omniedge
-
-      - uses: softprops/action-gh-release@v1
-        if: ${{ env.TAG }}
-        with:
-          token: ${{ secrets.GIT_HUB_TOKEN}}
-          files: |
-            omniedge-${{ github.ref_name }}-freebsd-13.1.zip
-          tag_name: ${{ env.TAG }}
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref_name }}
-          draft: true
-          prerelease: true
+          path: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
+          name: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
+          if-no-files-found: error
           
-
-      - name: Upload zip 
-        id: upload_release_asset
-        uses: actions/upload-release-asset@v1.0.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload package to GitHub Release
+        uses: svenstaro/upload-release-action@v2
+        if: "startsWith(github.ref, 'refs/tags/')"
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
-          asset_name: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
-          asset_content_type: application/zip
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file_glob: true
+          overwrite: true
+          file: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
+          tag: ${{ github.ref }}
