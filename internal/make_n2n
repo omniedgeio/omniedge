@@ -14,7 +14,7 @@ if [ "$arch" = 'mips' ]; then
         # for GL.iNet MIFI
         ./configure --target=mips-openwrt-linux-musl --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 elif [ "$arch" = 'mipsel' ]; then
-        ./configure --target=target-mipsel_24kc_musl --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+        ./configure --target=mipsel-openwrt-linux-musl --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 elif [ "$arch" = 'arm' ]; then
         ./configure --target=arm-openwrt-linux-muslgnueabi --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 elif [ "$arch" = 'arm64' ]; then
