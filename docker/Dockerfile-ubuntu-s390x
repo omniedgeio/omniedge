@@ -13,4 +13,3 @@ ARG BUILD_ENV
 ENV GOARCH=s390x
 RUN go generate ./...
 RUN BUILD_ENV=$BUILD_ENV make build
-RUN upx -9 -k ./out/omniedge
