@@ -1,0 +1,47 @@
+FROM ubuntu:20.04
+
+# install golang
+RUN apt-get update
+RUN apt-get install -y wget make curl git autoconf automake build-essential pkg-config openssl gzip libssl-dev zip upx
+
+WORKDIR /
+
+RUN curl -# -O https://dl.google.com/go/go1.4-bootstrap-20171003.tar.gz
+RUN tar -zxvf go1.4-bootstrap-20171003.tar.gz 
+RUN cd go/src/
+RUN GOOS=linux GOARCH=amd64 ./make.bash
+
+RUN cd /
+RUN wget https://downloads.openwrt.org/releases/19.07.9/targets/ar71xx/generic/openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz
+RUN tar -xf openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz 
+RUN mv openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64 openwrt_19.07.09-ar71xx
+RUN rm go1.4-bootstrap-20171003.tar.gz 
+RUN rm openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz 
+
+RUN export GOROOT_BOOTSTRAP=/go
+RUN export STAGING_DIR=/openwrt_19.07.09-ar71xx/staging_dir
+
+RUN mkdir golang
+RUN wget https://go.dev/dl/go1.18.5.src.tar.gz
+RUN mv go1.18.5.src.tar.gz golang/
+RUN cd golang/
+RUN tar -xvf go1.18.5.src.tar.gz
+RUN cd go/src/
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=mips GOMIPS=softfloat ./make.bash
+RUN cd .. && ls /pkg && ls /bin
+
+RUN export GOROOT_BOOTSTRAP=/golang/go
+RUN export CC=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-gcc
+RUN export CXX=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-g++
+RUN export GOROOT=/golang/go
+RUN export GOBIN=$GOROOT/bin
+RUN export GOPATH=/
+RUN export PATH=$PATH:$GOBIN:GOPATH/bin
+
+RUN echo $PATH && go version
+
+COPY . .
+ARG BUILD_ENV
+
+RUN go generate ./...
+RUN GOOS=linux GOARCH=mips GOMIPS=softfloat BUILD_ENV=$BUILD_ENV make build

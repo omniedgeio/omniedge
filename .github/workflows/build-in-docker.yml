@@ -22,7 +22,7 @@ jobs:
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        platform: [ arm64,arm,ppc64le,amd64,386 ]
+        platform: [386,amd64,arm,arm64,ppc64le,s390x ]
     runs-on: ubuntu-latest
     steps:
       - name: setup env to prod if tag is not empty
@@ -69,6 +69,12 @@ jobs:
       - name: dockerx platform
         run: |
           case ${{ matrix.platform }} in
+            amd64)
+            echo "DOCKER_PLATFORM=linux/amd64" >> $GITHUB_ENV
+            ;;
+            386)
+            echo "DOCKER_PLATFORM=linux/i386" >> $GITHUB_ENV
+            ;;
             arm64)
             echo "DOCKER_PLATFORM=linux/arm64" >> $GITHUB_ENV
             ;;
@@ -78,11 +84,8 @@ jobs:
             ppc64le)
             echo "DOCKER_PLATFORM=linux/ppc64le" >> $GITHUB_ENV
             ;;
-            amd64)
-            echo "DOCKER_PLATFORM=linux/amd64" >> $GITHUB_ENV
-            ;;
-            386)
-            echo "DOCKER_PLATFORM=linux/i386" >> $GITHUB_ENV
+            s390x)
+            echo "DOCKER_PLATFORM=linux/s390x" >> $GITHUB_ENV
             ;;
           esac
 
