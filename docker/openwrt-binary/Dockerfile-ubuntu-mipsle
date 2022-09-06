@@ -1,0 +1,54 @@
+
+FROM ubuntu:20.04 AS build-env
+
+ARG OPENWRT_SDK=https://downloads.openwrt.org/releases/22.03.0/targets/ramips/mt7621/openwrt-sdk-22.03.0-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64.tar.xz
+
+ENV TZ=America/New_York
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+RUN apt-get update
+RUN apt-get install -y wget make curl git autoconf automake build-essential pkg-config openssl gzip libssl-dev zip upx
+
+WORKDIR /
+
+RUN curl -# -O https://dl.google.com/go/go1.4-bootstrap-20171003.tar.gz
+RUN tar -zxvf go1.4-bootstrap-20171003.tar.gz && \
+    cd go/src/ && \
+    GOOS=linux GOARCH=amd64 ./make.bash
+ENV export GOROOT_BOOTSTRAP=/go
+
+WORKDIR /app
+COPY . .
+
+WORKDIR /
+RUN export GOROOT_BOOTSTRAP=/go && \
+    mkdir golang && \
+    wget https://go.dev/dl/go1.18.5.src.tar.gz && \
+    mv go1.18.5.src.tar.gz golang/ && cd golang/ && \
+    tar -xvf go1.18.5.src.tar.gz && \
+    cd go/src/ && GOOS=linux GOARCH=mipsle ./make.bash && \
+    cd .. && ls pkg && ls bin
+
+RUN cp -r /golang/go /usr/local/ && \
+    export GOROOT_BOOTSTRAP=/usr/local/go && \
+    export GOROOT=/usr/local/go && \
+    export GOBIN=$GOROOT/bin &&  \
+    export GOPATH=/ && \
+    export PATH=$PATH:$GOBIN:GOPATH/bin && \
+    echo $PATH && go version && \
+    cd / && \
+    wget -O openwrt-sdk.tar.xz ${OPENWRT_SDK} && \
+    xz -q -d openwrt-sdk.tar.xz && tar -xvf openwrt-sdk.tar && \
+    mv -f openwrt-sdk-* openwrt-sdk && \
+    rm go1.4-bootstrap-20171003.tar.gz && rm openwrt-sdk.tar && \
+    /openwrt-sdk/staging_dir/toolchain-mipsel_24kc_gcc-11.2.0_musl/bin/mipsel-openwrt-linux-gcc -v && \
+    export CC=/openwrt-sdk/staging_dir/toolchain-mipsel_24kc_gcc-11.2.0_musl/bin/mipsel-openwrt-linux-gcc && \ 
+    export CXX=/openwrt-sdk/staging_dir/toolchain-mipsel_24kc_gcc-11.2.0_musl/bin/mipsel-openwrt-linux-g++ && \
+    export STAGING_DIR=/openwrt-sdk/staging_dir && \
+    cd /app && cat internal/make_n2n && CGO_ENABLED=1 GOOS=linux GOARCH=mipsle BUILD_ENV=$BUILD_ENV make build && \
+    upx -9 -k /app/out/omniedge && \
+    zip -j /app/out/omniedge.zip /app/out/omniedge
+
+FROM ubuntu:20.04
+RUN mkdir /app
+COPY --from=build-env /app/out/omniedge /app/omniedge
+COPY --from=build-env /app/out/omniedge.zip /app/omniedge.zip

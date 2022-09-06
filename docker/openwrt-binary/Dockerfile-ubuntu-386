@@ -1,0 +1,28 @@
+#golang:i386
+FROM i386/golang:1.18
+
+ARG OPENWRT_SDK=https://downloads.openwrt.org/releases/22.03.0-rc5/targets/x86/generic/openwrt-sdk-22.03.0-rc5-x86-generic_gcc-11.2.0_musl.Linux-x86_64.tar.xz
+
+# install golang
+RUN apt update
+RUN apt -y install wget make git automake build-essential autoconf openssl gzip libssl-dev zip upx
+
+RUN wget -O openwrt-sdk.tar.xz ${OPENWRT_SDK}
+RUN xz -q -d openwrt-sdk.tar.xz && tar -xvf openwrt-sdk.tar
+RUN mv -f openwrt-sdk-* openwrt-sdk
+
+WORKDIR /app
+COPY . .
+
+RUN pwd && ls
+RUN /go/openwrt-sdk/staging_dir/toolchain-i386_pentium4_gcc-11.2.0_musl/bin/i486-openwrt-linux-gcc -v
+# COPY . .
+ARG BUILD_ENV
+
+ENV CC=/go/openwrt-sdk/staging_dir/toolchain-i386_pentium4_gcc-11.2.0_musl/bin/i486-openwrt-linux-gcc
+ENV CXX=/go/openwrt-sdk/staging_dir/toolchain-i386_pentium4_gcc-11.2.0_musl/bin/i486-openwrt-linux-g++
+ENV CGO_ENABLED=1 
+ENV GOARCH=386
+RUN go generate ./...
+RUN BUILD_ENV=$BUILD_ENV make build
+RUN upx -9 -k /app/out/omniedge

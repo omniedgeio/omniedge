@@ -7,16 +7,132 @@ on:
     tags:
       - 'v*.*.*'
 jobs:
-  build:
+  build-openwrt:
     name: Docker cross build
     env:
       ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        platform: [mips ]
+        platform: [386,amd64,arm,arm64]
     runs-on: ubuntu-latest
-    
+    steps:
+      - name: setup env to prod if tag is not empty
+        if: ${{ env.TAG }}
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+
+      - name: Checkout without tag
+        if: ${{ !env.TAG }}
+        uses: actions/checkout@master
+
+      - name: Checkout with tag
+        uses: actions/checkout@master
+        if: ${{ env.TAG }}
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Show CPU Model and Free Space
+        run: |
+          echo -e "Total CPU cores\t: $(nproc)"
+          cat /proc/cpuinfo | grep 'model name'
+          free -h
+
+      - name: Show system info
+        run: |
+          echo -e "system info: $(uname -a)"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Cache
+        uses: actions/cache@v2
+        env:
+          cache-name: omniedge-saas-cli-${{ matrix.platform }}
+        with:
+          path: |
+            /tmp/.buildx-cache
+          key: ${{ matrix.os }}-build-${{ env.cache-name }}
+          restore-keys: |
+            ${{ matrix.os }}-build-${{ env.cache-name }}
+
+      - name: dockerx platform
+        run: |
+          case ${{ matrix.platform }} in
+            amd64)
+            echo "DOCKER_PLATFORM=linux/amd64" >> $GITHUB_ENV
+            ;;
+            386)
+            echo "DOCKER_PLATFORM=linux/i386" >> $GITHUB_ENV
+            ;;
+            arm64)
+            echo "DOCKER_PLATFORM=linux/arm64" >> $GITHUB_ENV
+            ;;
+            arm)
+            echo "DOCKER_PLATFORM=linux/arm/v7" >> $GITHUB_ENV
+            ;;
+          esac
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          platforms: ${{ env.DOCKER_PLATFORM }}
+          push: false
+          load: true
+          file: docker/Dockerfile-ubuntu-${{ matrix.platform }}
+          build-args: |
+            BUILD_ENV=${{ env.ENVIRONMENT }}
+          tags: cli:0.1
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: run binfmt
+        run: |
+          docker run --privileged --rm tonistiigi/binfmt --install all
+
+      - name: run cli
+        run: |
+          docker run --name omniedge -t -d cli:0.1
+      - name: copy file
+        run: |
+          docker cp omniedge:/app/out/omniedge .
+      - name: zip
+        run: |
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./omniedge
+
+      - name: Archive package
+        uses: actions/upload-artifact@v2
+        with:
+          path: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          if-no-files-found: error
+          
+      - name: Upload package to GitHub Release
+        uses: svenstaro/upload-release-action@v2
+        if: "startsWith(github.ref, 'refs/tags/')"
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file_glob: true
+          overwrite: true
+          file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          tag: ${{ github.ref }}
+  build-mips-mipsle-openwrt:
+    name: Build openwrt
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      TAG: ${{ github.event.inputs.tag }}
+    strategy:
+      matrix:
+        platform: [mips,mipsle ]
+    runs-on: ubuntu-latest
     steps:
       - name: setup env to prod if tag is not empty
         if: ${{ env.TAG }}
@@ -36,7 +152,7 @@ jobs:
       - run: |
           set -x
           docker version
-          docker build -t local -f docker/openwrt/Dockerfile-ubuntu-${{ matrix.platform }} .
+          docker build -t local -f docker/openwrt-binary/Dockerfile-ubuntu-${{ matrix.platform }} .
           docker run --name omniedge -d local
       - name: copy file
         run: |
@@ -57,4 +173,217 @@ jobs:
           file_glob: true
           overwrite: true
           file: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
+          tag: ${{ github.ref }}
+  build-other-binary:
+    name: Build on ${{ matrix.platform }}
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      TAG: ${{ github.event.inputs.tag }}
+    strategy:
+      matrix:
+        platform: [ riscv64 ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: setup env to prod if tag is not empty
+        if: ${{ env.TAG }}
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+
+      - name: Checkout without tag
+        if: ${{ !env.TAG }}
+        uses: actions/checkout@master
+
+      - name: Checkout with tag
+        uses: actions/checkout@master
+        if: ${{ env.TAG }}
+        with:
+          ref: ${{ env.TAG }}
+      - name: setup golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.18.4'
+
+      - name: go mod download
+        run: |
+          go mod download
+      - name: Prepare Cross Compile
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
+          sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu upx
+          GOARCH=riscv64
+          CC=riscv64-linux-gnu-gcc
+          
+      - name: make
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
+          sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+          BUILD_ENV=${{ env.ENVIRONMENT }} make build
+          upx -9 -k ./out/omniedge
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+          cat ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+
+      - name: Archive package
+        uses: actions/upload-artifact@v2
+        with:
+          path: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          if-no-files-found: error
+          
+      - name: Upload package to GitHub Release
+        uses: svenstaro/upload-release-action@v2
+        if: "startsWith(github.ref, 'refs/tags/')"
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file_glob: true
+          overwrite: true
+          file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          tag: ${{ github.ref }}
+  build-freebsd-binary:
+    runs-on: macos-12
+    name: A job to run test FreeBSD
+    steps:
+      - name: setup env to prod if tag is not empty
+        if: ${{ env.TAG }}
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+          
+      - name: Checkout without tag
+        if: ${{ !env.TAG }}
+        uses: actions/checkout@master
+
+      - name: Checkout with tag
+        uses: actions/checkout@master
+        if: ${{ env.TAG }}
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Show CPU Model and Free Space
+        if: ${{ !matrix.os == 'macos-latest' }}
+        run: |
+          echo -e "Total CPU cores\t: $(nproc)"
+          cat /proc/cpuinfo | grep 'model name'
+          free -h
+      - name: Show system info
+        run: |
+          echo -e "system info: $(uname -a)"
+      - uses: actions/checkout@v2
+      - name: prepare
+        id: test
+        uses: vmactions/freebsd-vm@v0.1.8
+        with:
+          usesh: true
+          run: |
+            pkg update
+            free -h
+            pkg install -y bash go gmake git openssl zip autoconf automake libtool upx
+            chsh -s bash
+            make generate
+            BUILD_ENV=${{ env.ENVIRONMENT }} make build-freebsd
+            upx -9 -k ./out/omniedge
+            zip -j ./omniedge-${{ github.ref_name }}-freebsd-13.1.zip ./out/omniedge
+      
+      - name: Archive package
+        uses: actions/upload-artifact@v2
+        with:
+          path: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
+          name: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
+          if-no-files-found: error
+          
+      - name: Upload package to GitHub Release
+        uses: svenstaro/upload-release-action@v2
+        if: "startsWith(github.ref, 'refs/tags/')"
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file_glob: true
+          overwrite: true
+          file: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
+          tag: ${{ github.ref }}
+  build-for-distr:
+    name: Build on ${{ matrix.platform }}
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      TAG: ${{ github.event.inputs.tag }}
+    strategy:
+      matrix:
+        platform: [ ubuntu-18.04,ubuntu-20.04,ubuntu-22.04,macos-latest ]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: setup env to prod if tag is not empty
+        if: ${{ env.TAG }}
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+
+      - name: Checkout without tag
+        if: ${{ !env.TAG }}
+        uses: actions/checkout@master
+
+      - name: Checkout with tag
+        uses: actions/checkout@master
+        if: ${{ env.TAG }}
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Show CPU Model and Free Space
+        if: ${{ !matrix.platform == 'macos-latest' }}
+        run: |
+          echo -e "Total CPU cores\t: $(nproc)"
+          cat /proc/cpuinfo | grep 'model name'
+          free -h
+
+      - name: Show system info
+        run: |
+          echo -e "system info: $(uname -a)"
+
+      - name: setup golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.16.6'
+
+      - name: go mod download
+        run: |
+          go mod download
+
+      - name: make
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y openssl
+          sudo -E apt-get install -y build-essential
+          sudo -E apt-get install -y libssl-dev
+          sudo -E apt-get install -y zip upx
+          make generate
+          BUILD_ENV=${{ env.ENVIRONMENT }} make build
+          upx -9 -k ./out/omniedge
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+      
+      - name: make
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          brew install autoconf automake libtool coreutils upx
+          make generate
+          BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin
+          upx -9 -k ./out/omniedge
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+          cat ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+
+      - name: Archive package
+        uses: actions/upload-artifact@v2
+        with:
+          path: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          if-no-files-found: error
+          
+      - name: Upload package to GitHub Release
+        uses: svenstaro/upload-release-action@v2
+        if: "startsWith(github.ref, 'refs/tags/')"
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file_glob: true
+          overwrite: true
+          file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}

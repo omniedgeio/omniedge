@@ -1,0 +1,30 @@
+#golang:armv7
+FROM golang:buster@sha256:4c5a1dead04f13777610d1691ae6e4a376a2a1d938a6ef40d1f25815c3eb20d1
+
+# arm_cortex-a7_neon-vfpv4
+ARG OPENWRT_SDK=https://downloads.openwrt.org/releases/22.03.0-rc5/targets/ipq40xx/generic/openwrt-sdk-22.03.0-rc5-ipq40xx-generic_gcc-11.2.0_musl_eabi.Linux-x86_64.tar.xz
+
+# install golang
+RUN apt update
+RUN apt -y install build-essential autoconf openssl gzip libssl-dev zip upx
+
+RUN wget -O openwrt-sdk.tar.xz ${OPENWRT_SDK}
+RUN xz -q -d openwrt-sdk.tar.xz && tar -xvf openwrt-sdk.tar
+RUN mv -f openwrt-sdk-* openwrt-sdk
+
+WORKDIR /app
+COPY . .
+
+RUN pwd && ls
+RUN /go/openwrt-sdk/staging_dir/toolchain-arm_cortex-a7+neon-vfpv4_gcc-11.2.0_musl_eabi/bin/arm-openwrt-linux-gcc -v
+# COPY . .
+ARG BUILD_ENV
+
+ENV CC=/go/openwrt-sdk/staging_dir/toolchain-arm_cortex-a7+neon-vfpv4_gcc-11.2.0_musl_eabi/bin/arm-openwrt-linux-gcc
+ENV CXX=/go/openwrt-sdk/staging_dir/toolchain-arm_cortex-a7+neon-vfpv4_gcc-11.2.0_musl_eabi/bin/arm-openwrt-linux-g++
+ENV CGO_ENABLED=1 
+ENV GOARCH=arm
+RUN go generate ./...
+RUN BUILD_ENV=$BUILD_ENV make build
+RUN upx -9 -k /app/out/omniedge
+

@@ -1,0 +1,28 @@
+#golang:arm64v8
+FROM golang:buster@sha256:f60460ca6896db2269a4ec3fa25ddc0f3523706b2fae304b44693a7fd61fd5d5
+
+ARG OPENWRT_SDK=https://downloads.openwrt.org/releases/22.03.0-rc5/targets/rockchip/armv8/openwrt-sdk-22.03.0-rc5-rockchip-armv8_gcc-11.2.0_musl.Linux-x86_64.tar.xz
+
+# install golang
+RUN apt update
+RUN apt -y install build-essential autoconf openssl gzip libssl-dev zip upx
+
+RUN wget -O openwrt-sdk.tar.xz ${OPENWRT_SDK}
+RUN xz -q -d openwrt-sdk.tar.xz && tar -xvf openwrt-sdk.tar
+RUN mv -f openwrt-sdk-* openwrt-sdk
+
+WORKDIR /app
+COPY . .
+
+RUN pwd && ls
+RUN /go/openwrt-sdk/staging_dir/toolchain-aarch64_generic_gcc-11.2.0_musl/bin/aarch64-openwrt-linux-gcc -v
+# COPY . .
+ARG BUILD_ENV
+
+ENV CC=/go/openwrt-sdk/staging_dir/toolchain-aarch64_generic_gcc-11.2.0_musl/bin/aarch64-openwrt-linux-gcc
+ENV CXX=/go/openwrt-sdk/staging_dir/toolchain-aarch64_generic_gcc-11.2.0_musl/bin/aarch64-openwrt-linux-g++
+ENV CGO_ENABLED=1 
+ENV GOARCH=arm64
+RUN go generate ./...
+RUN BUILD_ENV=$BUILD_ENV make build
+RUN upx -9 -k /app/out/omniedge
