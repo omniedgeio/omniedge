@@ -131,7 +131,7 @@ jobs:
           file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
   build-arm-arm64-386-amd64-openwrt:
-    name: Build openwrt
+    name: Build openwrt binary
     env:
       ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
       TAG: ${{ github.event.inputs.tag }}
@@ -244,7 +244,7 @@ jobs:
           file: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
   build-mips-mipsle-openwrt:
-    name: Build openwrt
+    name: Build openwrt binary
     env:
       ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
       TAG: ${{ github.event.inputs.tag }}

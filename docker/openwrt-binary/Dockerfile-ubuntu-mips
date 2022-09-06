@@ -50,3 +50,4 @@ RUN cp -r /golang/go /usr/local/ && \
 FROM ubuntu:20.04
 RUN mkdir /app
 COPY --from=build-env /app/out/omniedge.zip /app/omniedge.zip
+ENV CROSS_OPENWRT=openwrt

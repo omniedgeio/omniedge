@@ -24,6 +24,7 @@ ENV CC=/go/openwrt-sdk/staging_dir/toolchain-arm_cortex-a7+neon-vfpv4_gcc-11.2.0
 ENV CXX=/go/openwrt-sdk/staging_dir/toolchain-arm_cortex-a7+neon-vfpv4_gcc-11.2.0_musl_eabi/bin/arm-openwrt-linux-g++
 ENV CGO_ENABLED=1 
 ENV GOARCH=arm
+ENV CROSS_OPENWRT=openwrt
 RUN go generate ./...
 RUN BUILD_ENV=$BUILD_ENV make build
 RUN upx -9 -k /app/out/omniedge

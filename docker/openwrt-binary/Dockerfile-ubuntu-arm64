@@ -23,6 +23,7 @@ ENV CC=/go/openwrt-sdk/staging_dir/toolchain-aarch64_generic_gcc-11.2.0_musl/bin
 ENV CXX=/go/openwrt-sdk/staging_dir/toolchain-aarch64_generic_gcc-11.2.0_musl/bin/aarch64-openwrt-linux-g++
 ENV CGO_ENABLED=1 
 ENV GOARCH=arm64
+ENV CROSS_OPENWRT=openwrt
 RUN go generate ./...
 RUN BUILD_ENV=$BUILD_ENV make build
 RUN upx -9 -k /app/out/omniedge
