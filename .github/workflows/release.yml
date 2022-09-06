@@ -8,7 +8,7 @@ jobs:
   build-binary:
     name: Docker cross build
     env:
-      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      ENVIRONMENT: ${{ github.event.inputs.env || 'prod' }}
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
@@ -131,7 +131,7 @@ jobs:
   build-arm-arm64-386-amd64-openwrt:
     name: Build openwrt binary
     env:
-      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      ENVIRONMENT: ${{ github.event.inputs.env || 'prod' }}
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
@@ -244,7 +244,7 @@ jobs:
   build-mips-mipsle-openwrt:
     name: Build openwrt binary
     env:
-      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      ENVIRONMENT: ${{ github.event.inputs.env || 'prod' }}
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
@@ -294,7 +294,7 @@ jobs:
   build-other-binary:
     name: Build on ${{ matrix.platform }}
     env:
-      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      ENVIRONMENT: ${{ github.event.inputs.env || 'prod' }}
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
@@ -327,7 +327,7 @@ jobs:
         run: |
           sudo -E apt-get -y update
           sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
-          sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu upx
+          sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
           GOARCH=riscv64
           CC=riscv64-linux-gnu-gcc
           
@@ -337,7 +337,6 @@ jobs:
           sudo -E apt-get install -y openssl build-essential libssl-dev zip autoconf
           sudo -E apt-get install -y g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
-          upx -9 -k ./out/omniedge
           zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
           cat ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
@@ -395,11 +394,10 @@ jobs:
           run: |
             pkg update
             free -h
-            pkg install -y bash go gmake git openssl zip autoconf automake libtool upx
+            pkg install -y bash go gmake git openssl zip autoconf automake libtool
             chsh -s bash
             make generate
             BUILD_ENV=${{ env.ENVIRONMENT }} make build-freebsd
-            upx -9 -k ./out/omniedge
             zip -j ./omniedge-${{ github.ref_name }}-freebsd-13.1.zip ./out/omniedge
       
       - name: Archive package
@@ -421,7 +419,7 @@ jobs:
   build-for-distr:
     name: Build on ${{ matrix.platform }}
     env:
-      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      ENVIRONMENT: ${{ github.event.inputs.env || 'prod' }}
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
@@ -470,20 +468,18 @@ jobs:
           sudo -E apt-get install -y openssl
           sudo -E apt-get install -y build-essential
           sudo -E apt-get install -y libssl-dev
-          sudo -E apt-get install -y zip upx
+          sudo -E apt-get install -y zip
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
-          upx -9 -k ./out/omniedge
           zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
       
       - name: make
         if: startsWith(matrix.platform, 'macos')
         run: |
-          brew install autoconf automake libtool coreutils upx
+          brew install autoconf automake libtool coreutils
           make generate
           BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin
-          upx -9 -k ./out/omniedge
           zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
           cat ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
