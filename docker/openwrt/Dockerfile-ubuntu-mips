@@ -23,6 +23,10 @@ RUN export GOROOT_BOOTSTRAP=/go && \
     cd go/src/ && GOOS=linux GOARCH=mips GOMIPS=softfloat ./make.bash && \
     cd .. && ls pkg && ls bin
 
+WORKDIR /app
+COPY . .
+
+WORKDIR /
 RUN cp -r /golang/go /usr/local/ && \
     export GOROOT_BOOTSTRAP=/usr/local/go && \
     export GOROOT=/usr/local/go && \
@@ -38,10 +42,12 @@ RUN cp -r /golang/go /usr/local/ && \
     rm openwrt-sdk-19.07.9-ar71xx-generic_gcc-7.5.0_musl.Linux-x86_64.tar.xz && \
     export CC=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-gcc && \ 
     export CXX=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-g++ && \
+    export STAGING_DIR=/openwrt_19.07.09-ar71xx/staging_dir && \
     git clone -b dev https://github.com/yongqianme/omniedge-cli /app && \
     cd /app && CGO_ENABLED=1 GOOS=linux GOARCH=mips GOMIPS=softfloat BUILD_ENV=$BUILD_ENV make build && \
-    upx -9 -k /app/out/omniedge
+    upx -9 -k /app/out/omniedge && \
+    zip -j /app/out/omniedge.zip /app/out/omniedge
 
 FROM ubuntu:20.04
-
-COPY --from=build-env /app/out/omniedge /omniedge
+RUN mkdir /app
+COPY --from=build-env /app/out/omniedge.zip /app/omniedge.zip
