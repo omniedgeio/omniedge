@@ -33,7 +33,7 @@ if [ "$openwrt" = 'openwrt' ]; then
     esac
 else
     ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
-if
+fi
 
 if [ "$arch" = 'riscv64' ]; then
         ./configure --target=riscv64-unknow-linux-gnu --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
