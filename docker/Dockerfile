@@ -2,7 +2,7 @@ FROM ubuntu:20.04
 
 ARG TARGETARCH
 ARG BUILD_ENV
-ARG VERSION=0.2.3
+ARG VERSION=0.2.4
 
 # Install all needed packages
 RUN apt-get update && \
