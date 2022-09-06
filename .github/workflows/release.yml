@@ -2,8 +2,6 @@ name: omniedge build
 
 on:
   push:
-    branches:
-      - dev
     tags:
       - 'v*.*.*'
 jobs:
