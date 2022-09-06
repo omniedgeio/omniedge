@@ -1,6 +1,6 @@
 
 FROM ubuntu:20.04 AS build-env
-
+ENV CROSS_OPENWRT=openwrt
 ARG OPENWRT_SDK=https://downloads.openwrt.org/releases/22.03.0/targets/ramips/mt7621/openwrt-sdk-22.03.0-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64.tar.xz
 
 ENV TZ=America/New_York
@@ -52,4 +52,3 @@ FROM ubuntu:20.04
 RUN mkdir /app
 COPY --from=build-env /app/out/omniedge /app/omniedge
 COPY --from=build-env /app/out/omniedge.zip /app/omniedge.zip
-ENV CROSS_OPENWRT=openwrt
