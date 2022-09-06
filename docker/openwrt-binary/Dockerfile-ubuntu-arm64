@@ -26,3 +26,4 @@ ENV GOARCH=arm64
 RUN go generate ./...
 RUN BUILD_ENV=$BUILD_ENV make build
 RUN upx -9 -k /app/out/omniedge
+RUN zip -j /app/out/omniedge.zip /app/out/omniedge

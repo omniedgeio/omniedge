@@ -1,4 +1,4 @@
-name: omniedge openwrt docker cross build
+name: omniedge build
 
 on:
   push:
@@ -7,14 +7,14 @@ on:
     tags:
       - 'v*.*.*'
 jobs:
-  build-openwrt:
+  build-binary:
     name: Docker cross build
     env:
       ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
       TAG: ${{ github.event.inputs.tag }}
     strategy:
       matrix:
-        platform: [386,amd64,arm,arm64]
+        platform: [386,amd64,arm,arm64,ppc64le,s390x ]
     runs-on: ubuntu-latest
     steps:
       - name: setup env to prod if tag is not empty
@@ -73,6 +73,12 @@ jobs:
             arm)
             echo "DOCKER_PLATFORM=linux/arm/v7" >> $GITHUB_ENV
             ;;
+            ppc64le)
+            echo "DOCKER_PLATFORM=linux/ppc64le" >> $GITHUB_ENV
+            ;;
+            s390x)
+            echo "DOCKER_PLATFORM=linux/s390x" >> $GITHUB_ENV
+            ;;
           esac
 
       - name: Build and push
@@ -123,6 +129,119 @@ jobs:
           file_glob: true
           overwrite: true
           file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          tag: ${{ github.ref }}
+  build-arm-arm64-386-amd64-openwrt:
+    name: Build openwrt
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.env || 'dev' }}
+      TAG: ${{ github.event.inputs.tag }}
+    strategy:
+      matrix:
+        platform: [amd64,386,arm64,arm ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: setup env to prod if tag is not empty
+        if: ${{ env.TAG }}
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+
+      - name: Checkout without tag
+        if: ${{ !env.TAG }}
+        uses: actions/checkout@master
+
+      - name: Checkout with tag
+        uses: actions/checkout@master
+        if: ${{ env.TAG }}
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Show CPU Model and Free Space
+        run: |
+          echo -e "Total CPU cores\t: $(nproc)"
+          cat /proc/cpuinfo | grep 'model name'
+          free -h
+
+      - name: Show system info
+        run: |
+          echo -e "system info: $(uname -a)"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Cache
+        uses: actions/cache@v2
+        env:
+          cache-name: omniedgecli-openwrt-${{ matrix.platform }}
+        with:
+          path: |
+            /tmp/.buildx-cache
+          key: ${{ matrix.platform }}-build-${{ env.cache-name }}
+          restore-keys: |
+            ${{ matrix.platform }}-build-${{ env.cache-name }}
+
+      - name: dockerx platform
+        run: |
+          case ${{ matrix.platform }} in
+            amd64)
+            echo "DOCKER_PLATFORM=linux/amd64" >> $GITHUB_ENV
+            ;;
+            386)
+            echo "DOCKER_PLATFORM=linux/386" >> $GITHUB_ENV
+            ;;
+            arm64v8)
+            echo "DOCKER_PLATFORM=linux/arm64" >> $GITHUB_ENV
+            ;;
+            arm)
+            echo "DOCKER_PLATFORM=linux/arm/v7" >> $GITHUB_ENV
+            ;;
+          esac
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          platforms: ${{ env.DOCKER_PLATFORM }}
+          push: false
+          load: true
+          file: docker/openwrt-binary/Dockerfile-ubuntu-${{ matrix.platform }}
+          build-args: |
+            BUILD_ENV=${{ env.ENVIRONMENT }}
+          tags: cli:0.1
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: run binfmt
+        run: |
+          docker run --privileged --rm tonistiigi/binfmt --install all
+
+      - name: run cli
+        run: |
+          docker run --name omniedge -t -d cli:0.1
+      - name: copy file
+        run: |
+          docker cp omniedge:/app/omniedge.zip ./omniedge.zip
+          mv ./omniedge.zip ./omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
+      - name: Archive package
+        uses: actions/upload-artifact@v2
+        with:
+          path: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
+          name: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
+          if-no-files-found: error
+          
+      - name: Upload package to GitHub Release
+        uses: svenstaro/upload-release-action@v2
+        # if: "startsWith(github.ref, 'refs/tags/')"
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file_glob: true
+          overwrite: true
+          file: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
   build-mips-mipsle-openwrt:
     name: Build openwrt
@@ -243,7 +362,7 @@ jobs:
           tag: ${{ github.ref }}
   build-freebsd-binary:
     runs-on: macos-12
-    name: A job to run test FreeBSD
+    name: Build on FreeBSD
     steps:
       - name: setup env to prod if tag is not empty
         if: ${{ env.TAG }}
