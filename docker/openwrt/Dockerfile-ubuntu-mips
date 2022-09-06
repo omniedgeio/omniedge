@@ -43,7 +43,6 @@ RUN cp -r /golang/go /usr/local/ && \
     export CC=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-gcc && \ 
     export CXX=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-g++ && \
     export STAGING_DIR=/openwrt_19.07.09-ar71xx/staging_dir && \
-    git clone -b dev https://github.com/yongqianme/omniedge-cli /app && \
     cd /app && CGO_ENABLED=1 GOOS=linux GOARCH=mips GOMIPS=softfloat BUILD_ENV=$BUILD_ENV make build && \
     upx -9 -k /app/out/omniedge && \
     zip -j /app/out/omniedge.zip /app/out/omniedge
