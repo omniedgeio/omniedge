@@ -34,7 +34,6 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: prepare
-        if: startsWith(matrix.platform, 'ubuntu')
         run: |
           sudo hostname ${{ matrix.platform }}
           sudo -E apt-get -y update
@@ -45,7 +44,7 @@ jobs:
           curl https://omniedge.io/install/omniedge-install.sh | bash
           omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
           sleep 5
-          sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &> /dev/null
+          sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }}
 
       - name: test
         run: |
