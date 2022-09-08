@@ -24,9 +24,10 @@ jobs:
       - name: test
         run: |
           nmap -sP 100.100.100.0/24
+          
   Test-FreeBSD:
     runs-on: macos-12
-    name: Build on FreeBSD
+    name: Test on FreeBSD
     steps:
       - name: prepare
         id: test
@@ -42,11 +43,8 @@ jobs:
             omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
             sleep 5
             omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
-            
-      - name: test
-        run: |
-          nmap -sP 100.100.100.0/24
-            
+            nmap -sP 100.100.100.0/24
+  
   Test-on-Ubuntu-MacOS:
     name: Test on ${{ matrix.platform }}
     strategy:
