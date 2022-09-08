@@ -42,6 +42,7 @@ jobs:
             omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
             sleep 5
             omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
+            
       - name: test
         run: |
           nmap -sP 100.100.100.0/24
@@ -53,10 +54,19 @@ jobs:
         platform: [ ubuntu-22.04,macos-latest ]
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: install & connect
+      - name: prepare
+        if: startsWith(matrix.platform, 'ubuntu')
         run: |
           sudo -E apt-get -y update
           sudo -E apt-get install -y net-tools nmap curl unzip
+          
+      - name: prepare
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          brew install unzip nmap
+
+      - name: install & connect
+        run: |
           curl https://omniedge.io/install/omniedge-install.sh | bash
           omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
           sleep 5
