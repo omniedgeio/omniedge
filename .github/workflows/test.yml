@@ -1,0 +1,67 @@
+name: omniedge test
+
+on:
+  push:
+    branches:
+      - "add-test-ci"
+    tags:
+      - 'v*.*.*'
+jobs:
+  Test-Github-Action:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: install network tools
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y net-tools nmap
+          sudo hostname omniedge-githubaction
+
+      - name: OmniEdge for Github Action
+        uses: omniedgeio/github-action@v1
+        with:
+          securitykey: ${{ secrets.OMNIEDGE_SECURITY_KEY }}
+          virtualnetworkid: ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }}
+      - name: test
+        run: |
+          nmap -sP 100.100.100.0/24
+  Test-FreeBSD:
+    runs-on: macos-12
+    name: Build on FreeBSD
+    steps:
+      - name: prepare
+        id: test
+        uses: vmactions/freebsd-vm@v0.1.8
+        with:
+          usesh: true
+          run: |
+            pkg update
+            free -h
+            pkg install -y bash curl wget unzip nmap
+            chsh -s bash
+            curl https://omniedge.io/install/omniedge-install.sh | bash
+            omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
+            sleep 5
+            omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
+      - name: test
+        run: |
+          nmap -sP 100.100.100.0/24
+            
+  Test-on-Ubuntu-MacOS:
+    name: Test on ${{ matrix.platform }}
+    strategy:
+      matrix:
+        platform: [ ubuntu-22.04,macos-latest ]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: install & connect
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y net-tools nmap curl unzip
+          curl https://omniedge.io/install/omniedge-install.sh | bash
+          omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
+          sleep 5
+          omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
+
+      - name: test
+        run: |
+          nmap -sP 100.100.100.0/24
