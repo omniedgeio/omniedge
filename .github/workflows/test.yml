@@ -38,6 +38,7 @@ jobs:
           run: |
             pkg update
             free -h
+            sudo hostname FreeBSD
             pkg install -y bash curl wget unzip nmap
             chsh -s bash
             curl https://omniedge.io/install/omniedge-install.sh | bash
@@ -50,20 +51,16 @@ jobs:
     name: Test on ${{ matrix.platform }}
     strategy:
       matrix:
-        platform: [ ubuntu-22.04,macos-latest ]
+        platform: [ ubuntu-22.04]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: prepare
         if: startsWith(matrix.platform, 'ubuntu')
         run: |
+          sudo hostname Ubuntu-22.04
           sudo -E apt-get -y update
           sudo -E apt-get install -y net-tools nmap curl unzip
-          
-      - name: prepare
-        if: startsWith(matrix.platform, 'macos')
-        run: |
-          brew install unzip nmap
-
+        
       - name: install & connect
         run: |
           curl https://omniedge.io/install/omniedge-install.sh | bash
