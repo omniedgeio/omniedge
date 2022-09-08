@@ -25,39 +25,18 @@ jobs:
       - name: test
         run: |
           nmap -sP 100.100.100.0/24
-
-  Test-FreeBSD:
-    runs-on: macos-12
-    name: Test on FreeBSD
-    steps:
-      - name: prepare
-        id: test
-        uses: vmactions/freebsd-vm@v0.1.8
-        with:
-          usesh: true
-          run: |
-            pkg update
-            free -h
-            sudo hostname FreeBSD
-            pkg install -y bash curl wget unzip nmap
-            chsh -s bash
-            curl https://omniedge.io/install/omniedge-install.sh | bash
-            omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
-            sleep 5
-            sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
-            nmap -sP 100.100.100.0/24
   
-  Test-on-Ubuntu-MacOS:
+  Test-on-Ubuntu:
     name: Test on ${{ matrix.platform }}
     strategy:
       matrix:
-        platform: [ ubuntu-22.04]
+        platform: [ ubuntu-22.04,ubuntu-18.04,ubuntu-20.04]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: prepare
         if: startsWith(matrix.platform, 'ubuntu')
         run: |
-          sudo hostname Ubuntu-22.04
+          sudo hostname ${{ matrix.platform }}
           sudo -E apt-get -y update
           sudo -E apt-get install -y net-tools nmap curl unzip
         
@@ -66,7 +45,7 @@ jobs:
           curl https://omniedge.io/install/omniedge-install.sh | bash
           omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
           sleep 5
-          sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
+          sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &> /dev/null
 
       - name: test
         run: |
