@@ -3,7 +3,7 @@ name: omniedge test
 on:
   push:
     branches:
-      - "add-test-ci"
+      - "main"
     tags:
       - 'v*.*.*'
 jobs:
