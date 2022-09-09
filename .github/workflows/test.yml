@@ -24,8 +24,9 @@ jobs:
 
       - name: test
         run: |
-          sleep 20
+          sleep 40
           nmap -sP 100.100.100.0/24
+          ping -c 4 100.100.100.176
   
   Test-on-Ubuntu:
     name: Test on ${{ matrix.platform }}
@@ -46,8 +47,9 @@ jobs:
           omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
           sleep 5
           sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
-          sleep 30
+          sleep 40
 
       - name: test
         run: |
           nmap -sP 100.100.100.0/24
+          ping -c 4 100.100.100.63
