@@ -30,7 +30,7 @@ jobs:
     name: Test on ${{ matrix.platform }}
     strategy:
       matrix:
-        platform: [ ubuntu-22.04,ubuntu-18.04,ubuntu-20.04]
+        platform: [ ubuntu-22.04]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: prepare
