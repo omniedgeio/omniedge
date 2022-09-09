@@ -24,7 +24,7 @@ jobs:
 
       - name: test
         run: |
-          sleep 40
+          sleep 30
           nmap -sP 100.100.100.0/24
           ping -c 4 100.100.100.176
   
