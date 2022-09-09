@@ -24,6 +24,7 @@ jobs:
 
       - name: test
         run: |
+          sleep 20
           nmap -sP 100.100.100.0/24
   
   Test-on-Ubuntu:
@@ -44,7 +45,8 @@ jobs:
           curl https://omniedge.io/install/omniedge-install.sh | bash
           omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
           sleep 5
-          sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }}
+          sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
+          sleep 30
 
       - name: test
         run: |
