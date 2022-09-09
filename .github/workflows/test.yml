@@ -1,0 +1,55 @@
+name: omniedge test
+
+on:
+  push:
+    branches:
+      - "main"
+    tags:
+      - 'v*.*.*'
+jobs:
+  Test-Github-Action:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: install network tools
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y net-tools nmap traceroute
+          sudo hostname omniedge
+
+      - name: OmniEdge for Github Action
+        uses: omniedgeio/github-action@v1
+        with:
+          securitykey: ${{ secrets.OMNIEDGE_SECURITY_KEY }}
+          virtualnetworkid: ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }}
+
+      - name: test
+        run: |
+          sleep 30
+          nmap -sP 100.100.100.0/24
+          ping -c 4 100.100.100.176
+  
+  Test-on-Ubuntu:
+    name: Test on ${{ matrix.platform }}
+    strategy:
+      matrix:
+        platform: [ ubuntu-22.04]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: prepare
+        run: |
+          sudo hostname ${{ matrix.platform }}
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y net-tools nmap traceroute curl unzip
+        
+      - name: install & connect
+        run: |
+          curl https://omniedge.io/install/omniedge-install.sh | bash
+          omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
+          sleep 5
+          sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
+          sleep 40
+
+      - name: test
+        run: |
+          nmap -sP 100.100.100.0/24
+          ping -c 4 100.100.100.63
