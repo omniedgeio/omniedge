@@ -13,7 +13,7 @@ jobs:
       - name: install network tools
         run: |
           sudo -E apt-get -y update
-          sudo -E apt-get install -y net-tools nmap traceroute
+          sudo -E apt-get install -y net-tools
           sudo hostname omniedge
 
       - name: OmniEdge for Github Action
@@ -25,7 +25,6 @@ jobs:
       - name: test
         run: |
           sleep 30
-          nmap -sP 100.100.100.0/24
           ping -c 4 100.100.100.176
   
   Test-on-Ubuntu:
@@ -39,7 +38,7 @@ jobs:
         run: |
           sudo hostname ${{ matrix.platform }}
           sudo -E apt-get -y update
-          sudo -E apt-get install -y net-tools nmap traceroute curl unzip
+          sudo -E apt-get install -y net-tools curl unzip
         
       - name: install & connect
         run: |
@@ -51,5 +50,4 @@ jobs:
 
       - name: test
         run: |
-          nmap -sP 100.100.100.0/24
           ping -c 4 100.100.100.63
