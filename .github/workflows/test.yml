@@ -6,6 +6,8 @@ on:
       - "main"
     tags:
       - 'v*.*.*'
+  schedule:
+  - cron: "0 */24 * * *"
 jobs:
   Test-Github-Action:
     runs-on: ubuntu-22.04
