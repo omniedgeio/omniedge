@@ -8,40 +8,18 @@ jobs:
   build-binary:
     name: Docker cross build
     env:
-      ENVIRONMENT: ${{ github.event.inputs.env || 'prod' }}
-      TAG: ${{ github.event.inputs.tag }}
+      ENVIRONMENT: prod
     strategy:
       matrix:
         platform: [386,amd64,arm,arm64,ppc64le,s390x ]
     runs-on: ubuntu-latest
     steps:
-      - name: setup env to prod if tag is not empty
-        if: ${{ env.TAG }}
-        run: |
-          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
-
-      - name: Checkout without tag
-        if: ${{ !env.TAG }}
-        uses: actions/checkout@master
-
       - name: Checkout with tag
         uses: actions/checkout@master
-        if: ${{ env.TAG }}
-        with:
-          ref: ${{ env.TAG }}
-
-      - name: Show CPU Model and Free Space
-        run: |
-          echo -e "Total CPU cores\t: $(nproc)"
-          cat /proc/cpuinfo | grep 'model name'
-          free -h
-
-      - name: Show system info
-        run: |
-          echo -e "system info: $(uname -a)"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
@@ -128,40 +106,17 @@ jobs:
           overwrite: true
           file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
-  build-arm-arm64-386-amd64-openwrt:
+  build-openwrt-1:
     name: Build openwrt binary
     env:
-      ENVIRONMENT: ${{ github.event.inputs.env || 'prod' }}
-      TAG: ${{ github.event.inputs.tag }}
+      ENVIRONMENT: prod
     strategy:
       matrix:
         platform: [amd64,386,arm64,arm ]
     runs-on: ubuntu-latest
     steps:
-      - name: setup env to prod if tag is not empty
-        if: ${{ env.TAG }}
-        run: |
-          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
-
-      - name: Checkout without tag
-        if: ${{ !env.TAG }}
-        uses: actions/checkout@master
-
       - name: Checkout with tag
         uses: actions/checkout@master
-        if: ${{ env.TAG }}
-        with:
-          ref: ${{ env.TAG }}
-
-      - name: Show CPU Model and Free Space
-        run: |
-          echo -e "Total CPU cores\t: $(nproc)"
-          cat /proc/cpuinfo | grep 'model name'
-          free -h
-
-      - name: Show system info
-        run: |
-          echo -e "system info: $(uname -a)"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -234,7 +189,7 @@ jobs:
           
       - name: Upload package to GitHub Release
         uses: svenstaro/upload-release-action@v2
-        # if: "startsWith(github.ref, 'refs/tags/')"
+        if: "startsWith(github.ref, 'refs/tags/')"
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
@@ -244,27 +199,15 @@ jobs:
   build-mips-mipsle-openwrt:
     name: Build openwrt binary
     env:
-      ENVIRONMENT: ${{ github.event.inputs.env || 'prod' }}
-      TAG: ${{ github.event.inputs.tag }}
+      ENVIRONMENT: prod
     strategy:
       matrix:
         platform: [mips,mipsle ]
     runs-on: ubuntu-latest
-    steps:
-      - name: setup env to prod if tag is not empty
-        if: ${{ env.TAG }}
-        run: |
-          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
-
-      - name: Checkout without tag
-        if: ${{ !env.TAG }}
-        uses: actions/checkout@master
-
+    steps: 
       - name: Checkout with tag
         uses: actions/checkout@master
-        if: ${{ env.TAG }}
-        with:
-          ref: ${{ env.TAG }}
+
       - uses: docker-practice/actions-setup-docker@master
       - run: |
           set -x
@@ -284,7 +227,7 @@ jobs:
           
       - name: Upload package to GitHub Release
         uses: svenstaro/upload-release-action@v2
-        # if: "startsWith(github.ref, 'refs/tags/')"
+        if: "startsWith(github.ref, 'refs/tags/')"
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
@@ -294,27 +237,15 @@ jobs:
   build-other-binary:
     name: Build on ${{ matrix.platform }}
     env:
-      ENVIRONMENT: ${{ github.event.inputs.env || 'prod' }}
-      TAG: ${{ github.event.inputs.tag }}
+      ENVIRONMENT: prod
     strategy:
       matrix:
         platform: [ riscv64 ]
     runs-on: ubuntu-latest
     steps:
-      - name: setup env to prod if tag is not empty
-        if: ${{ env.TAG }}
-        run: |
-          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
-
-      - name: Checkout without tag
-        if: ${{ !env.TAG }}
-        uses: actions/checkout@master
-
       - name: Checkout with tag
         uses: actions/checkout@master
-        if: ${{ env.TAG }}
-        with:
-          ref: ${{ env.TAG }}
+
       - name: setup golang
         uses: actions/setup-go@v2
         with:
@@ -361,30 +292,9 @@ jobs:
     runs-on: macos-12
     name: Build on FreeBSD
     steps:
-      - name: setup env to prod if tag is not empty
-        if: ${{ env.TAG }}
-        run: |
-          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
-          
-      - name: Checkout without tag
-        if: ${{ !env.TAG }}
-        uses: actions/checkout@master
-
       - name: Checkout with tag
         uses: actions/checkout@master
-        if: ${{ env.TAG }}
-        with:
-          ref: ${{ env.TAG }}
-
-      - name: Show CPU Model and Free Space
-        if: ${{ !matrix.os == 'macos-latest' }}
-        run: |
-          echo -e "Total CPU cores\t: $(nproc)"
-          cat /proc/cpuinfo | grep 'model name'
-          free -h
-      - name: Show system info
-        run: |
-          echo -e "system info: $(uname -a)"
+        
       - uses: actions/checkout@v2
       - name: prepare
         id: test
@@ -419,38 +329,14 @@ jobs:
   build-for-distr:
     name: Build on ${{ matrix.platform }}
     env:
-      ENVIRONMENT: ${{ github.event.inputs.env || 'prod' }}
-      TAG: ${{ github.event.inputs.tag }}
+      ENVIRONMENT: prod
     strategy:
       matrix:
         platform: [ ubuntu-18.04,ubuntu-20.04,ubuntu-22.04,macos-latest ]
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: setup env to prod if tag is not empty
-        if: ${{ env.TAG }}
-        run: |
-          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
-
-      - name: Checkout without tag
-        if: ${{ !env.TAG }}
-        uses: actions/checkout@master
-
       - name: Checkout with tag
         uses: actions/checkout@master
-        if: ${{ env.TAG }}
-        with:
-          ref: ${{ env.TAG }}
-
-      - name: Show CPU Model and Free Space
-        if: ${{ !matrix.platform == 'macos-latest' }}
-        run: |
-          echo -e "Total CPU cores\t: $(nproc)"
-          cat /proc/cpuinfo | grep 'model name'
-          free -h
-
-      - name: Show system info
-        run: |
-          echo -e "system info: $(uname -a)"
 
       - name: setup golang
         uses: actions/setup-go@v2

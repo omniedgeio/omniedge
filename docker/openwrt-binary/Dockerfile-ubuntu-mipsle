@@ -40,12 +40,10 @@ RUN cp -r /golang/go /usr/local/ && \
     xz -q -d openwrt-sdk.tar.xz && tar -xvf openwrt-sdk.tar && \
     mv -f openwrt-sdk-* openwrt-sdk && \
     rm go1.4-bootstrap-20171003.tar.gz && rm openwrt-sdk.tar && \
-    
     /openwrt-sdk/staging_dir/toolchain-mipsel_24kc_gcc-7.3.0_musl/bin/mipsel-openwrt-linux-gcc -v && \
     export CC=/openwrt-sdk/staging_dir/toolchain-mipsel_24kc_gcc-7.3.0_musl/bin/mipsel-openwrt-linux-gcc  && \
     export CXX=/openwrt-sdk/staging_dir/toolchain-mipsel_24kc_gcc-7.3.0_musl/bin/mipsel-openwrt-linux-g++ && \
     export STAGING_DIR=/openwrt-sdk/staging_dir && \
-        
     cd /app && cat internal/make_n2n && CGO_ENABLED=1 GOOS=linux GOARCH=mipsle GOMIPS=softfloat BUILD_ENV=$BUILD_ENV make build && \
     upx -9 -k /app/out/omniedge && \
     zip -j /app/out/omniedge.zip /app/out/omniedge
