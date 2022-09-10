@@ -26,9 +26,8 @@ jobs:
           virtualnetworkid: ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }}
 
       - name: run ping and traceroute
-        if: ${{needs.job1.outputs.status}}=='true'
         run: |
-          sleep 20
+          sleep 30
           ping -c 4 100.100.100.34
           traceroute 100.100.100.34
   
@@ -49,9 +48,8 @@ jobs:
           sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
 
       - name: run ping and traceroute
-        if: ${{needs.job1.outputs.status}}=='true'
         run: |
-          sleep 30
+          sleep 40
           ping -c 4 100.100.100.34
           traceroute 100.100.100.34
   Tester:
