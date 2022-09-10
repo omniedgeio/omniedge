@@ -11,6 +11,7 @@ on:
 jobs:
   
   Ping-From-Github-Action:
+    needs: Tester
     runs-on: ubuntu-22.04
     steps:
       - name: install network tools
@@ -27,11 +28,11 @@ jobs:
 
       - name: run ping and traceroute
         run: |
-          sleep 30
           ping -c 4 100.100.100.34
           traceroute 100.100.100.34
   
   Ping-From-Ubuntu:
+    needs: Tester
     runs-on: ubuntu-22.04
     steps:
       - name: prepare
@@ -49,14 +50,13 @@ jobs:
 
       - name: run ping and traceroute
         run: |
-          sleep 40
           ping -c 4 100.100.100.34
           traceroute 100.100.100.34
   Tester:
     name: Tester
     runs-on: ubuntu-22.04
     outputs:
-      status: ${{ steps.ip-address.outputs.ip-address }}
+      ip4: ${{ steps.ip-address.outputs.ip-address }}
     steps:
       - name: prepare
         run: |
