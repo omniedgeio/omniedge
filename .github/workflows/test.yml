@@ -26,6 +26,7 @@ jobs:
 
       - name: test
         run: |
+          sleep 5
           ping -c 10 100.100.100.176
   
   Test-on-Ubuntu:
