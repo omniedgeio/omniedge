@@ -47,7 +47,6 @@ jobs:
         run: |
           sudo -E apt-get -y update
           sudo -E apt-get install -y net-tools traceroute
-          sudo hostname omniedge
 
       - name: OmniEdge for Github Action
         uses: omniedgeio/github-action@v1
@@ -58,7 +57,7 @@ jobs:
       - name: output ip address
         id: ip-address
         run: |
-          ip4=$(/sbin/ip -o -4 addr list omniedge | awk '{print $4}' | cut -d/ -f1)
+          ip4=$(/sbin/ip -o -4 addr list Github-Action | awk '{print $4}' | cut -d/ -f1)
           echo $ip4
           echo "::set-output name=ip-address::$ip4"
 
@@ -85,14 +84,6 @@ jobs:
           omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
           sleep 2
           sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
-      
-      - name: output ip address
-        id: ip-address
-        run: |
-          ip4=$(/sbin/ip -o -4 addr list ubuntu-22.04 | awk '{print $4}' | cut -d/ -f1)
-          echo $ip4
-          echo "::set-output name=ip-address::$ip4"
-
       - name: run ping and traceroute
         run: |
           sleep 20
