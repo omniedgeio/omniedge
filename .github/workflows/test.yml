@@ -74,8 +74,8 @@ jobs:
       - name: output ip address
         id: ip-address
         run: |
-          name=$hostname
-          ip4=$(/sbin/ip -o -4 addr list $name | awk '{print $4}' | cut -d/ -f1)
+          ip4=$(/sbin/ip -o -4 addr list Tester | awk '{print $4}' | cut -d/ -f1)
+          echo $ip4
           echo "::set-output name=ip-address::$ip4"
       
       - name: wait 100s for ping coming
