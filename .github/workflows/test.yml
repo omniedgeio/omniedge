@@ -63,8 +63,7 @@ jobs:
 
       - name: run ping and traceroute
         run: |
-          sleep 30
-          ping -c 10 100.100.100.34
+          ping -c 4 100.100.100.34
           traceroute 100.100.100.34
   
   Ping-From-Ubuntu:
@@ -80,13 +79,11 @@ jobs:
       - name: install & connect
         run: |
           curl https://omniedge.io/install/omniedge-install.sh | bash
-          sleep 10
           omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
           sleep 2
           sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
       - name: run ping and traceroute
         run: |
-          sleep 20
-          ping -c 10 100.100.100.34
+          ping -c 4 100.100.100.34
           traceroute 100.100.100.34
   
