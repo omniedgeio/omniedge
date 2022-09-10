@@ -71,9 +71,12 @@ jobs:
           sleep 2
           sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
       
-      - name: The connection has succeeded
-        id: set-status
-        run: echo "::set-output name=status::true"
+      - name: output ip address
+        id: ip-address
+        run: |
+          name=$hostname
+          ip4=$(/sbin/ip -o -4 addr list $name | awk '{print $4}' | cut -d/ -f1)
+          echo "::set-output name=ip-address::$ip4"
       
       - name: wait 100s for ping coming
         run: |
