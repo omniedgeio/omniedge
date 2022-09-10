@@ -16,7 +16,7 @@ jobs:
       - name: install network tools
         run: |
           sudo -E apt-get -y update
-          sudo -E apt-get install -y net-tools
+          sudo -E apt-get install -y net-tools traceroute
           sudo hostname omniedge
 
       - name: OmniEdge for Github Action
@@ -29,6 +29,7 @@ jobs:
         run: |
           sleep 5
           ping -c 4 100.100.100.34
+          traceroute 100.100.100.34
   
   Ping-From-Ubuntu:
     runs-on: ubuntu-22.04
@@ -37,7 +38,7 @@ jobs:
         run: |
           sudo hostname ubuntu-22.04
           sudo -E apt-get -y update
-          sudo -E apt-get install -y net-tools curl unzip
+          sudo -E apt-get install -y net-tools curl unzip traceroute
         
       - name: install & connect
         run: |
@@ -50,6 +51,7 @@ jobs:
         run: |
           sleep 20
           ping -c 4 100.100.100.34
+          traceroute 100.100.100.34
   Tester:
     name: Tester
     runs-on: ubuntu-22.04
