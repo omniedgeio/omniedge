@@ -9,13 +9,14 @@ on:
   schedule:
   - cron: "0 */24 * * *"
 jobs:
+  
   Test-Github-Action:
     runs-on: ubuntu-22.04
     steps:
       - name: install network tools
         run: |
           sudo -E apt-get -y update
-          sudo -E apt-get install -y net-tools nmap
+          sudo -E apt-get install -y net-tools
           sudo hostname omniedge
 
       - name: OmniEdge for Github Action
@@ -26,9 +27,7 @@ jobs:
 
       - name: test
         run: |
-          sleep 2
-          sudo nmap -sP 100.100.100.0/24
-          ping -c 10 100.100.100.176
+          ping -c 4 100.100.100.176
   
   Test-on-Ubuntu:
     name: Test on ${{ matrix.platform }}
@@ -41,7 +40,7 @@ jobs:
         run: |
           sudo hostname ${{ matrix.platform }}
           sudo -E apt-get -y update
-          sudo -E apt-get install -y net-tools curl unzip nmap
+          sudo -E apt-get install -y net-tools curl unzip
         
       - name: install & connect
         run: |
@@ -52,4 +51,19 @@ jobs:
 
       - name: test
         run: |
-          ping -c 10 100.100.100.63
+          ping -c 4 100.100.100.63
+  Tester:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: install network tools
+        run: |
+          sudo hostname omniedge
+      - name: OmniEdge for Github Action
+        uses: omniedgeio/github-action@v1
+        with:
+          securitykey: ${{ secrets.OMNIEDGE_SECURITY_KEY }}
+          virtualnetworkid: ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }}
+
+      - name: waiting for ping coming
+        run: |
+          sleep 100
