@@ -56,7 +56,7 @@ jobs:
     name: Tester
     runs-on: ubuntu-22.04
     outputs:
-      status: ${{ steps.set-status.outputs.status }}
+      status: ${{ steps.ip-address.outputs.ip-address }}
     steps:
       - name: prepare
         run: |
@@ -68,7 +68,7 @@ jobs:
         run: |
           curl https://omniedge.io/install/omniedge-install.sh | bash
           omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
-          sleep 2
+          sleep 2 
           sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
       
       - name: output ip address
@@ -80,4 +80,5 @@ jobs:
       
       - name: wait 100s for ping coming
         run: |
-          sleep 100
+          sleep 100 &
+          
