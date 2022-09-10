@@ -55,9 +55,16 @@ jobs:
           securitykey: ${{ secrets.OMNIEDGE_SECURITY_KEY }}
           virtualnetworkid: ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }}
 
+      - name: output ip address
+        id: ip-address
+        run: |
+          ip4=$(/sbin/ip -o -4 addr list omniedge | awk '{print $4}' | cut -d/ -f1)
+          echo $ip4
+          echo "::set-output name=ip-address::$ip4"
+
       - name: run ping and traceroute
         run: |
-          ping -c 4 100.100.100.34
+          ping -c 10 100.100.100.34
           traceroute 100.100.100.34
   
   Ping-From-Ubuntu:
@@ -76,9 +83,16 @@ jobs:
           omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
           sleep 2
           sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
+      
+      - name: output ip address
+        id: ip-address
+        run: |
+          ip4=$(/sbin/ip -o -4 addr list ubuntu-22.04 | awk '{print $4}' | cut -d/ -f1)
+          echo $ip4
+          echo "::set-output name=ip-address::$ip4"
 
       - name: run ping and traceroute
         run: |
-          ping -c 4 100.100.100.34
+          ping -c 10 100.100.100.34
           traceroute 100.100.100.34
   
