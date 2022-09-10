@@ -31,7 +31,6 @@ jobs:
           ping -c 4 100.100.100.34
   
   Ping-From-Ubuntu:
-    name: Test on ubuntu-22.04
     runs-on: ubuntu-22.04
     steps:
       - name: prepare
@@ -49,7 +48,7 @@ jobs:
 
       - name: test
         run: |
-          sleep 5
+          sleep 20
           ping -c 4 100.100.100.34
   Tester:
     name: Tester
