@@ -26,8 +26,7 @@ jobs:
 
       - name: test
         run: |
-          sleep 50
-          ping -c 4 100.100.100.176
+          ping -c 10 100.100.100.176
   
   Test-on-Ubuntu:
     name: Test on ${{ matrix.platform }}
@@ -46,10 +45,9 @@ jobs:
         run: |
           curl https://omniedge.io/install/omniedge-install.sh | bash
           omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
-          sleep 5
+          sleep 2
           sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
-          sleep 40
 
       - name: test
         run: |
-          ping -c 4 100.100.100.63
+          ping -c 10 100.100.100.63
