@@ -27,18 +27,15 @@ jobs:
 
       - name: test
         run: |
-          ping -c 4 100.100.100.176
+          sleep 5
   
   Test-on-Ubuntu:
-    name: Test on ${{ matrix.platform }}
-    strategy:
-      matrix:
-        platform: [ ubuntu-22.04]
-    runs-on: ${{ matrix.platform }}
+    name: Test on ubuntu-22.04
+    runs-on: ubuntu-22.04
     steps:
       - name: prepare
         run: |
-          sudo hostname ${{ matrix.platform }}
+          sudo hostname ubuntu-22.04
           sudo -E apt-get -y update
           sudo -E apt-get install -y net-tools curl unzip
         
@@ -51,19 +48,24 @@ jobs:
 
       - name: test
         run: |
-          ping -c 4 100.100.100.63
+          sleep 10
   Tester:
+    name: Tester
     runs-on: ubuntu-22.04
     steps:
-      - name: install network tools
+      - name: prepare
         run: |
-          sudo hostname omniedge
-      - name: OmniEdge for Github Action
-        uses: omniedgeio/github-action@v1
-        with:
-          securitykey: ${{ secrets.OMNIEDGE_SECURITY_KEY }}
-          virtualnetworkid: ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }}
+          sudo hostname Tester
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y net-tools curl unzip
+        
+      - name: install & connect
+        run: |
+          curl https://omniedge.io/install/omniedge-install.sh | bash
+          omniedge login -s ${{ secrets.OMNIEDGE_SECURITY_KEY }}
+          sleep 2
+          sudo omniedge join -n ${{ secrets.OMNIEDGE_VIRTUALNETWORK_ID }} &
 
-      - name: waiting for ping coming
+      - name: test
         run: |
           sleep 100
