@@ -298,6 +298,16 @@ cd omniedge-windows
 5. Press `crtl+B` to build, and you will find **OmniEdge.exe** in the folder`.\build-package\build\release\`.
 6. copy **OmniEdge.exe** to `.\build-package\package\`,open **omniedge_withTAP_V02_bat.iss** with Inno Setup Compile, press `ctril+F9` to compile and you will find the installer package in the folder `.\build-package\release`
 
+### OpenWrt
+
+1. Compile the binary
+
+We use the github action with the docker to build the binary for openwrt, the docker file is located at:
+`https://github.com/omniedgeio/omniedge-cli/blob/dev/docker/openwrt-binary`
+
+2. Package the ipk
+
+A seperated repo `https://github.com/omniedgeio/omniedge-openwrt` with github action is used to download the openwrt binary and package the ipk. 
 
 ## Usage
 
