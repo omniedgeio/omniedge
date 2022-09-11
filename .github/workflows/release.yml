@@ -212,7 +212,7 @@ jobs:
       - run: |
           set -x
           docker version
-          docker build -t local -f docker/openwrt-binary/Dockerfile-ubuntu-${{ matrix.platform }} .
+          docker build -t local --build-arg BUILD_ENV=${{ env.ENVIRONMENT }} -f docker/openwrt-binary/Dockerfile-ubuntu-${{ matrix.platform }} .
           docker run --name omniedge -d local
       - name: copy file
         run: |
@@ -234,6 +234,7 @@ jobs:
           overwrite: true
           file: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
+
   build-other-binary:
     name: Build on ${{ matrix.platform }}
     env:
