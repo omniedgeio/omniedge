@@ -1,6 +1,8 @@
-
 FROM ubuntu:20.04 AS build-env
+
 ENV CROSS_OPENWRT=openwrt
+ARG BUILD_ENV
+
 ARG OPENWRT_SDK=https://downloads.openwrt.org/releases/18.06.9/targets/ramips/mt7621/openwrt-sdk-18.06.9-ramips-mt7621_gcc-7.3.0_musl.Linux-x86_64.tar.xz
 
 ENV TZ=America/New_York
