@@ -359,7 +359,20 @@ jobs:
           BUILD_ENV=${{ env.ENVIRONMENT }} make build
           zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
-      
+        
+      - name: Test and output ip address
+        if: startsWith(matrix.platform, 'ubuntu-22.04')
+        run: |
+          chmod +x ./out/omniedge
+          sudo hostname Compile-Action
+          ./out/omniedge login -s ${{OMNEIDGE_SECURITY_KEY}}
+          sleep 2
+          sudo ./out/omniedge join -n ${{OMNEIDGE_VIRTUALNETWORK_ID}} &
+
+          ip4=$(/sbin/ip -o -4 addr list Compile-Action | awk '{print $4}' | cut -d/ -f1)
+          echo $ip4
+          echo "::set-output name=ip-address::$ip4"
+
       - name: make
         if: startsWith(matrix.platform, 'macos')
         run: |
