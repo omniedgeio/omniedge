@@ -292,6 +292,8 @@ jobs:
   build-freebsd-binary:
     runs-on: macos-12
     name: Build on FreeBSD
+    env:
+      ENVIRONMENT: prod
     steps:
       - name: Checkout with tag
         uses: actions/checkout@master
@@ -301,6 +303,7 @@ jobs:
         id: test
         uses: vmactions/freebsd-vm@v0.1.8
         with:
+          env: 'ENVIRONMENT'
           usesh: true
           run: |
             pkg update
