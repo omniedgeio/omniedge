@@ -1,4 +1,30 @@
 
+## Important Announcement: OmniEdge Service Shutdown and Data Deletion
+
+Dear OmniEdge Users,
+
+We hope this letter finds you well. It is with a mix of gratitude and sadness that we write to inform you about an important decision regarding our services. After careful consideration, **we have made the difficult choice to shut down the OmniEdge service at the end of this month, May 2023.**
+
+We want to express our deepest appreciation to each and every one of our 7000 users who have been a part of the OmniEdge community. Your support and trust in our platform have meant the world to us, and it has been an incredible journey to serve you over the years.
+
+However,as technology advances and new opportunities arise, we have had to make tough decisions about the future of our services. It is with a heavy heart that we announce the closure of OmniEdge. We understand that this news may come as a disappointment, and we apologize for any inconvenience it may cause you.
+
+In line with the shutdown, **we want to assure you that all your personal information and data will be completely deleted from our systems.** We take your privacy seriously, and as responsible custodians of your data, we are committed to ensuring its secure and permanent removal. Your trust in us has been invaluable, and we will treat your personal information with the utmost care and respect.
+
+While this chapter of OmniEdge may be coming to an end, we encourage you to explore alternative services that can meet your needs. The technology landscape is constantly evolving, and we are confident that you will find innovative solutions to replace the functionalities you enjoyed with OmniEdge.
+
+We would like to express our deepest gratitude for your support, loyalty, and feedback throughout our journey. We could not have come this far without you, and we are immensely grateful for the time we have spent together. It has been an honor to serve you, and we hope that our paths may cross again in the future.
+
+If you have any questions or concerns regarding the shutdown process or the deletion of your data, please feel free to reach out to our support team at [support@omniege.io] We are here to assist you during this transition period.
+
+Once again, we thank you from the bottom of our hearts for being a part of the OmniEdge community. Your trust and support have been invaluable, and we wish you all the best in your future endeavors.
+
+Sincerely,
+Yong Qian
+Founder & CEO 
+OmniEdge Team
+May 18,2023
+
 ![OmniEdge](https://user-images.githubusercontent.com/93888/185755146-a79ad5d6-7901-4855-9efb-ae108dbdcdf6.png)
 
 <div align="center">
