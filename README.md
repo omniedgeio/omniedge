@@ -20,9 +20,13 @@ If you have any questions or concerns regarding the shutdown process or the dele
 Once again, we thank you from the bottom of our hearts for being a part of the OmniEdge community. Your trust and support have been invaluable, and we wish you all the best in your future endeavors.
 
 Sincerely,
+
 Yong Qian
+
 Founder & CEO 
+
 OmniEdge Team
+
 May 18,2023
 
 ![OmniEdge](https://user-images.githubusercontent.com/93888/185755146-a79ad5d6-7901-4855-9efb-ae108dbdcdf6.png)
