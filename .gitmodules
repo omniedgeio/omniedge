@@ -37,3 +37,9 @@
 [submodule "omniedge-docker"]
 	path = omniedge-docker
 	url = https://github.com/omniedgeio/omniedge-docker.git
+[submodule "omniedge-backend"]
+	path = omniedge-backend
+	url = https://github.com/omniedgeio/omniedge-backend.git
+[submodule "omniedge-frontend"]
+	path = omniedge-frontend
+	url = https://github.com/omniedgeio/omniedge-frontend.git
