@@ -35,6 +35,14 @@
 [【English】](README.md) [【繁体中文】](README/README-zh-Hant.md) [【简体中文】](README/README-zh-Hans.md) [【日本语】](README/README-JP.md) [【Español】](README/README-ES.md) [【Italiano】](README/README-IT.md) [【한국어】](README/README-KR.md) 
 [【العربي】](README/README-AR.md) [【Tiếng Việt】](README/README-VN.md) [【แบบไทย】](README/README-TH.md)
 
+## The total cost to run OmniEdge SaaS Service : $57.15
+
+- Backend : $12
+- Frontend: $25
+- 1 Supernode: $6
+- PostgresSQL: $15.15
+- GitHub : $0
+
 [Hiring: Lead Developer - OmniEdge Enterprise VPN Project](Hiring.md)
 
 OmniEdge is an Open source p2p layer 2 VPN infrastructure based on [n2n](https://github.com/ntop/n2n) protocol, a traditional VPN alternative. No central server, easy to scale with less maintenance. What happens in intranet, stays in in intranet. OmniEdge is fully open sourced the code including backend, frontend, and Apps. 
