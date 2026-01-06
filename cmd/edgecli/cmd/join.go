@@ -147,6 +147,10 @@ func start(device *edge.DeviceResponse, joinResponse *edge.JoinVirtualNetworkRes
 	if randomMac, err = edge.GenerateRandomMac(); err != nil {
 		return err
 	}
+
+	// Get actual hardware UUID for heartbeat
+	hardwareId, _ := edge.RevealHardwareUUID()
+
 	var startOption = edge.StartOption{
 		Hostname:      device.Name,
 		DeviceMac:     randomMac,
@@ -158,7 +162,7 @@ func start(device *edge.DeviceResponse, joinResponse *edge.JoinVirtualNetworkRes
 		EnableRouting: enableRouting,
 		Token:         fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
 		BaseUrl:       edge.ConfigV.GetString(RestEndpointUrl),
-		HardwareUUID:  viper.GetString(keyDeviceUUID),
+		HardwareUUID:  hardwareId,
 	}
 	var service = edge.StartService{
 		StartOption: startOption,
