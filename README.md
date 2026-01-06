@@ -80,23 +80,10 @@ sudo docker run -d \
   omniedge/omniedge:latest
 ```
 
----
-
-## 📊 Monthly Operations Infrastructure
-*Transparency on the cost of running the OmniEdge SaaS*
-
-- **Backend**: $12.00
-- **Frontend**: $25.00
-- **Supernode**: $6.00
-- **PostgresSQL**: $15.15
-- **CI/CD (GitHub)**: $0.00
-- **Total**: **$57.15**
-
----
 
 ## 📝 Contributors & Advisors
 
-Special thanks to our [Advisors](https://omniedge.io/docs/article/about) and the [Global Team](https://github.com/orgs/omniedgeio/people) across US, AU, CN, DE, MY, and CA.
+Special thanks to our [Advisors](https://connect.omniedge.io/docs/article/about) and the [Global Team](https://github.com/orgs/omniedgeio/people) across US, AU, CN, DE, MY, and CA.
 
 Built with ❤️ by [OmniEdge](https://connect.omniedge.io)
 
