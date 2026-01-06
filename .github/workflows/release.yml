@@ -382,16 +382,28 @@ jobs:
         run: |
           brew install autoconf automake libtool coreutils
           make generate
-          VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin
-          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
-          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
-          cat ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+          
+          # Build for Intel (amd64)
+          VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin-amd64
+          codesign -s - ./out/omniedge
+          zip -j ./omniedge-${{ github.ref_name }}-macos-amd64.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-macos-amd64.zip > ./omniedge-${{ github.ref_name }}-macos-amd64.zip.sha256
+          
+          # Build for Apple Silicon (arm64)
+          VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin-arm64
+          codesign -s - ./out/omniedge
+          zip -j ./omniedge-${{ github.ref_name }}-macos-arm64.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-macos-arm64.zip > ./omniedge-${{ github.ref_name }}-macos-arm64.zip.sha256
+          
+          cat *.sha256
 
       - name: Archive package
         uses: actions/upload-artifact@v4
         with:
-          path: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
-          name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          path: |
+            omniedge-${{ github.ref_name }}-${{ matrix.platform }}*.zip
+            *.sha256
+          name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}
           if-no-files-found: error
           
       - name: Upload package to GitHub Release
@@ -401,5 +413,5 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
           overwrite: true
-          file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
+          file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}*.zip
           tag: ${{ github.ref }}
