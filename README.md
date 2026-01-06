@@ -11,7 +11,7 @@ OmniEdge CLI enables seamless connectivity between your devices across networks.
 - 📡 **OpenWrt Routers**: Mesh your network infrastructure
 - 🖥️ **Servers**: Linux, macOS, FreeBSD
 
-[🌐 Website](https://omniedge.io) • [� Docs](https://omniedge.io/docs) • [� Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
+[🌐 Website](https://connect.omniedge.io) • [� Docs](https://connect.omniedge.io/docs) • [� Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
 
 ## Quick Install
 
@@ -76,9 +76,9 @@ sudo omniedge join -n "your-network-id"
 ## Other Clients
 
 - [📱 iOS & M1 Mac](https://apps.apple.com/us/app/omniedgenew/id1603005893) - App Store
-- [🤖 Android](https://omniedge.io/download/android) - APK Download
-- [🪟 Windows](https://omniedge.io/download/windows) - Installer
-- [🔌 Synology NAS](https://omniedge.io/download/synology) - Package
+- [🤖 Android](https://connect.omniedge.io/download/android) - APK Download
+- [🪟 Windows](https://connect.omniedge.io/download/windows) - Installer
+- [🔌 Synology NAS](https://connect.omniedge.io/download/synology) - Package
 
 ## v0.3.0 Highlights
 
@@ -89,10 +89,10 @@ sudo omniedge join -n "your-network-id"
 
 ## Documentation
 
-- [Architecture](https://omniedge.io/docs/article/architecture)
-- [Installation Guide](https://omniedge.io/docs/article/install)
-- [Use Cases](https://omniedge.io/docs/article/cases)
-- [Performance](https://omniedge.io/docs/article/performance)
+- [Architecture](https://connect.omniedge.io/docs/article/architecture)
+- [Installation Guide](https://connect.omniedge.io/docs/article/install)
+- [Use Cases](https://connect.omniedge.io/docs/article/cases)
+- [Performance](https://connect.omniedge.io/docs/article/performance)
 
 ## Contributing
 
@@ -104,4 +104,4 @@ See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
 
 ---
 
-Built with ❤️ by [OmniEdge](https://omniedge.io)
+Built with ❤️ by [OmniEdge](https://connect.omniedge.io)
