@@ -10,9 +10,8 @@ var versionCmd = &cobra.Command{
 	Use:     "version",
 	Aliases: []string{},
 	Short:   "",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Omniedge 0.2.4")
-		return nil
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Omniedge 0.3.0")
 	},
 }
 

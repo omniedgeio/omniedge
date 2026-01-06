@@ -16,7 +16,7 @@ OmniEdge CLI enables seamless connectivity between your devices across networks.
 ## Quick Install
 
 ```bash
-curl https://omniedge.io/install/omniedge-install.sh | bash
+curl https://connect.omniedge.io/install/omniedge-install.sh | bash
 ```
 
 ## Supported Platforms
