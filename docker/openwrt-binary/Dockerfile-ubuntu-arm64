@@ -1,5 +1,5 @@
-#golang:arm64v8 for OpenWrt cross-compilation
-FROM arm64v8/golang:1.21-bookworm
+#Cross-compile for arm64 using OpenWrt SDK on x86_64 host
+FROM golang:1.21-bookworm
 
 ARG OPENWRT_SDK=https://downloads.openwrt.org/releases/23.05.0/targets/rockchip/armv8/openwrt-sdk-23.05.0-rockchip-armv8_gcc-12.3.0_musl.Linux-x86_64.tar.xz
 
