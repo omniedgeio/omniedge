@@ -15,16 +15,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout with tag
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v3
 
       - name: Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         env:
           cache-name: omniedge-saas-cli-${{ matrix.platform }}
         with:
@@ -58,7 +58,7 @@ jobs:
           esac
 
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v5
         with:
           context: .
           platforms: ${{ env.DOCKER_PLATFORM }}
@@ -91,7 +91,7 @@ jobs:
           zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./omniedge
 
       - name: Archive package
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
@@ -116,15 +116,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout with tag
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v3
 
       - name: Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         env:
           cache-name: omniedgecli-openwrt-${{ matrix.platform }}
         with:
@@ -151,7 +151,7 @@ jobs:
             ;;
           esac
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v5
         with:
           context: .
           platforms: ${{ env.DOCKER_PLATFORM }}
@@ -181,7 +181,7 @@ jobs:
           docker cp omniedge:/app/out/omniedge.zip ./omniedge.zip
           mv ./omniedge.zip ./omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
       - name: Archive package
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
           name: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
@@ -206,7 +206,7 @@ jobs:
     runs-on: ubuntu-latest
     steps: 
       - name: Checkout with tag
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
 
       - uses: docker-practice/actions-setup-docker@master
       - run: |
@@ -219,7 +219,7 @@ jobs:
           docker cp omniedge:/app/omniedge.zip ./omniedge.zip
           mv ./omniedge.zip ./omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
       - name: Archive package
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
           name: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
@@ -245,10 +245,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout with tag
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
 
       - name: setup golang
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: '1.18.4'
 
@@ -274,7 +274,7 @@ jobs:
           cat ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
 
       - name: Archive package
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
@@ -296,9 +296,9 @@ jobs:
       ENVIRONMENT: prod
     steps:
       - name: Checkout with tag
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
         
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: prepare
         id: test
         uses: vmactions/freebsd-vm@v0.1.8
@@ -315,7 +315,7 @@ jobs:
             zip -j ./omniedge-${{ github.ref_name }}-freebsd-13.1.zip ./out/omniedge
       
       - name: Archive package
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
           name: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
@@ -340,10 +340,10 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout with tag
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
 
       - name: setup golang
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: '1.16.6'
 
@@ -388,7 +388,7 @@ jobs:
           cat ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
 
       - name: Archive package
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
