@@ -39,7 +39,7 @@ OmniEdge is a next-generation decentralized networking platform designed to prov
 - **Decentralized P2P Mesh**: No central bottlenecks. What happens in the intranet, stays in the intranet.
 - **Zero-Config Onboarding**: Connect nodes in minutes with an encrypted mesh.
 - **Technical Observability**: Real-time status pulses and heartbeat tracking for robotics fleets.
-- **Fully Open Source**: From backend to frontend and mobile apps.
+- **Fully Open Source**: Fully open source all clients.
 
 ---
 
@@ -51,7 +51,7 @@ This is the **Meta-Repository** for OmniEdge, synchronizing all core components:
 |-----------|------------|-------------|
 | **CLI** | [omniedge-cli](https://github.com/omniedgeio/omniedge-cli) | Core engine for Linux, macOS, FreeBSD, and Edge devices. |
 | **Android** | [omniedge-android](https://github.com/omniedgeio/omniedge-android) | Mobile & TV client for Android. |
-| **iOS/macOS** | [omniedge-iOS](https://github.com/omniedgeio/omniedge-iOS) / [omniedge-macOS](https://github.com/omniedgeio/omniedge-macOS) | Native Apple ecosystem clients. |
+| **iOS/macOS** | [omniedge-iOS](https://github.com/omniedgeio/omniedge-iOS) / [omniedge-macOS](https://github.com/omniedgeio/omniedge-macOS) | Native Apple ecosystem clients (not ready yet). |
 | **Windows** | [omniedge-windows](https://github.com/omniedgeio/omniedge-windows) | Native Windows client (Qt). |
 | **Synology** | [omniedge-synology](https://github.com/omniedgeio/omniedge-synology) | NAS package for storage-centric edge nodes. |
 | **OpenWrt** | [omniedge-openwrt](https://github.com/omniedgeio/omniedge-openwrt) | Mesh networking for router infrastructure. |
