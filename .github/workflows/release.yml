@@ -313,6 +313,8 @@ jobs:
             # Disable other system repos
             if [ -f /etc/pkg/FreeBSD.conf ]; then sed -i '' 's/enabled: yes/enabled: no/' /etc/pkg/FreeBSD.conf; fi
             pkg update -f
+            # Perform a full upgrade to resolve library version mismatches (e.g. PCRE2 for git)
+            pkg upgrade -y
             pkg install -y bash go gmake git openssl zip autoconf automake libtool
           run: |
             export PATH="/usr/local/bin:$PATH"
