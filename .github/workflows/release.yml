@@ -305,8 +305,9 @@ jobs:
           usesh: true
           prepare: |
             pkg update
-            pkg install -y go gmake git openssl zip autoconf automake libtool
+            pkg install -y bash go gmake git openssl zip autoconf automake libtool
           run: |
+            export PATH="/usr/local/bin:$PATH"
             gmake generate
             BUILD_ENV=$ENVIRONMENT gmake build-freebsd
             zip -j ./omniedge-${{ github.ref_name }}-freebsd-14.zip ./out/omniedge
