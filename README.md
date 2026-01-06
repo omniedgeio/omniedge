@@ -1,109 +1,107 @@
-# Omniedge Cli
+# OmniEdge CLI
 
-OmniEdge CLi for macOS (Intel, M1/M2 MacBook), Linux Distributions, and ARM, Raspberry PI, Nvidia Jetson Embedded System. 
+> Secure P2P mesh networking for AI devices, IoT, and edge computing
 
->Bring the intranet on the internet
+[![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge-cli)](https://github.com/omniedgeio/omniedge-cli/releases)
+[![License](https://img.shields.io/github/license/omniedgeio/omniedge-cli)](LICENSE)
 
-[🤝 Website](https://omniedge.io)
-[💬 Twitter](https://twitter.com/omniedgeio)
-[😇 Discord](https://discord.gg/d4faRPYj)
+OmniEdge CLI enables seamless connectivity between your devices across networks. Perfect for:
+- 🤖 **AI/ML Devices**: NVIDIA Jetson, AI edge computers
+- 🍓 **Raspberry Pi**: All models from Pi 3 to Pi 5
+- 📡 **OpenWrt Routers**: Mesh your network infrastructure
+- 🖥️ **Servers**: Linux, macOS, FreeBSD
 
-Main repo: https://github.com/omniedgeio/omniedge
+[🌐 Website](https://omniedge.io) • [� Docs](https://omniedge.io/docs) • [� Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
 
-## Install OmniEdge Cli
+## Quick Install
 
 ```bash
 curl https://omniedge.io/install/omniedge-install.sh | bash
 ```
 
-## Install OmniEdge other clients
+## Supported Platforms
 
--   [Android: OmniEdge.apk](https://omniedge.io/install/download/0.2.2/omniedge-release-v0.2.2.apk)
--   [macOS cli](https://omniedge.io/install/download/0.2.3/omniedgecli-macos-latest.zip)
--   [Windows](https://omniedge.io/install/download/0.2.3/omniedge-setup-0.2.3.exe)
--   [Linux Cli](https://github.com/omniedgeio/app-release/releases/tag/v0.2.3)
--   [iOS & M1 Mac on App Store](https://apps.apple.com/us/app/omniedgenew/id1603005893)
--   [Synology](https://omniedge.io/download/synology)
--   [Raspberry Pi, ARM, Nvidia Jetson](https://github.com/omniedgeio/app-release/releases/tag/v0.2.3)
+### Linux (Native)
+| Architecture | Devices | Download |
+|--------------|---------|----------|
+| **amd64** | Servers, NUCs, Mini PCs | [omniedge-amd64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **arm64** | NVIDIA Jetson, RPi 4/5, Apple Silicon | [omniedge-arm64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **arm** | Raspberry Pi 3, IoT Gateways | [omniedge-arm.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
 
+### OpenWrt (Routers)
+| Architecture | Devices | Download |
+|--------------|---------|----------|
+| **amd64** | x86 Software Routers | [omniedge-openwrt-amd64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **arm64** | Modern ARM Routers | [omniedge-openwrt-arm64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **arm** | Qualcomm IPQ40xx | [omniedge-openwrt-arm.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **mips** | Legacy MIPS Routers | [omniedge-openwrt-mips.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **mipsle** | MediaTek Routers | [omniedge-openwrt-mipsle.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
 
-## Cli Command
+### Emerging Architectures
+| Architecture | Devices | Download |
+|--------------|---------|----------|
+| **riscv64** | Sipeed, StarFive, VisionFive | [omniedge-riscv64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **loongarch64** | Loongson (China) | [omniedge-loongarch64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+
+### Desktop/Workstation
+| Platform | Download |
+|----------|----------|
+| **macOS** (Apple Silicon) | [omniedge-macos-latest.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Ubuntu 22.04 LTS** | [omniedge-ubuntu-22.04.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Ubuntu 24.04 LTS** | [omniedge-ubuntu-24.04.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **FreeBSD 14** | [omniedge-freebsd-14.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+
+## Usage
 
 ### Login
 
-- Login By Password
+```bash
+# Login with email
+omniedge login -u your@email.com
 
-```shell
-omniedge login -u xxx@xxx.com
+# Login with API key (recommended for automation)
+omniedge login -s YOUR_SECRET_KEY
 ```
 
--  Login By Secret-Key
-
-You can generate secret-key on omniedge web.
-
-```shell
-omniedge login -s xxxxxx
-```
-
-### Join
-
-you can just call `omniedge join`, it will automatically prompt 
-the available network for you to choose. And you can 
-also add one parameter `-n` to specify the network id manually.
-
-And then, enjoy the omniedge network.
-
-```shell
-omniedge join 
-// or
-omniedge join -n "virtual-network-id" 
-```
-
-
-## Resources
-
-- Architecture: https://omniedge.io/docs/article/architecture
-- Install: https://omniedge.io/docs/article/install
-- Cases: https://omniedge.io/docs/article/cases
-- Compare: https://omniedge.io/docs/article/compare
-- Performance: https://omniedge.io/docs/article/performance
-- Dashboard: https://omniedge.io/docs/article/admin
-- [n2n](https://github.com/ntop/n2n)
-
-
-## Compile for riscv64
+### Join Network
 
 ```bash
-apt-get update
-apt-get install -y openssl autoconf build-essential libssl-dev zip wget g++-riscv64-linux-gnu gcc-riscv64-linux-gnu
+# Interactive mode - choose network from list
+sudo omniedge join
 
-wget https://go.dev/dl/go1.18.4.linux-amd64.tar.gz
-rm -rf /usr/local/go && tar -C /usr/local -xzf go1.18.4.linux-amd64.tar.gz
-export PATH=$PATH:/usr/local/go/bin
-go version
-export GOOS=linux
-export GOARCH=riscv64
-export CGO_ENABLED=1
-export CC=riscv64-linux-gnu-gcc
-git clone https://github.com/yongqianme/omniedge-cli.git
-cd omniedge-cli
-go mod download
-go generate
-BUILD_ENV=prod make build-riscv64
+# Direct mode - specify network ID
+sudo omniedge join -n "your-network-id"
 ```
 
+## Other Clients
 
-## Contributing Guildlines
+- [📱 iOS & M1 Mac](https://apps.apple.com/us/app/omniedgenew/id1603005893) - App Store
+- [🤖 Android](https://omniedge.io/download/android) - APK Download
+- [🪟 Windows](https://omniedge.io/download/windows) - Installer
+- [🔌 Synology NAS](https://omniedge.io/download/synology) - Package
 
-Check the tempalte into .github folder to report an issue or submit a PR: 
-1. ISSUE_TEMPLATE.md 
-2. PULL_REQUEST_TEMPLATE.md 
+## v0.3.0 Highlights
 
-## How to get started? 
+- ✨ **Native macOS `utun` support** - No third-party kernel extensions needed
+- 💓 **Real-time heartbeat** - Device online status visible in dashboard
+- 🏗️ **Modern toolchain** - Go 1.21, OpenWrt SDK 23.05
+- 🌏 **Emerging architectures** - RISC-V and LoongArch support
 
-1. If you only need a convenient connectivity service 
-Just visit https://omniedge.io/download and download the apps for your platform. 
+## Documentation
 
-# Contributors
-  
-@ivyxjc
+- [Architecture](https://omniedge.io/docs/article/architecture)
+- [Installation Guide](https://omniedge.io/docs/article/install)
+- [Use Cases](https://omniedge.io/docs/article/cases)
+- [Performance](https://omniedge.io/docs/article/performance)
+
+## Contributing
+
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
+
+## License
+
+[GPL-3.0](LICENSE)
+
+---
+
+Built with ❤️ by [OmniEdge](https://omniedge.io)
