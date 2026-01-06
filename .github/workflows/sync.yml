@@ -1,34 +1,80 @@
 name: sync
+
 on:
   push:
     branches:
       - main
   schedule:
-  - cron: "0 */24 * * *"
+    - cron: "0 */12 * * *"
+  repository_dispatch:
+    types: [meta-release]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.3.0)'
+        required: false
+
 jobs:
-  build:
+  sync-and-release:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+          fetch-depth: 0
 
-      - name: update submodule
-        id: update-submodule
+      - name: Update submodules
+        id: update
         run: |
-          git submodule update --remote
-          echo ::set-output name=commit-status::$(git status --porcelain=v1 2>/dev/null | wc -l)
-      - name: Commit files
-        if: ${{ steps.update-submodule.outputs.commit-status==1 }}
-        id: commit
+          git submodule update --init --recursive --remote
+          
+          # Check if there are changes
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "version=${{ github.event.client_payload.version }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=auto" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and Push Submodule Updates
+        if: steps.update.outputs.changes == 'true'
         run: |
           git config --local user.email "github-actions@omniedge.io"
           git config --local user.name "github-actions"
           git add .
-          git commit -m "sync submodule" -a
-      - name: Push changes
-        id: push
-        if: ${{ steps.update-submodule.outputs.commit-status==1 }}
-        uses: ad-m/github-push-action@master
+          git commit -m "chore: sync submodules [${{ steps.version.outputs.version }}]"
+          git push origin main
+
+      - name: Create Unified Release
+        if: steps.version.outputs.version != 'auto'
+        uses: softprops/action-gh-release@v1
         with:
-          force_with_lease: true
+          tag_name: ${{ steps.version.outputs.version }}
+          name: OmniEdge Release ${{ steps.version.outputs.version }}
+          body: |
+            Unified release for OmniEdge version ${{ steps.version.outputs.version }}.
+            
+            This release synchronizes the following components:
+            - CLI
+            - Windows
+            - Android
+            - OpenWrt
+            - Synology
+            - Docker
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
