@@ -22,13 +22,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          submodules: recursive
+          submodules: true # Non-recursive to avoid stray sub-submodule errors
           fetch-depth: 0
 
       - name: Update submodules
         id: update
         run: |
-          git submodule update --init --recursive --remote
+          # Force update submodule pointers to remote heads
+          git submodule update --init --remote
           
           # Check if there are changes
           if [[ -n "$(git status --porcelain)" ]]; then
