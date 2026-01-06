@@ -308,9 +308,10 @@ jobs:
           prepare: |
             # Only enable the main repo to avoid ports sync issues
             mkdir -p /usr/local/etc/pkg/repos
-            echo 'FreeBSD: { url: "pkg+http://pkg.FreeBSD.org/${ABI}/latest", enabled: yes }' > /usr/local/etc/pkg/repos/FreeBSD.conf
-            # Disable other repos
-            find /etc/pkg /usr/local/etc/pkg -name "*.conf" ! -name "FreeBSD.conf" -exec sed -i '' 's/enabled: yes/enabled: no/g' {} + || true
+            # Use direct http URL to avoid SRV lookup errors with pkg+http prefix
+            echo 'FreeBSD: { url: "http://pkg.FreeBSD.org/${ABI}/latest", enabled: yes }' > /usr/local/etc/pkg/repos/FreeBSD.conf
+            # Disable other system repos
+            if [ -f /etc/pkg/FreeBSD.conf ]; then sed -i '' 's/enabled: yes/enabled: no/' /etc/pkg/FreeBSD.conf; fi
             pkg update -f
             pkg install -y bash go gmake git openssl zip autoconf automake libtool
           run: |
