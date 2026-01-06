@@ -50,7 +50,6 @@ This is the **Meta-Repository** for OmniEdge, synchronizing all core components:
 | Component | Repository | Description |
 |-----------|------------|-------------|
 | **CLI** | [omniedge-cli](https://github.com/omniedgeio/omniedge-cli) | Core engine for Linux, macOS, FreeBSD, and Edge devices. |
-| **Frontend** | [omniedge-web-frontend](https://github.com/omniedgeio/omniedge-web-frontend) | Dashboard and node management interface (Next.js). |
 | **Android** | [omniedge-android](https://github.com/omniedgeio/omniedge-android) | Mobile & TV client for Android. |
 | **iOS/macOS** | [omniedge-iOS](https://github.com/omniedgeio/omniedge-iOS) / [omniedge-macOS](https://github.com/omniedgeio/omniedge-macOS) | Native Apple ecosystem clients. |
 | **Windows** | [omniedge-windows](https://github.com/omniedgeio/omniedge-windows) | Native Windows client (Qt). |
