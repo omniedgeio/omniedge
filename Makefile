@@ -8,7 +8,7 @@ build: go.sum generate
 
 build-darwin: go.sum generate
 	rm -rf ./out
-	GOOS=darwin go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
+	GOOS=darwin GOARCH=$(shell go env GOARCH) go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
 
 
 build-riscv64: go.sum generate
