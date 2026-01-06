@@ -1,9 +1,9 @@
 #golang:amd64
-FROM amd64/golang:1.18
+FROM golang:1.21-bookworm
 
-# install golang
+# install build tools
 RUN apt update
-RUN apt -y install wget make git autoconf automake build-essential upx
+RUN apt -y install wget make git autoconf automake build-essential
 
 WORKDIR /app
 

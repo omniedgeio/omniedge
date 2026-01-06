@@ -1,9 +1,9 @@
 #golang:armv7
-FROM golang:buster@sha256:4c5a1dead04f13777610d1691ae6e4a376a2a1d938a6ef40d1f25815c3eb20d1
+FROM arm32v7/golang:1.21-bookworm
 
-# install golang
+# install build tools
 RUN apt update
-RUN apt -y install wget make git autoconf automake build-essential upx
+RUN apt -y install wget make git autoconf automake build-essential
 
 WORKDIR /app
 
