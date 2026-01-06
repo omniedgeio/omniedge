@@ -290,35 +290,32 @@ jobs:
           file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
   build-freebsd-binary:
-    runs-on: macos-14
+    runs-on: ubuntu-latest
     name: Build on FreeBSD
     env:
       ENVIRONMENT: prod
     steps:
       - name: Checkout with tag
         uses: actions/checkout@v4
-        
-      - uses: actions/checkout@v4
-      - name: prepare
-        id: test
-        uses: vmactions/freebsd-vm@v0.1.8
+
+      - name: Build on FreeBSD
+        uses: vmactions/freebsd-vm@v1
         with:
           envs: 'ENVIRONMENT'
           usesh: true
-          run: |
+          prepare: |
             pkg update
-            free -h
-            pkg install -y bash go gmake git openssl zip autoconf automake libtool
-            chsh -s bash
-            make generate
-            BUILD_ENV=${{ env.ENVIRONMENT }} make build-freebsd
-            zip -j ./omniedge-${{ github.ref_name }}-freebsd-13.1.zip ./out/omniedge
+            pkg install -y go gmake git openssl zip autoconf automake libtool
+          run: |
+            gmake generate
+            BUILD_ENV=$ENVIRONMENT gmake build-freebsd
+            zip -j ./omniedge-${{ github.ref_name }}-freebsd-14.zip ./out/omniedge
       
       - name: Archive package
         uses: actions/upload-artifact@v4
         with:
-          path: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
-          name: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
+          path: omniedge-${{ github.ref_name }}-freebsd-14.zip
+          name: omniedge-${{ github.ref_name }}-freebsd-14.zip
           if-no-files-found: error
           
       - name: Upload package to GitHub Release
@@ -328,7 +325,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
           overwrite: true
-          file: omniedge-${{ github.ref_name }}-freebsd-13.1.zip
+          file: omniedge-${{ github.ref_name }}-freebsd-14.zip
           tag: ${{ github.ref }}
   build-for-distr:
     name: Build on ${{ matrix.platform }}
