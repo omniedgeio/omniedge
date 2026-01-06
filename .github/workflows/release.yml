@@ -306,7 +306,10 @@ jobs:
           envs: 'ENVIRONMENT'
           usesh: true
           prepare: |
-            pkg update
+            # Use latest repository instead of quarterly for better package availability
+            mkdir -p /usr/local/etc/pkg/repos
+            echo 'FreeBSD: { url: "pkg+http://pkg.FreeBSD.org/${ABI}/latest" }' > /usr/local/etc/pkg/repos/FreeBSD.conf
+            pkg update -f
             pkg install -y bash go gmake git openssl zip autoconf automake libtool
           run: |
             export PATH="/usr/local/bin:$PATH"

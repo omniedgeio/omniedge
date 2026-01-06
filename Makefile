@@ -10,13 +10,15 @@ build-darwin: go.sum generate
 	rm -rf ./out
 	GOOS=darwin go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
 
-build-darwin-amd64: go.sum generate
+build-darwin-amd64: go.sum
 	rm -rf ./out
-	GOOS=darwin GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
+	CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go generate ./...
+	CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
 
-build-darwin-arm64: go.sum generate
+build-darwin-arm64: go.sum
 	rm -rf ./out
-	GOOS=darwin GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
+	CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go generate ./...
+	CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
 
 build-riscv64: go.sum generate
 	rm -rf ./out

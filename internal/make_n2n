@@ -31,6 +31,18 @@ if [ "$openwrt" = 'openwrt' ]; then
 			./configure --target=x86-64-openwrt-linux-musl --host x86_64-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 			;;
     esac
+elif [ "$OS_V" = 'Darwin' ]; then
+    case $arch in
+        amd64)
+            ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -arch x86_64" LDFLAGS="-arch x86_64"
+            ;;
+        arm64)
+            ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -arch arm64" LDFLAGS="-arch arm64"
+            ;;
+        *)
+            ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+            ;;
+    esac
 else
     ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 fi
