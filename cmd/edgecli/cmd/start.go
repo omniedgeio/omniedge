@@ -24,6 +24,10 @@ var startCmd = &cobra.Command{
 			log.Errorf("%+v", err)
 			return
 		}
+
+		// Get actual hardware UUID for heartbeat
+		hardwareId, _ := edgecli.RevealHardwareUUID()
+
 		var startOption = edgecli.StartOption{
 			Hostname:      viper.GetString(keyDeviceName),
 			DeviceMac:     randomMac,
@@ -35,7 +39,7 @@ var startCmd = &cobra.Command{
 			EnableRouting: viper.GetBool(cliEnableRouting),
 			Token:         viper.GetString(keyAuthResponseToken),
 			BaseUrl:       edgecli.ConfigV.GetString(RestEndpointUrl),
-			HardwareUUID:  viper.GetString(keyDeviceUUID),
+			HardwareUUID:  hardwareId,
 		}
 		var service = edgecli.StartService{
 			StartOption: startOption,
