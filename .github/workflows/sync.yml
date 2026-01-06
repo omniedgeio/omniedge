@@ -21,7 +21,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
           submodules: false # Manual update for better control
           fetch-depth: 0
 
@@ -79,5 +79,5 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}
 
