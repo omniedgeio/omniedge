@@ -2,6 +2,7 @@ FROM ubuntu:20.04 AS build-env
 
 ENV CROSS_OPENWRT=openwrt
 ARG BUILD_ENV
+ARG VERSION
 
 ENV TZ=America/New_York
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -47,11 +48,10 @@ RUN cp -r /golang/go /usr/local/ && \
     export CC=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-gcc && \ 
     export CXX=/openwrt_19.07.09-ar71xx/staging_dir/toolchain-mips_24kc_gcc-7.5.0_musl/bin/mips-openwrt-linux-g++ && \
     export STAGING_DIR=/openwrt_19.07.09-ar71xx/staging_dir && \
-    cd /app && cat internal/make_n2n && CGO_ENABLED=1 GOOS=linux GOARCH=mips GOMIPS=softfloat BUILD_ENV=$BUILD_ENV make build && \
+    cd /app && cat internal/make_n2n && CGO_ENABLED=1 GOOS=linux GOARCH=mips GOMIPS=softfloat VERSION=$VERSION BUILD_ENV=$BUILD_ENV make build && \
     upx -9 -k /app/out/omniedge && \
     zip -j /app/out/omniedge.zip /app/out/omniedge
 
 FROM ubuntu:20.04
 RUN mkdir /app
-COPY --from=build-env /app/out/omniedge.zip /app/omniedge.zip
 

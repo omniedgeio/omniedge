@@ -2,7 +2,7 @@ FROM ubuntu:20.04
 
 ARG TARGETARCH
 ARG BUILD_ENV
-ARG VERSION=0.3.0
+ARG VERSION
 
 # Install all needed packages
 RUN apt-get update && \
@@ -19,4 +19,4 @@ COPY . .
 ENV GOARCH=${TARGETARCH}
 ENV GOOS=linux
 RUN go generate ./...
-RUN BUILD_ENV=$BUILD_ENV make build
+RUN VERSION=$VERSION BUILD_ENV=$BUILD_ENV make build

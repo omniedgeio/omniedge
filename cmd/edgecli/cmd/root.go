@@ -11,8 +11,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+var Version string = "dev"
+
 var rootCmd = &cobra.Command{
 	Use:           "omniedge",
+	Version:       Version,
 	Short:         "",
 	Long:          ``,
 	SilenceErrors: true,
