@@ -48,6 +48,14 @@ jobs:
           event-type: cli-release
           client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
 
+      - name: Trigger omniedge-web-frontend
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: omniedgeio/omniedge-web-frontend
+          event-type: cli-release
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
+
       - name: Summary
         run: |
           echo "## 🚀 Triggered Dependency Updates" >> $GITHUB_STEP_SUMMARY
@@ -59,3 +67,4 @@ jobs:
           echo "- omniedge-openwrt" >> $GITHUB_STEP_SUMMARY
           echo "- omniedge-synology" >> $GITHUB_STEP_SUMMARY
           echo "- github-action" >> $GITHUB_STEP_SUMMARY
+          echo "- omniedge-web-frontend" >> $GITHUB_STEP_SUMMARY

@@ -53,5 +53,7 @@ RUN cp -r /golang/go /usr/local/ && \
     zip -j /app/out/omniedge.zip /app/out/omniedge
 
 FROM ubuntu:20.04
-RUN mkdir /app
+RUN mkdir -p /app/out
+COPY --from=build-env /app/out/omniedge /app/out/omniedge
+COPY --from=build-env /app/out/omniedge.zip /app/out/omniedge.zip
 

@@ -215,10 +215,10 @@ jobs:
           set -x
           docker version
           docker build -t local --build-arg BUILD_ENV=${{ env.ENVIRONMENT }} --build-arg VERSION=${{ github.ref_name }} -f docker/openwrt-binary/Dockerfile-ubuntu-${{ matrix.platform }} .
-          docker run --name omniedge -d local
+          docker run --name omniedge -t -d local
       - name: copy file
         run: |
-          docker cp omniedge:/app/omniedge.zip ./omniedge.zip
+          docker cp omniedge:/app/out/omniedge.zip ./omniedge.zip
           mv ./omniedge.zip ./omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
       - name: Archive package
         uses: actions/upload-artifact@v4
