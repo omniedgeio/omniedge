@@ -2,7 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	edge "github.com/omniedgeio/omniedge-cli"
+	api "github.com/omniedgeio/omniedge-cli/pkg/api"
+	core "github.com/omniedgeio/omniedge-cli/pkg/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -17,15 +18,15 @@ var loginCmd = &cobra.Command{
 	Short:   "Login Omniedge network",
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
-		edge.LoadClientConfig()
+		core.LoadClientConfig()
 		var username = viper.GetString(cliUsername)
 		var password string
 		var secretKey string
 		password = viper.GetString(cliPassword)
 		secretKey = viper.GetString(cliSecretKey)
-		endpointUrl := edge.ConfigV.GetString(RestEndpointUrl)
+		endpointUrl := core.ConfigV.GetString(RestEndpointUrl)
 		// login by username
-		var authResp *edge.AuthResp
+		var authResp *api.AuthResp
 		var err error
 		if username != "" {
 			if password = viper.GetString(cliPassword); password == "" {
@@ -37,15 +38,15 @@ var loginCmd = &cobra.Command{
 				password = string(bytePassword)
 				fmt.Println()
 			}
-			httpOption := edge.HttpOption{
+			httpOption := api.HttpOption{
 				BaseUrl: endpointUrl,
 			}
-			authOption := &edge.AuthOption{
+			authOption := &api.AuthOption{
 				Username:   username,
 				Password:   password,
-				AuthMethod: edge.LoginByPassword,
+				AuthMethod: api.LoginByPassword,
 			}
-			authService := edge.AuthService{
+			authService := api.AuthService{
 				HttpOption: httpOption,
 			}
 			authResp, err = authService.Login(authOption)
@@ -62,14 +63,14 @@ var loginCmd = &cobra.Command{
 				log.Errorf("Please input secret key or set system variable %s", omniedgeSecretKey)
 				return
 			}
-			httpOption := edge.HttpOption{
+			httpOption := api.HttpOption{
 				BaseUrl: endpointUrl,
 			}
-			authOption := &edge.AuthOption{
+			authOption := &api.AuthOption{
 				SecretKey:  secretKey,
-				AuthMethod: edge.LoginBySecretKey,
+				AuthMethod: api.LoginBySecretKey,
 			}
-			authService := edge.AuthService{
+			authService := api.AuthService{
 				HttpOption: httpOption,
 			}
 			authResp, err = authService.Login(authOption)

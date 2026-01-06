@@ -1,7 +1,7 @@
 package main
 
 import (
-	edgecli "github.com/omniedgeio/omniedge-cli"
+	core "github.com/omniedgeio/omniedge-cli/pkg/core"
 	rootCmd "github.com/omniedgeio/omniedge-cli/cmd/edgecli/cmd"
 	log "github.com/sirupsen/logrus"
 	"os"
@@ -11,9 +11,9 @@ import (
 var Env string
 
 func main() {
-	edgecli.Env = Env
+	core.Env = Env
 	if Env == "" {
-		edgecli.Env = "dev"
+		core.Env = "dev"
 	}
 	username := os.Getenv("SUDO_USER")
 	u, err := user.Lookup(username)
@@ -22,7 +22,7 @@ func main() {
 		rootCmd.Option.ScanResultDefaultPath = u.HomeDir + "/.omniedge/scan.json"
 	}
 
-	log.Infof("You are in mode: %s", edgecli.Env)
+	log.Infof("You are in mode: %s", core.Env)
 	log.SetFormatter(&log.TextFormatter{
 		TimestampFormat:        "2006-01-02T15:04:05",
 		FullTimestamp:          true,

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	edge "github.com/omniedgeio/omniedge-cli"
+	core "github.com/omniedgeio/omniedge-cli/pkg/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -42,7 +42,7 @@ func loadAuthFile() error {
 	if authFile == "" {
 		authFile = Option.AuthFileDefaultPath
 	}
-	handledAuthFile, err := edge.HandleFilePrefix(authFile)
+	handledAuthFile, err := core.HandleFilePrefix(authFile)
 	if err != nil {
 		return errors.New("fail to parse the path of the auth file")
 	}
@@ -59,11 +59,11 @@ func persistAuthFile() {
 	if authFile == "" {
 		authFile = Option.AuthFileDefaultPath
 	}
-	handledAuthFile, err := edge.HandleFilePrefix(authFile)
+	handledAuthFile, err := core.HandleFilePrefix(authFile)
 	if err != nil {
 		log.Fatalf("Fail to parse the path of the auth file")
 	}
-	if err = edge.HandleFileStatus(handledAuthFile); err != nil {
+	if err = core.HandleFileStatus(handledAuthFile); err != nil {
 		log.Fatalf("Fail to create omniedge file, err is %s", err.Error())
 	}
 	if err := viper.WriteConfigAs(handledAuthFile); err != nil {
@@ -76,7 +76,7 @@ func loadScanResult() error {
 	if scanResult == "" {
 		scanResult = Option.ScanResultDefaultPath
 	}
-	handledScanResultFile, err := edge.HandleFilePrefix(scanResult)
+	handledScanResultFile, err := core.HandleFilePrefix(scanResult)
 	if err != nil {
 		return errors.New("fail to parse the path of the auth file")
 	}
@@ -93,12 +93,12 @@ func persistScanResult() {
 	if scanResult == "" {
 		scanResult = Option.ScanResultDefaultPath
 	}
-	handledScanResultFile, err := edge.HandleFilePrefix(scanResult)
+	handledScanResultFile, err := core.HandleFilePrefix(scanResult)
 	if err != nil {
 		log.Fatalf("Fail to parse the path of the scan result")
 	}
 	log.Infof("result %+v", handledScanResultFile)
-	if err = edge.HandleFileStatus(handledScanResultFile); err != nil {
+	if err = core.HandleFileStatus(handledScanResultFile); err != nil {
 		log.Fatalf("Fail to create scan result, err is %s", err.Error())
 	}
 	if err := viper.WriteConfigAs(handledScanResultFile); err != nil {
