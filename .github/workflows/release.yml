@@ -303,7 +303,7 @@ jobs:
         id: test
         uses: vmactions/freebsd-vm@v0.1.8
         with:
-          env: 'ENVIRONMENT'
+          envs: 'ENVIRONMENT'
           usesh: true
           run: |
             pkg update
