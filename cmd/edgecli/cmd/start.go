@@ -33,6 +33,9 @@ var startCmd = &cobra.Command{
 			DeviceMask:    viper.GetString(keyJoinVirtualNetworkNetMask),
 			SuperNode:     viper.GetString(keyJoinVirtualNetworkSuperNode),
 			EnableRouting: viper.GetBool(cliEnableRouting),
+			Token:         viper.GetString(keyAuthResponseToken),
+			BaseUrl:       edgecli.ConfigV.GetString(RestEndpointUrl),
+			HardwareUUID:  viper.GetString(keyDeviceUUID),
 		}
 		var service = edgecli.StartService{
 			StartOption: startOption,

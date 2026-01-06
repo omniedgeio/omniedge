@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type RegisterOption struct {
@@ -16,6 +17,14 @@ type RegisterOption struct {
 }
 
 type RegisterService struct {
+	HttpOption
+}
+
+type HeartbeatOption struct {
+	HardwareUUID string
+}
+
+type HeartbeatService struct {
 	HttpOption
 }
 
@@ -48,5 +57,31 @@ func (s *RegisterService) Register(opt *RegisterOption) (*DeviceResponse, error)
 		return nil, errors.New(fmt.Sprintf("Fail to register device, error message: %s", resp.(*ErrorResponse).Message))
 	default:
 		return nil, errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
+	}
+}
+
+func (s *HeartbeatService) Heartbeat(opt *HeartbeatOption) error {
+	var url string
+	url = s.BaseUrl + "/devices/heartbeat"
+
+	body := map[string]string{
+		"hardware_id": opt.HardwareUUID,
+	}
+	postBody, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Authorization", s.Token)
+	resp, err := HandleCall(req)
+	if err != nil {
+		return err
+	}
+	log.Tracef("Heartbeat response %+v", resp)
+	switch resp.(type) {
+	case *SuccessResponse:
+		return nil
+	case *ErrorResponse:
+		return errors.New(fmt.Sprintf("Fail to send heartbeat, error message: %s", resp.(*ErrorResponse).Message))
+	default:
+		return errors.New(fmt.Sprint("Internal error during heartbeat"))
 	}
 }

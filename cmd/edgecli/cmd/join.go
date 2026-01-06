@@ -2,12 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/manifoldco/promptui"
 	edge "github.com/omniedgeio/omniedge-cli"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"strings"
 )
 
 var joinCmd = &cobra.Command{
@@ -155,6 +156,9 @@ func start(device *edge.DeviceResponse, joinResponse *edge.JoinVirtualNetworkRes
 		DeviceMask:    joinResponse.SubnetMask,
 		SuperNode:     joinResponse.Server.Host,
 		EnableRouting: enableRouting,
+		Token:         fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
+		BaseUrl:       edge.ConfigV.GetString(RestEndpointUrl),
+		HardwareUUID:  viper.GetString(keyDeviceUUID),
 	}
 	var service = edge.StartService{
 		StartOption: startOption,

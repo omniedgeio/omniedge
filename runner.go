@@ -1,6 +1,8 @@
 package edgecli
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	omnin2n "github.com/omniedgeio/omniedge-cli/internal"
 	log "github.com/sirupsen/logrus"
@@ -15,6 +17,9 @@ type StartOption struct {
 	DeviceMask    string
 	SuperNode     string
 	EnableRouting bool
+	Token         string
+	BaseUrl       string
+	HardwareUUID  string
 }
 
 type StartService struct {
@@ -33,12 +38,49 @@ func (s *StartService) Start() error {
 	if err := edge.OpenTunTapDevice(); err != nil {
 		return err
 	}
+
+	// Start Heartbeat Goroutine
+	if s.Token != "" && s.BaseUrl != "" {
+		go s.heartbeatLoop()
+	}
+
 	log.Info("Starting omniedge")
 	log.Infof("Listening address: %s", edge.DeviceIP)
 	if err := edge.Start(); err != nil {
 		log.Errorf("fail to start omniedge, error info:\n %s", err.Error())
 	}
 	return nil
+}
+
+func (s *StartService) heartbeatLoop() {
+	heartbeatService := HeartbeatService{
+		HttpOption: HttpOption{
+			Token:   s.Token,
+			BaseUrl: s.BaseUrl,
+		},
+	}
+	opt := &HeartbeatOption{
+		HardwareUUID: s.HardwareUUID,
+	}
+
+	// Initial heartbeat
+	if err := heartbeatService.Heartbeat(opt); err != nil {
+		log.Warnf("Initial heartbeat failed: %v", err)
+	}
+
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if err := heartbeatService.Heartbeat(opt); err != nil {
+				log.Warnf("Heartbeat failed: %v", err)
+			} else {
+				log.Debug("Heartbeat sent successfully")
+			}
+		}
+	}
 }
 
 func (s *StartService) createEdge() *omnin2n.Edge {
