@@ -290,7 +290,7 @@ jobs:
           file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
   build-freebsd-binary:
-    runs-on: macos-12
+    runs-on: macos-14
     name: Build on FreeBSD
     env:
       ENVIRONMENT: prod
@@ -336,7 +336,7 @@ jobs:
       ENVIRONMENT: prod
     strategy:
       matrix:
-        platform: [ubuntu-20.04,ubuntu-22.04,ubuntu-24.04,macos-latest]
+        platform: [ubuntu-22.04,ubuntu-24.04,macos-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout with tag
