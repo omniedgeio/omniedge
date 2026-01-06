@@ -349,9 +349,9 @@ jobs:
             arch: amd64
           - platform: ubuntu-24.04
             arch: amd64
-          - platform: macos-13
+          - platform: macos-15
             arch: amd64
-          - platform: macos-14
+          - platform: macos-15
             arch: arm64
     runs-on: ${{ matrix.platform }}
     steps:
