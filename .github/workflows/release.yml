@@ -11,7 +11,7 @@ jobs:
       ENVIRONMENT: prod
     strategy:
       matrix:
-        platform: [386,amd64,arm,arm64,ppc64le,s390x ]
+        platform: [amd64,arm,arm64]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout with tag
@@ -112,7 +112,7 @@ jobs:
       ENVIRONMENT: prod
     strategy:
       matrix:
-        platform: [amd64,386,arm64,arm ]
+        platform: [amd64,arm64,arm]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout with tag
@@ -336,7 +336,7 @@ jobs:
       ENVIRONMENT: prod
     strategy:
       matrix:
-        platform: [ ubuntu-18.04,ubuntu-20.04,ubuntu-22.04,macos-latest ]
+        platform: [ubuntu-20.04,ubuntu-22.04,macos-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout with tag
