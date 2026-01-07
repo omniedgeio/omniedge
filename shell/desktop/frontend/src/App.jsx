@@ -104,6 +104,7 @@ function App() {
     const toggleNetworkExpand = async (networkId) => {
         const isExpanded = !!expandedNetworks[networkId];
         setExpandedNetworks({ ...expandedNetworks, [networkId]: !isExpanded });
+        // Always fetch devices when expanding to ensure status is synchronized
         if (!isExpanded) {
             try {
                 console.log('toggleNetworkExpand - fetching devices for networkId:', networkId);
@@ -115,6 +116,24 @@ function App() {
             }
         }
     };
+
+    // Auto-refresh devices for expanded networks every 10 seconds
+    useEffect(() => {
+        const refreshInterval = setInterval(async () => {
+            for (const networkId of Object.keys(expandedNetworks)) {
+                if (expandedNetworks[networkId]) {
+                    try {
+                        const devs = await BridgeService.GetNetworkDevices(networkId);
+                        setNetworkDevices(prev => ({ ...prev, [networkId]: devs || [] }));
+                    } catch (err) {
+                        console.error('Auto-refresh devices error:', err);
+                    }
+                }
+            }
+        }, 10000);
+
+        return () => clearInterval(refreshInterval);
+    }, [expandedNetworks]);
 
     const openURL = (url) => {
         Browser.OpenURL(url);
@@ -141,7 +160,7 @@ function App() {
                     {error && <div className="error-text" style={{ marginTop: 10 }}>{error}</div>}
                 </div>
                 <div className="divider"></div>
-                <div className="menu-item quit-row" onClick={() => Events.Emit("quit")}>
+                <div className="menu-item quit-row" onClick={() => BridgeService.Quit()}>
                     <span>Quit</span>
                     <span className="shortcut">⌘Q</span>
                 </div>
@@ -201,7 +220,7 @@ function App() {
                         {isExpanded && (
                             <div className="network-detail">
                                 <div className="detail-header">
-                                    <span style={{ fontSize: 16, fontWeight: 500 }}>{net.name}</span>
+                                    <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.7 }}>Connection</span>
                                     <div
                                         className={`ios-switch ${isActive ? 'on' : ''}`}
                                         onClick={(e) => {
@@ -225,8 +244,9 @@ function App() {
                                                     <span className="truncate">{dev.name}</span>
                                                 </div>
                                                 <div className="device-ip">{dev.virtual_ip}</div>
-                                                <div className={`device-latency ${dev.latency < 50 ? 'latency-fast' : dev.latency < 100 ? 'latency-medium' : 'latency-slow'}`}>
-                                                    {dev.latency} ms
+                                                <div className={`device-status ${dev.online ? 'status-online' : 'status-offline'}`}>
+                                                    <span className="status-dot"></span>
+                                                    {dev.online ? 'Online' : 'Offline'}
                                                 </div>
                                             </div>
 
@@ -269,10 +289,10 @@ function App() {
 
             {/* Logical Section: Utilities matching native OmniMainMenu.swift */}
             <div className="footer">
-                <div className="menu-item utility-item" onClick={() => openURL('https://omniedge.io/dashboard')}>
+                <div className="menu-item utility-item" onClick={() => openURL('https://connect.omniedge.io/dashboard')}>
                     Dashboard ...
                 </div>
-                <div className="menu-item quit-row" onClick={() => Events.Emit("quit")}>
+                <div className="menu-item quit-row" onClick={() => BridgeService.Quit()}>
                     <span>Quit</span>
                     <span className="shortcut">⌘Q</span>
                 </div>

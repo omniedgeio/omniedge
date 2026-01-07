@@ -235,22 +235,50 @@ body {
     font-weight: 500;
 }
 
-/* Latency Status Colors */
+/* Online Status Styling */
+.device-status {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.status-online {
+    color: #34c759;
+}
+
+.status-online .status-dot {
+    background-color: #34c759;
+}
+
+.status-offline {
+    color: #8e8e93;
+}
+
+.status-offline .status-dot {
+    background-color: #8e8e93;
+}
+
+/* Legacy Latency Colors - kept for reference */
 .latency-fast {
     color: #34c759;
 }
 
-/* Green < 50ms */
 .latency-medium {
     color: #ff9500;
 }
 
-/* Orange 50-100ms */
 .latency-slow {
     color: #8e8e93;
 }
-
-/* Gray > 100ms */
 
 /* Hierarchy styling */
 .sub-device {

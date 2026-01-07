@@ -75,8 +75,12 @@ func main() {
 	})
 	trayMenu.AddSeparator()
 	trayMenu.Add("Quit").OnClick(func(*application.Context) {
+		// Disconnect before quitting
+		bridgeService.Disconnect()
 		app.Quit()
 	})
+
+	// Note: Quit handled via BridgeService.Quit() method called from frontend
 
 	// Create system tray
 	systemTray := app.SystemTray.New()

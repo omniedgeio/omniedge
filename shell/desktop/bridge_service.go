@@ -446,6 +446,15 @@ func (b *BridgeService) Disconnect() error {
 	return nil
 }
 
+// Quit disconnects the VPN and quits the application
+func (b *BridgeService) Quit() {
+	log.Info("BridgeService: Quit called - disconnecting and exiting")
+	b.Disconnect()
+	if b.app != nil {
+		b.app.Quit()
+	}
+}
+
 // GetStatus returns the current connection status
 func (b *BridgeService) GetStatus() string {
 	return string(b.status)
@@ -494,6 +503,7 @@ func (b *BridgeService) GetLocalIP() string {
 type DeviceWithNetwork struct {
 	api.VirtualNetworkDeviceResponse
 	NetworkID string `json:"network_id"`
+	Online    bool   `json:"online"` // Calculated field - true if last_seen within 5 minutes
 }
 
 // GetNetworkDevices returns devices in a specific network
@@ -516,11 +526,16 @@ func (b *BridgeService) GetNetworkDevices(networkID string) ([]DeviceWithNetwork
 	log.Infof("BridgeService: GetDevices returned %d devices", len(devs))
 
 	result := make([]DeviceWithNetwork, len(devs))
+	now := time.Now()
 	for i, d := range devs {
-		log.Debugf("BridgeService: Device %d: ID=%s, Name=%s, VirtualIP=%s", i, d.ID, d.Name, d.VirtualIP)
+		// Calculate online status: device is online if last_seen within 5 minutes
+		isOnline := now.Sub(d.LastSeen) < 5*time.Minute
+		log.Debugf("BridgeService: Device %d: ID=%s, Name=%s, VirtualIP=%s, LastSeen=%v, Online=%v",
+			i, d.ID, d.Name, d.VirtualIP, d.LastSeen, isOnline)
 		result[i] = DeviceWithNetwork{
 			VirtualNetworkDeviceResponse: d,
 			NetworkID:                    networkID,
+			Online:                       isOnline,
 		}
 	}
 	return result, nil
