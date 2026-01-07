@@ -2,9 +2,11 @@ package api
 
 import (
 	"encoding/json"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type HttpOption struct {
@@ -13,12 +15,15 @@ type HttpOption struct {
 }
 
 func HandleCall(req *http.Request) (interface{}, error) {
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Errorf("Fail to call backend API [%s]. err is %s\n", req.URL, err.Error())
 		return nil, err
 	}
+	defer resp.Body.Close()
 	return handle(resp)
 }
 

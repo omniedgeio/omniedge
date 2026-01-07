@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type VirtualNetwork struct {
@@ -122,5 +123,25 @@ func (s *VirtualNetworkService) Upload(opt *UploadOption) error {
 		return errors.New(fmt.Sprintf("Fail to upload, error message: %s", resp.(*ErrorResponse).Message))
 	default:
 		return errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
+	}
+}
+func (s *VirtualNetworkService) GetDevices(networkID string) ([]VirtualNetworkDeviceResponse, error) {
+	url := fmt.Sprintf("%s/virtual-networks/%s/devices", s.BaseUrl, networkID)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Authorization", s.Token)
+	resp, _ := HandleCall(req)
+	switch resp.(type) {
+	case *SuccessResponse:
+		devicesJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
+		var devices []VirtualNetworkDeviceResponse
+		if err := json.Unmarshal(devicesJson, &devices); err != nil {
+			return nil, errors.New(fmt.Sprintf("Fail to unmarshal response's data ,err is %+v", err))
+		}
+		return devices, nil
+	case *ErrorResponse:
+		return nil, errors.New(fmt.Sprintf("Fail to get devices, error message: %s", resp.(*ErrorResponse).Message))
+	default:
+		return nil, errors.New(fmt.Sprint("Internal error during devices fetch"))
 	}
 }

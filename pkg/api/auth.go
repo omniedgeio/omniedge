@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type AuthResp struct {
@@ -98,5 +99,25 @@ func (s *AuthService) Refresh(opt *RefreshTokenOption) (*AuthResp, error) {
 		return nil, errors.New(fmt.Sprintf("Fail to login, error message: %s", resp.(*ErrorResponse).Message))
 	default:
 		return nil, errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
+	}
+}
+func (s *AuthService) Me() (*ProfileResponse, error) {
+	url := s.BaseUrl + "/profile"
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Authorization", s.Token)
+	resp, _ := HandleCall(req)
+	switch resp := resp.(type) {
+	case *SuccessResponse:
+		profileJson, _ := json.Marshal(resp.Data)
+		profile := ProfileResponse{}
+		if err := json.Unmarshal(profileJson, &profile); err != nil {
+			return nil, fmt.Errorf("Fail to unmarshal response's data ,err is %+v", err)
+		}
+		return &profile, nil
+	case *ErrorResponse:
+		return nil, fmt.Errorf("Fail to get profile, error message: %s", resp.Message)
+	default:
+		return nil, fmt.Errorf("Internal error during profile fetch")
 	}
 }
