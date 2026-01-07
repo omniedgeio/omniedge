@@ -319,6 +319,12 @@ body {
     color: var(--text-secondary);
 }
 
+@media (prefers-color-scheme: dark) {
+    .nested-item .ip {
+        color: var(--text-secondary-dark);
+    }
+}
+
 /* iOS-style toggle used in native app */
 .ios-switch {
     width: 32px;
