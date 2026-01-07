@@ -7,15 +7,16 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/panta/machineid"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/google/uuid"
+	"github.com/panta/machineid"
+	log "github.com/sirupsen/logrus"
 )
 
 var Env string
@@ -134,7 +135,7 @@ func GenerateRandomMac() (string, error) {
 	buf := make([]byte, 6)
 	_, err := rand.Read(buf)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("Fail to generate random buf, err: %+v", err))
+		return "", fmt.Errorf("Fail to generate random buf, err: %+v", err)
 	}
 	// Set the local bit
 	buf[0] &= 252
@@ -154,7 +155,7 @@ func GetCurrentDeviceNetStatus(cidrStr string) (*DeviceNet, error) {
 	}
 	cidr, err := ParseCIDR(cidrStr)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Fail to parse cidr, %+v", err))
+		return nil, fmt.Errorf("Fail to parse cidr, %+v", err)
 	}
 	var ip, mac string
 	for _, netInterface := range netInterfaces {
@@ -180,4 +181,12 @@ func GetCurrentDeviceNetStatus(cidrStr string) (*DeviceNet, error) {
 		SubnetMask: cidr.Mask(),
 	}, nil
 
+}
+
+func GetRandomPort() int {
+	// Pick a random port between 20000 and 60000
+	buf := make([]byte, 2)
+	rand.Read(buf)
+	port := 20000 + int(buf[0])<<8 | int(buf[1])
+	return port%40000 + 20000
 }

@@ -10,33 +10,34 @@ import (
 )
 
 type StartOption struct {
-	Hostname      string
-	CommunityName string
-	VirtualIP     string
-	SecretKey     string
-	DeviceMac     string
-	DeviceMask    string
-	SuperNode     string
-	EnableRouting bool
-	Token         string
-	BaseUrl       string
-	HardwareUUID  string
+	Hostname      string `json:"hostname"`
+	CommunityName string `json:"community_name"`
+	VirtualIP     string `json:"virtual_ip"`
+	SecretKey     string `json:"secret_key"`
+	DeviceMac     string `json:"device_mac"`
+	DeviceMask    string `json:"device_mask"`
+	SuperNode     string `json:"super_node"`
+	EnableRouting bool   `json:"enable_routing"`
+	Token         string `json:"token"`
+	BaseUrl       string `json:"base_url"`
+	HardwareUUID  string `json:"hardware_uuid"`
 }
 
 type StartService struct {
 	StartOption
+	edge *omnin2n.Edge
 }
 
 func (s *StartService) Start() error {
-	edge := s.createEdge()
+	s.edge = s.createEdge()
 	id := uuid.New().String()
-	edge.Id = id
+	s.edge.Id = id
 
-	if err := edge.Configure(); err != nil {
+	if err := s.edge.Configure(); err != nil {
 		return err
 	}
 
-	if err := edge.OpenTunTapDevice(); err != nil {
+	if err := s.edge.OpenTunTapDevice(); err != nil {
 		return err
 	}
 
@@ -46,11 +47,19 @@ func (s *StartService) Start() error {
 	}
 
 	log.Info("Starting omniedge")
-	log.Infof("Listening address: %s", edge.DeviceIP)
-	if err := edge.Start(); err != nil {
+	log.Infof("Listening address: %s", s.edge.DeviceIP)
+	if err := s.edge.Start(); err != nil {
 		log.Errorf("fail to start omniedge, error info:\n %s", err.Error())
+		return err
 	}
 	return nil
+}
+
+func (s *StartService) Stop() {
+	if s.edge != nil {
+		s.edge.Stop()
+		log.Info("Omniedge stopped")
+	}
 }
 
 func (s *StartService) heartbeatLoop() {
@@ -72,14 +81,11 @@ func (s *StartService) heartbeatLoop() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			if err := heartbeatService.Heartbeat(opt); err != nil {
-				log.Warnf("Heartbeat failed: %v", err)
-			} else {
-				log.Debug("Heartbeat sent successfully")
-			}
+	for range ticker.C {
+		if err := heartbeatService.Heartbeat(opt); err != nil {
+			log.Warnf("Heartbeat failed: %v", err)
+		} else {
+			log.Debug("Heartbeat sent successfully")
 		}
 	}
 }
@@ -99,6 +105,11 @@ func (s *StartService) createEdge() *omnin2n.Edge {
 	edge.SuperNodeHostPort = s.SuperNode
 	edge.TransopId = 2
 	edge.DeviceMac = s.DeviceMac
+
+	// Use random ports to avoid "address already in use"
+	edge.LocalPort = GetRandomPort()
+	edge.ManagementPort = GetRandomPort()
+
 	edge.MTU = 1500
 	return edge
 }

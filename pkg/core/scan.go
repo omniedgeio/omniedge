@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -29,11 +28,11 @@ func (s *ScanService) Scan(option *ScanOption) (*[]api.ScanResult, error) {
 		nmap.WithContext(ctx),
 	)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("unable to create nmap scanner: %v", err))
+		return nil, fmt.Errorf("unable to create nmap scanner: %v", err)
 	}
 	result, _, err := scanner.Run()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("nmap scan failed: %v", err))
+		return nil, fmt.Errorf("nmap scan failed: %v", err)
 	}
 	res := handleScanNmapResult(result)
 	return res, nil
