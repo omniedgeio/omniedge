@@ -50,11 +50,11 @@ func main() {
 	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:     "OmniEdge",
 		Width:     320,
-		Height:    520,
-		MinWidth:  320, // Lock to prevent resizing
-		MaxWidth:  320, // Lock to prevent resizing
-		MinHeight: 520, // Lock to prevent resizing
-		MaxHeight: 520, // Lock to prevent resizing
+		Height:    600,  // Initial height, resized by frontend
+		MinWidth:  320,  // Lock width
+		MaxWidth:  320,  // Lock width
+		MinHeight: 600,  // Allow shrinking
+		MaxHeight: 1000, // Allow growing
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,
@@ -90,6 +90,9 @@ func main() {
 
 	// Set the tray in bridge service for dynamic icon switching
 	bridgeService.SetSystemTray(systemTray, trayIconConnected, trayIconDisconnected)
+
+	// Set main window reference for dynamic resizing
+	bridgeService.SetMainWindow(mainWindow)
 
 	// Attach window to tray
 	// This handles the show/hide on tray icon click automatically in Wails v3

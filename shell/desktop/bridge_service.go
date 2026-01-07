@@ -2,15 +2,17 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
-	"github.com/keybase/go-keychain"
 	"github.com/omniedgeio/omniedge-cli/pkg/api"
 	"github.com/omniedgeio/omniedge-cli/pkg/bridge"
 	"github.com/omniedgeio/omniedge-cli/pkg/core"
@@ -18,12 +20,28 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// Keychain constants
-const (
-	keychainService        = "io.omniedge.desktop"
-	keychainAccountAuth    = "auth_token"
-	keychainAccountRefresh = "refresh_token"
-)
+// Token storage file path
+var tokenFilePath string
+
+func init() {
+	// Use cross-platform app config directory:
+	// macOS: ~/Library/Application Support
+	// Windows: %AppData%
+	// Linux: ~/.config
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		configDir = os.TempDir() // Fallback to temp
+	}
+	omniedgeDir := filepath.Join(configDir, "OmniEdge")
+	os.MkdirAll(omniedgeDir, 0700)
+	tokenFilePath = filepath.Join(omniedgeDir, "tokens.json")
+}
+
+// TokenData represents the stored token data
+type TokenData struct {
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
+}
 
 // ConnectionStatus represents the VPN connection state
 type ConnectionStatus string
@@ -37,7 +55,9 @@ const (
 
 // BridgeService exposes core OmniEdge functionality to the frontend
 type BridgeService struct {
+	mu                   sync.Mutex // Protects concurrent access to token operations
 	app                  *application.App
+	mainWindow           *application.WebviewWindow // Reference to main window for resizing
 	systemTray           *application.SystemTray
 	iconConnected        []byte
 	iconDisconnected     []byte
@@ -99,6 +119,27 @@ func (b *BridgeService) SetSystemTray(tray *application.SystemTray, connected []
 	b.iconConnected = connected
 	b.iconDisconnected = disconnected
 	b.updateTrayIcon()
+}
+
+// SetMainWindow sets the main window reference for dynamic resizing
+func (b *BridgeService) SetMainWindow(window *application.WebviewWindow) {
+	b.mainWindow = window
+}
+
+// ResizeWindow resizes the main window to the specified height (width stays fixed at 320)
+func (b *BridgeService) ResizeWindow(height int) {
+	if b.mainWindow == nil {
+		log.Warn("BridgeService: Cannot resize - mainWindow is nil")
+		return
+	}
+	// Clamp height to reasonable bounds
+	if height < 200 {
+		height = 200
+	} else if height > 800 {
+		height = 800
+	}
+	log.Debugf("BridgeService: Resizing window to 320x%d", height)
+	b.mainWindow.SetSize(320, height)
 }
 
 func (b *BridgeService) updateTrayIcon() {
@@ -239,104 +280,66 @@ func (b *BridgeService) Login(securityKey string) LoginResult {
 	return LoginResult{Success: true, Message: "Login successful"}
 }
 
-// SaveTokens persists auth tokens to macOS Keychain
+// SaveTokens persists auth tokens to a file
 func (b *BridgeService) SaveTokens() error {
-	// Save auth token
-	item := keychain.NewItem()
-	item.SetSecClass(keychain.SecClassGenericPassword)
-	item.SetService(keychainService)
-	item.SetAccount(keychainAccountAuth)
-	item.SetData([]byte(b.token))
-	item.SetAccessible(keychain.AccessibleAfterFirstUnlock)
-	item.SetSynchronizable(keychain.SynchronizableNo)
-
-	// Delete existing and add new
-	keychain.DeleteItem(item)
-	if err := keychain.AddItem(item); err != nil {
-		log.Warnf("Failed to save auth token to keychain: %v", err)
+	data := TokenData{
+		Token:        b.token,
+		RefreshToken: b.refreshToken,
+	}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Warnf("Failed to marshal tokens: %v", err)
 		return err
 	}
-
-	// Save refresh token
-	item2 := keychain.NewItem()
-	item2.SetSecClass(keychain.SecClassGenericPassword)
-	item2.SetService(keychainService)
-	item2.SetAccount(keychainAccountRefresh)
-	item2.SetData([]byte(b.refreshToken))
-	item2.SetAccessible(keychain.AccessibleAfterFirstUnlock)
-	item2.SetSynchronizable(keychain.SynchronizableNo)
-
-	keychain.DeleteItem(item2)
-	if err := keychain.AddItem(item2); err != nil {
-		log.Warnf("Failed to save refresh token to keychain: %v", err)
+	if err := os.WriteFile(tokenFilePath, jsonData, 0600); err != nil {
+		log.Warnf("Failed to save tokens to file: %v", err)
 		return err
 	}
-
-	log.Info("BridgeService: Tokens saved to keychain")
+	log.Info("BridgeService: Tokens saved to file")
 	return nil
 }
 
-// LoadTokens loads auth tokens from macOS Keychain
+// LoadTokens loads auth tokens from a file
 func (b *BridgeService) LoadTokens() error {
-	// Load auth token
-	query := keychain.NewItem()
-	query.SetSecClass(keychain.SecClassGenericPassword)
-	query.SetService(keychainService)
-	query.SetAccount(keychainAccountAuth)
-	query.SetMatchLimit(keychain.MatchLimitOne)
-	query.SetReturnData(true)
-
-	results, err := keychain.QueryItem(query)
-	if err != nil || len(results) == 0 {
-		log.Debug("No auth token found in keychain")
+	jsonData, err := os.ReadFile(tokenFilePath)
+	if err != nil {
+		log.Debug("No token file found")
 		return fmt.Errorf("no tokens found")
 	}
-	b.token = string(results[0].Data)
-
-	// Load refresh token
-	query2 := keychain.NewItem()
-	query2.SetSecClass(keychain.SecClassGenericPassword)
-	query2.SetService(keychainService)
-	query2.SetAccount(keychainAccountRefresh)
-	query2.SetMatchLimit(keychain.MatchLimitOne)
-	query2.SetReturnData(true)
-
-	results2, err := keychain.QueryItem(query2)
-	if err != nil || len(results2) == 0 {
-		log.Debug("No refresh token found in keychain")
-		return fmt.Errorf("no refresh token found")
+	var data TokenData
+	if err := json.Unmarshal(jsonData, &data); err != nil {
+		log.Warnf("Failed to unmarshal tokens: %v", err)
+		return err
 	}
-	b.refreshToken = string(results2[0].Data)
-
-	log.Info("BridgeService: Tokens loaded from keychain")
+	b.token = data.Token
+	b.refreshToken = data.RefreshToken
+	log.Info("BridgeService: Tokens loaded from file")
 	return nil
 }
 
-// ClearTokens removes auth tokens from macOS Keychain
+// ClearTokens removes auth tokens file
 func (b *BridgeService) ClearTokens() error {
-	item := keychain.NewItem()
-	item.SetSecClass(keychain.SecClassGenericPassword)
-	item.SetService(keychainService)
-	item.SetAccount(keychainAccountAuth)
-	keychain.DeleteItem(item)
-
-	item2 := keychain.NewItem()
-	item2.SetSecClass(keychain.SecClassGenericPassword)
-	item2.SetService(keychainService)
-	item2.SetAccount(keychainAccountRefresh)
-	keychain.DeleteItem(item2)
-
+	os.Remove(tokenFilePath)
 	b.token = ""
 	b.refreshToken = ""
-	log.Info("BridgeService: Tokens cleared from keychain")
+	log.Info("BridgeService: Tokens cleared")
 	return nil
 }
 
 // TryAutoLogin attempts to restore session from saved tokens
 func (b *BridgeService) TryAutoLogin() LoginResult {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// If already logged in, don't try again
+	if b.token != "" {
+		log.Debug("BridgeService: Already logged in, skipping auto-login")
+		return LoginResult{Success: true, Message: "Already logged in"}
+	}
+
 	log.Info("BridgeService: Attempting auto-login from saved tokens")
 
-	// Load tokens from keychain
+	// Load tokens from file
 	if err := b.LoadTokens(); err != nil {
 		log.Debug("BridgeService: No saved tokens, auto-login failed")
 		return LoginResult{Success: false, Message: "No saved session"}

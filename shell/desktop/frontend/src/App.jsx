@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import { Events, Browser } from "@wailsio/runtime";
 import * as BridgeService from "../bindings/omniedge-desktop/bridgeservice.js";
@@ -18,6 +18,21 @@ function App() {
     const [activeNetwork, setActiveNetwork] = useState(null);
     const [expandedNetworks, setExpandedNetworks] = useState({});
     const [networkDevices, setNetworkDevices] = useState({});
+    const appRef = useRef(null);
+
+    // Resize window to fit content
+    const resizeToContent = useCallback(() => {
+        if (appRef.current) {
+            const height = appRef.current.scrollHeight + 20; // Add padding
+            BridgeService.ResizeWindow(height);
+        }
+    }, []);
+
+    // Resize on content changes
+    useEffect(() => {
+        const timer = setTimeout(resizeToContent, 100); // Delay to ensure render
+        return () => clearTimeout(timer);
+    }, [isLoggedIn, networks, expandedNetworks, isLoading, resizeToContent]);
 
     useEffect(() => {
         BridgeService.GetLogos().then(setLogo);
@@ -148,7 +163,7 @@ function App() {
 
     if (!isLoggedIn) {
         return (
-            <div className="app">
+            <div className="app" ref={appRef}>
                 <div className="login-view">
                     <div style={{ fontSize: 24, color: '#007AFF', marginBottom: 16 }}>⬡</div>
                     <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>OmniEdge</h2>
@@ -176,7 +191,7 @@ function App() {
     }
 
     return (
-        <div className="app">
+        <div className="app" ref={appRef}>
             {/* Native Login/Logout Toggle */}
             <div className="menu-item" onClick={handleLogout}>
                 Log out as {profile?.name || 'User'}
