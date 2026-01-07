@@ -48,9 +48,13 @@ func main() {
 
 	// Create the main window (hidden by default)
 	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:  "OmniEdge",
-		Width:  320,
-		Height: 520, // Increased height for more content
+		Title:     "OmniEdge",
+		Width:     320,
+		Height:    520,
+		MinWidth:  320, // Lock to prevent resizing
+		MaxWidth:  320, // Lock to prevent resizing
+		MinHeight: 520, // Lock to prevent resizing
+		MaxHeight: 520, // Lock to prevent resizing
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,
@@ -76,7 +80,7 @@ func main() {
 
 	// Create system tray
 	systemTray := app.SystemTray.New()
-	systemTray.SetTemplateIcon(trayIconTemplate)
+	systemTray.SetIcon(trayIconTemplate) // Start with template/disconnected icon
 	systemTray.SetTooltip("OmniEdge")
 	systemTray.SetMenu(trayMenu)
 

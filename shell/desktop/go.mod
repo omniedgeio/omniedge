@@ -34,6 +34,7 @@ require (
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/leaanthony/go-ansi-parser v1.6.1 // indirect
+	github.com/leaanthony/slicer v1.6.0 // indirect
 	github.com/leaanthony/u v1.1.1 // indirect
 	github.com/lmittmann/tint v1.0.7 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
@@ -56,6 +57,7 @@ require (
 	github.com/spf13/viper v1.7.1 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
+	github.com/wailsapp/wails/v2 v2.11.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/net v0.37.0 // indirect

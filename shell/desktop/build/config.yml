@@ -5,11 +5,11 @@ version: '3'
 
 # This information is used to generate the build assets.
 info:
-  companyName: "My Company" # The name of the company
-  productName: "My Product" # The name of the application
-  productIdentifier: "com.mycompany.myproduct" # The unique product identifier
-  description: "A program that does X" # The application description
-  copyright: "(c) 2025, My Company" # Copyright text
+  companyName: "OmniEdge" # The name of the company
+  productName: "OmniEdge" # The name of the application
+  productIdentifier: "io.omniedge.desktop" # The unique product identifier
+  description: "OmniEdge VPN Client" # The application description
+  copyright: "(c) 2026, OmniEdge" # Copyright text
   comments: "Some Product Comments" # Comments
   version: "0.0.1" # The application version
 

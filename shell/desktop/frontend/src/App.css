@@ -1,19 +1,17 @@
 :root {
-    /* macOS Premium Palette */
-    --panel-bg-light: rgba(255, 255, 255, 0.85);
-    --panel-bg-dark: rgba(30, 30, 30, 0.85);
-    --text-primary: #1d1d1f;
-    --text-primary-dark: #f5f5f7;
-    --text-secondary: #86868b;
-    --text-secondary-dark: #98989d;
+    /* macOS Native Menu Palette - Hyper-Optimized */
+    --menu-bg-light: rgba(255, 255, 255, 0.72);
+    --menu-bg-dark: rgba(30, 30, 30, 0.72);
+    --text-primary: rgba(29, 29, 31, 0.9);
+    --text-primary-dark: rgba(245, 245, 247, 0.9);
+    --text-secondary: rgba(110, 110, 115, 0.76);
+    --text-secondary-dark: rgba(161, 161, 166, 0.76);
     --accent-blue: #007aff;
-    --accent-green: #34c759;
-    --accent-orange: #ff9500;
-    --accent-red: #ff3b30;
-    --row-hover: rgba(0, 0, 0, 0.04);
-    --row-hover-dark: rgba(255, 255, 255, 0.08);
-    --divider: rgba(0, 0, 0, 0.06);
-    --divider-dark: rgba(255, 255, 255, 0.08);
+    --selection-bg: #007aff;
+    --selection-text: rgba(255, 255, 255, 0.9);
+    --divider: rgba(0, 0, 0, 0.08);
+    /* 0.5px equivalent on Retina */
+    --divider-dark: rgba(255, 255, 255, 0.12);
 }
 
 * {
@@ -22,344 +20,329 @@
     box-sizing: border-box;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     user-select: none;
+    -webkit-font-smoothing: antialiased;
 }
 
 body {
     background: transparent;
-    overflow: hidden;
+    overflow-x: hidden;
 }
 
 .app {
-    width: 100vw;
-    height: 100vh;
-    background: var(--panel-bg-light);
-    backdrop-filter: blur(60px) saturate(210%);
-    -webkit-backdrop-filter: blur(60px) saturate(210%);
+    width: 320px;
+    /* Fixed width to match main.go */
+    height: 100%;
+    /* Fill window height */
+    background: var(--menu-bg-light);
+    backdrop-filter: blur(30px) saturate(200%);
+    -webkit-backdrop-filter: blur(30px) saturate(200%);
     color: var(--text-primary);
     display: flex;
     flex-direction: column;
-    border: 0.5px solid rgba(0, 0, 0, 0.15);
-    border-radius: 14px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+    border: 0.5px solid rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
 }
 
 @media (prefers-color-scheme: dark) {
     .app {
-        background: var(--panel-bg-dark);
+        background: var(--menu-bg-dark);
         color: var(--text-primary-dark);
-        border-color: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.08);
     }
 }
 
-/* Sections */
-.main-scroll {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 0 12px;
-}
-
-.main-scroll::-webkit-scrollbar {
-    width: 0;
-}
-
-.header-logout {
-    padding: 16px 16px 8px;
+/* Base Menu Item */
+.menu-item {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 13px;
+    font-weight: 400;
+    /* macOS native is closer to Regular (400) */
+    min-height: 24px;
+    cursor: default;
+}
+
+.menu-item:hover:not(.subheader):not(.no-hover):not(.label-only) {
+    background: var(--selection-bg);
+    color: var(--selection-text);
+}
+
+.menu-item-content {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+/* Subheader (Label items) */
+.subheader {
+    font-size: 11px;
     font-weight: 500;
-    cursor: pointer;
-    transition: opacity 0.2s;
+    /* Reduced from 600 for better native aesthetic */
+    letter-spacing: 0.2px;
+    color: var(--text-secondary);
+    padding: 12px 14px 4px;
+    min-height: auto;
+    text-transform: uppercase;
 }
 
-.header-logout:hover {
-    opacity: 0.7;
+@media (prefers-color-scheme: dark) {
+    .subheader {
+        color: var(--text-secondary-dark);
+    }
 }
 
-.status-section {
-    padding: 8px 16px;
+/* Multi-line Detail Section (matching native DetailMenuItem) */
+.detail-section {
+    padding: 6px 14px;
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.network-active-label {
+.detail-line {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     font-size: 13px;
-    font-weight: 600;
+    line-height: 1.5;
+    gap: 12px;
 }
 
-.this-device-tag {
+.detail-label {
+    color: var(--text-secondary);
+    width: 80px;
+    /* Reduced from 90 to close the gap in 233px width */
+    flex-shrink: 0;
     font-size: 11px;
-    font-weight: 400;
-    color: var(--text-secondary);
-}
-
-.ip-display {
-    font-size: 12px;
-    color: var(--text-secondary);
-    font-family: "SF Mono", Menlo, monospace;
-}
-
-.virtual-ip-row {
-    margin-top: 4px;
-    color: var(--accent-blue);
-    font-weight: 500;
-}
-
-.section-title {
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--text-secondary);
-    padding: 12px 16px 4px;
 }
 
 @media (prefers-color-scheme: dark) {
-
-    .this-device-tag,
-    .ip-display,
-    .section-title {
+    .detail-label {
         color: var(--text-secondary-dark);
     }
 }
 
-/* Row Items */
-.menu-row {
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    border-radius: 8px;
-    cursor: default;
-    transition: background 0.1s;
-    margin: 2px 4px;
-}
-
-.menu-row:hover:not(.no-hover) {
-    background: var(--row-hover);
+.detail-value {
+    color: var(--text-primary);
+    word-break: break-all;
 }
 
 @media (prefers-color-scheme: dark) {
-    .menu-row:hover:not(.no-hover) {
-        background: var(--row-hover-dark);
+    .detail-value {
+        color: var(--text-primary-dark);
     }
 }
 
-.row-name {
-    flex: 1;
-    font-size: 13px;
+/* Divider (matching NSMenuItem.separator) */
+.divider {
+    height: 1px;
+    background: rgba(60, 60, 67, 0.18);
+    mix-blend-mode: color-burn;
+    margin: 4px 0;
+}
+
+@media (prefers-color-scheme: dark) {
+    .divider {
+        background: rgba(255, 255, 255, 0.12);
+        mix-blend-mode: normal;
+    }
+}
+
+/* Network Row with chevron on right */
+.network-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
 }
 
 .chevron {
+    margin-left: auto;
     opacity: 0.5;
-    transition: transform 0.2s ease-in-out;
 }
 
-.chevron.expanded {
-    transform: rotate(180deg);
-}
-
-/* Nested Items */
-.nested-container {
-    padding-left: 12px;
-    margin-left: 12px;
-    border-left: 0.5px solid var(--divider);
+/* Network Detail Popup (matching design with dashed border) */
+.network-detail {
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px dashed rgba(100, 100, 100, 0.3);
+    border-radius: 12px;
+    margin: 8px 12px;
+    padding: 14px 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 @media (prefers-color-scheme: dark) {
-    .nested-container {
-        border-left-color: var(--divider-dark);
+    .network-detail {
+        background: rgba(40, 40, 40, 0.95);
+        border-color: rgba(180, 180, 180, 0.2);
     }
 }
 
-.device-item {
-    padding: 6px 12px;
+.detail-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 0 14px 10px;
 }
 
-.device-main {
+.nested-item {
+    font-size: 13px;
+    padding: 6px 14px;
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Device Grid Layout (3 columns) */
+.device-grid {
+    display: grid;
+    grid-template-columns: 1fr 100px 50px;
+    align-items: center;
+    width: 100%;
+    padding: 4px 14px;
+    font-size: 12px;
 }
 
 .device-name {
-    font-size: 12px;
-    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-primary);
+    overflow: hidden;
+    min-width: 0;
+    /* Allow flex item to shrink below content size */
+}
+
+.device-name .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100px;
+    /* Limit width for truncation */
 }
 
 .device-ip {
-    font-size: 10px;
     color: var(--text-secondary);
-    font-family: "SF Mono", Menlo, monospace;
+    font-family: ui-monospace, SFMono-Regular, SF Pro Mono, Menlo, monospace;
 }
 
-.latency {
-    font-size: 11px;
-    font-weight: 600;
+.device-latency {
+    text-align: right;
+    font-weight: 500;
 }
 
-/* Switch Styling */
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 42px;
-    height: 24px;
+/* Latency Status Colors */
+.latency-fast {
+    color: #34c759;
 }
 
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
+/* Green < 50ms */
+.latency-medium {
+    color: #ff9500;
 }
 
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(120, 120, 128, 0.3);
-    transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 24px;
+/* Orange 50-100ms */
+.latency-slow {
+    color: #8e8e93;
 }
 
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 20px;
-    width: 20px;
-    left: 2px;
-    bottom: 2px;
-    background-color: white;
-    transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 50%;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+/* Gray > 100ms */
+
+/* Hierarchy styling */
+.sub-device {
+    padding-left: 34px;
+    opacity: 0.8;
 }
 
-input:checked+.slider {
-    background-color: var(--accent-blue);
-}
-
-input:checked+.slider:before {
-    transform: translateX(18px);
-}
-
-/* Footer */
-.footer {
-    padding: 8px 0;
-    border-top: 0.5px solid var(--divider);
-}
-
-@media (prefers-color-scheme: dark) {
-    .footer {
-        border-top-color: var(--divider-dark);
-    }
-}
-
-.footer-row {
-    padding: 6px 28px;
-    font-size: 13px;
+.expand-icon {
+    width: 16px;
+    height: 16px;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.footer-row:hover {
-    background: var(--row-hover);
-}
-
-@media (prefers-color-scheme: dark) {
-    .footer-row:hover {
-        background: var(--row-hover-dark);
-    }
-}
-
-/* Login View */
-.login-view {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 40px;
-    text-align: center;
-}
-
-.logo-main {
-    width: 64px;
-    height: 64px;
-    margin-bottom: 24px;
-    filter: drop-shadow(0 0 10px rgba(0, 122, 255, 0.3));
-}
-
-.login-form {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.security-input {
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    background: rgba(255, 255, 255, 0.4);
-    outline: none;
-    font-size: 14px;
-    transition: border-color 0.2s;
-}
-
-.security-input:focus {
-    border-color: var(--accent-blue);
+    cursor: default;
+    opacity: 0.6;
 }
 
 @media (prefers-color-scheme: dark) {
-    .security-input {
-        background: rgba(0, 0, 0, 0.2);
-        border-color: rgba(255, 255, 255, 0.1);
-        color: white;
+    .device-name {
+        color: var(--text-primary-dark);
+    }
+
+    .device-ip {
+        color: var(--text-secondary-dark);
     }
 }
 
-.btn-primary {
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: none;
-    background: var(--accent-blue);
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.2s;
+.nested-item .ip {
+    color: var(--text-secondary);
 }
 
-.btn-primary:hover {
+/* iOS-style toggle used in native app */
+.ios-switch {
+    width: 32px;
+    height: 18px;
+    background: #d1d1d6;
+    border-radius: 9px;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.ios-switch.on {
+    background: #34c759;
+}
+
+.ios-switch .dot {
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 8px;
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.ios-switch.on .dot {
+    transform: translateX(14px);
+}
+
+/* Footer & Utilities */
+.footer {
+    padding: 2px 0;
+}
+
+.shortcut {
+    margin-left: auto;
+    font-size: 11px;
+    opacity: 0.5;
+}
+
+.menu-item:hover .shortcut {
+    color: white;
     opacity: 0.9;
 }
 
-.btn-primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.error-text {
-    margin-top: 12px;
-    color: var(--accent-red);
-    font-size: 12px;
-}
-
-.divider-line {
-    height: 0.5px;
-    background: var(--divider);
-    margin: 8px 16px;
+/* Utility Links */
+.utility-item {
+    color: var(--text-primary);
 }
 
 @media (prefers-color-scheme: dark) {
-    .divider-line {
-        background: var(--divider-dark);
+    .utility-item {
+        color: var(--text-primary-dark);
     }
+}
+
+/* Helpers */
+.truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }

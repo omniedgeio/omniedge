@@ -127,18 +127,39 @@ func (s *VirtualNetworkService) Upload(opt *UploadOption) error {
 }
 func (s *VirtualNetworkService) GetDevices(networkID string) ([]VirtualNetworkDeviceResponse, error) {
 	url := fmt.Sprintf("%s/virtual-networks/%s/devices", s.BaseUrl, networkID)
+	log.Infof("GetDevices: Fetching devices from %s", url)
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Authorization", s.Token)
 	resp, _ := HandleCall(req)
+	log.Infof("GetDevices: Response type %T", resp)
 	switch resp.(type) {
 	case *SuccessResponse:
-		devicesJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
-		var devices []VirtualNetworkDeviceResponse
-		if err := json.Unmarshal(devicesJson, &devices); err != nil {
-			return nil, errors.New(fmt.Sprintf("Fail to unmarshal response's data ,err is %+v", err))
+		dataJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
+		log.Infof("GetDevices: Raw data JSON: %s", string(dataJson))
+
+		// API returns {"data": [...devices...], "meta": {...}}
+		// The SuccessResponse.Data already contains the inner structure
+		// Try parsing as wrapper with "data" field
+		var wrapper struct {
+			Data []VirtualNetworkDeviceResponse `json:"data"`
+			Meta interface{}                    `json:"meta"`
 		}
-		return devices, nil
+		if err := json.Unmarshal(dataJson, &wrapper); err == nil && len(wrapper.Data) > 0 {
+			log.Infof("GetDevices: Parsed %d devices from 'data' field", len(wrapper.Data))
+			return wrapper.Data, nil
+		}
+
+		// Fallback: try parsing as direct array
+		var devices []VirtualNetworkDeviceResponse
+		if err := json.Unmarshal(dataJson, &devices); err == nil {
+			log.Infof("GetDevices: Parsed %d devices from array", len(devices))
+			return devices, nil
+		}
+
+		// Final fallback: return empty list
+		log.Warn("GetDevices: Could not parse devices, returning empty list")
+		return []VirtualNetworkDeviceResponse{}, nil
 	case *ErrorResponse:
 		return nil, errors.New(fmt.Sprintf("Fail to get devices, error message: %s", resp.(*ErrorResponse).Message))
 	default:

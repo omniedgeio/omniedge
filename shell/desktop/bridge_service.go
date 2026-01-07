@@ -4,11 +4,14 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/omniedgeio/omniedge-cli/pkg/api"
+	"github.com/omniedgeio/omniedge-cli/pkg/bridge"
 	"github.com/omniedgeio/omniedge-cli/pkg/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -26,18 +29,23 @@ const (
 
 // BridgeService exposes core OmniEdge functionality to the frontend
 type BridgeService struct {
-	app              *application.App
-	systemTray       *application.SystemTray
-	iconConnected    []byte
-	iconDisconnected []byte
-	status           ConnectionStatus
-	virtualIP        string
-	communityName    string
-	token            string
-	refreshToken     string
-	baseURL          string
-	hardwareUUID     string
-	appIcon          []byte
+	app                  *application.App
+	systemTray           *application.SystemTray
+	iconConnected        []byte
+	iconDisconnected     []byte
+	status               ConnectionStatus
+	virtualIP            string
+	communityName        string
+	connectedNetworkName string // Actual human-readable network name
+	connectedNetworkID   string // Currently connected network ID
+	token                string
+	refreshToken         string
+	baseURL              string
+	hardwareUUID         string
+	appIcon              []byte
+	heartbeatDone        chan bool
+	activeService        *core.StartService // Kept for reference, but legacy on macOS
+	helper               *bridge.HelperClient
 }
 
 // NewBridgeService creates a new BridgeService instance
@@ -46,10 +54,21 @@ func NewBridgeService() *BridgeService {
 	core.LoadClientConfig()
 	log.SetLevel(log.DebugLevel)
 	uuid, _ := core.RevealHardwareUUID()
-	return &BridgeService{
+	b := &BridgeService{
 		status:       StatusDisconnected,
 		baseURL:      core.ConfigV.GetString("rest-endpoint-url"),
 		hardwareUUID: uuid,
+		helper:       bridge.NewHelperClient(),
+	}
+	// Try to stop any ghost VPNs via the helper on startup
+	go b.cleanupGhostVPN()
+	return b
+}
+
+func (b *BridgeService) cleanupGhostVPN() {
+	if b.helper.IsAvailable() {
+		log.Info("BridgeService: Privileged helper detected. Performing initial cleanup...")
+		b.helper.StopVPN()
 	}
 }
 
@@ -93,6 +112,47 @@ func (b *BridgeService) updateTrayIcon() {
 func (b *BridgeService) SetApp(app *application.App) {
 	b.app = app
 	b.CheckExistingConnection()
+	go b.startHeartbeat()
+}
+
+func (b *BridgeService) startHeartbeat() {
+	ticker := time.NewTicker(30 * time.Second)
+	b.heartbeatDone = make(chan bool)
+
+	// Immediate first heartbeat
+	b.sendHeartbeat()
+
+	for {
+		select {
+		case <-b.heartbeatDone:
+			ticker.Stop()
+			return
+		case <-ticker.C:
+			b.sendHeartbeat()
+		}
+	}
+}
+
+func (b *BridgeService) sendHeartbeat() {
+	if b.token == "" {
+		return
+	}
+
+	hbService := api.HeartbeatService{
+		HttpOption: api.HttpOption{
+			BaseUrl: b.baseURL,
+			Token:   b.token,
+		},
+	}
+	opt := &api.HeartbeatOption{
+		HardwareUUID: b.hardwareUUID,
+	}
+	err := hbService.Heartbeat(opt)
+	if err != nil {
+		log.Debugf("BridgeService: Heartbeat failed: %v", err)
+	} else {
+		log.Trace("BridgeService: Heartbeat sent successfully")
+	}
 }
 
 // CheckExistingConnection checks if there's an existing VPN connection
@@ -161,6 +221,10 @@ func (b *BridgeService) Login(securityKey string) LoginResult {
 	b.token = "Bearer " + resp.Token
 	b.refreshToken = resp.RefreshToken
 	log.Infof("BridgeService.Login successful. Token set.")
+
+	// Check for existing connection after login
+	b.CheckExistingConnection()
+
 	return LoginResult{Success: true, Message: "Login successful"}
 }
 
@@ -214,17 +278,132 @@ func (b *BridgeService) GetNetworks() ([]NetworkInfo, error) {
 }
 
 // Connect initiates a VPN connection to the specified network
-func (b *BridgeService) Connect(networkID string) error {
+func (b *BridgeService) Connect(networkId string) error {
+	if b.token == "" {
+		return fmt.Errorf("not logged in")
+	}
+
+	// Initial cleanup to ensure utun is available
+	if b.helper.IsAvailable() {
+		b.helper.StopVPN()
+	}
+
 	b.status = StatusConnecting
 	if b.app != nil {
 		b.app.Event.Emit("status-changed", string(b.status))
 	}
 
-	// TODO: Implement actual VPN connection logic
-	// This would involve calling the privileged helper
+	// 1. Register device first (creates or updates the device in the API)
+	regService := api.RegisterService{
+		HttpOption: api.HttpOption{
+			BaseUrl: b.baseURL,
+			Token:   b.token,
+		},
+	}
+	deviceResp, err := regService.Register(&api.RegisterOption{
+		Name:         b.GetDeviceName(),
+		HardwareUUID: b.hardwareUUID,
+		OS:           "darwin",
+	})
+	if err != nil {
+		log.Warnf("BridgeService: Device registration failed: %v", err)
+		// Continue anyway - device might already exist
+	} else {
+		log.Infof("BridgeService: Device registered with ID: %s", deviceResp.ID)
+	}
+
+	// 2. Get Join info
+	vnService := api.VirtualNetworkService{
+		HttpOption: api.HttpOption{
+			BaseUrl: b.baseURL,
+			Token:   b.token,
+		},
+	}
+
+	// Use the registered device UUID if available, otherwise use hardware UUID
+	deviceId := b.hardwareUUID
+	if deviceResp != nil && deviceResp.ID != "" {
+		deviceId = deviceResp.ID
+	}
+	joinOpt := &api.JoinOption{
+		VirtualNetworkId: networkId,
+		DeviceId:         deviceId,
+	}
+
+	joinResp, err := vnService.Join(joinOpt)
+	if err != nil {
+		b.status = StatusError
+		if b.app != nil {
+			b.app.Event.Emit("status-changed", string(b.status))
+		}
+		return err
+	}
+
+	// 2. Generate Random Mac
+	randomMac, _ := core.GenerateRandomMac()
+
+	// 3. Prepare Start Option
+	startOption := core.StartOption{
+		Hostname:      b.GetDeviceName(),
+		DeviceMac:     randomMac,
+		CommunityName: joinResp.CommunityName,
+		VirtualIP:     joinResp.VirtualIP,
+		SecretKey:     joinResp.SecretKey,
+		DeviceMask:    joinResp.SubnetMask,
+		SuperNode:     joinResp.Server.Host,
+		EnableRouting: false,
+		Token:         b.token,
+		BaseUrl:       b.baseURL,
+		HardwareUUID:  b.hardwareUUID,
+	}
+
+	// 4. Start VPN via Helper
+	if b.helper.IsAvailable() {
+		log.Infof("BridgeService: Starting VPN via privileged helper for %s", joinResp.CommunityName)
+		if err := b.helper.StartVPN(&startOption); err != nil {
+			b.status = StatusError
+			if b.app != nil {
+				b.app.Event.Emit("status-changed", string(b.status))
+			}
+			return fmt.Errorf("helper failed to start vpn: %w", err)
+		}
+	} else {
+		// Fallback for non-macOS or dev environments (though likely to fail without root)
+		log.Warn("BridgeService: Privileged helper not available, attempting in-process start...")
+		b.activeService = &core.StartService{
+			StartOption: startOption,
+		}
+		if err := b.activeService.Start(); err != nil {
+			b.status = StatusError
+			if b.app != nil {
+				b.app.Event.Emit("status-changed", string(b.status))
+			}
+			return err
+		}
+	}
 
 	b.status = StatusConnected
+	b.virtualIP = joinResp.VirtualIP
+	b.communityName = joinResp.CommunityName
+	b.connectedNetworkID = networkId
+
+	// Lookup actual network name from networks list
+	nets, err := b.GetNetworks()
+	if err == nil {
+		for _, net := range nets {
+			if net.ID == networkId {
+				b.connectedNetworkName = net.Name
+				log.Infof("BridgeService: Connected to network: %s (ID: %s)", net.Name, networkId)
+				break
+			}
+		}
+	}
+	if b.connectedNetworkName == "" {
+		b.connectedNetworkName = "Unknown Network"
+	}
+
 	b.updateTrayIcon()
+
 	if b.app != nil {
 		b.app.Event.Emit("status-changed", string(b.status))
 	}
@@ -233,12 +412,37 @@ func (b *BridgeService) Connect(networkID string) error {
 
 // Disconnect terminates the current VPN connection
 func (b *BridgeService) Disconnect() error {
+	log.Info("BridgeService: Disconnect called")
+
+	// 1. Stop via helper if available
+	if b.helper.IsAvailable() {
+		log.Info("BridgeService: Stopping VPN via helper")
+		if err := b.helper.StopVPN(); err != nil {
+			log.Warnf("BridgeService: StopVPN via helper failed: %v", err)
+		}
+	}
+
+	// 2. Stop active service if running in-process
+	if b.activeService != nil {
+		log.Info("BridgeService: Stopping active service")
+		b.activeService.Stop()
+		b.activeService = nil
+	}
+
+	// Note: Removed pkill command as it was too broad and killed the Node.js frontend server
+	// The helper.StopVPN() should handle proper edge termination
+
 	b.status = StatusDisconnected
 	b.virtualIP = ""
+	b.communityName = ""
+	b.connectedNetworkName = ""
+	b.connectedNetworkID = ""
 	b.updateTrayIcon()
+
 	if b.app != nil {
 		b.app.Event.Emit("status-changed", string(b.status))
 	}
+	log.Info("BridgeService: Disconnect completed")
 	return nil
 }
 
@@ -250,6 +454,25 @@ func (b *BridgeService) GetStatus() string {
 // GetVirtualIP returns the virtual IP assigned to this device
 func (b *BridgeService) GetVirtualIP() string {
 	return b.virtualIP
+}
+
+// GetDeviceName returns the name of this device (from config or API)
+func (b *BridgeService) GetDeviceName() string {
+	name := core.ConfigV.GetString("device-name")
+	if name == "" {
+		// Fallback to hostname
+		hostname, _ := os.Hostname()
+		return hostname
+	}
+	return name
+}
+
+// GetConnectedNetworkName returns the name of the currently joined network
+func (b *BridgeService) GetConnectedNetworkName() string {
+	if b.status != StatusConnected {
+		return "" // Return empty when not connected
+	}
+	return b.connectedNetworkName
 }
 
 // GetLocalIP returns the local IP address
@@ -268,8 +491,14 @@ func (b *BridgeService) GetLocalIP() string {
 	return "127.0.0.1"
 }
 
+type DeviceWithNetwork struct {
+	api.VirtualNetworkDeviceResponse
+	NetworkID string `json:"network_id"`
+}
+
 // GetNetworkDevices returns devices in a specific network
-func (b *BridgeService) GetNetworkDevices(networkID string) ([]api.VirtualNetworkDeviceResponse, error) {
+func (b *BridgeService) GetNetworkDevices(networkID string) ([]DeviceWithNetwork, error) {
+	log.Infof("BridgeService: GetNetworkDevices called with networkID: %s", networkID)
 	if b.token == "" {
 		return nil, fmt.Errorf("not logged in")
 	}
@@ -279,7 +508,22 @@ func (b *BridgeService) GetNetworkDevices(networkID string) ([]api.VirtualNetwor
 			Token:   b.token,
 		},
 	}
-	return vnService.GetDevices(networkID)
+	devs, err := vnService.GetDevices(networkID)
+	if err != nil {
+		log.Errorf("BridgeService: GetDevices API error: %v", err)
+		return nil, err
+	}
+	log.Infof("BridgeService: GetDevices returned %d devices", len(devs))
+
+	result := make([]DeviceWithNetwork, len(devs))
+	for i, d := range devs {
+		log.Debugf("BridgeService: Device %d: ID=%s, Name=%s, VirtualIP=%s", i, d.ID, d.Name, d.VirtualIP)
+		result[i] = DeviceWithNetwork{
+			VirtualNetworkDeviceResponse: d,
+			NetworkID:                    networkID,
+		}
+	}
+	return result, nil
 }
 
 // Ping measures latency to a target IP

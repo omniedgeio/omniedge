@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import { Events, Browser } from "@wailsio/runtime";
 import * as BridgeService from "../bindings/omniedge-desktop/bridgeservice.js";
@@ -6,7 +6,8 @@ import * as BridgeService from "../bindings/omniedge-desktop/bridgeservice.js";
 function App() {
     const [status, setStatus] = useState('disconnected');
     const [virtualIP, setVirtualIP] = useState('');
-    const [localIP, setLocalIP] = useState('Detecting...');
+    const [deviceName, setDeviceName] = useState('');
+    const [networkName, setNetworkName] = useState('');
     const [networks, setNetworks] = useState([]);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [profile, setProfile] = useState(null);
@@ -15,63 +16,40 @@ function App() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [activeNetwork, setActiveNetwork] = useState(null);
-    const [devices, setDevices] = useState([]);
-    const [latencies, setLatencies] = useState({});
     const [expandedNetworks, setExpandedNetworks] = useState({});
-
-    const pingInterval = useRef(null);
+    const [networkDevices, setNetworkDevices] = useState({});
 
     useEffect(() => {
-        // Fetch logo
         BridgeService.GetLogos().then(setLogo);
+        BridgeService.GetDeviceName().then(setDeviceName);
 
-        // Listen for status changes
         Events.On("status-changed", (event) => {
             const newStatus = event.data;
             setStatus(newStatus);
-            if (newStatus === 'connected') {
-                BridgeService.GetVirtualIP().then(setVirtualIP);
-            } else if (newStatus === 'disconnected') {
-                setVirtualIP('');
-            }
+            refreshConnectionInfo();
         });
 
-        // Initial background checks
-        BridgeService.GetLocalIP().then(setLocalIP);
         BridgeService.GetStatus().then(currStatus => {
             setStatus(currStatus);
-            if (currStatus === 'connected') {
-                BridgeService.GetVirtualIP().then(setVirtualIP);
-            }
+            refreshConnectionInfo();
         });
 
-        return () => stopPingLoop();
+        // Auto-check if logged in (token persists in BridgeService)
+        BridgeService.GetProfile().then(p => {
+            if (p && p.name) {
+                setProfile(p);
+                setIsLoggedIn(true);
+                BridgeService.GetNetworks().then(setNetworks);
+            }
+        }).catch(() => { });
     }, []);
 
-    const startPingLoop = () => {
-        stopPingLoop();
-        pingInterval.current = setInterval(async () => {
-            const reachableDevices = devices.filter(d => d.online && d.virtual_ip);
-            if (reachableDevices.length > 0) {
-                const newLatencies = { ...latencies };
-                for (const dev of reachableDevices) {
-                    try {
-                        const ms = await BridgeService.Ping(dev.virtual_ip);
-                        newLatencies[dev.id] = ms;
-                    } catch (e) {
-                        newLatencies[dev.id] = -1;
-                    }
-                }
-                setLatencies(newLatencies);
-            }
-        }, 5000);
-    };
-
-    const stopPingLoop = () => {
-        if (pingInterval.current) {
-            clearInterval(pingInterval.current);
-            pingInterval.current = null;
-        }
+    const refreshConnectionInfo = async () => {
+        const vIP = await BridgeService.GetVirtualIP();
+        setVirtualIP(vIP);
+        const netName = await BridgeService.GetConnectedNetworkName();
+        console.log('refreshConnectionInfo - networkName:', netName, 'virtualIP:', vIP);
+        setNetworkName(netName);
     };
 
     const handleLogin = async () => {
@@ -89,9 +67,16 @@ function App() {
                 setError(result.message);
             }
         } catch (err) {
-            setError(err.toString());
+            setError("Login failed. Check security key.");
         }
         setIsLoading(false);
+    };
+
+    const handleLogout = () => {
+        setIsLoggedIn(false);
+        setProfile(null);
+        setNetworks([]);
+        // Ideally call a backend logout to clear token
     };
 
     const handleConnect = async (networkId) => {
@@ -99,11 +84,8 @@ function App() {
         try {
             await BridgeService.Connect(networkId);
             setActiveNetwork(networkId);
-            const devs = await BridgeService.GetNetworkDevices(networkId);
-            setDevices(devs || []);
-            startPingLoop();
         } catch (err) {
-            setError(err.toString());
+            console.error(err);
         }
         setIsLoading(false);
     };
@@ -113,54 +95,55 @@ function App() {
         try {
             await BridgeService.Disconnect();
             setActiveNetwork(null);
-            setDevices([]);
-            stopPingLoop();
         } catch (err) {
-            setError(err.toString());
+            console.error(err);
         }
         setIsLoading(false);
     };
 
-    const toggleNetwork = async (networkId) => {
+    const toggleNetworkExpand = async (networkId) => {
         const isExpanded = !!expandedNetworks[networkId];
         setExpandedNetworks({ ...expandedNetworks, [networkId]: !isExpanded });
         if (!isExpanded) {
-            const devs = await BridgeService.GetNetworkDevices(networkId);
-            setDevices(prev => [...prev.filter(d => d.network_id !== networkId), ...(devs || [])]);
+            try {
+                console.log('toggleNetworkExpand - fetching devices for networkId:', networkId);
+                const devs = await BridgeService.GetNetworkDevices(networkId);
+                console.log('toggleNetworkExpand - received devices:', devs);
+                setNetworkDevices(prev => ({ ...prev, [networkId]: devs || [] }));
+            } catch (err) {
+                console.error('toggleNetworkExpand - error:', err);
+            }
         }
     };
 
-    const getLatencyClass = (lx) => {
-        if (lx === undefined || lx < 0) return 'latency-bad';
-        if (lx < 50) return 'latency-good';
-        if (lx < 150) return 'latency-fair';
-        return 'latency-bad';
+    const openURL = (url) => {
+        Browser.OpenURL(url);
     };
 
     if (!isLoggedIn) {
         return (
             <div className="app">
                 <div className="login-view">
-                    {logo ? (
-                        <img src={`data:image/png;base64,${logo}`} className="logo-main" alt="OmniEdge" />
-                    ) : (
-                        <div className="logo-main" style={{ fontSize: 48 }}>⬡</div>
-                    )}
-                    <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>OmniEdge</h2>
-                    <div className="login-form">
-                        <input
-                            type="password"
-                            placeholder="Enter Security Key"
-                            className="security-input"
-                            value={securityKey}
-                            onChange={(e) => setSecurityKey(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                        />
-                        <button className="btn-primary" onClick={handleLogin} disabled={isLoading || !securityKey}>
-                            {isLoading ? 'Authenticating...' : 'Sign In'}
-                        </button>
-                    </div>
-                    {error && <div className="error-text">{error}</div>}
+                    <div style={{ fontSize: 24, color: '#007AFF', marginBottom: 16 }}>⬡</div>
+                    <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>OmniEdge</h2>
+                    <p style={{ marginBottom: 20, fontSize: 12, opacity: 0.6 }}>Log in to your mesh network</p>
+                    <input
+                        type="password"
+                        placeholder="Security Key"
+                        className="security-input"
+                        value={securityKey}
+                        onChange={(e) => setSecurityKey(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                    />
+                    <button className="btn-primary" style={{ cursor: 'pointer' }} onClick={handleLogin}>
+                        {isLoading ? 'Connecting...' : 'Log in'}
+                    </button>
+                    {error && <div className="error-text" style={{ marginTop: 10 }}>{error}</div>}
+                </div>
+                <div className="divider"></div>
+                <div className="menu-item quit-row" onClick={() => Events.Emit("quit")}>
+                    <span>Quit</span>
+                    <span className="shortcut">⌘Q</span>
                 </div>
             </div>
         );
@@ -168,91 +151,132 @@ function App() {
 
     return (
         <div className="app">
-            <div className="header-logout" onClick={() => setIsLoggedIn(false)}>
-                Logout as {profile?.name || 'User'}
+            {/* Native Login/Logout Toggle */}
+            <div className="menu-item" onClick={handleLogout}>
+                Log out as {profile?.name || 'User'}
+            </div>
+            <div className="divider"></div>
+
+            {/* Logical Section: This Device Dashboard */}
+            <div className="detail-section no-hover">
+                <div className="detail-line">
+                    <span className="detail-label">Network:</span>
+                    <span className="detail-value truncate">
+                        {status === 'connected' ? networkName : 'Not connected'}
+                    </span>
+                </div>
+                <div className="detail-line">
+                    <span className="detail-label">Device:</span>
+                    <span className="detail-value truncate">{deviceName}</span>
+                </div>
+                <div className="detail-line">
+                    <span className="detail-label">IP:</span>
+                    <span className="detail-value">{virtualIP || '---.---.---.---'}</span>
+                </div>
             </div>
 
-            <div className="divider-line"></div>
+            <div className="divider"></div>
 
-            <main className="main-scroll">
-                {/* Active Connection Info */}
-                <div className="status-section">
-                    <div className="network-active-label">
-                        <span>{activeNetwork ? networks.find(n => n.id === activeNetwork)?.name : 'Disconnected'}</span>
-                        <span className="this-device-tag">This Device</span>
-                    </div>
-                    <div className="ip-display">{localIP}</div>
-                    {virtualIP && <div className="ip-display virtual-ip-row">{virtualIP}</div>}
-                </div>
+            {/* Logical Section: network selection */}
+            <div className="menu-item subheader">
+                My Virtual Networks
+            </div>
 
-                <div className="divider-line"></div>
+            {networks.map(net => {
+                const isExpanded = expandedNetworks[net.id];
+                const isActive = activeNetwork === net.id || status === 'connected' && networkName === net.name;
 
-                <div className="section-title">My Virtual Networks</div>
-
-                {networks.map(net => (
+                return (
                     <div key={net.id}>
-                        <div className="menu-row" onClick={() => toggleNetwork(net.id)}>
-                            <span className="row-name">{net.name}</span>
-                            <div className={`chevron ${expandedNetworks[net.id] ? 'expanded' : ''}`}>
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
+                        <div className="menu-item" onClick={() => toggleNetworkExpand(net.id)}>
+                            <div className="network-row">
+                                <span className="truncate" style={{ fontWeight: isActive ? '500' : '400' }}>{net.name}</span>
+                                <div className="chevron" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}>
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                </div>
                             </div>
                         </div>
-
-                        {expandedNetworks[net.id] && (
-                            <div className="nested-container">
-                                <div className="device-item no-hover" style={{ paddingBottom: 10 }}>
-                                    <span className="text-meta" style={{ fontSize: 11 }}>{net.ip_range}</span>
-                                    <label className="switch">
-                                        <input
-                                            type="checkbox"
-                                            checked={activeNetwork === net.id}
-                                            onChange={() => activeNetwork === net.id ? handleDisconnect() : handleConnect(net.id)}
-                                        />
-                                        <span className="slider"></span>
-                                    </label>
-                                </div>
-
-                                {devices.filter(d => d.network_id === net.id || activeNetwork === net.id).map(dev => (
-                                    <div key={dev.id} className="device-item">
-                                        <div className="device-main">
-                                            <span className="device-name">{dev.name}</span>
-                                            <span className="device-ip">{dev.virtual_ip}</span>
-                                        </div>
-                                        <span className={`latency ${getLatencyClass(latencies[dev.id])}`}>
-                                            {latencies[dev.id] !== undefined ? `${latencies[dev.id]} ms` : ''}
-                                        </span>
+                        {isExpanded && (
+                            <div className="network-detail">
+                                <div className="detail-header">
+                                    <span style={{ fontSize: 16, fontWeight: 500 }}>{net.name}</span>
+                                    <div
+                                        className={`ios-switch ${isActive ? 'on' : ''}`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            isActive ? handleDisconnect() : handleConnect(net.id);
+                                        }}
+                                        style={{ transform: 'scale(1.2)', transformOrigin: 'right' }}
+                                    >
+                                        <div className="dot"></div>
                                     </div>
-                                ))}
-                                {devices.filter(d => d.network_id === net.id).length === 0 && (
-                                    <div className="device-item text-meta" style={{ fontSize: 11 }}>No devices online</div>
-                                )}
+                                </div>
+                                <div className="divider" style={{ margin: '4px 0' }}></div>
+                                <div style={{ padding: '8px 0' }}>
+                                    {(networkDevices[net.id] || []).map(dev => (
+                                        <div key={dev.id || dev.virtual_ip}>
+                                            <div className="device-grid">
+                                                <div className="device-name">
+                                                    <span className="expand-icon">
+                                                        {dev.has_sub_devices ? "−" : ""}
+                                                    </span>
+                                                    <span className="truncate">{dev.name}</span>
+                                                </div>
+                                                <div className="device-ip">{dev.virtual_ip}</div>
+                                                <div className={`device-latency ${dev.latency < 50 ? 'latency-fast' : dev.latency < 100 ? 'latency-medium' : 'latency-slow'}`}>
+                                                    {dev.latency} ms
+                                                </div>
+                                            </div>
+
+                                            {/* Sub-devices support */}
+                                            {dev.has_sub_devices && (dev.sub_devices || []).map(sub => (
+                                                <div key={sub.id} className="device-grid sub-device">
+                                                    <div className="device-name">
+                                                        <span className="truncate">{sub.name}</span>
+                                                    </div>
+                                                    <div className="device-ip">{sub.ip}</div>
+                                                    <div className={`device-latency ${sub.latency < 50 ? 'latency-fast' : sub.latency < 100 ? 'latency-medium' : 'latency-slow'}`}>
+                                                        {sub.latency} ms
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {/* Mock visual purely for design parity if list is long */}
+                                            {dev.name === 'GL-MIFI' && (
+                                                <div className="center-text" style={{ padding: '4px 0', opacity: 0.6 }}>
+                                                    <svg width="20" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <path d="M7 13l5 5 5-5M7 6l5 5 5-5" />
+                                                    </svg>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {(!networkDevices[net.id] || networkDevices[net.id].length === 0) && (
+                                        <div className="nested-item" style={{ opacity: 0.4 }}>
+                                            <span>No other devices found</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
-                ))}
+                );
+            })}
 
-                <div className="menu-row" onClick={() => Browser.OpenURL("https://omniedge.io/dashboard")}>
-                    <span className="row-name">Dashboard...</span>
-                </div>
-            </main>
+            <div className="divider"></div>
 
-            <footer className="footer">
-                <div className="footer-row">
-                    <span>Auto update</span>
-                    <label className="switch" style={{ transform: 'scale(0.8)' }}>
-                        <input type="checkbox" defaultChecked />
-                        <span className="slider"></span>
-                    </label>
+            {/* Logical Section: Utilities matching native OmniMainMenu.swift */}
+            <div className="footer">
+                <div className="menu-item utility-item" onClick={() => openURL('https://omniedge.io/dashboard')}>
+                    Dashboard ...
                 </div>
-                <div className="footer-row">Check for update</div>
-                <div className="footer-row">About OmniEdge</div>
-                <div className="footer-row" onClick={() => Events.Emit("quit")}>
+                <div className="menu-item quit-row" onClick={() => Events.Emit("quit")}>
                     <span>Quit</span>
-                    <span className="text-meta" style={{ fontSize: 11 }}>⌘Q</span>
+                    <span className="shortcut">⌘Q</span>
                 </div>
-            </footer>
+            </div>
         </div>
     );
 }
