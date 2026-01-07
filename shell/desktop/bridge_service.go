@@ -10,11 +10,19 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/keybase/go-keychain"
 	"github.com/omniedgeio/omniedge-cli/pkg/api"
 	"github.com/omniedgeio/omniedge-cli/pkg/bridge"
 	"github.com/omniedgeio/omniedge-cli/pkg/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/wailsapp/wails/v3/pkg/application"
+)
+
+// Keychain constants
+const (
+	keychainService        = "io.omniedge.desktop"
+	keychainAccountAuth    = "auth_token"
+	keychainAccountRefresh = "refresh_token"
 )
 
 // ConnectionStatus represents the VPN connection state
@@ -222,10 +230,150 @@ func (b *BridgeService) Login(securityKey string) LoginResult {
 	b.refreshToken = resp.RefreshToken
 	log.Infof("BridgeService.Login successful. Token set.")
 
+	// Save tokens to keychain for persistence
+	b.SaveTokens()
+
 	// Check for existing connection after login
 	b.CheckExistingConnection()
 
 	return LoginResult{Success: true, Message: "Login successful"}
+}
+
+// SaveTokens persists auth tokens to macOS Keychain
+func (b *BridgeService) SaveTokens() error {
+	// Save auth token
+	item := keychain.NewItem()
+	item.SetSecClass(keychain.SecClassGenericPassword)
+	item.SetService(keychainService)
+	item.SetAccount(keychainAccountAuth)
+	item.SetData([]byte(b.token))
+	item.SetAccessible(keychain.AccessibleAfterFirstUnlock)
+	item.SetSynchronizable(keychain.SynchronizableNo)
+
+	// Delete existing and add new
+	keychain.DeleteItem(item)
+	if err := keychain.AddItem(item); err != nil {
+		log.Warnf("Failed to save auth token to keychain: %v", err)
+		return err
+	}
+
+	// Save refresh token
+	item2 := keychain.NewItem()
+	item2.SetSecClass(keychain.SecClassGenericPassword)
+	item2.SetService(keychainService)
+	item2.SetAccount(keychainAccountRefresh)
+	item2.SetData([]byte(b.refreshToken))
+	item2.SetAccessible(keychain.AccessibleAfterFirstUnlock)
+	item2.SetSynchronizable(keychain.SynchronizableNo)
+
+	keychain.DeleteItem(item2)
+	if err := keychain.AddItem(item2); err != nil {
+		log.Warnf("Failed to save refresh token to keychain: %v", err)
+		return err
+	}
+
+	log.Info("BridgeService: Tokens saved to keychain")
+	return nil
+}
+
+// LoadTokens loads auth tokens from macOS Keychain
+func (b *BridgeService) LoadTokens() error {
+	// Load auth token
+	query := keychain.NewItem()
+	query.SetSecClass(keychain.SecClassGenericPassword)
+	query.SetService(keychainService)
+	query.SetAccount(keychainAccountAuth)
+	query.SetMatchLimit(keychain.MatchLimitOne)
+	query.SetReturnData(true)
+
+	results, err := keychain.QueryItem(query)
+	if err != nil || len(results) == 0 {
+		log.Debug("No auth token found in keychain")
+		return fmt.Errorf("no tokens found")
+	}
+	b.token = string(results[0].Data)
+
+	// Load refresh token
+	query2 := keychain.NewItem()
+	query2.SetSecClass(keychain.SecClassGenericPassword)
+	query2.SetService(keychainService)
+	query2.SetAccount(keychainAccountRefresh)
+	query2.SetMatchLimit(keychain.MatchLimitOne)
+	query2.SetReturnData(true)
+
+	results2, err := keychain.QueryItem(query2)
+	if err != nil || len(results2) == 0 {
+		log.Debug("No refresh token found in keychain")
+		return fmt.Errorf("no refresh token found")
+	}
+	b.refreshToken = string(results2[0].Data)
+
+	log.Info("BridgeService: Tokens loaded from keychain")
+	return nil
+}
+
+// ClearTokens removes auth tokens from macOS Keychain
+func (b *BridgeService) ClearTokens() error {
+	item := keychain.NewItem()
+	item.SetSecClass(keychain.SecClassGenericPassword)
+	item.SetService(keychainService)
+	item.SetAccount(keychainAccountAuth)
+	keychain.DeleteItem(item)
+
+	item2 := keychain.NewItem()
+	item2.SetSecClass(keychain.SecClassGenericPassword)
+	item2.SetService(keychainService)
+	item2.SetAccount(keychainAccountRefresh)
+	keychain.DeleteItem(item2)
+
+	b.token = ""
+	b.refreshToken = ""
+	log.Info("BridgeService: Tokens cleared from keychain")
+	return nil
+}
+
+// TryAutoLogin attempts to restore session from saved tokens
+func (b *BridgeService) TryAutoLogin() LoginResult {
+	log.Info("BridgeService: Attempting auto-login from saved tokens")
+
+	// Load tokens from keychain
+	if err := b.LoadTokens(); err != nil {
+		log.Debug("BridgeService: No saved tokens, auto-login failed")
+		return LoginResult{Success: false, Message: "No saved session"}
+	}
+
+	// Validate that we have a refresh token
+	if b.refreshToken == "" {
+		log.Debug("BridgeService: No refresh token, auto-login failed")
+		return LoginResult{Success: false, Message: "No refresh token"}
+	}
+
+	// Try to refresh the token
+	authService := api.AuthService{
+		HttpOption: api.HttpOption{
+			BaseUrl: b.baseURL,
+		},
+	}
+	resp, err := authService.Refresh(&api.RefreshTokenOption{
+		RefreshToken: b.refreshToken,
+	})
+	if err != nil {
+		log.Warnf("BridgeService: Token refresh failed: %v", err)
+		b.ClearTokens()
+		return LoginResult{Success: false, Message: "Session expired"}
+	}
+
+	// Update tokens
+	b.token = "Bearer " + resp.Token
+	b.refreshToken = resp.RefreshToken
+	b.SaveTokens()
+
+	log.Info("BridgeService: Auto-login successful via token refresh")
+
+	// Check for existing connection
+	b.CheckExistingConnection()
+
+	return LoginResult{Success: true, Message: "Session restored"}
 }
 
 // GetProfile returns the current user's profile

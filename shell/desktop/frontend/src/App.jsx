@@ -14,7 +14,7 @@ function App() {
     const [logo, setLogo] = useState('');
     const [securityKey, setSecurityKey] = useState('');
     const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true); // Start loading while checking auto-login
     const [activeNetwork, setActiveNetwork] = useState(null);
     const [expandedNetworks, setExpandedNetworks] = useState({});
     const [networkDevices, setNetworkDevices] = useState({});
@@ -34,14 +34,21 @@ function App() {
             refreshConnectionInfo();
         });
 
-        // Auto-check if logged in (token persists in BridgeService)
-        BridgeService.GetProfile().then(p => {
-            if (p && p.name) {
-                setProfile(p);
-                setIsLoggedIn(true);
-                BridgeService.GetNetworks().then(setNetworks);
+        // Try auto-login using saved tokens (Keychain)
+        BridgeService.TryAutoLogin().then(result => {
+            if (result.success) {
+                BridgeService.GetProfile().then(p => {
+                    if (p && p.name) {
+                        setProfile(p);
+                        setIsLoggedIn(true);
+                        BridgeService.GetNetworks().then(setNetworks);
+                    }
+                });
             }
-        }).catch(() => { });
+            setIsLoading(false);
+        }).catch(() => {
+            setIsLoading(false);
+        });
     }, []);
 
     const refreshConnectionInfo = async () => {
