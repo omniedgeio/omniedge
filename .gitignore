@@ -1,23 +1,50 @@
+# n2n library (generated)
 internal/n2n
-# Binaries for programs and plugins
+
+# Go binaries
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
+# Test binary
 *.test
 
-# Output of the go coverage tool, specifically when used with LiteIDE
+# Coverage
 *.out
+coverage.html
 
-# Dependency directories (remove the comment below to include it)
+# Build output
+out/
+bin/
+dist/
+
+# Desktop app builds
+shell/desktop/bin/
+shell/desktop/node_modules/
+shell/desktop/frontend/dist/
+*.AppImage
+*.flatpak
+*.dmg
+*.deb
+*.rpm
+
+# Dependencies
 # vendor/
 
-.vscode
+# IDE
+.vscode/
+.idea/
 
+# Config (local)
 app.yaml
 sqlboiler.toml
-.idea
-out
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+*.tmp
+*.log
