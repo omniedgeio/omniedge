@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -454,7 +455,7 @@ func (b *BridgeService) Connect(networkId string) error {
 	deviceResp, err := regService.Register(&api.RegisterOption{
 		Name:         b.GetDeviceName(),
 		HardwareUUID: b.hardwareUUID,
-		OS:           "darwin",
+		OS:           runtime.GOOS,
 	})
 	if err != nil {
 		log.Warnf("BridgeService: Device registration failed: %v", err)

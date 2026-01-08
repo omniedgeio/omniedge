@@ -4,6 +4,7 @@ import (
 	"embed"
 	_ "embed"
 	"log"
+	"runtime"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -46,8 +47,8 @@ func main() {
 	bridgeService.SetApp(app)
 	bridgeService.SetAppIcon(appIcon)
 
-	// Create the main window (hidden by default)
-	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
+	// Create the main window with platform-specific options
+	windowOpts := application.WebviewWindowOptions{
 		Title:     "OmniEdge",
 		Width:     320,
 		Height:    600,  // Initial height, resized by frontend
@@ -55,17 +56,34 @@ func main() {
 		MaxWidth:  320,  // Lock width
 		MinHeight: 600,  // Allow shrinking
 		MaxHeight: 1000, // Allow growing
-		Mac: application.MacWindow{
+		URL:       "/",
+		Hidden:    true,
+	}
+
+	// Platform-specific window styling
+	switch runtime.GOOS {
+	case "darwin":
+		windowOpts.Mac = application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,
 			TitleBar:                application.MacTitleBarHiddenInset,
-		},
-		BackgroundColour: application.NewRGBA(0, 0, 0, 0),
-		URL:              "/",
-		Hidden:           true,
-		AlwaysOnTop:      true,
-		Frameless:        true,
-	})
+		}
+		windowOpts.BackgroundColour = application.NewRGBA(0, 0, 0, 0)
+		windowOpts.AlwaysOnTop = true
+		windowOpts.Frameless = true
+	case "windows":
+		// Windows: Use system chrome with transparency if available
+		windowOpts.BackgroundColour = application.NewRGBA(255, 255, 255, 255)
+		windowOpts.AlwaysOnTop = true
+		windowOpts.Frameless = false // Keep native title bar on Windows
+	case "linux":
+		// Linux: Standard window with native chrome
+		windowOpts.BackgroundColour = application.NewRGBA(255, 255, 255, 255)
+		windowOpts.AlwaysOnTop = true
+		windowOpts.Frameless = false // Keep native title bar on Linux
+	}
+
+	mainWindow := app.Window.NewWithOptions(windowOpts)
 
 	// Create system tray menu
 	trayMenu := app.Menu.New()

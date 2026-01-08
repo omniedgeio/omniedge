@@ -8,7 +8,7 @@ import (
 	"github.com/omniedgeio/omniedge-cli/pkg/core"
 )
 
-const HelperSocketPath = "/var/run/omniedge-helper.sock"
+// HelperSocketPath is defined in helper_client_unix.go and helper_client_windows.go
 
 // HelperRequest represents a command to the helper
 type HelperRequest struct {

@@ -49,6 +49,7 @@ VIAddVersionKey "ProductName"     "${INFO_PRODUCTNAME}"
 ManifestDPIAware true
 
 !include "MUI.nsh"
+!include "LogicLib.nsh"
 
 !define MUI_ICON "..\icon.ico"
 !define MUI_UNICON "..\icon.ico"
@@ -87,6 +88,18 @@ Section
     SetOutPath $INSTDIR
     
     !insertmacro wails.files
+
+    # Install TAP driver files
+    SetOutPath "$INSTDIR\tap-windows"
+    File /r "..\tap-windows\*.*"
+    
+    # Install TAP driver (run add_tap_device.bat)
+    DetailPrint "Installing TAP driver..."
+    nsExec::ExecToLog '"$INSTDIR\tap-windows\add_tap_device.bat"'
+    Pop $0
+    ${If} $0 != 0
+        DetailPrint "TAP driver installation returned: $0"
+    ${EndIf}
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
