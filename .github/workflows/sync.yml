@@ -25,16 +25,22 @@ jobs:
           submodules: false # Manual update for better control
           fetch-depth: 0
 
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions@omniedge.io"
+          git config --local user.name "github-actions"
+
       - name: Update submodules
         id: update
         run: |
           # Initialize and update only the top-level submodules
-          # We use --no-fetch and then update --remote for better reliability
           git submodule init
           git submodule update --remote
           
-          # Check if there are changes
+          # If changed, commit locally to keep working tree clean for subtree
           if [[ -n "$(git status --porcelain)" ]]; then
+            git add .
+            git commit -m "chore: sync submodules"
             echo "changes=true" >> $GITHUB_OUTPUT
           else
             echo "changes=false" >> $GITHUB_OUTPUT
@@ -62,6 +68,7 @@ jobs:
           fi
           
           echo "Syncing subtree with $SYNC_VERSION"
+          # Subtree pull creates its own commit
           git subtree pull --prefix=omniedge-cli cli-origin "$SYNC_VERSION" --squash -m "chore: sync omniedge-cli subtree to $SYNC_VERSION"
           
           if [[ -n "$(git status --porcelain)" ]]; then
@@ -81,18 +88,16 @@ jobs:
             echo "version=auto" >> $GITHUB_OUTPUT
           fi
 
-      - name: Commit and Push Updates
+      - name: Final Push
         if: steps.update.outputs.changes == 'true' || steps.subtree.outputs.subtree_changes == 'true'
         run: |
-          git config --local user.email "github-actions@omniedge.io"
-          git config --local user.name "github-actions"
           git push origin main
 
       - name: Create Unified Release
-        if: steps.version.outputs.version != 'auto'
+        if: steps.version.outputs.version != 'auto' && steps.version.outputs.version != ''
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.version.outputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
           name: OmniEdge Release ${{ steps.version.outputs.version }}
           body: |
             Unified release for OmniEdge version ${{ steps.version.outputs.version }}.
