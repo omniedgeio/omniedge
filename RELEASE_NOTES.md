@@ -87,7 +87,7 @@
 ### Recommended: Install Script
 
 ```bash
-curl -fsSL https://connect.omniedge.io/install/omniedge-install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/omniedge-install.sh | bash
 ```
 
 The script auto-detects your platform and installs the latest version.

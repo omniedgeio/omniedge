@@ -3,8 +3,8 @@
 set -e
 
 # OmniEdge CLI Install Script
-# Usage: curl https://connect.omniedge.io/install/omniedge-install.sh | bash
-# Manual version: curl https://connect.omniedge.io/install/omniedge-install.sh | OMNIEDGE_VERSION=v1.0.0 bash
+# Usage: curl https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/omniedge-install.sh | bash
+# Manual version: curl https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/omniedge-install.sh | OMNIEDGE_VERSION=v1.0.0 bash
 
 REPO="omniedgeio/omniedge"
 PKG_NAME="omniedge"
