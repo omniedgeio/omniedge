@@ -11,6 +11,15 @@ OmniEdge enables seamless connectivity between your devices across networks. Per
 - 📡 **OpenWrt Routers**: Mesh your network infrastructure
 - 🖥️ **Servers**: Linux, macOS, FreeBSD, Windows
 
+## Highlights
+
+- 🖥️ **Cross-platform Desktop App** - Windows, macOS, Linux with native GUI
+- 📦 **Multiple Linux Packages** - DEB, RPM, AppImage, Flatpak, Arch
+- 🪟 **Windows Support** - NSIS installer with bundled TAP driver
+- ✨ **Native macOS `utun` support** - No third-party kernel extensions needed
+- 💓 **Real-time heartbeat** - Device online status visible in dashboard
+- 🏗️ **Emerging architectures** - RISC-V, LoongArch, FreeBSD 14
+
 [🌐 Website](https://connect.omniedge.io) • [📚 Docs](https://connect.omniedge.io/docs) • [💬 Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
 
 ## Quick Install
@@ -21,41 +30,45 @@ curl https://connect.omniedge.io/install/omniedge-install.sh | bash
 
 ## Desktop Applications
 
-| Platform | Package | Download |
+Download the latest desktop app from the [Releases page](https://github.com/omniedgeio/omniedge/releases/latest).
+
+| Platform | Package | Filename |
 |----------|---------|----------|
-| **Windows** | NSIS Installer | [omniedge-desktop-windows-amd64.exe](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **macOS** | DMG (Apple Silicon) | [omniedge-desktop-macos-arm64.dmg](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **Linux** | DEB (Ubuntu/Debian) | [omniedge-desktop-linux-amd64.deb](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **Linux** | RPM (Fedora/RHEL) | [omniedge-desktop-linux-amd64.rpm](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **Linux** | AppImage (Universal) | [omniedge-desktop-linux-amd64.AppImage](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **Linux** | Flatpak | [omniedge-desktop-linux-amd64.flatpak](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **Linux** | Arch (AUR) | [omniedge-desktop-linux-arch.tar.gz](https://github.com/omniedgeio/omniedge/releases/latest) |
+| **Windows** | NSIS Installer | `omniedge-desktop-{version}-windows-amd64.exe` |
+| **macOS** | DMG (Apple Silicon) | `omniedge-desktop-{version}-macos-arm64.dmg` |
+| **Linux** | DEB (Ubuntu/Debian) | `omniedge-desktop-{version}-linux-amd64.deb` |
+| **Linux** | RPM (Fedora/RHEL) | `omniedge-desktop-{version}-linux-amd64.rpm` |
+| **Linux** | AppImage (Universal) | `omniedge-desktop-{version}-linux-amd64.AppImage` |
+| **Linux** | Flatpak | `omniedge-desktop-{version}-linux-amd64.flatpak` |
+| **Linux** | Arch (AUR) | `omniedge-desktop-{version}-linux-amd64-arch.tar.gz` |
 
 ## CLI Binaries
 
+Download CLI binaries from the [Releases page](https://github.com/omniedgeio/omniedge/releases/latest). Filenames follow the format `omniedge-{version}-{platform}.zip`.
+
 ### Linux (Native)
-| Architecture | Devices | Download |
+| Architecture | Devices | Filename |
 |--------------|---------|----------|
-| **amd64** | Servers, NUCs, Mini PCs | [omniedge-amd64.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **arm64** | NVIDIA Jetson, RPi 4/5, Apple Silicon | [omniedge-arm64.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **arm** | Raspberry Pi 3, IoT Gateways | [omniedge-arm.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
+| **amd64** | Servers, NUCs, Mini PCs | `omniedge-{version}-amd64.zip` |
+| **arm64** | NVIDIA Jetson, RPi 4/5 | `omniedge-{version}-arm64.zip` |
+| **arm** | Raspberry Pi 3, IoT Gateways | `omniedge-{version}-arm.zip` |
 
 ### OpenWrt (Routers)
-| Architecture | Devices | Download |
+| Architecture | Devices | Filename |
 |--------------|---------|----------|
-| **amd64** | x86 Software Routers | [omniedge-openwrt-amd64.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **arm64** | Modern ARM Routers | [omniedge-openwrt-arm64.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **arm** | Qualcomm IPQ40xx | [omniedge-openwrt-arm.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **mips** | Legacy MIPS Routers | [omniedge-openwrt-mips.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **mipsle** | MediaTek Routers | [omniedge-openwrt-mipsle.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
+| **amd64** | x86 Software Routers | `omniedge-{version}-openwrt-amd64.zip` |
+| **arm64** | Modern ARM Routers | `omniedge-{version}-openwrt-arm64.zip` |
+| **arm** | Qualcomm IPQ40xx | `omniedge-{version}-openwrt-arm.zip` |
+| **mips** | Legacy MIPS Routers | `omniedge-{version}-openwrt-mips.zip` |
+| **mipsle** | MediaTek Routers | `omniedge-{version}-openwrt-mipsle.zip` |
 
 ### Other Platforms
-| Platform | Download |
+| Platform | Filename |
 |----------|----------|
-| **macOS CLI** (Apple Silicon) | [omniedge-macos-arm64.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **FreeBSD 14** | [omniedge-freebsd-14.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **RISC-V** | [omniedge-riscv64.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
-| **LoongArch** | [omniedge-loongarch64.zip](https://github.com/omniedgeio/omniedge/releases/latest) |
+| **macOS CLI** (Apple Silicon) | `omniedge-{version}-macos-arm64.zip` |
+| **FreeBSD 14** | `omniedge-{version}-freebsd-14.zip` |
+| **RISC-V** | `omniedge-{version}-riscv64.zip` |
+| **LoongArch** | `omniedge-{version}-loongarch64.zip` |
 
 ## Usage
 
@@ -81,16 +94,7 @@ sudo omniedge join -n "your-network-id"
 
 ## Mobile Apps
 
-- [📱 iOS & M1 Mac](https://apps.apple.com/us/app/omniedgenew/id1603005893) - App Store
-- [🤖 Android](https://connect.omniedge.io/download/android) - APK Download
-
-## v1.0.1 Highlights
-
-- 🖥️ **Cross-platform Desktop App** - Windows, macOS, Linux with native GUI
-- � **Multiple Linux Packages** - DEB, RPM, AppImage, Flatpak, Arch
-- 🪟 **Windows Support** - NSIS installer with bundled TAP driver
-- ✨ **Native macOS `utun` support** - No third-party kernel extensions needed
-- 💓 **Real-time heartbeat** - Device online status visible in dashboard
+Coming soon...
 
 ## Documentation
 
