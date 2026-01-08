@@ -1,7 +1,0 @@
-#!/bin/sh
-OS_V=$(uname)
-if [ "$OS_V" = 'FreeBSD' ]; then
-        gmake
-else
-        make
-fi
