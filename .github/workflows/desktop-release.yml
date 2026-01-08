@@ -38,7 +38,9 @@ jobs:
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
 
       - name: Install NSIS
-        run: choco install nsis -y
+        run: |
+          choco install nsis -y
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
 
       - name: Get version
         id: version
@@ -50,6 +52,11 @@ jobs:
             VERSION="${GITHUB_REF#refs/tags/v}"
             echo "version=$VERSION" >> $GITHUB_OUTPUT
           fi
+
+      - name: Generate n2n library
+        working-directory: internal
+        run: |
+          go generate ./...
 
       - name: Build Desktop App
         working-directory: shell/desktop
@@ -110,6 +117,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config
+          sudo apt-get install -y autoconf automake libtool  # For n2n build
           sudo apt-get install -y libfuse2 fuse  # For AppImage
           sudo apt-get install -y flatpak flatpak-builder  # For Flatpak
 
@@ -129,6 +137,11 @@ jobs:
             VERSION="${GITHUB_REF#refs/tags/v}"
             echo "version=$VERSION" >> $GITHUB_OUTPUT
           fi
+
+      - name: Generate n2n library
+        working-directory: internal
+        run: |
+          go generate ./...
 
       - name: Build Desktop App
         working-directory: shell/desktop
