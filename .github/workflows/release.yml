@@ -376,7 +376,7 @@ jobs:
           sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
         
       - name: Test and output ip address
-        if: startsWith(matrix.platform, 'ubuntu-22.04')
+        if: startsWith(matrix.platform, 'ubuntu-22.04') && secrets.OMNEIDGE_SECURITY_KEY != ''
         run: |
           chmod +x ./out/omniedge
           sudo hostname Compile-Action
