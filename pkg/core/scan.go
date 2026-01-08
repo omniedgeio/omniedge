@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/Ullaakut/nmap/v2"
-	"github.com/omniedgeio/omniedge-cli/pkg/api"
+	"github.com/omniedgeio/omniedge/pkg/api"
 	log "github.com/sirupsen/logrus"
 )
 

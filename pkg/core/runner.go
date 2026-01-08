@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	omnin2n "github.com/omniedgeio/omniedge-cli/internal"
-	"github.com/omniedgeio/omniedge-cli/pkg/api"
+	omnin2n "github.com/omniedgeio/omniedge/internal"
+	"github.com/omniedgeio/omniedge/pkg/api"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/omniedgeio/omniedge-cli/pkg/core"
+	"github.com/omniedgeio/omniedge/pkg/core"
 )
 
 // HelperSocketPath is defined in helper_client_unix.go and helper_client_windows.go

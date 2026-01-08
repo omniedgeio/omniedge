@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/omniedgeio/omniedge-cli/pkg/api"
-	"github.com/omniedgeio/omniedge-cli/pkg/bridge"
-	"github.com/omniedgeio/omniedge-cli/pkg/core"
+	"github.com/omniedgeio/omniedge/pkg/api"
+	"github.com/omniedgeio/omniedge/pkg/bridge"
+	"github.com/omniedgeio/omniedge/pkg/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )

@@ -1,4 +1,4 @@
-module github.com/omniedgeio/omniedge-cli
+module github.com/omniedgeio/omniedge
 
 go 1.16
 

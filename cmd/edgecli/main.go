@@ -1,11 +1,12 @@
 package main
 
 import (
-	core "github.com/omniedgeio/omniedge-cli/pkg/core"
-	rootCmd "github.com/omniedgeio/omniedge-cli/cmd/edgecli/cmd"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"os/user"
+
+	rootCmd "github.com/omniedgeio/omniedge/cmd/edgecli/cmd"
+	core "github.com/omniedgeio/omniedge/pkg/core"
+	log "github.com/sirupsen/logrus"
 )
 
 var Env string

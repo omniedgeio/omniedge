@@ -1,6 +1,6 @@
 BUILD_ENV ?= "dev"
 VERSION ?= $(shell git describe --tags --always --dirty)
-LDFLAGS = -X main.Env=${BUILD_ENV} -X github.com/omniedgeio/omniedge-cli/cmd/edgecli/cmd.Version=$(VERSION)
+LDFLAGS = -X main.Env=${BUILD_ENV} -X github.com/omniedgeio/omniedge/cmd/edgecli/cmd.Version=$(VERSION)
 
 build: go.sum generate
 	rm -rf ./out

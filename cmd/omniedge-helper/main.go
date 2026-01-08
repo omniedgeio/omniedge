@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/omniedgeio/omniedge-cli/pkg/core"
+	"github.com/omniedgeio/omniedge/pkg/core"
 	log "github.com/sirupsen/logrus"
 )
 

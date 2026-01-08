@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	api "github.com/omniedgeio/omniedge-cli/pkg/api"
-	core "github.com/omniedgeio/omniedge-cli/pkg/core"
+	api "github.com/omniedgeio/omniedge/pkg/api"
+	core "github.com/omniedgeio/omniedge/pkg/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

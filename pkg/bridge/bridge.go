@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/omniedgeio/omniedge-cli/pkg/api"
-	"github.com/omniedgeio/omniedge-cli/pkg/core"
-	"github.com/omniedgeio/omniedge-cli/pkg/msgbus"
+	"github.com/omniedgeio/omniedge/pkg/api"
+	"github.com/omniedgeio/omniedge/pkg/core"
+	"github.com/omniedgeio/omniedge/pkg/msgbus"
 	log "github.com/sirupsen/logrus"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )

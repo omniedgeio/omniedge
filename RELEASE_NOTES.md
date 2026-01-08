@@ -74,7 +74,7 @@
 
 ```bash
 # Download and replace existing binary
-curl -LO https://github.com/omniedgeio/omniedge-cli/releases/download/v0.3.0/omniedge-v0.3.0-YOUR_PLATFORM.zip
+curl -LO https://github.com/omniedgeio/omniedge/releases/download/v0.3.0/omniedge-v0.3.0-YOUR_PLATFORM.zip
 unzip omniedge-v0.3.0-YOUR_PLATFORM.zip
 sudo mv omniedge /usr/local/bin/
 
@@ -88,4 +88,4 @@ Thank you to all contributors who made this release possible!
 
 ---
 
-**Full Changelog**: https://github.com/omniedgeio/omniedge-cli/compare/v0.2.4...v0.3.0
+**Full Changelog**: https://github.com/omniedgeio/omniedge/compare/v0.2.4...v0.3.0
