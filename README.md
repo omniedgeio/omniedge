@@ -22,10 +22,18 @@ OmniEdge enables seamless connectivity between your devices across networks. Per
 
 [🌐 Website](https://connect.omniedge.io) • [📚 Docs](https://connect.omniedge.io/docs) • [💬 Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
 
-## Quick Install
+## Quick Install (CLI)
+
+The easiest way to install OmniEdge CLI:
 
 ```bash
-curl https://connect.omniedge.io/install/omniedge-install.sh | bash
+curl -fsSL https://connect.omniedge.io/install/omniedge-install.sh | bash
+```
+
+To install a specific version:
+
+```bash
+curl -fsSL https://connect.omniedge.io/install/omniedge-install.sh | OMNIEDGE_VERSION=v1.0.0 bash
 ```
 
 ## Desktop Applications

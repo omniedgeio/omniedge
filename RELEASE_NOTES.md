@@ -82,10 +82,20 @@
 - Fixed hardware UUID mismatch in heartbeat API
 - Fixed release workflow missing parameters
 
-## 📋 Upgrade Instructions
+## 📋 Install / Upgrade
+
+### Recommended: Install Script
 
 ```bash
-# Download and replace existing binary
+curl -fsSL https://connect.omniedge.io/install/omniedge-install.sh | bash
+```
+
+The script auto-detects your platform and installs the latest version.
+
+### Manual Download
+
+```bash
+# Download for your platform
 curl -LO https://github.com/omniedgeio/omniedge/releases/download/v1.0.0/omniedge-v1.0.0-YOUR_PLATFORM.zip
 unzip omniedge-v1.0.0-YOUR_PLATFORM.zip
 sudo mv omniedge /usr/local/bin/
