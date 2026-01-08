@@ -6,7 +6,7 @@
 		"0000": {
 			"ProductVersion": "1.0.1",
 			"CompanyName": "OmniEdge",
-			"FileDescription": "OmniEdge VPN Client",
+			"FileDescription": "OmniEdge Client",
 			"LegalCopyright": "© 2026, OmniEdge",
 			"ProductName": "OmniEdge",
 			"Comments": "Secure peer-to-peer VPN"

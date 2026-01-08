@@ -6,10 +6,6 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import * as time$0 from "../../../../../time/models.js";
-
 export class IdentityResponse {
     /**
      * Creates a new IdentityResponse instance.
@@ -113,62 +109,6 @@ export class ProfileResponse {
             $$parsedSource["identities"] = $$createField4_0($$parsedSource["identities"]);
         }
         return new ProfileResponse(/** @type {Partial<ProfileResponse>} */($$parsedSource));
-    }
-}
-
-export class VirtualNetworkDeviceResponse {
-    /**
-     * Creates a new VirtualNetworkDeviceResponse instance.
-     * @param {Partial<VirtualNetworkDeviceResponse>} [$$source = {}] - The source object to create the VirtualNetworkDeviceResponse.
-     */
-    constructor($$source = {}) {
-        if (!("id" in $$source)) {
-            /**
-             * @member
-             * @type {string}
-             */
-            this["id"] = "";
-        }
-        if (!("name" in $$source)) {
-            /**
-             * @member
-             * @type {string}
-             */
-            this["name"] = "";
-        }
-        if (!("virtual_ip" in $$source)) {
-            /**
-             * @member
-             * @type {string}
-             */
-            this["virtual_ip"] = "";
-        }
-        if (!("last_seen" in $$source)) {
-            /**
-             * @member
-             * @type {time$0.Time}
-             */
-            this["last_seen"] = null;
-        }
-        if (!("online" in $$source)) {
-            /**
-             * @member
-             * @type {boolean}
-             */
-            this["online"] = false;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new VirtualNetworkDeviceResponse instance from a string or object.
-     * @param {any} [$$source = {}]
-     * @returns {VirtualNetworkDeviceResponse}
-     */
-    static createFrom($$source = {}) {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new VirtualNetworkDeviceResponse(/** @type {Partial<VirtualNetworkDeviceResponse>} */($$parsedSource));
     }
 }
 

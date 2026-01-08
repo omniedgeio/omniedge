@@ -4,6 +4,5 @@
 
 export {
     IdentityResponse,
-    ProfileResponse,
-    VirtualNetworkDeviceResponse
+    ProfileResponse
 } from "./models.js";

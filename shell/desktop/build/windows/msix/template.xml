@@ -18,7 +18,7 @@
         PublisherName="CN=OmniEdge"
         PublisherDisplayName="OmniEdge"
         Version="0.1.0.0"
-        PackageDescription="OmniEdge VPN Client">
+        PackageDescription="OmniEdge Client">
         <Capabilities>
             <Capability Name="runFullTrust" />
             
@@ -26,7 +26,7 @@
         <Applications>
             <Application
                 Id="io.omniedge.desktop"
-                Description="OmniEdge VPN Client"
+                Description="OmniEdge Client"
                 DisplayName="OmniEdge"
                 ExecutableName="omniedge"
                 EntryPoint="Windows.FullTrustApplication">
@@ -43,7 +43,7 @@
             <Framework>false</Framework>
             <DisplayName>OmniEdge</DisplayName>
             <PublisherDisplayName>OmniEdge</PublisherDisplayName>
-            <Description>OmniEdge VPN Client</Description>
+            <Description>OmniEdge Client</Description>
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>

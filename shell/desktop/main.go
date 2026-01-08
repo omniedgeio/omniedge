@@ -31,7 +31,7 @@ func main() {
 	// Create a new Wails application
 	app := application.New(application.Options{
 		Name:        "OmniEdge",
-		Description: "OmniEdge VPN Client",
+		Description: "OmniEdge Client",
 		Services: []application.Service{
 			application.NewService(bridgeService),
 		},

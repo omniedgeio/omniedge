@@ -15,5 +15,6 @@ export {
     ScreenManager,
     SystemTray,
     SystemTrayManager,
+    WebviewWindow,
     WindowManager
 } from "./models.js";

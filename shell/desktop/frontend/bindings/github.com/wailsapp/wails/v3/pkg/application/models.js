@@ -422,6 +422,27 @@ export class SystemTrayManager {
     }
 }
 
+export class WebviewWindow {
+    /**
+     * Creates a new WebviewWindow instance.
+     * @param {Partial<WebviewWindow>} [$$source = {}] - The source object to create the WebviewWindow.
+     */
+    constructor($$source = {}) {
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new WebviewWindow instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {WebviewWindow}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new WebviewWindow(/** @type {Partial<WebviewWindow>} */($$parsedSource));
+    }
+}
+
 /**
  * WindowManager manages all window-related operations
  */

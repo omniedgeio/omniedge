@@ -31,12 +31,20 @@ export function CheckExistingConnection() {
 }
 
 /**
- * Connect initiates a VPN connection to the specified network
- * @param {string} networkID
+ * ClearTokens removes auth tokens file
  * @returns {$CancellablePromise<void>}
  */
-export function Connect(networkID) {
-    return $Call.ByID(4008425326, networkID);
+export function ClearTokens() {
+    return $Call.ByID(1122677779);
+}
+
+/**
+ * Connect initiates a VPN connection to the specified network
+ * @param {string} networkId
+ * @returns {$CancellablePromise<void>}
+ */
+export function Connect(networkId) {
+    return $Call.ByID(4008425326, networkId);
 }
 
 /**
@@ -45,6 +53,22 @@ export function Connect(networkID) {
  */
 export function Disconnect() {
     return $Call.ByID(2404824402);
+}
+
+/**
+ * GetConnectedNetworkName returns the name of the currently joined network
+ * @returns {$CancellablePromise<string>}
+ */
+export function GetConnectedNetworkName() {
+    return $Call.ByID(1596518392);
+}
+
+/**
+ * GetDeviceName returns the name of this device (from config or API)
+ * @returns {$CancellablePromise<string>}
+ */
+export function GetDeviceName() {
+    return $Call.ByID(2616588237);
 }
 
 /**
@@ -66,7 +90,7 @@ export function GetLogos() {
 /**
  * GetNetworkDevices returns devices in a specific network
  * @param {string} networkID
- * @returns {$CancellablePromise<api$0.VirtualNetworkDeviceResponse[]>}
+ * @returns {$CancellablePromise<$models.DeviceWithNetwork[]>}
  */
 export function GetNetworkDevices(networkID) {
     return $Call.ByID(2113861389, networkID).then(/** @type {($result: any) => any} */(($result) => {
@@ -111,6 +135,14 @@ export function GetVirtualIP() {
 }
 
 /**
+ * LoadTokens loads auth tokens from a file
+ * @returns {$CancellablePromise<void>}
+ */
+export function LoadTokens() {
+    return $Call.ByID(4077962982);
+}
+
+/**
  * Login authenticates with the OmniEdge API using a security key
  * @param {string} securityKey
  * @returns {$CancellablePromise<$models.LoginResult>}
@@ -128,6 +160,31 @@ export function Login(securityKey) {
  */
 export function Ping(targetIP) {
     return $Call.ByID(319741840, targetIP);
+}
+
+/**
+ * Quit disconnects the VPN and quits the application
+ * @returns {$CancellablePromise<void>}
+ */
+export function Quit() {
+    return $Call.ByID(2290472455);
+}
+
+/**
+ * ResizeWindow resizes the main window to the specified height (width stays fixed at 320)
+ * @param {number} height
+ * @returns {$CancellablePromise<void>}
+ */
+export function ResizeWindow(height) {
+    return $Call.ByID(2198926892, height);
+}
+
+/**
+ * SaveTokens persists auth tokens to a file
+ * @returns {$CancellablePromise<void>}
+ */
+export function SaveTokens() {
+    return $Call.ByID(793692771);
 }
 
 /**
@@ -149,6 +206,15 @@ export function SetAppIcon(icon) {
 }
 
 /**
+ * SetMainWindow sets the main window reference for dynamic resizing
+ * @param {application$0.WebviewWindow | null} window
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetMainWindow(window) {
+    return $Call.ByID(3550950061, window);
+}
+
+/**
  * SetSystemTray sets the system tray reference and icons for dynamic switching
  * @param {application$0.SystemTray | null} tray
  * @param {string} connected
@@ -159,8 +225,18 @@ export function SetSystemTray(tray, connected, disconnected) {
     return $Call.ByID(1035098297, tray, connected, disconnected);
 }
 
+/**
+ * TryAutoLogin attempts to restore session from saved tokens
+ * @returns {$CancellablePromise<$models.LoginResult>}
+ */
+export function TryAutoLogin() {
+    return $Call.ByID(3479871039).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType6($result);
+    }));
+}
+
 // Private type creation functions
-const $$createType0 = api$0.VirtualNetworkDeviceResponse.createFrom;
+const $$createType0 = $models.DeviceWithNetwork.createFrom;
 const $$createType1 = $Create.Array($$createType0);
 const $$createType2 = $models.NetworkInfo.createFrom;
 const $$createType3 = $Create.Array($$createType2);

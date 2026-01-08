@@ -8,6 +8,7 @@ export {
 };
 
 export {
+    DeviceWithNetwork,
     LoginResult,
     NetworkInfo
 } from "./models.js";

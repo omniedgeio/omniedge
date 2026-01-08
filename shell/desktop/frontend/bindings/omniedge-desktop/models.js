@@ -6,6 +6,74 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as time$0 from "../time/models.js";
+
+export class DeviceWithNetwork {
+    /**
+     * Creates a new DeviceWithNetwork instance.
+     * @param {Partial<DeviceWithNetwork>} [$$source = {}] - The source object to create the DeviceWithNetwork.
+     */
+    constructor($$source = {}) {
+        if (!("id" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["id"] = "";
+        }
+        if (!("name" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["name"] = "";
+        }
+        if (!("virtual_ip" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["virtual_ip"] = "";
+        }
+        if (!("last_seen" in $$source)) {
+            /**
+             * @member
+             * @type {time$0.Time}
+             */
+            this["last_seen"] = null;
+        }
+        if (!("network_id" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["network_id"] = "";
+        }
+        if (!("online" in $$source)) {
+            /**
+             * Calculated field - true if last_seen within 5 minutes
+             * @member
+             * @type {boolean}
+             */
+            this["online"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new DeviceWithNetwork instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {DeviceWithNetwork}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new DeviceWithNetwork(/** @type {Partial<DeviceWithNetwork>} */($$parsedSource));
+    }
+}
+
 /**
  * LoginResult represents the result of a login attempt
  */
