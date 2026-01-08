@@ -85,7 +85,7 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
 
-  # Build Linux packages (deb and rpm)
+  # Build Linux packages (deb, rpm, AppImage, Flatpak, Arch)
   build-linux:
     name: Build Linux (${{ matrix.arch }})
     runs-on: ubuntu-latest
@@ -110,6 +110,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config
+          sudo apt-get install -y libfuse2 fuse  # For AppImage
+          sudo apt-get install -y flatpak flatpak-builder  # For Flatpak
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
@@ -137,6 +139,7 @@ jobs:
         run: |
           CGO_ENABLED=1 go build -o shell/desktop/bin/omniedge-helper ./cmd/omniedge-helper
 
+      # --- DEB Package ---
       - name: Build DEB package
         working-directory: shell/desktop
         env:
@@ -145,7 +148,9 @@ jobs:
           GIT_COMMITTER_EMAIL: "support@omniedge.io"
         run: |
           nfpm package -p deb -f build/linux/nfpm/nfpm.yaml -t bin/
+          mv bin/omniedge_*.deb bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.deb
 
+      # --- RPM Package ---
       - name: Build RPM package
         working-directory: shell/desktop
         env:
@@ -154,13 +159,72 @@ jobs:
           GIT_COMMITTER_EMAIL: "support@omniedge.io"
         run: |
           nfpm package -p rpm -f build/linux/nfpm/nfpm.yaml -t bin/
+          mv bin/omniedge-*.rpm bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.rpm
 
-      - name: Rename packages
-        working-directory: shell/desktop/bin
+      # --- AppImage ---
+      - name: Build AppImage
+        working-directory: shell/desktop
         run: |
-          mv omniedge_*.deb omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.deb
-          mv omniedge-*.rpm omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.rpm
+          export APP_NAME="OmniEdge"
+          export APP_BINARY="bin/omniedge"
+          export ICON_PATH="build/appicon.png"
+          export DESKTOP_FILE="build/linux/desktop"
+          
+          # Download linuxdeploy
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+          
+          # Create AppDir
+          mkdir -p OmniEdge.AppDir/usr/bin
+          cp bin/omniedge OmniEdge.AppDir/usr/bin/
+          cp bin/omniedge-helper OmniEdge.AppDir/usr/bin/
+          cp build/appicon.png OmniEdge.AppDir/omniedge.png
+          cp build/linux/desktop OmniEdge.AppDir/omniedge.desktop
+          
+          # Build AppImage
+          ./linuxdeploy-x86_64.AppImage --appdir OmniEdge.AppDir --output appimage
+          mv OmniEdge*.AppImage bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.AppImage
 
+      # --- Flatpak ---
+      - name: Setup Flatpak
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.gnome.Platform//45 org.gnome.Sdk//45
+
+      - name: Build Flatpak
+        working-directory: shell/desktop
+        run: |
+          # Copy binaries to flatpak build dir
+          mkdir -p build/linux/flatpak/build
+          cp bin/omniedge build/linux/flatpak/
+          cp bin/omniedge-helper build/linux/flatpak/
+          cp build/appicon.png build/linux/flatpak/omniedge.png
+          cp build/linux/desktop build/linux/flatpak/omniedge.desktop
+          
+          # Build flatpak
+          flatpak-builder --user --force-clean --repo=repo build/linux/flatpak/build build/linux/flatpak/io.omniedge.desktop.yml
+          flatpak build-bundle repo bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.flatpak io.omniedge.desktop
+
+      # --- Arch Linux Package ---
+      - name: Build Arch package
+        working-directory: shell/desktop
+        run: |
+          mkdir -p bin/arch-pkg
+          cp bin/omniedge bin/arch-pkg/
+          cp bin/omniedge-helper bin/arch-pkg/
+          cp build/linux/desktop bin/arch-pkg/omniedge.desktop
+          cp build/appicon.png bin/arch-pkg/omniedge.png
+          cp build/linux/omniedge-helper.service bin/arch-pkg/
+          cp build/linux/arch/PKGBUILD bin/arch-pkg/
+          
+          # Update version in PKGBUILD
+          sed -i "s/pkgver=.*/pkgver=${{ steps.version.outputs.version }}/" bin/arch-pkg/PKGBUILD
+          
+          # Create tarball for AUR
+          cd bin
+          tar -czvf omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}-arch.tar.gz arch-pkg/
+
+      # --- Upload Artifacts ---
       - name: Upload DEB Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -172,6 +236,24 @@ jobs:
         with:
           name: omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}-rpm
           path: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.rpm
+
+      - name: Upload AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}-appimage
+          path: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.AppImage
+
+      - name: Upload Flatpak Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}-flatpak
+          path: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.flatpak
+
+      - name: Upload Arch Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}-arch
+          path: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}-arch.tar.gz
 
       - name: Upload to Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -284,7 +366,16 @@ jobs:
           echo "## 🚀 OmniEdge Desktop ${{ steps.version.outputs.version }} Released" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Packages Built:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Windows**: omniedge-desktop-${{ steps.version.outputs.version }}-windows-amd64.exe (NSIS installer with TAP driver)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Linux DEB**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.deb (Ubuntu/Debian)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Linux RPM**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.rpm (RHEL/CentOS/Fedora)" >> $GITHUB_STEP_SUMMARY
-          echo "- **macOS**: omniedge-desktop-${{ steps.version.outputs.version }}-macos-arm64.dmg (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Windows" >> $GITHUB_STEP_SUMMARY
+          echo "- **NSIS Installer**: omniedge-desktop-${{ steps.version.outputs.version }}-windows-amd64.exe (includes TAP driver)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Linux" >> $GITHUB_STEP_SUMMARY
+          echo "- **DEB**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.deb (Ubuntu/Debian)" >> $GITHUB_STEP_SUMMARY
+          echo "- **RPM**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.rpm (RHEL/CentOS/Fedora)" >> $GITHUB_STEP_SUMMARY
+          echo "- **AppImage**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.AppImage (Universal)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Flatpak**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.flatpak (GNOME/Flathub)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Arch**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64-arch.tar.gz (Arch/AUR)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### macOS" >> $GITHUB_STEP_SUMMARY
+          echo "- **DMG**: omniedge-desktop-${{ steps.version.outputs.version }}-macos-arm64.dmg (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
