@@ -179,7 +179,7 @@ jobs:
         working-directory: shell/desktop
         run: |
           export APP_NAME="OmniEdge"
-          export APP_BINARY="bin/omniedge"
+          export APP_BINARY="bin/OmniEdge"
           export ICON_PATH="build/appicon.png"
           export DESKTOP_FILE="build/linux/desktop"
           
@@ -189,7 +189,7 @@ jobs:
           
           # Create AppDir
           mkdir -p OmniEdge.AppDir/usr/bin
-          cp bin/omniedge OmniEdge.AppDir/usr/bin/
+          cp bin/OmniEdge OmniEdge.AppDir/usr/bin/omniedge
           cp bin/omniedge-helper OmniEdge.AppDir/usr/bin/
           cp build/appicon.png OmniEdge.AppDir/omniedge.png
           cp build/linux/desktop OmniEdge.AppDir/omniedge.desktop
@@ -209,7 +209,7 @@ jobs:
         run: |
           # Copy binaries to flatpak build dir
           mkdir -p build/linux/flatpak/build
-          cp bin/omniedge build/linux/flatpak/
+          cp bin/OmniEdge build/linux/flatpak/omniedge
           cp bin/omniedge-helper build/linux/flatpak/
           cp build/appicon.png build/linux/flatpak/omniedge.png
           cp build/linux/desktop build/linux/flatpak/omniedge.desktop
@@ -223,7 +223,7 @@ jobs:
         working-directory: shell/desktop
         run: |
           mkdir -p bin/arch-pkg
-          cp bin/omniedge bin/arch-pkg/
+          cp bin/OmniEdge bin/arch-pkg/omniedge
           cp bin/omniedge-helper bin/arch-pkg/
           cp build/linux/desktop bin/arch-pkg/omniedge.desktop
           cp build/appicon.png bin/arch-pkg/omniedge.png

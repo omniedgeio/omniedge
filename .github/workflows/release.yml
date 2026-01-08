@@ -377,12 +377,19 @@ jobs:
         
       - name: Test and output ip address
         if: startsWith(matrix.platform, 'ubuntu-22.04')
+        env:
+          OMNIEDGE_SECRET_KEY: ${{ secrets.OMNEIDGE_SECURITY_KEY }}
+          OMNIEDGE_NETWORK_ID: ${{ secrets.OMNEIDGE_VIRTUALNETWORK_ID }}
         run: |
+          if [ -z "$OMNIEDGE_SECRET_KEY" ]; then
+            echo "Skipping test: OMNEIDGE_SECURITY_KEY not configured"
+            exit 0
+          fi
           chmod +x ./out/omniedge
           sudo hostname Compile-Action
-          ./out/omniedge login -s ${{secrets.OMNEIDGE_SECURITY_KEY}}
+          ./out/omniedge login -s "$OMNIEDGE_SECRET_KEY"
           sleep 2
-          sudo ./out/omniedge join -n ${{secrets.OMNEIDGE_VIRTUALNETWORK_ID}} &
+          sudo ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" &
 
           ip4=$(/sbin/ip -o -4 addr list Compile-Action | awk '{print $4}' | cut -d/ -f1)
           echo $ip4
