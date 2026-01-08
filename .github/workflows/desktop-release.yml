@@ -3,7 +3,7 @@ name: OmniEdge Desktop Build
 on:
   push:
     tags:
-      - 'desktop-v*.*.*'
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version:
