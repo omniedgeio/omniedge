@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/mitchellh/mapstructure"
-	edgecli "github.com/omniedgeio/omniedge-cli"
+	api "github.com/omniedgeio/omniedge-cli/pkg/api"
+	core "github.com/omniedgeio/omniedge-cli/pkg/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -15,15 +17,15 @@ var uploadCmd = &cobra.Command{
 	Short:   "Upload local subnet to omniedge",
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
-		edgecli.LoadClientConfig()
+		core.LoadClientConfig()
 
 		if err := loadAuthFile(); err != nil {
 			log.Errorf("%+v", err)
 			log.Error("Please try login first")
 			return
 		}
-		endpointUrl := edgecli.ConfigV.GetString(RestEndpointUrl)
-		httpOption := edgecli.HttpOption{
+		endpointUrl := core.ConfigV.GetString(RestEndpointUrl)
+		httpOption := api.HttpOption{
 			Token:   fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
 			BaseUrl: endpointUrl,
 		}
@@ -44,19 +46,19 @@ var uploadCmd = &cobra.Command{
 			log.Errorf("No subnets in scan result, please scan first")
 		}
 
-		var scanResults []*edgecli.ScanResult
+		var scanResults []*api.ScanResult
 		for _, v := range scanResultArray.([]interface{}) {
-			data := &edgecli.ScanResult{}
+			data := &api.ScanResult{}
 			if err := mapstructure.Decode(v, data); err != nil {
 				log.Errorf("%+v\nFail to decode scan result, please contact omniedge team", err)
 			}
 			scanResults = append(scanResults, data)
 		}
 
-		var uploadService = &edgecli.VirtualNetworkService{
+		var uploadService = &api.VirtualNetworkService{
 			HttpOption: httpOption,
 		}
-		uploadOption := &edgecli.UploadOption{
+		uploadOption := &api.UploadOption{
 			IP:          viper.GetString(keyScanIP),
 			MacAddress:  viper.GetString(keyScanMacAddress),
 			SubnetMask:  viper.GetString(keyScanSubnetMask),

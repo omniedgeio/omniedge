@@ -1,0 +1,9 @@
+--- n2n.h	2026-01-07 08:31:31.000000000 +0800
++++ n2n.h	2026-01-07 08:31:31.000000000 +0800
+@@ -19,4 +19,6 @@
+ #ifndef _N2N_H_
+ #define _N2N_H_
+ 
++#define SKIP_MULTICAST_PEERS_DISCOVERY 1
++
+ /*

@@ -1,17 +1,17 @@
-# OmniEdge CLI
+# OmniEdge
 
 > Secure P2P mesh networking for AI devices, IoT, and edge computing
 
 [![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge-cli)](https://github.com/omniedgeio/omniedge-cli/releases)
 [![License](https://img.shields.io/github/license/omniedgeio/omniedge-cli)](LICENSE)
 
-OmniEdge CLI enables seamless connectivity between your devices across networks. Perfect for:
+OmniEdge enables seamless connectivity between your devices across networks. Perfect for:
 - 🤖 **AI/ML Devices**: NVIDIA Jetson, AI edge computers
 - 🍓 **Raspberry Pi**: All models from Pi 3 to Pi 5
 - 📡 **OpenWrt Routers**: Mesh your network infrastructure
-- 🖥️ **Servers**: Linux, macOS, FreeBSD
+- 🖥️ **Servers**: Linux, macOS, FreeBSD, Windows
 
-[🌐 Website](https://omniedge.io) • [� Docs](https://omniedge.io/docs) • [� Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
+[🌐 Website](https://connect.omniedge.io) • [📚 Docs](https://connect.omniedge.io/docs) • [💬 Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
 
 ## Quick Install
 
@@ -19,7 +19,19 @@ OmniEdge CLI enables seamless connectivity between your devices across networks.
 curl https://connect.omniedge.io/install/omniedge-install.sh | bash
 ```
 
-## Supported Platforms
+## Desktop Applications
+
+| Platform | Package | Download |
+|----------|---------|----------|
+| **Windows** | NSIS Installer | [omniedge-desktop-windows-amd64.exe](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **macOS** | DMG (Apple Silicon) | [omniedge-desktop-macos-arm64.dmg](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Linux** | DEB (Ubuntu/Debian) | [omniedge-desktop-linux-amd64.deb](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Linux** | RPM (Fedora/RHEL) | [omniedge-desktop-linux-amd64.rpm](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Linux** | AppImage (Universal) | [omniedge-desktop-linux-amd64.AppImage](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Linux** | Flatpak | [omniedge-desktop-linux-amd64.flatpak](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Linux** | Arch (AUR) | [omniedge-desktop-linux-arch.tar.gz](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+
+## CLI Binaries
 
 ### Linux (Native)
 | Architecture | Devices | Download |
@@ -37,19 +49,13 @@ curl https://connect.omniedge.io/install/omniedge-install.sh | bash
 | **mips** | Legacy MIPS Routers | [omniedge-openwrt-mips.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
 | **mipsle** | MediaTek Routers | [omniedge-openwrt-mipsle.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
 
-### Emerging Architectures
-| Architecture | Devices | Download |
-|--------------|---------|----------|
-| **riscv64** | Sipeed, StarFive, VisionFive | [omniedge-riscv64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
-| **loongarch64** | Loongson (China) | [omniedge-loongarch64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
-
-### Desktop/Workstation
+### Other Platforms
 | Platform | Download |
 |----------|----------|
-| **macOS** (Apple Silicon) | [omniedge-macos-latest.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
-| **Ubuntu 22.04 LTS** | [omniedge-ubuntu-22.04.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
-| **Ubuntu 24.04 LTS** | [omniedge-ubuntu-24.04.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **macOS CLI** (Apple Silicon) | [omniedge-macos-arm64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
 | **FreeBSD 14** | [omniedge-freebsd-14.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **RISC-V** | [omniedge-riscv64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **LoongArch** | [omniedge-loongarch64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
 
 ## Usage
 
@@ -73,26 +79,24 @@ sudo omniedge join
 sudo omniedge join -n "your-network-id"
 ```
 
-## Other Clients
+## Mobile Apps
 
 - [📱 iOS & M1 Mac](https://apps.apple.com/us/app/omniedgenew/id1603005893) - App Store
-- [🤖 Android](https://omniedge.io/download/android) - APK Download
-- [🪟 Windows](https://omniedge.io/download/windows) - Installer
-- [🔌 Synology NAS](https://omniedge.io/download/synology) - Package
+- [🤖 Android](https://connect.omniedge.io/download/android) - APK Download
 
-## v0.3.0 Highlights
+## v1.0.1 Highlights
 
+- 🖥️ **Cross-platform Desktop App** - Windows, macOS, Linux with native GUI
+- � **Multiple Linux Packages** - DEB, RPM, AppImage, Flatpak, Arch
+- 🪟 **Windows Support** - NSIS installer with bundled TAP driver
 - ✨ **Native macOS `utun` support** - No third-party kernel extensions needed
 - 💓 **Real-time heartbeat** - Device online status visible in dashboard
-- 🏗️ **Modern toolchain** - Go 1.21, OpenWrt SDK 23.05
-- 🌏 **Emerging architectures** - RISC-V and LoongArch support
 
 ## Documentation
 
-- [Architecture](https://omniedge.io/docs/article/architecture)
-- [Installation Guide](https://omniedge.io/docs/article/install)
-- [Use Cases](https://omniedge.io/docs/article/cases)
-- [Performance](https://omniedge.io/docs/article/performance)
+- [Architecture](https://connect.omniedge.io/docs/article/architecture)
+- [Installation Guide](https://connect.omniedge.io/docs/article/install)
+- [Use Cases](https://connect.omniedge.io/docs/article/cases)
 
 ## Contributing
 
@@ -104,4 +108,4 @@ See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
 
 ---
 
-Built with ❤️ by [OmniEdge](https://omniedge.io)
+Built with ❤️ by [OmniEdge](https://connect.omniedge.io)

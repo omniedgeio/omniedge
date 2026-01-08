@@ -1,7 +1,8 @@
 package cmd
 
 import (
-	edgecli "github.com/omniedgeio/omniedge-cli"
+	api "github.com/omniedgeio/omniedge-cli/pkg/api"
+	core "github.com/omniedgeio/omniedge-cli/pkg/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -14,23 +15,23 @@ var scanCmd = &cobra.Command{
 	Example: "scan -c 192.168.32.0/24 -t 20",
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
-		edgecli.LoadClientConfig()
+		core.LoadClientConfig()
 		var err error
 		var timeout = viper.GetInt64(cliScanTimeout)
 		var cidr = viper.GetString(cliCidr)
-		var scanOption = edgecli.ScanOption{
+		var scanOption = core.ScanOption{
 			Cidr:    cidr,
 			Timeout: timeout,
 		}
-		var deviceNet *edgecli.DeviceNet
-		deviceNet, err = edgecli.GetCurrentDeviceNetStatus(cidr)
+		var deviceNet *core.DeviceNet
+		deviceNet, err = core.GetCurrentDeviceNetStatus(cidr)
 		if err != nil {
 			log.Errorf("%+v", err)
 		}
-		var service = edgecli.ScanService{
+		var service = core.ScanService{
 			ScanOption: scanOption,
 		}
-		var scanResult *[]edgecli.ScanResult
+		var scanResult *[]api.ScanResult
 		log.Printf("%+v", scanOption)
 
 		if scanResult, err = service.Scan(&scanOption); err != nil {

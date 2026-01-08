@@ -6,9 +6,10 @@ build: go.sum generate
 	rm -rf ./out
 	GOOS=linux go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
 
-build-darwin: go.sum generate
+build-darwin: go.sum
 	rm -rf ./out
-	GOOS=darwin go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
+	CGO_ENABLED=1 GOOS=darwin go generate ./...
+	CGO_ENABLED=1 GOOS=darwin go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
 
 build-darwin-amd64: go.sum
 	rm -rf ./out
@@ -22,11 +23,13 @@ build-darwin-arm64: go.sum
 
 build-riscv64: go.sum generate
 	rm -rf ./out
-	GOOS=linux go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
+	CGO_ENABLED=1 GOOS=linux GOARCH=riscv64 go generate ./...
+	CGO_ENABLED=1 GOOS=linux GOARCH=riscv64 go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
 
-build-freebsd: go.sum generate
+build-freebsd: go.sum
 	rm -rf ./out
-	GOOS=freebsd go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
+	CGO_ENABLED=1 GOOS=freebsd go generate ./...
+	CGO_ENABLED=1 GOOS=freebsd go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
 
 generate-bindata:
 	go get -u github.com/go-bindata/go-bindata/...

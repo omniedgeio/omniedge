@@ -5,7 +5,8 @@ import (
 	"strings"
 
 	"github.com/manifoldco/promptui"
-	edge "github.com/omniedgeio/omniedge-cli"
+	api "github.com/omniedgeio/omniedge-cli/pkg/api"
+	core "github.com/omniedgeio/omniedge-cli/pkg/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -17,28 +18,28 @@ var joinCmd = &cobra.Command{
 	Short:   "Join omniedge network",
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
-		edge.LoadClientConfig()
+		core.LoadClientConfig()
 		if err := loadAuthFile(); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
-		endpointUrl := edge.ConfigV.GetString(RestEndpointUrl)
+		endpointUrl := core.ConfigV.GetString(RestEndpointUrl)
 		var vnId = viper.GetString(cliVirtualNetworkId)
 		var deviceId = viper.GetString(keyDeviceUUID)
 		var deviceName = viper.GetString(keyDeviceName)
 
-		var device *edge.DeviceResponse
+		var device *api.DeviceResponse
 		var err error
 
 		refreshToken := viper.GetString(keyAuthResponseRefreshToken)
 		if refreshToken != "" {
-			refreshTokenOption := &edge.RefreshTokenOption{
+			refreshTokenOption := &api.RefreshTokenOption{
 				RefreshToken: refreshToken,
 			}
-			var refreshTokenHttpOption = edge.HttpOption{
+			var refreshTokenHttpOption = api.HttpOption{
 				BaseUrl: endpointUrl,
 			}
-			authService := edge.AuthService{
+			authService := api.AuthService{
 				HttpOption: refreshTokenHttpOption,
 			}
 			if authResp, err := authService.Refresh(refreshTokenOption); err != nil {
@@ -51,7 +52,7 @@ var joinCmd = &cobra.Command{
 			}
 		}
 
-		var httpOption = edge.HttpOption{
+		var httpOption = api.HttpOption{
 			Token:   fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
 			BaseUrl: endpointUrl,
 		}
@@ -62,18 +63,18 @@ var joinCmd = &cobra.Command{
 				return
 			}
 		} else {
-			device = &edge.DeviceResponse{
+			device = &api.DeviceResponse{
 				Name: deviceName,
 				ID:   deviceId,
 			}
 		}
 		deviceId = device.ID
 
-		var service = edge.VirtualNetworkService{
+		var service = api.VirtualNetworkService{
 			HttpOption: httpOption,
 		}
 		if vnId == "" {
-			var resp []edge.VirtualNetworkResponse
+			var resp []api.VirtualNetworkResponse
 			var err error
 			if resp, err = service.List(); err != nil {
 				log.Errorf("%+v", err)
@@ -94,14 +95,14 @@ var joinCmd = &cobra.Command{
 				viper.Set(keyVirtualNetworks, resp)
 			}
 		}
-		var joinOption = &edge.JoinOption{
+		var joinOption = &api.JoinOption{
 			VirtualNetworkId: vnId,
 			DeviceId:         deviceId,
 		}
-		service = edge.VirtualNetworkService{
+		service = api.VirtualNetworkService{
 			HttpOption: httpOption,
 		}
-		var joinResp *edge.JoinVirtualNetworkResponse
+		var joinResp *api.JoinVirtualNetworkResponse
 		if joinResp, err = service.Join(joinOption); err != nil {
 			log.Errorf("%+v", err)
 			return
@@ -121,37 +122,37 @@ var joinCmd = &cobra.Command{
 	},
 }
 
-func register(httpOption edge.HttpOption) (*edge.DeviceResponse, error) {
-	hardwareId, err := edge.RevealHardwareUUID()
+func register(httpOption api.HttpOption) (*api.DeviceResponse, error) {
+	hardwareId, err := core.RevealHardwareUUID()
 	if err != nil {
 		return nil, err
 	}
-	registerOption := &edge.RegisterOption{
-		Name:         edge.RevealHostName(),
+	registerOption := &api.RegisterOption{
+		Name:         core.RevealHostName(),
 		HardwareUUID: hardwareId,
-		OS:           edge.RevealOS(),
+		OS:           core.RevealOS(),
 	}
-	registerService := edge.RegisterService{
+	registerService := api.RegisterService{
 		HttpOption: httpOption,
 	}
-	var device *edge.DeviceResponse
+	var device *api.DeviceResponse
 	if device, err = registerService.Register(registerOption); err != nil {
 		return nil, err
 	}
 	return device, err
 }
 
-func start(device *edge.DeviceResponse, joinResponse *edge.JoinVirtualNetworkResponse, enableRouting bool) error {
+func start(device *api.DeviceResponse, joinResponse *api.JoinVirtualNetworkResponse, enableRouting bool) error {
 	var randomMac string
 	var err error
-	if randomMac, err = edge.GenerateRandomMac(); err != nil {
+	if randomMac, err = core.GenerateRandomMac(); err != nil {
 		return err
 	}
 
 	// Get actual hardware UUID for heartbeat
-	hardwareId, _ := edge.RevealHardwareUUID()
+	hardwareId, _ := core.RevealHardwareUUID()
 
-	var startOption = edge.StartOption{
+	var startOption = core.StartOption{
 		Hostname:      device.Name,
 		DeviceMac:     randomMac,
 		CommunityName: joinResponse.CommunityName,
@@ -161,10 +162,10 @@ func start(device *edge.DeviceResponse, joinResponse *edge.JoinVirtualNetworkRes
 		SuperNode:     joinResponse.Server.Host,
 		EnableRouting: enableRouting,
 		Token:         fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
-		BaseUrl:       edge.ConfigV.GetString(RestEndpointUrl),
+		BaseUrl:       core.ConfigV.GetString(RestEndpointUrl),
 		HardwareUUID:  hardwareId,
 	}
-	var service = edge.StartService{
+	var service = core.StartService{
 		StartOption: startOption,
 	}
 	if err := service.Start(); err != nil {
@@ -173,7 +174,7 @@ func start(device *edge.DeviceResponse, joinResponse *edge.JoinVirtualNetworkRes
 	return nil
 }
 
-func prompt(networks []edge.VirtualNetworkResponse) (string, error) {
+func prompt(networks []api.VirtualNetworkResponse) (string, error) {
 	templates := &promptui.SelectTemplates{
 		Label:    "choose the network",
 		Active:   "\U0001F336 {{ .Name | cyan }}",

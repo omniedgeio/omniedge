@@ -1,0 +1,56 @@
+name: omniedge
+version: '1.0.1'
+summary: OmniEdge VPN Client
+description: |
+  OmniEdge is a peer-to-peer VPN solution that creates secure, 
+  encrypted connections between your devices across any network.
+  
+  Features:
+  - Zero-config peer-to-peer VPN
+  - End-to-end encryption
+  - Cross-platform support
+  - Easy device management
+
+grade: stable
+confinement: strict
+base: core22
+architectures:
+  - build-on: amd64
+
+apps:
+  omniedge:
+    command: bin/omniedge
+    extensions: [gnome]
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+      - unity7
+      - home
+
+  omniedge-helper:
+    command: bin/omniedge-helper
+    daemon: simple
+    restart-condition: on-failure
+    plugs:
+      - network
+      - network-bind
+      - network-control
+      - firewall-control
+
+parts:
+  omniedge:
+    plugin: dump
+    source: .
+    organize:
+      omniedge: bin/omniedge
+      omniedge-helper: bin/omniedge-helper
+      omniedge.desktop: share/applications/omniedge.desktop
+      omniedge.png: share/icons/hicolor/128x128/apps/omniedge.png
+    stage-packages:
+      - libgtk-3-0
+      - libwebkit2gtk-4.1-0

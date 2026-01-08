@@ -2,7 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	edge "github.com/omniedgeio/omniedge-cli"
+	api "github.com/omniedgeio/omniedge-cli/pkg/api"
+	core "github.com/omniedgeio/omniedge-cli/pkg/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -14,31 +15,31 @@ var registerCmd = &cobra.Command{
 	Short:   "",
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
-		edge.LoadClientConfig()
+		core.LoadClientConfig()
 
 		if err := loadAuthFile(); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
-		endpointUrl := edge.ConfigV.GetString(RestEndpointUrl)
-		hardwareId, err := edge.RevealHardwareUUID()
+		endpointUrl := core.ConfigV.GetString(RestEndpointUrl)
+		hardwareId, err := core.RevealHardwareUUID()
 		if err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
-		httpOption := edge.HttpOption{
+		httpOption := api.HttpOption{
 			Token:   fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
 			BaseUrl: endpointUrl,
 		}
-		registerOption := &edge.RegisterOption{
-			Name:         edge.RevealHostName(),
+		registerOption := &api.RegisterOption{
+			Name:         core.RevealHostName(),
 			HardwareUUID: hardwareId,
-			OS:           edge.RevealOS(),
+			OS:           core.RevealOS(),
 		}
-		registerService := edge.RegisterService{
+		registerService := api.RegisterService{
 			HttpOption: httpOption,
 		}
-		var device *edge.DeviceResponse
+		var device *api.DeviceResponse
 		if device, err = registerService.Register(registerOption); err != nil {
 			log.Errorf("%+v", err)
 			return

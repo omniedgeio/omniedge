@@ -306,10 +306,15 @@ jobs:
           envs: 'ENVIRONMENT'
           usesh: true
           prepare: |
-            # Use latest repository instead of quarterly for better package availability
+            # Only enable the main repo to avoid ports sync issues
             mkdir -p /usr/local/etc/pkg/repos
-            echo 'FreeBSD: { url: "pkg+http://pkg.FreeBSD.org/${ABI}/latest" }' > /usr/local/etc/pkg/repos/FreeBSD.conf
+            # Use direct http URL to avoid SRV lookup errors with pkg+http prefix
+            echo 'FreeBSD: { url: "http://pkg.FreeBSD.org/${ABI}/latest", enabled: yes }' > /usr/local/etc/pkg/repos/FreeBSD.conf
+            # Disable other system repos
+            if [ -f /etc/pkg/FreeBSD.conf ]; then sed -i '' 's/enabled: yes/enabled: no/' /etc/pkg/FreeBSD.conf; fi
             pkg update -f
+            # Perform a full upgrade to resolve library version mismatches (e.g. PCRE2 for git)
+            pkg upgrade -y
             pkg install -y bash go gmake git openssl zip autoconf automake libtool
           run: |
             export PATH="/usr/local/bin:$PATH"
@@ -334,12 +339,18 @@ jobs:
           file: omniedge-${{ github.ref_name }}-freebsd-14.zip
           tag: ${{ github.ref }}
   build-for-distr:
-    name: Build on ${{ matrix.platform }}
+    name: Build on ${{ matrix.platform }} (${{ matrix.arch }})
     env:
       ENVIRONMENT: prod
     strategy:
       matrix:
-        platform: [ubuntu-22.04,ubuntu-24.04,macos-latest]
+        include:
+          - platform: ubuntu-22.04
+            arch: amd64
+          - platform: ubuntu-24.04
+            arch: amd64
+          - platform: macos-15
+            arch: arm64
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout with tag
@@ -358,14 +369,11 @@ jobs:
         if: startsWith(matrix.platform, 'ubuntu')
         run: |
           sudo -E apt-get -y update
-          sudo -E apt-get install -y openssl
-          sudo -E apt-get install -y build-essential
-          sudo -E apt-get install -y libssl-dev
-          sudo -E apt-get install -y zip
+          sudo -E apt-get install -y openssl build-essential libssl-dev zip
           make generate
           VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build
           zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
-          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.os }}.zip.sha256
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
         
       - name: Test and output ip address
         if: startsWith(matrix.platform, 'ubuntu-22.04')
@@ -380,7 +388,7 @@ jobs:
           echo $ip4
           echo "ip-address=$ip4" >> $GITHUB_OUTPUT
 
-      - name: make
+      - name: build
         if: startsWith(matrix.platform, 'macos')
         run: |
           brew install autoconf automake libtool coreutils
@@ -416,19 +424,74 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
           overwrite: true
-          file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}*.zip
-          tag: ${{ github.ref }}
-
-  sync-meta:
-    name: Sync to Meta Repo
-    needs: [build-binary, build-openwrt-1, build-mips-mipsle-openwrt, build-other-binary, build-freebsd-binary, build-for-distr]
+  notify:
+    name: Trigger updates in dependent repos
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
+    needs: 
+      - build-binary
+      - build-openwrt-1
+      - build-mips-mipsle-openwrt
+      - build-other-binary
+      - build-freebsd-binary
+      - build-for-distr
     steps:
-      - name: repository dispatch
+      - name: Get release version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Trigger omniedge-docker
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.REPO_DISPATCH_TOKEN }}
-          repository: omniedgeio/omniedge
-          event-type: meta-release
-          client-payload: '{"version": "${{ github.ref_name }}", "package": "cli"}'
+          repository: omniedgeio/omniedge-docker
+          event-type: cli-release
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
+
+      - name: Trigger omniedge-openwrt
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: omniedgeio/omniedge-openwrt
+          event-type: cli-release
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
+
+      - name: Trigger omniedge-synology
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: omniedgeio/omniedge-synology
+          event-type: cli-release
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
+
+      - name: Trigger github-action
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: omniedgeio/github-action
+          event-type: cli-release
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
+
+      - name: Trigger omniedge-web-frontend
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: omniedgeio/omniedge-web-frontend
+          event-type: cli-release
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
+
+      - name: Summary
+        run: |
+          echo "## 🚀 Triggered Dependency Updates" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "CLI Version: **${{ steps.version.outputs.tag }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Notified repositories:" >> $GITHUB_STEP_SUMMARY
+          echo "- omniedge-docker" >> $GITHUB_STEP_SUMMARY
+          echo "- omniedge-openwrt" >> $GITHUB_STEP_SUMMARY
+          echo "- omniedge-synology" >> $GITHUB_STEP_SUMMARY
+          echo "- github-action" >> $GITHUB_STEP_SUMMARY
+          echo "- omniedge-web-frontend" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,23 @@
+[Unit]
+Description=OmniEdge VPN Helper Service
+Documentation=https://connect.omniedge.io
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/omniedge-helper
+ExecStopPost=/bin/rm -f /var/run/omniedge-helper.sock
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Run as root for network interface management
+User=root
+
+# Security hardening (less restrictive since we need network access)
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

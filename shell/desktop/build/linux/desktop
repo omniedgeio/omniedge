@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=OmniEdge
+Comment=OmniEdge Client
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/omniedge %u
+Terminal=false
+Type=Application
+Icon=omniedge
+Categories=Utility;
+StartupWMClass=omniedge
+
+ 
