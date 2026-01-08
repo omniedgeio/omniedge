@@ -8,10 +8,10 @@ info:
   companyName: "OmniEdge" # The name of the company
   productName: "OmniEdge" # The name of the application
   productIdentifier: "io.omniedge.desktop" # The unique product identifier
-  description: "OmniEdge VPN Client" # The application description
+  description: "OmniEdge Client" # The application description
   copyright: "(c) 2026, OmniEdge" # Copyright text
   comments: "Some Product Comments" # Comments
-  version: "0.0.1" # The application version
+  version: "1.0.1" # The application version
 
 # iOS build configuration (uncomment to customise iOS project generation)
 # Note: Keys under `ios` OVERRIDE values under `info` when set.

@@ -6,23 +6,27 @@
 name: "omniedge"
 arch: ${GOARCH}
 platform: "linux"
-version: "0.1.0"
+version: "1.0.1"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
-description: "OmniEdge VPN Client"
+description: "OmniEdge Client"
 vendor: "OmniEdge"
-homepage: "https://wails.io"
-license: "MIT"
+homepage: "https://connect.omniedge.io"
+license: "GPL-3.0"
 release: "1"
 
 contents:
   - src: "./bin/omniedge"
     dst: "/usr/local/bin/omniedge"
+  - src: "./bin/omniedge-helper"
+    dst: "/usr/local/bin/omniedge-helper"
   - src: "./build/appicon.png"
     dst: "/usr/share/icons/hicolor/128x128/apps/omniedge.png"
   - src: "./build/linux/omniedge.desktop"
     dst: "/usr/share/applications/omniedge.desktop"
+  - src: "./build/linux/omniedge-helper.service"
+    dst: "/usr/lib/systemd/system/omniedge-helper.service"
 
 # Default dependencies for Debian 12/Ubuntu 22.04+ with WebKit 4.1
 depends:
