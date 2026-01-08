@@ -1,15 +1,15 @@
-#golang:i386
-FROM i386/golang:1.18
+#golang:386
+FROM i386/golang:1.23-bookworm
 
 # install golang
 RUN apt update
-RUN apt -y install wget make git autoconf automake build-essential upx
+RUN apt -y install wget make git autoconf automake build-essential libtool patch pkg-config upx
 
 WORKDIR /app
 
 COPY . .
-ARG BUILD_ENV
-
+RUN rm -f go.work
+ENV GOWORK=off
 ENV GOARCH=386
 RUN go generate ./...
 RUN BUILD_ENV=$BUILD_ENV make build

@@ -6,7 +6,7 @@
         <key>CFBundleName</key>
             <string>OmniEdge</string>
         <key>CFBundleExecutable</key>
-            <string>omniedge</string>
+            <string>OmniEdge</string>
         <key>CFBundleIdentifier</key>
             <string>io.omniedge.desktop</string>
         <key>CFBundleVersion</key>

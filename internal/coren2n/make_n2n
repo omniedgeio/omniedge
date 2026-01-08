@@ -1,0 +1,60 @@
+#!/bin/sh
+./autogen.sh
+[ -f Makefile ] && make clean
+
+arch=${GOARCH:-$(go env GOARCH)}
+OS_V=$(uname)
+echo "Building n2n for OS: $OS_V, Arch: $arch"
+CC_V=$CC
+openwrt=$CROSS_OPENWRT
+
+# https://github.com/ntop/n2n/issues/1013
+# https://github.com/omniedgeio/omniedge/discussions/17
+
+
+if [ "$openwrt" = 'openwrt' ]; then
+    case $arch in  
+		mips)
+        	./configure --host=mips-openwrt-linux-musl CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"  
+        	;;
+		mipsle)
+			./configure --host=mipsel-openwrt-linux-musl CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+			;;
+		arm)
+			./configure --host=arm-openwrt-linux-muslgnueabi CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+			;;
+		arm64)
+			./configure --host=aarch64-openwrt-linux-musl CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+			;;
+		386)
+			./configure --host=i386-openwrt-linux-musl CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+			;;
+		amd64|x86_64)
+			./configure --host=x86_64-openwrt-linux-musl CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+			;;
+    esac
+elif [ "$OS_V" = 'Darwin' ]; then
+    case $arch in
+        amd64)
+            ./configure --host=x86_64-apple-darwin CC="clang -arch x86_64" CXX="clang++ -arch x86_64" CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -arch x86_64" LDFLAGS="-arch x86_64"
+            ;;
+        arm64)
+            ./configure --host=aarch64-apple-darwin CC="clang -arch arm64" CXX="clang++ -arch arm64" CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -arch arm64" LDFLAGS="-arch arm64"
+            ;;
+        *)
+            ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+            ;;
+    esac
+else
+    ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+fi
+
+if [ "$arch" = 'riscv64' ]; then
+        ./configure --host=riscv64-unknown-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+fi
+
+if [ "$OS_V" = 'FreeBSD' ]; then
+        gmake
+else
+        make
+fi

@@ -1,0 +1,36 @@
+#!/bin/sh
+./autogen.sh
+[ -f Makefile ] && make clean
+
+arch=$GOARCH
+OS_V=$(uname)
+CC_V=$CC
+
+# https://github.com/ntop/n2n/issues/1013
+# https://github.com/omniedgeio/omniedge/discussions/17
+
+
+if ["$CC_V"='gcc']; then
+        if [ "$arch" = 'mips' ]; then
+                # for GL.iNet MIFI
+                ./configure --host=mips-openwrt-linux-musl
+        elif [ "$arch" = 'arm' ]; then
+                ./configure --host=arm-openwrt-linux-muslgnueabi CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+        elif [ "$arch" = 'arm64' ]; then
+                ./configure --host=aarch64-openwrt-linux-musl CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+        elif [ "$arch" = '386' ]; then
+                ./configure --host=i386-openwrt-linux-musl CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+        elif [ "$arch" = 'amd64' ]; then
+                ./configure --host=x86_64-openwrt-linux-musl CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+        elif [ "$arch" = 'riscv64' ]; then
+                ./configure --host=riscv64-unknown-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+        fi
+else
+        ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+fi
+
+if [ "$OS_V" = 'FreeBSD' ]; then
+        gmake
+else
+        make
+fi

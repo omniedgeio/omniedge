@@ -1,11 +1,11 @@
 #golang:amd64 for OpenWrt cross-compilation
-FROM amd64/golang:1.21-bookworm
+FROM amd64/golang:1.23-bookworm
 
 ARG OPENWRT_SDK=https://downloads.openwrt.org/releases/23.05.0/targets/x86/64/openwrt-sdk-23.05.0-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz
 
 # install build tools
 RUN apt update
-RUN apt -y install wget make git automake build-essential autoconf openssl gzip libssl-dev zip xz-utils
+RUN apt -y install wget make git automake build-essential autoconf libtool patch pkg-config openssl gzip libssl-dev zip xz-utils
 
 RUN wget -O openwrt-sdk.tar.xz ${OPENWRT_SDK}
 RUN xz -q -d openwrt-sdk.tar.xz && tar -xvf openwrt-sdk.tar
@@ -13,13 +13,13 @@ RUN mv -f openwrt-sdk-* openwrt-sdk
 
 WORKDIR /app
 COPY . .
-
-RUN pwd && ls
+RUN rm -f go.work
 RUN /go/openwrt-sdk/staging_dir/toolchain-x86_64_gcc-12.3.0_musl/bin/x86_64-openwrt-linux-gcc -v
 
 ARG BUILD_ENV
 ARG VERSION
 
+ENV GOWORK=off
 ENV CC=/go/openwrt-sdk/staging_dir/toolchain-x86_64_gcc-12.3.0_musl/bin/x86_64-openwrt-linux-gcc
 ENV CXX=/go/openwrt-sdk/staging_dir/toolchain-x86_64_gcc-12.3.0_musl/bin/x86_64-openwrt-linux-g++
 ENV CGO_ENABLED=1 

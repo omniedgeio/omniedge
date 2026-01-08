@@ -2,8 +2,8 @@
 
 > Secure P2P mesh networking for AI devices, IoT, and edge computing
 
-[![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge-cli)](https://github.com/omniedgeio/omniedge/releases)
-[![License](https://img.shields.io/github/license/omniedgeio/omniedge-cli)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/releases)
+[![License](https://img.shields.io/github/license/omniedgeio/omniedge)](LICENSE)
 
 OmniEdge enables seamless connectivity between your devices across networks. Perfect for:
 - 🤖 **AI/ML Devices**: NVIDIA Jetson, AI edge computers
@@ -81,7 +81,16 @@ sudo omniedge join -n "your-network-id"
 
 ## Mobile Apps
 
-Coming soon...
+- [📱 iOS & M1 Mac](https://apps.apple.com/us/app/omniedgenew/id1603005893) - App Store
+- [🤖 Android](https://connect.omniedge.io/download/android) - APK Download
+
+## v1.0.1 Highlights
+
+- 🖥️ **Cross-platform Desktop App** - Windows, macOS, Linux with native GUI
+- � **Multiple Linux Packages** - DEB, RPM, AppImage, Flatpak, Arch
+- 🪟 **Windows Support** - NSIS installer with bundled TAP driver
+- ✨ **Native macOS `utun` support** - No third-party kernel extensions needed
+- 💓 **Real-time heartbeat** - Device online status visible in dashboard
 
 ## Documentation
 
