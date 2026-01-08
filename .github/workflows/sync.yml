@@ -44,7 +44,7 @@ jobs:
         id: subtree
         run: |
           git remote add cli-origin https://github.com/omniedgeio/omniedge-cli.git || true
-          git fetch cli-origin --tags
+          git fetch cli-origin --tags -f
           
           # Use version from dispatch if available, otherwise main
           SYNC_VERSION="main"
@@ -52,6 +52,13 @@ jobs:
             SYNC_VERSION="${{ github.event.client_payload.tag }}"
           elif [[ "${{ github.event_name }}" == "repository_dispatch" && "${{ github.event.action }}" == "meta-release" ]]; then
             SYNC_VERSION="${{ github.event.client_payload.version }}"
+          fi
+          
+          # Ignore legacy versions before v1.0.0
+          if [[ "$SYNC_VERSION" =~ ^v?[0]\..* ]]; then
+             echo "Ignoring legacy version $SYNC_VERSION"
+             echo "subtree_changes=false" >> $GITHUB_OUTPUT
+             exit 0
           fi
           
           echo "Syncing subtree with $SYNC_VERSION"

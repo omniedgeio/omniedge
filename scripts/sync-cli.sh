@@ -14,10 +14,16 @@ fi
 
 # Fetch tags and data
 echo "Fetching from $REMOTE_NAME..."
-git fetch "$REMOTE_NAME" --tags
+git fetch "$REMOTE_NAME" --tags -f
 
 # If a version is provided as an argument, use it; otherwise use BRANCH
 VERSION=${1:-$BRANCH}
+
+# Ignore legacy versions before v1.0.0
+if [[ "$VERSION" =~ ^v?[0]\..* ]]; then
+    echo "Ignoring legacy version $VERSION"
+    exit 0
+fi
 
 echo "Syncing $PREFIX with $VERSION from $REMOTE_NAME..."
 
