@@ -13,7 +13,7 @@ OmniEdge enables seamless connectivity between your devices across networks. Per
 
 ## Highlights
 
-- 🖥️ **Cross-platform Desktop App** - Windows, macOS, Linux with native GUI
+- 🖥️ **Cross-platform Desktop App** - Windows, macOS, Linux with system tray
 - 📦 **Multiple Linux Packages** - DEB, RPM, AppImage, Flatpak, Arch
 - 🪟 **Windows Support** - NSIS installer with bundled TAP driver
 - ✨ **Native macOS `utun` support** - No third-party kernel extensions needed
