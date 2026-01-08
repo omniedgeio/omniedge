@@ -1,0 +1,31 @@
+#Cross-compile for arm using OpenWrt SDK on x86_64 host
+FROM golang:1.21-bookworm
+
+# arm_cortex-a7_neon-vfpv4
+ARG OPENWRT_SDK=https://downloads.openwrt.org/releases/23.05.0/targets/ipq40xx/generic/openwrt-sdk-23.05.0-ipq40xx-generic_gcc-12.3.0_musl_eabi.Linux-x86_64.tar.xz
+
+# install build tools
+RUN apt update
+RUN apt -y install wget make git automake build-essential autoconf openssl gzip libssl-dev zip xz-utils
+
+RUN wget -O openwrt-sdk.tar.xz ${OPENWRT_SDK}
+RUN xz -q -d openwrt-sdk.tar.xz && tar -xvf openwrt-sdk.tar
+RUN mv -f openwrt-sdk-* openwrt-sdk
+
+WORKDIR /app
+COPY . .
+
+RUN pwd && ls
+RUN /go/openwrt-sdk/staging_dir/toolchain-arm_cortex-a7+neon-vfpv4_gcc-12.3.0_musl_eabi/bin/arm-openwrt-linux-gcc -v
+
+ARG BUILD_ENV
+ARG VERSION
+
+ENV CC=/go/openwrt-sdk/staging_dir/toolchain-arm_cortex-a7+neon-vfpv4_gcc-12.3.0_musl_eabi/bin/arm-openwrt-linux-gcc
+ENV CXX=/go/openwrt-sdk/staging_dir/toolchain-arm_cortex-a7+neon-vfpv4_gcc-12.3.0_musl_eabi/bin/arm-openwrt-linux-g++
+ENV CGO_ENABLED=1 
+ENV GOARCH=arm
+ENV CROSS_OPENWRT=openwrt
+RUN go generate ./...
+RUN VERSION=$VERSION BUILD_ENV=$BUILD_ENV make build
+RUN zip -j /app/out/omniedge.zip /app/out/omniedge

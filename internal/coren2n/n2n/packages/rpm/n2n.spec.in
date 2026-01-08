@@ -1,0 +1,98 @@
+Summary: n2n peer-to-peer VPN
+Name: n2n
+Version: @N2N_VERSION_SHORT@
+Release: @GIT_COMMITS@
+License: GPL
+Group: Networking/Utilities
+URL: http://www.ntop.org/
+Source: n2n-%{version}.tgz
+Packager: Luca Deri <deri@ntop.org>
+# Temporary location where the RPM will be built
+BuildRoot:  %{_tmppath}/%{name}-%{version}-root
+#Requires: ntopng
+
+%description
+n2n peer-to-peer VPN
+
+%prep
+
+%build
+
+mkdir -p $RPM_BUILD_ROOT/usr/sbin $RPM_BUILD_ROOT/usr/share/man/man1 $RPM_BUILD_ROOT/usr/share/man/man7 $RPM_BUILD_ROOT/usr/share/man/man8
+mkdir -p $RPM_BUILD_ROOT/etc/n2n
+mkdir -p $RPM_BUILD_ROOT/usr/lib/systemd/system/
+cp $HOME/n2n/edge $RPM_BUILD_ROOT/usr/sbin
+cp $HOME/n2n/supernode $RPM_BUILD_ROOT/usr/sbin
+cp $HOME/n2n/n2n.7.gz $RPM_BUILD_ROOT/usr/share/man/man7
+cp $HOME/n2n/supernode.1.gz $RPM_BUILD_ROOT/usr/share/man/man1
+cp $HOME/n2n/edge.8.gz $RPM_BUILD_ROOT/usr/share/man/man8
+cp $HOME/n2n/packages/etc/systemd/system/*.service $RPM_BUILD_ROOT/usr/lib/systemd/system/
+cp $HOME/n2n/packages/etc/n2n/*.conf.sample $RPM_BUILD_ROOT/etc/n2n
+
+find $RPM_BUILD_ROOT -name ".git" | xargs /bin/rm -rf
+find $RPM_BUILD_ROOT -name ".svn" | xargs /bin/rm -rf
+find $RPM_BUILD_ROOT -name "*~"   | xargs /bin/rm -f
+#
+DST=$RPM_BUILD_ROOT/usr/n2n
+SRC=$RPM_BUILD_DIR/%{name}-%{version}
+#mkdir -p $DST/conf
+# Clean out our build directory
+%clean
+rm -fr $RPM_BUILD_ROOT
+
+%files
+/usr/sbin/edge
+/usr/sbin/supernode
+/usr/share/man/man7/n2n.7.gz
+/usr/share/man/man1/supernode.1.gz
+/usr/share/man/man8/edge.8.gz
+/usr/lib/systemd/system/edge.service
+/usr/lib/systemd/system/edge@.service
+/usr/lib/systemd/system/edge-ntopng@.service
+/usr/lib/systemd/system/supernode.service
+%config(noreplace) /etc/n2n/supernode.conf.sample
+%config(noreplace) /etc/n2n/edge.conf.sample
+
+# Set the default attributes of all of the files specified to have an
+# owner and group of root and to inherit the permissions of the file
+# itself.
+%defattr(-, root, root)
+
+%changelog
+* Fri Aug 17 2018 Luca Deri <deri@ntop.org> 1.0
+- Current package version
+
+# Execution order:
+# install:    pre -> (copy) -> post
+# upgrade:    pre -> (copy) -> post -> preun (old) -> (delete old) -> postun (old)
+# un-install:                          preun       -> (delete)     -> postun
+
+%pre
+
+if ! grep -q n2n /etc/group; then
+  echo 'Creating n2n group'
+  /usr/sbin/groupadd -r n2n
+fi
+
+if ! /usr/bin/id -u n2n > /dev/null 2>&1; then
+  echo 'Creating n2n user'
+  /usr/sbin/useradd -M -N -g n2n -r -s /bin/false n2n
+fi
+
+%post
+if [ ! -f /.dockerenv ]; then
+    /bin/systemctl daemon-reload
+    # NOTE: do not enable any services during first installation
+fi
+
+%preun
+if [ ! -f /.dockerenv ]; then
+    # possibly remove the installed services
+    %systemd_preun supernode.service edge.service 'edge-ntopng@*.service' 'edge@*.service'
+fi
+
+%postun
+if [ ! -f /.dockerenv ]; then
+    # possibly restart the running services
+    %systemd_postun_with_restart supernode.service edge.service 'edge-ntopng@*.service' 'edge@*.service'
+fi

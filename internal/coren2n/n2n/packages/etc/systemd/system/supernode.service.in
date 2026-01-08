@@ -1,0 +1,16 @@
+[Unit]
+Description=n2n supernode process
+After=network-online.target syslog.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=n2n
+Group=n2n
+ExecStart=/usr/sbin/supernode /etc/n2n/supernode.conf -f
+Restart=on-abnormal
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+Alias=

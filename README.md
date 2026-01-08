@@ -1,91 +1,111 @@
-![OmniEdge](https://user-images.githubusercontent.com/93888/185755146-a79ad5d6-7901-4855-9efb-ae108dbdcdf6.png)
+# OmniEdge
 
-<div align="center">
-  <h1>OmniEdge</h1>
-  <p><strong>Secure Connectivity Fabric for AI Clusters, Humanoids, and Edge Computing</strong></p>
+> Secure P2P mesh networking for AI devices, IoT, and edge computing
 
-[![Website](https://img.shields.io/website?label=omniedge.io&url=https%3A%2F%2Fomniedge.io)](https://omniedge.io)
-[![Sync Status](https://github.com/omniedgeio/omniedge/workflows/sync/badge.svg)](https://github.com/omniedgeio/omniedge/actions)
-[![License](https://img.shields.io/github/license/omniedgeio/omniedge)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/releases)
-[![Docker](https://img.shields.io/docker/v/omniedge/omniedge?label=Docker)](https://hub.docker.com/r/omniedge/omniedge)
+[![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge-cli)](https://github.com/omniedgeio/omniedge-cli/releases)
+[![License](https://img.shields.io/github/license/omniedgeio/omniedge-cli)](LICENSE)
 
-  <br />
-  <a href="https://connect.omniedge.io/download">Download</a>
-  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="https://connect.omniedge.io/docs">Documentation</a>
-  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="https://discord.gg/FY6Yd6jcPu">Discord</a>
-  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="https://twitter.com/omniedgeio">Twitter</a>
-  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="https://buy.stripe.com/4gwcNy54x75RfCw5kw">Support Project</a>
-  <br />
-  <hr />
-</div>
+OmniEdge enables seamless connectivity between your devices across networks. Perfect for:
+- 🤖 **AI/ML Devices**: NVIDIA Jetson, AI edge computers
+- 🍓 **Raspberry Pi**: All models from Pi 3 to Pi 5
+- 📡 **OpenWrt Routers**: Mesh your network infrastructure
+- 🖥️ **Servers**: Linux, macOS, FreeBSD, Windows
 
+[🌐 Website](https://connect.omniedge.io) • [📚 Docs](https://connect.omniedge.io/docs) • [💬 Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
 
+## Quick Install
 
-## 🌟 The Nervous System for the Agentic Future
-
-OmniEdge is a next-generation decentralized networking platform designed to provide a secure, low-latency connectivity fabric for the agentic future. It transforms traditional VPN concepts into a **Secure Connectivity Fabric**, enabling seamless machine-to-machine communication for:
-
-- 🤖 **AI Clusters & Humanoids**: Low-latency P2P tunnels for real-time agent coordination.
-- 📡 **Edge Computing**: Securely mesh NVIDIA Jetson, Raspberry Pi, and industrial edge nodes.
-- 🏢 **Industrial IoT**: High-density fleet management with sub-millisecond overhead.
-- 💻 **Remote Teams**: Zero-config private networks for global collaboration.
-
-### Why OmniEdge?
-- **Decentralized P2P Mesh**: No central bottlenecks. What happens in the intranet, stays in the intranet.
-- **Zero-Config Onboarding**: Connect nodes in minutes with an encrypted mesh.
-- **Technical Observability**: Real-time status pulses and heartbeat tracking for robotics fleets.
-- **Fully Open Source**: Fully open source all clients.
-
----
-
-## 📁 Repository Ecosystem
-
-This is the **Meta-Repository** for OmniEdge, synchronizing all core components:
-
-| Component | Repository | Description |
-|-----------|------------|-------------|
-| **CLI** | [omniedge-cli](https://github.com/omniedgeio/omniedge-cli) | Core engine for Linux, macOS, FreeBSD, and Edge devices. |
-| **Android** | [omniedge-android](https://github.com/omniedgeio/omniedge-android) | Mobile & TV client for Android. |
-| **iOS/macOS** | [omniedge-iOS](https://github.com/omniedgeio/omniedge-iOS) / [omniedge-macOS](https://github.com/omniedgeio/omniedge-macOS) | Native Apple ecosystem clients (not ready yet). |
-| **Windows** | [omniedge-windows](https://github.com/omniedgeio/omniedge-windows) | Native Windows client (Qt). |
-| **Synology** | [omniedge-synology](https://github.com/omniedgeio/omniedge-synology) | NAS package for storage-centric edge nodes. |
-| **OpenWrt** | [omniedge-openwrt](https://github.com/omniedgeio/omniedge-openwrt) | Mesh networking for router infrastructure. |
-
----
-
-## 🚀 Quick Start in 5 Minutes
-
-1. **Sign Up**: Create your account on the [Dashboard](https://connect.omniedge.io/register).
-2. **Download**: Get the [OmniEdge Client](https://connect.omniedge.io/download) for your platform.
-3. **Connect**:
-   ```bash
-   # On CLI-based systems (Linux, macOS, FreeBSD)
-   curl https://connect.omniedge.io/install/omniedge-install.sh | bash
-   omniedge login -u your@email.com
-   sudo omniedge join
-   ```
-
-### Docker Usage
 ```bash
-sudo docker run -d \
-  -e OMNIEDGE_SECURITYKEY=YOUR_KEY \
-  -e OMNIEDGE_VIRTUALNETWORK_ID="YOUR_NETWORK_ID" \
-  --network host \
-  --privileged \
-  omniedge/omniedge:latest
+curl https://connect.omniedge.io/install/omniedge-install.sh | bash
 ```
 
+## Desktop Applications
 
-## 📝 Contributors & Advisors
+| Platform | Package | Download |
+|----------|---------|----------|
+| **Windows** | NSIS Installer | [omniedge-desktop-windows-amd64.exe](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **macOS** | DMG (Apple Silicon) | [omniedge-desktop-macos-arm64.dmg](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Linux** | DEB (Ubuntu/Debian) | [omniedge-desktop-linux-amd64.deb](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Linux** | RPM (Fedora/RHEL) | [omniedge-desktop-linux-amd64.rpm](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Linux** | AppImage (Universal) | [omniedge-desktop-linux-amd64.AppImage](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Linux** | Flatpak | [omniedge-desktop-linux-amd64.flatpak](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **Linux** | Arch (AUR) | [omniedge-desktop-linux-arch.tar.gz](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
 
-Special thanks to our [Advisors](https://connect.omniedge.io/docs/article/about) and the [Global Team](https://github.com/orgs/omniedgeio/people) across US, AU, CN, DE, MY, and CA.
+## CLI Binaries
+
+### Linux (Native)
+| Architecture | Devices | Download |
+|--------------|---------|----------|
+| **amd64** | Servers, NUCs, Mini PCs | [omniedge-amd64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **arm64** | NVIDIA Jetson, RPi 4/5, Apple Silicon | [omniedge-arm64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **arm** | Raspberry Pi 3, IoT Gateways | [omniedge-arm.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+
+### OpenWrt (Routers)
+| Architecture | Devices | Download |
+|--------------|---------|----------|
+| **amd64** | x86 Software Routers | [omniedge-openwrt-amd64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **arm64** | Modern ARM Routers | [omniedge-openwrt-arm64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **arm** | Qualcomm IPQ40xx | [omniedge-openwrt-arm.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **mips** | Legacy MIPS Routers | [omniedge-openwrt-mips.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **mipsle** | MediaTek Routers | [omniedge-openwrt-mipsle.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+
+### Other Platforms
+| Platform | Download |
+|----------|----------|
+| **macOS CLI** (Apple Silicon) | [omniedge-macos-arm64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **FreeBSD 14** | [omniedge-freebsd-14.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **RISC-V** | [omniedge-riscv64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+| **LoongArch** | [omniedge-loongarch64.zip](https://github.com/omniedgeio/omniedge-cli/releases/latest) |
+
+## Usage
+
+### Login
+
+```bash
+# Login with email
+omniedge login -u your@email.com
+
+# Login with API key (recommended for automation)
+omniedge login -s YOUR_SECRET_KEY
+```
+
+### Join Network
+
+```bash
+# Interactive mode - choose network from list
+sudo omniedge join
+
+# Direct mode - specify network ID
+sudo omniedge join -n "your-network-id"
+```
+
+## Mobile Apps
+
+- [📱 iOS & M1 Mac](https://apps.apple.com/us/app/omniedgenew/id1603005893) - App Store
+- [🤖 Android](https://connect.omniedge.io/download/android) - APK Download
+
+## v1.0.1 Highlights
+
+- 🖥️ **Cross-platform Desktop App** - Windows, macOS, Linux with native GUI
+- � **Multiple Linux Packages** - DEB, RPM, AppImage, Flatpak, Arch
+- 🪟 **Windows Support** - NSIS installer with bundled TAP driver
+- ✨ **Native macOS `utun` support** - No third-party kernel extensions needed
+- 💓 **Real-time heartbeat** - Device online status visible in dashboard
+
+## Documentation
+
+- [Architecture](https://connect.omniedge.io/docs/article/architecture)
+- [Installation Guide](https://connect.omniedge.io/docs/article/install)
+- [Use Cases](https://connect.omniedge.io/docs/article/cases)
+
+## Contributing
+
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
+
+## License
+
+[GPL-3.0](LICENSE)
+
+---
 
 Built with ❤️ by [OmniEdge](https://connect.omniedge.io)
-
-© 2026 OmniEdge Inc. All rights reserved.
-*Built by a global remote team.*

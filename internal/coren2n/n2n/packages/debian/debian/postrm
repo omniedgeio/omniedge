@@ -1,0 +1,11 @@
+#!/bin/sh -e
+
+set -e
+
+#case "$1" in
+#	purge|remove)
+#
+#	;;
+#esac
+
+exit 0

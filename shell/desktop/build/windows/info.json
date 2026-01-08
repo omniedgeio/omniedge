@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "1.0.1"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "1.0.1",
+			"CompanyName": "OmniEdge",
+			"FileDescription": "OmniEdge Client",
+			"LegalCopyright": "© 2026, OmniEdge",
+			"ProductName": "OmniEdge",
+			"Comments": "Secure peer-to-peer VPN"
+		}
+	}
+}
