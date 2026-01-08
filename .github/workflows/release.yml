@@ -401,13 +401,7 @@ jobs:
           brew install autoconf automake libtool coreutils
           make generate
           
-          # Build for Intel (amd64)
-          VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin-amd64
-          codesign -s - ./out/omniedge
-          zip -j ./omniedge-${{ github.ref_name }}-macos-amd64.zip ./out/omniedge
-          sha256sum ./omniedge-${{ github.ref_name }}-macos-amd64.zip > ./omniedge-${{ github.ref_name }}-macos-amd64.zip.sha256
-          
-          # Build for Apple Silicon (arm64)
+          # Build for Apple Silicon (arm64) - native on this runner
           VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin-arm64
           codesign -s - ./out/omniedge
           zip -j ./omniedge-${{ github.ref_name }}-macos-arm64.zip ./out/omniedge
