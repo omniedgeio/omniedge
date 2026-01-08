@@ -7,7 +7,7 @@ on:
   schedule:
     - cron: "0 */12 * * *"
   repository_dispatch:
-    types: [meta-release]
+    types: [meta-release, cli-sync]
   workflow_dispatch:
     inputs:
       version:
@@ -40,6 +40,29 @@ jobs:
             echo "changes=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Sync CLI Subtree
+        id: subtree
+        run: |
+          git remote add cli-origin https://github.com/omniedgeio/omniedge-cli.git || true
+          git fetch cli-origin --tags
+          
+          # Use version from dispatch if available, otherwise main
+          SYNC_VERSION="main"
+          if [[ "${{ github.event_name }}" == "repository_dispatch" && "${{ github.event.action }}" == "cli-sync" ]]; then
+            SYNC_VERSION="${{ github.event.client_payload.tag }}"
+          elif [[ "${{ github.event_name }}" == "repository_dispatch" && "${{ github.event.action }}" == "meta-release" ]]; then
+            SYNC_VERSION="${{ github.event.client_payload.version }}"
+          fi
+          
+          echo "Syncing subtree with $SYNC_VERSION"
+          git subtree pull --prefix=omniedge-cli cli-origin "$SYNC_VERSION" --squash -m "chore: sync omniedge-cli subtree to $SYNC_VERSION"
+          
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "subtree_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "subtree_changes=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Determine Version
         id: version
         run: |
@@ -51,13 +74,11 @@ jobs:
             echo "version=auto" >> $GITHUB_OUTPUT
           fi
 
-      - name: Commit and Push Submodule Updates
-        if: steps.update.outputs.changes == 'true'
+      - name: Commit and Push Updates
+        if: steps.update.outputs.changes == 'true' || steps.subtree.outputs.subtree_changes == 'true'
         run: |
           git config --local user.email "github-actions@omniedge.io"
           git config --local user.name "github-actions"
-          git add .
-          git commit -m "chore: sync submodules [${{ steps.version.outputs.version }}]"
           git push origin main
 
       - name: Create Unified Release
