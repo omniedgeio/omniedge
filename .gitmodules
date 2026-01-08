@@ -1,7 +1,3 @@
-[submodule "omniedge-cli"]
-	path = omniedge-cli
-	url = https://github.com/omniedgeio/omniedge-cli.git
-	branch = main
 [submodule "docker-customize-supernode"]
 	path = docker-customize-supernode
 	url = https://github.com/omniedgeio/docker-customize-supernode.git
