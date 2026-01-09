@@ -35,8 +35,8 @@ if [ "$openwrt" = 'openwrt' ]; then
     esac
 elif [ "$OS_V" = 'Darwin' ]; then
     # Apply utun patch for macOS (replaces tuntap with utun driver)
-    SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-    PATCH_FILE="$SCRIPT_DIR/../../patches/tuntap_osx_utun.c"
+    # Script runs from inside n2n directory: internal/coren2n/n2n/
+    PATCH_FILE="../../../patches/tuntap_osx_utun.c"
     if [ -f "$PATCH_FILE" ]; then
         echo "Applying macOS utun patch..."
         cp "$PATCH_FILE" tuntap_osx.c
