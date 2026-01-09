@@ -234,18 +234,17 @@ export function SetSystemTray(tray, connected, disconnected) {
 }
 
 /**
- * StartBrowserLogin initiates a browser-based login flow with PKCE
- * @returns {$CancellablePromise<$models.LoginResult>}
+ * StartBrowserLogin initiates a session-based browser login flow
+ * @returns {$CancellablePromise<$models.QRLoginResult>}
  */
 export function StartBrowserLogin() {
     return $Call.ByID(3180936177).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType7($result);
     }));
 }
 
 /**
  * StartQRLogin initiates a QR code login session
- * Returns session info for displaying QR code, then waits for mobile authentication
  * @returns {$CancellablePromise<$models.QRLoginResult>}
  */
 export function StartQRLogin() {

@@ -47,7 +47,18 @@ function App() {
             refreshConnectionInfo();
         });
 
-        // QR Login Listeners
+        // Login Listeners (Shared between QR and Browser)
+        Events.On("login-success", () => {
+            handleSuccessfulLogin();
+        });
+        Events.On("login-failed", (event) => {
+            setError("Login failed: " + event.data);
+            setIsQrMode(false);
+            setQrInfo(null);
+            setIsLoading(false);
+        });
+
+        // Legacy QR Login Listeners
         Events.On("qr-login-success", () => {
             handleSuccessfulLogin();
         });
@@ -76,13 +87,21 @@ function App() {
     }, []);
 
     const handleSuccessfulLogin = async () => {
-        const userProfile = await BridgeService.GetProfile();
-        setProfile(userProfile);
-        const nets = await BridgeService.GetNetworks();
-        setNetworks(nets || []);
-        setIsLoggedIn(true);
-        setIsQrMode(false);
-        setQrInfo(null);
+        setIsLoading(true);
+        try {
+            const userProfile = await BridgeService.GetProfile();
+            setProfile(userProfile);
+            const nets = await BridgeService.GetNetworks();
+            setNetworks(nets || []);
+            setIsLoggedIn(true);
+            setIsQrMode(false);
+            setQrInfo(null);
+        } catch (err) {
+            console.error("handleSuccessfulLogin failed:", err);
+            setError("Failed to load profile after login.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const refreshConnectionInfo = async () => {
@@ -114,14 +133,19 @@ function App() {
         try {
             const result = await BridgeService.StartBrowserLogin();
             if (result.success) {
-                handleSuccessfulLogin();
+                // We don't call handleSuccessfulLogin here yet, 
+                // we wait for the "login-success" event from the backend
+                setQrInfo(result.info);
+                setError("Please complete the login in your browser...");
+                setIsLoading(false);
             } else {
                 setError(result.message);
+                setIsLoading(false);
             }
         } catch (err) {
             setError("Browser login failed.");
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     const handleStartQrLogin = async () => {

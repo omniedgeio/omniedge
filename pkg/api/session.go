@@ -114,8 +114,10 @@ func (s *SessionService) ConnectAndWaitForToken(sessionID string, timeoutSeconds
 
 	conn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
+		log.Errorf("SessionService: Failed to connect to WebSocket %s: %v", wsURL, err)
 		return nil, fmt.Errorf("failed to connect to WebSocket: %w", err)
 	}
+	log.Infof("SessionService: Successfully connected to WebSocket %s", wsURL)
 	defer conn.Close()
 
 	// Set read deadline
@@ -162,14 +164,18 @@ func (s *SessionService) getWebSocketURL(sessionID string) string {
 		baseURL = "ws://" + strings.TrimPrefix(baseURL, "http://")
 	}
 
-	// Remove /api/v1 or /api/v2 suffix if present
 	parsed, err := url.Parse(baseURL)
 	if err == nil {
-		// The WebSocket endpoint is at /login/session/{id} at the root
-		parsed.Path = "/login/session/" + sessionID
+		// Keep the existing path (e.g. /api/v2) and append the login/session part
+		if !strings.HasSuffix(parsed.Path, "/") {
+			parsed.Path += "/"
+		}
+		parsed.Path += "login/session/" + sessionID
 		return parsed.String()
 	}
 
 	// Fallback: simple string replacement
-	return baseURL + "/login/session/" + sessionID
+	res := baseURL + "/login/session/" + sessionID
+	log.Debugf("getWebSocketURL result: %s", res)
+	return res
 }
