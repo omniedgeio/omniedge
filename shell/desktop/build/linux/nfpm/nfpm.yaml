@@ -28,10 +28,12 @@ contents:
   - src: "./build/linux/omniedge-helper.service"
     dst: "/usr/lib/systemd/system/omniedge-helper.service"
 
-# Default dependencies for Debian 12/Ubuntu 22.04+ with WebKit 4.1
+# Dependencies with alternatives for different Debian/Ubuntu versions
+# - Debian 12 / Ubuntu 22.04+: libwebkit2gtk-4.1-0
+# - Debian 11 / Ubuntu 20.04: libwebkit2gtk-4.0-37
 depends:
   - libgtk-3-0
-  - libwebkit2gtk-4.1-0
+  - libwebkit2gtk-4.1-0 | libwebkit2gtk-4.0-37
 
 # Distribution-specific overrides for different package formats and WebKit versions
 overrides:
