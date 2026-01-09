@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	api "github.com/omniedgeio/omniedge/pkg/api"
 	core "github.com/omniedgeio/omniedge/pkg/core"
@@ -26,11 +28,19 @@ var loginCmd = &cobra.Command{
 		password = viper.GetString(cliPassword)
 		secretKey = viper.GetString(cliSecretKey)
 		endpointUrl := core.ConfigV.GetString(RestEndpointUrl)
-		// login by username
+
+		httpOption := api.HttpOption{
+			BaseUrl: endpointUrl,
+		}
+		authService := api.AuthService{
+			HttpOption: httpOption,
+		}
+
 		var authResp *api.AuthResp
 		var err error
+
 		if username != "" {
-			if password = viper.GetString(cliPassword); password == "" {
+			if password == "" {
 				fmt.Print("Enter Password:")
 				bytePassword, err := terminal.ReadPassword(0)
 				if err != nil {
@@ -39,50 +49,83 @@ var loginCmd = &cobra.Command{
 				password = string(bytePassword)
 				fmt.Println()
 			}
-			httpOption := api.HttpOption{
-				BaseUrl: endpointUrl,
-			}
 			authOption := &api.AuthOption{
 				Username:   username,
 				Password:   password,
 				AuthMethod: api.LoginByPassword,
 			}
-			authService := api.AuthService{
-				HttpOption: httpOption,
-			}
 			authResp, err = authService.Login(authOption)
-		} else {
+		} else if secretKey != "" || os.Getenv(omniedgeSecretKey) != "" {
 			if secretKey == "" {
-				for _, e := range os.Environ() {
-					pair := strings.SplitN(e, "=", 2)
-					if omniedgeSecretKey == pair[0] {
-						secretKey = pair[1]
-					}
-				}
-			}
-			if secretKey == "" {
-				log.Errorf("Please input secret key or set system variable %s", omniedgeSecretKey)
-				return
-			}
-			httpOption := api.HttpOption{
-				BaseUrl: endpointUrl,
+				secretKey = os.Getenv(omniedgeSecretKey)
 			}
 			authOption := &api.AuthOption{
 				SecretKey:  secretKey,
 				AuthMethod: api.LoginBySecretKey,
 			}
-			authService := api.AuthService{
-				HttpOption: httpOption,
-			}
 			authResp, err = authService.Login(authOption)
+		} else {
+			// OAuth 2.0 Device Flow
+			fmt.Println("Initiating browser-based login...")
+			clientId := "omniedge-cli" // Default CLI client ID
+			deviceResp, err := authService.DeviceFlowInit(clientId, "openid profile email offline_access")
+			if err != nil {
+				log.Errorf("Failed to initiate login: %v", err)
+				return
+			}
+
+			fmt.Printf("\nPlease visit: %s\n", deviceResp.VerificationUri)
+			fmt.Printf("And enter the code: %s\n\n", deviceResp.UserCode)
+
+			// Try to open browser automatically
+			// open.Run(deviceResp.VerificationUriComplete)
+
+			fmt.Println("Waiting for authorization...")
+
+			interval := deviceResp.Interval
+			if interval <= 0 {
+				interval = 5
+			}
+
+			for {
+				authResp, err = authService.DeviceFlowToken(clientId, deviceResp.DeviceCode)
+				if err == nil {
+					break
+				}
+
+				errMsg := err.Error()
+				if strings.Contains(errMsg, "authorization_pending") {
+					// Keep polling
+				} else if strings.Contains(errMsg, "slow_down") {
+					interval += 5
+				} else {
+					log.Errorf("Login failed: %v", err)
+					return
+				}
+
+				time.Sleep(time.Duration(interval) * time.Second)
+			}
 		}
 		if err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
+
+		// Bridge for legacy code if needed (redundant now but safe)
+		if authResp.Token == "" && authResp.AccessToken != "" {
+			authResp.Token = authResp.AccessToken
+		}
+
 		viper.Set(cliSecretKey, "")
 		viper.Set(keyAuthResponse, authResp)
+		viper.Set(keyAuthResponseToken, authResp.Token)
+		viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
 		persistAuthFile()
+
+		// Securely save to keychain
+		authJSON, _ := json.Marshal(authResp)
+		_ = core.SaveSecureToken(string(authJSON))
+
 		log.Infof("successful to login")
 	},
 }
