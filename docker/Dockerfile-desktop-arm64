@@ -1,0 +1,48 @@
+# ARM64 Desktop Build Dockerfile
+# Pre-installs all dependencies for faster CI builds
+FROM arm64v8/golang:1.25-bookworm
+
+# Install build tools and desktop dependencies in a single layer
+RUN apt-get update && apt-get install -y \
+    wget make git autoconf automake build-essential libtool patch pkg-config \
+    libgtk-3-dev libwebkit2gtk-4.1-dev \
+    nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install nfpm for package building
+RUN go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+
+WORKDIR /app
+
+# Copy source code
+COPY . .
+
+# Remove go.work to avoid workspace conflicts
+RUN rm -f go.work go.work.sum
+
+# Set build environment
+ENV GOWORK=off
+ENV GOARCH=arm64
+ENV CGO_ENABLED=1
+ENV GOOS=linux
+
+# Build arguments
+ARG VERSION=1.0.0
+
+# Build n2n library
+RUN cd internal && go generate ./...
+
+# Build frontend
+RUN cd shell/desktop/frontend && npm install && npm run build
+
+# Build desktop app
+RUN cd shell/desktop && go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/OmniEdge
+
+# Build helper
+RUN go build -o shell/desktop/bin/omniedge-helper ./cmd/omniedge-helper
+
+# Build DEB package
+RUN cd shell/desktop && GOARCH=arm64 $(go env GOPATH)/bin/nfpm package -p deb -f build/linux/nfpm/nfpm.yaml -t bin/
+
+# Default command shows built files
+CMD ["ls", "-la", "/app/shell/desktop/bin/"]
