@@ -1,4 +1,22 @@
-# OmniEdge v1.0.0 Release Notes
+# OmniEdge Release Notes
+
+## v1.0.1 (2026-01-09)
+### 🚀 Desktop UI/UX Polish
+- **Refined Header**: Implemented the official OmniEdge logo and clean typography.
+- **Identity Status**: Added a visual status indicator (green dot) to the user profile chip for clear connection feedback.
+- **Active Network**: The currently connected virtual network is now clearly highlighted with a distinct background and indicator in the dashboard list.
+
+### 🐛 Bug Fixes
+- **Backend Stability**: Fixed a critical race condition (Error 1006) in the WebSocket service that caused login failures or "unexpected EOF" errors.
+- **Login Flow**: Improved robustness of the browser-based login mechanism.
+
+### 🔧 CI/CD Improvements
+- **macOS Build**: Release workflow now correctly targets Apple Silicon (arm64) for optimized performance on modern Macs.
+
+---
+
+## v1.0.0 (2026-01-08)
+Release Notes
 
 **Release Date:** January 8, 2026
 
