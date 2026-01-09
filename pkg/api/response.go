@@ -33,9 +33,15 @@ type ErrorResponse struct {
 	Code    int         `json:"-"`
 	Message string      `json:"message"`
 	Errors  interface{} `json:"errors"`
+	// OAuth error field for OAuth 2.0 error responses
+	OAuthError string `json:"error"`
 }
 
 func (err ErrorResponse) Error() string {
+	// Return OAuth error if message is empty (for OAuth endpoints)
+	if err.Message == "" && err.OAuthError != "" {
+		return err.OAuthError
+	}
 	return err.Message
 }
 
