@@ -34,6 +34,16 @@ if [ "$openwrt" = 'openwrt' ]; then
 			;;
     esac
 elif [ "$OS_V" = 'Darwin' ]; then
+    # Apply utun patch for macOS (replaces tuntap with utun driver)
+    SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+    PATCH_FILE="$SCRIPT_DIR/../../patches/tuntap_osx_utun.c"
+    if [ -f "$PATCH_FILE" ]; then
+        echo "Applying macOS utun patch..."
+        cp "$PATCH_FILE" tuntap_osx.c
+    else
+        echo "Warning: utun patch not found at $PATCH_FILE"
+    fi
+    
     case $arch in
         amd64)
             ./configure --host=x86_64-apple-darwin CC="clang -arch x86_64" CXX="clang++ -arch x86_64" CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -arch x86_64" LDFLAGS="-arch x86_64"
