@@ -9,7 +9,7 @@ set -e
 REPO="omniedgeio/omniedge"
 PKG_NAME="omniedge"
 BIN_DIR="/usr/local/bin"
-DEFAULT_VERSION="v1.0.0"
+DEFAULT_VERSION="latest"
 
 # Colors for output
 RED='\033[0;31m'
@@ -25,6 +25,7 @@ setup_env() {
 }
 
 # --- get latest version from GitHub API ---
+# --- get latest version from GitHub ---
 get_latest_version() {
     # If OMNIEDGE_VERSION is set in environment, use it
     if [ -n "$OMNIEDGE_VERSION" ]; then
@@ -34,15 +35,24 @@ get_latest_version() {
     fi
 
     info "Checking for latest version..."
+    
+    # Try fetching via redirect URL (more reliable without API limits)
     if command -v curl >/dev/null 2>&1; then
-        VERSION=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-    elif command -v wget >/dev/null 2>&1; then
-        VERSION=$(wget -qO- "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        VERSION_URL=$(curl -Ls -o /dev/null -w %{url_effective} "https://github.com/${REPO}/releases/latest")
+        VERSION=$(echo "$VERSION_URL" | sed 's:.*/tag/::')
+    fi
+
+    # Fallback to API if redirect failed or returned empty/wrong content
+    if [ -z "$VERSION" ] || [ "$VERSION" = "latest" ]; then
+        if command -v curl >/dev/null 2>&1; then
+            VERSION=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        elif command -v wget >/dev/null 2>&1; then
+            VERSION=$(wget -qO- "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        fi
     fi
     
-    if [ -z "$VERSION" ]; then
-        VERSION="$DEFAULT_VERSION"
-        warn "Failed to get latest version from GitHub API, falling back to ${VERSION}"
+    if [ -z "$VERSION" ] || [ "$VERSION" = "latest" ]; then
+        fatal "Failed to get latest version from GitHub."
     else
         info "Latest version: ${VERSION}"
     fi
