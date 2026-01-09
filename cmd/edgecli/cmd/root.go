@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
+	api "github.com/omniedgeio/omniedge/pkg/api"
 	core "github.com/omniedgeio/omniedge/pkg/core"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -38,6 +40,21 @@ func bindFlags(cmd *cobra.Command) {
 }
 
 func loadAuthFile() error {
+	// Try loading from secure keychain first
+	if secureData, err := core.LoadSecureToken(); err == nil && secureData != "" {
+		var authResp api.AuthResp
+		if err := json.Unmarshal([]byte(secureData), &authResp); err == nil {
+			// Bridge legacy Token field if needed
+			if authResp.Token == "" && authResp.AccessToken != "" {
+				authResp.Token = authResp.AccessToken
+			}
+			viper.Set(keyAuthResponse, authResp)
+			viper.Set(keyAuthResponseToken, authResp.Token)
+			viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
+			return nil
+		}
+	}
+
 	var authFile = viper.GetString(cliAuthConfigFile)
 	if authFile == "" {
 		authFile = Option.AuthFileDefaultPath
