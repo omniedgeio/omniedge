@@ -12,5 +12,7 @@ RUN rm -f go.work
 
 ENV GOWORK=off
 ENV GOARCH=amd64
+ARG VERSION
+ARG BUILD_ENV=prod
 RUN go generate ./...
 RUN VERSION=$VERSION BUILD_ENV=$BUILD_ENV make build

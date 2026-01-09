@@ -11,5 +11,7 @@ COPY . .
 RUN rm -f go.work
 ENV GOWORK=off
 ENV GOARCH=s390x
+ARG VERSION
+ARG BUILD_ENV=prod
 RUN go generate ./...
-RUN BUILD_ENV=$BUILD_ENV make build
+RUN VERSION=$VERSION BUILD_ENV=$BUILD_ENV make build
