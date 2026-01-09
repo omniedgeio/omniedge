@@ -23,6 +23,14 @@ import * as application$0 from "../github.com/wailsapp/wails/v3/pkg/application/
 import * as $models from "./models.js";
 
 /**
+ * CancelQRLogin cancels any pending QR login session
+ * @returns {$CancellablePromise<void>}
+ */
+export function CancelQRLogin() {
+    return $Call.ByID(3806357862);
+}
+
+/**
  * CheckExistingConnection checks if there's an existing VPN connection
  * @returns {$CancellablePromise<void>}
  */
@@ -226,6 +234,27 @@ export function SetSystemTray(tray, connected, disconnected) {
 }
 
 /**
+ * StartBrowserLogin initiates a browser-based login flow with PKCE
+ * @returns {$CancellablePromise<$models.LoginResult>}
+ */
+export function StartBrowserLogin() {
+    return $Call.ByID(3180936177).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType6($result);
+    }));
+}
+
+/**
+ * StartQRLogin initiates a QR code login session
+ * Returns session info for displaying QR code, then waits for mobile authentication
+ * @returns {$CancellablePromise<$models.QRLoginResult>}
+ */
+export function StartQRLogin() {
+    return $Call.ByID(1000135308).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType7($result);
+    }));
+}
+
+/**
  * TryAutoLogin attempts to restore session from saved tokens
  * @returns {$CancellablePromise<$models.LoginResult>}
  */
@@ -243,3 +272,4 @@ const $$createType3 = $Create.Array($$createType2);
 const $$createType4 = api$0.ProfileResponse.createFrom;
 const $$createType5 = $Create.Nullable($$createType4);
 const $$createType6 = $models.LoginResult.createFrom;
+const $$createType7 = $models.QRLoginResult.createFrom;

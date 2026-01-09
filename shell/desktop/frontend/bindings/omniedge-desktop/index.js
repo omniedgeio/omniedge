@@ -10,5 +10,7 @@ export {
 export {
     DeviceWithNetwork,
     LoginResult,
-    NetworkInfo
+    NetworkInfo,
+    QRLoginInfo,
+    QRLoginResult
 } from "./models.js";

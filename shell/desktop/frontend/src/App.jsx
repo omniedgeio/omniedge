@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import { Events, Browser } from "@wailsio/runtime";
 import * as BridgeService from "../bindings/omniedge-desktop/bridgeservice.js";
+import { QRCodeSVG } from 'qrcode.react';
 
 function App() {
     const [status, setStatus] = useState('disconnected');
@@ -11,13 +12,15 @@ function App() {
     const [networks, setNetworks] = useState([]);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [profile, setProfile] = useState(null);
-    const [logo, setLogo] = useState('');
+    const [logo, setLogo] = useState(''); // logo not currently used in the render?
     const [securityKey, setSecurityKey] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true); // Start loading while checking auto-login
     const [activeNetwork, setActiveNetwork] = useState(null);
     const [expandedNetworks, setExpandedNetworks] = useState({});
     const [networkDevices, setNetworkDevices] = useState({});
+    const [qrInfo, setQrInfo] = useState(null);
+    const [isQrMode, setIsQrMode] = useState(false);
     const appRef = useRef(null);
 
     // Resize window to fit content
@@ -32,7 +35,7 @@ function App() {
     useEffect(() => {
         const timer = setTimeout(resizeToContent, 100); // Delay to ensure render
         return () => clearTimeout(timer);
-    }, [isLoggedIn, networks, expandedNetworks, isLoading, resizeToContent]);
+    }, [isLoggedIn, networks, expandedNetworks, isLoading, resizeToContent, isQrMode]);
 
     useEffect(() => {
         BridgeService.GetLogos().then(setLogo);
@@ -44,6 +47,18 @@ function App() {
             refreshConnectionInfo();
         });
 
+        // QR Login Listeners
+        Events.On("qr-login-success", () => {
+            handleSuccessfulLogin();
+        });
+
+        Events.On("qr-login-failed", (event) => {
+            setError("QR Login failed: " + event.data);
+            setIsQrMode(false);
+            setQrInfo(null);
+            setIsLoading(false);
+        });
+
         BridgeService.GetStatus().then(currStatus => {
             setStatus(currStatus);
             refreshConnectionInfo();
@@ -52,13 +67,7 @@ function App() {
         // Try auto-login using saved tokens (Keychain)
         BridgeService.TryAutoLogin().then(result => {
             if (result.success) {
-                BridgeService.GetProfile().then(p => {
-                    if (p && p.name) {
-                        setProfile(p);
-                        setIsLoggedIn(true);
-                        BridgeService.GetNetworks().then(setNetworks);
-                    }
-                });
+                handleSuccessfulLogin();
             }
             setIsLoading(false);
         }).catch(() => {
@@ -66,11 +75,20 @@ function App() {
         });
     }, []);
 
+    const handleSuccessfulLogin = async () => {
+        const userProfile = await BridgeService.GetProfile();
+        setProfile(userProfile);
+        const nets = await BridgeService.GetNetworks();
+        setNetworks(nets || []);
+        setIsLoggedIn(true);
+        setIsQrMode(false);
+        setQrInfo(null);
+    };
+
     const refreshConnectionInfo = async () => {
         const vIP = await BridgeService.GetVirtualIP();
         setVirtualIP(vIP);
         const netName = await BridgeService.GetConnectedNetworkName();
-        console.log('refreshConnectionInfo - networkName:', netName, 'virtualIP:', vIP);
         setNetworkName(netName);
     };
 
@@ -80,11 +98,7 @@ function App() {
         try {
             const result = await BridgeService.Login(securityKey);
             if (result.success) {
-                const userProfile = await BridgeService.GetProfile();
-                setProfile(userProfile);
-                const nets = await BridgeService.GetNetworks();
-                setNetworks(nets || []);
-                setIsLoggedIn(true);
+                handleSuccessfulLogin();
             } else {
                 setError(result.message);
             }
@@ -94,11 +108,50 @@ function App() {
         setIsLoading(false);
     };
 
+    const handleBrowserLogin = async () => {
+        setIsLoading(true);
+        setError('');
+        try {
+            const result = await BridgeService.StartBrowserLogin();
+            if (result.success) {
+                handleSuccessfulLogin();
+            } else {
+                setError(result.message);
+            }
+        } catch (err) {
+            setError("Browser login failed.");
+        }
+        setIsLoading(false);
+    };
+
+    const handleStartQrLogin = async () => {
+        setIsLoading(true);
+        setError('');
+        try {
+            const result = await BridgeService.StartQRLogin();
+            if (result.success) {
+                setQrInfo(result.info);
+                setIsQrMode(true);
+            } else {
+                setError(result.message);
+            }
+        } catch (err) {
+            setError("Failed to start QR login");
+        }
+        setIsLoading(false);
+    };
+
+    const handleCancelQrLogin = () => {
+        BridgeService.CancelQRLogin();
+        setIsQrMode(false);
+        setQrInfo(null);
+    };
+
     const handleLogout = () => {
         setIsLoggedIn(false);
         setProfile(null);
         setNetworks([]);
-        // Ideally call a backend logout to clear token
+        BridgeService.ClearTokens();
     };
 
     const handleConnect = async (networkId) => {
@@ -129,9 +182,7 @@ function App() {
         // Always fetch devices when expanding to ensure status is synchronized
         if (!isExpanded) {
             try {
-                console.log('toggleNetworkExpand - fetching devices for networkId:', networkId);
                 const devs = await BridgeService.GetNetworkDevices(networkId);
-                console.log('toggleNetworkExpand - received devices:', devs);
                 setNetworkDevices(prev => ({ ...prev, [networkId]: devs || [] }));
             } catch (err) {
                 console.error('toggleNetworkExpand - error:', err);
@@ -167,18 +218,39 @@ function App() {
                 <div className="login-view">
                     <div style={{ fontSize: 24, color: '#007AFF', marginBottom: 16 }}>⬡</div>
                     <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>OmniEdge</h2>
-                    <p style={{ marginBottom: 20, fontSize: 12, opacity: 0.6 }}>Log in to your mesh network</p>
-                    <input
-                        type="password"
-                        placeholder="Security Key"
-                        className="security-input"
-                        value={securityKey}
-                        onChange={(e) => setSecurityKey(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                    />
-                    <button className="btn-primary" style={{ cursor: 'pointer' }} onClick={handleLogin}>
-                        {isLoading ? 'Connecting...' : 'Log in'}
-                    </button>
+
+                    {!isQrMode ? (
+                        <>
+                            <p style={{ marginBottom: 20, fontSize: 12, opacity: 0.6 }}>Log in to your mesh network</p>
+                            <input
+                                type="password"
+                                placeholder="Security Key"
+                                className="security-input"
+                                value={securityKey}
+                                onChange={(e) => setSecurityKey(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                            />
+                            <button className="btn-primary" style={{ cursor: 'pointer' }} onClick={handleLogin}>
+                                {isLoading ? 'Connecting...' : 'Log in'}
+                            </button>
+                            <div style={{ marginTop: 12 }}>
+                                <button className="btn-primary" style={{ cursor: 'pointer' }} onClick={handleBrowserLogin}>
+                                    Log in with Browser
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="qr-container" style={{ textAlign: 'center' }}>
+                            <p style={{ marginBottom: 16, fontSize: 12, opacity: 0.6 }}>Scan with OmniEdge Mobile App</p>
+                            <div style={{ background: 'white', padding: 12, borderRadius: 8, display: 'inline-block', marginBottom: 16 }}>
+                                {qrInfo && <QRCodeSVG value={qrInfo.qr_data} size={150} />}
+                            </div>
+                            <button className="btn-secondary" style={{ width: '100%', cursor: 'pointer' }} onClick={handleCancelQrLogin}>
+                                Cancel
+                            </button>
+                        </div>
+                    )}
+
                     {error && <div className="error-text" style={{ marginTop: 10 }}>{error}</div>}
                 </div>
                 <div className="divider"></div>
@@ -284,15 +356,6 @@ function App() {
                                                     </div>
                                                 </div>
                                             ))}
-
-                                            {/* Mock visual purely for design parity if list is long */}
-                                            {dev.name === 'GL-MIFI' && (
-                                                <div className="center-text" style={{ padding: '4px 0', opacity: 0.6 }}>
-                                                    <svg width="20" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                        <path d="M7 13l5 5 5-5M7 6l5 5 5-5" />
-                                                    </svg>
-                                                </div>
-                                            )}
                                         </div>
                                     ))}
                                     {(!networkDevices[net.id] || networkDevices[net.id].length === 0) && (

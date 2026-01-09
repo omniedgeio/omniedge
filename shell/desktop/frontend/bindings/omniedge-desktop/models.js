@@ -156,3 +156,109 @@ export class NetworkInfo {
         return new NetworkInfo(/** @type {Partial<NetworkInfo>} */($$parsedSource));
     }
 }
+
+/**
+ * QRLoginInfo contains information for QR code login display
+ */
+export class QRLoginInfo {
+    /**
+     * Creates a new QRLoginInfo instance.
+     * @param {Partial<QRLoginInfo>} [$$source = {}] - The source object to create the QRLoginInfo.
+     */
+    constructor($$source = {}) {
+        if (!("session_id" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["session_id"] = "";
+        }
+        if (!("auth_url" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["auth_url"] = "";
+        }
+        if (!("qr_data" in $$source)) {
+            /**
+             * URL to encode in QR code
+             * @member
+             * @type {string}
+             */
+            this["qr_data"] = "";
+        }
+        if (!("expires_at" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["expires_at"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new QRLoginInfo instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {QRLoginInfo}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new QRLoginInfo(/** @type {Partial<QRLoginInfo>} */($$parsedSource));
+    }
+}
+
+/**
+ * QRLoginResult represents the result of a QR login attempt
+ */
+export class QRLoginResult {
+    /**
+     * Creates a new QRLoginResult instance.
+     * @param {Partial<QRLoginResult>} [$$source = {}] - The source object to create the QRLoginResult.
+     */
+    constructor($$source = {}) {
+        if (!("success" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["success"] = false;
+        }
+        if (!("message" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["message"] = "";
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {QRLoginInfo | null | undefined}
+             */
+            this["info"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new QRLoginResult instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {QRLoginResult}
+     */
+    static createFrom($$source = {}) {
+        const $$createField2_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("info" in $$parsedSource) {
+            $$parsedSource["info"] = $$createField2_0($$parsedSource["info"]);
+        }
+        return new QRLoginResult(/** @type {Partial<QRLoginResult>} */($$parsedSource));
+    }
+}
+
+// Private type creation functions
+const $$createType0 = QRLoginInfo.createFrom;
+const $$createType1 = $Create.Nullable($$createType0);

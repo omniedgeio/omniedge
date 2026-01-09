@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +21,7 @@ import (
 	"github.com/omniedgeio/omniedge/pkg/bridge"
 	"github.com/omniedgeio/omniedge/pkg/core"
 	log "github.com/sirupsen/logrus"
+	"github.com/skratchdot/open-golang/open"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -279,6 +283,234 @@ func (b *BridgeService) Login(securityKey string) LoginResult {
 	b.CheckExistingConnection()
 
 	return LoginResult{Success: true, Message: "Login successful"}
+}
+
+// StartBrowserLogin initiates a browser-based login flow with PKCE
+func (b *BridgeService) StartBrowserLogin() LoginResult {
+	pkce, err := api.GeneratePKCE()
+	if err != nil {
+		log.Errorf("StartBrowserLogin: PKCE generation failed: %v", err)
+		return LoginResult{Success: false, Message: "failed to generate PKCE"}
+	}
+
+	// 1. Setup loopback server on a random port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		log.Errorf("StartBrowserLogin: listener failed: %v", err)
+		return LoginResult{Success: false, Message: "failed to start loopback listener"}
+	}
+	defer listener.Close()
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
+
+	authCodeChan := make(chan string)
+	errorChan := make(chan error)
+
+	server := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/callback" {
+				http.NotFound(w, r)
+				return
+			}
+
+			// Capture code and state
+			query := r.URL.Query()
+			code := query.Get("code")
+			returnedState := query.Get("state")
+
+			if returnedState != pkce.State {
+				fmt.Fprintf(w, "<html><body><h2>Error: State mismatch.</h2><p>Please try again.</p></body></html>")
+				errorChan <- fmt.Errorf("state mismatch")
+				return
+			}
+
+			if code == "" {
+				fmt.Fprintf(w, "<html><body><h2>Error: No code received.</h2></body></html>")
+				errorChan <- fmt.Errorf("no code received")
+				return
+			}
+
+			fmt.Fprintf(w, "<html><body><h2>Login successful!</h2><p>You can close this window and return to OmniEdge.</p></body></html>")
+			authCodeChan <- code
+		}),
+	}
+
+	go func() {
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			errorChan <- err
+		}
+	}()
+	defer server.Shutdown(context.Background())
+
+	// 2. Launch system browser
+	authURL := fmt.Sprintf("%s/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s&code_challenge=%s&code_challenge_method=S256",
+		b.baseURL, "omniedge-desktop", url.QueryEscape(redirectURI), url.QueryEscape("openid profile email offline_access"), pkce.State, pkce.Challenge)
+
+	log.Infof("StartBrowserLogin: launching browser with URL: %s", authURL)
+	if err := open.Run(authURL); err != nil {
+		log.Errorf("StartBrowserLogin: failed to open browser: %v", err)
+		return LoginResult{Success: false, Message: "failed to open browser"}
+	}
+
+	// 3. Wait for code or error
+	var authCode string
+	select {
+	case authCode = <-authCodeChan:
+		log.Infof("StartBrowserLogin: successfully received auth code")
+	case err := <-errorChan:
+		log.Errorf("StartBrowserLogin: flow failed: %v", err)
+		return LoginResult{Success: false, Message: err.Error()}
+	case <-time.After(5 * time.Minute):
+		log.Warn("StartBrowserLogin: timed out after 5 minutes")
+		return LoginResult{Success: false, Message: "login timed out"}
+	}
+
+	// 4. Exchange auth code for tokens
+	authService := api.AuthService{
+		HttpOption: api.HttpOption{BaseUrl: b.baseURL},
+	}
+	resp, err := authService.GetTokenByAuthCode("omniedge-desktop", authCode, pkce.Verifier, redirectURI)
+	if err != nil {
+		log.Errorf("StartBrowserLogin: token exchange failed: %v", err)
+		return LoginResult{Success: false, Message: err.Error()}
+	}
+
+	// 5. Update and save tokens
+	b.mu.Lock()
+	b.token = "Bearer " + resp.Token
+	b.refreshToken = resp.RefreshToken
+	b.mu.Unlock()
+
+	log.Infof("StartBrowserLogin successful. Saving tokens.")
+	b.SaveTokens()
+
+	// Securely save to keychain as well
+	authJSON, _ := json.Marshal(resp)
+	_ = core.SaveSecureToken(string(authJSON))
+
+	// Check for existing connection
+	b.CheckExistingConnection()
+
+	return LoginResult{Success: true, Message: "Login successful"}
+}
+
+// QRLoginInfo contains information for QR code login display
+type QRLoginInfo struct {
+	SessionID string `json:"session_id"`
+	AuthURL   string `json:"auth_url"`
+	QRData    string `json:"qr_data"` // URL to encode in QR code
+	ExpiresAt string `json:"expires_at"`
+}
+
+// QRLoginResult represents the result of a QR login attempt
+type QRLoginResult struct {
+	Success bool         `json:"success"`
+	Message string       `json:"message"`
+	Info    *QRLoginInfo `json:"info,omitempty"`
+}
+
+// qrLoginCancel is used to cancel pending QR login
+var qrLoginCancel chan bool
+
+// StartQRLogin initiates a QR code login session
+// Returns session info for displaying QR code, then waits for mobile authentication
+func (b *BridgeService) StartQRLogin() QRLoginResult {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// Cancel any existing QR login session
+	if qrLoginCancel != nil {
+		close(qrLoginCancel)
+		qrLoginCancel = nil
+	}
+
+	sessionService := api.SessionService{
+		HttpOption: api.HttpOption{
+			BaseUrl: b.baseURL,
+		},
+	}
+
+	// Generate a new session
+	session, err := sessionService.GenerateSession()
+	if err != nil {
+		log.Errorf("BridgeService.StartQRLogin: Failed to generate session: %v", err)
+		return QRLoginResult{Success: false, Message: err.Error()}
+	}
+
+	log.Infof("BridgeService.StartQRLogin: Session created: %s", session.ID)
+
+	// Create cancel channel for this session
+	qrLoginCancel = make(chan bool)
+	cancelChan := qrLoginCancel
+
+	// Start WebSocket listener in background
+	go func() {
+		defer func() {
+			b.mu.Lock()
+			if qrLoginCancel == cancelChan {
+				qrLoginCancel = nil
+			}
+			b.mu.Unlock()
+		}()
+
+		// Wait for tokens via WebSocket (15 minutes timeout to match session expiry)
+		tokenResp, err := sessionService.ConnectAndWaitForToken(session.ID, 900)
+
+		select {
+		case <-cancelChan:
+			log.Info("BridgeService.StartQRLogin: QR login cancelled")
+			return
+		default:
+		}
+
+		if err != nil {
+			log.Warnf("BridgeService.StartQRLogin: WebSocket error: %v", err)
+			if b.app != nil {
+				b.app.Event.Emit("qr-login-failed", err.Error())
+			}
+			return
+		}
+
+		// Successfully received tokens
+		b.token = "Bearer " + tokenResp.Token
+		b.refreshToken = tokenResp.RefreshToken
+		log.Info("BridgeService.StartQRLogin: Login successful via QR")
+
+		// Save tokens
+		b.SaveTokens()
+
+		// Check for existing connection
+		b.CheckExistingConnection()
+
+		// Notify frontend
+		if b.app != nil {
+			b.app.Event.Emit("qr-login-success", "Login successful")
+		}
+	}()
+
+	return QRLoginResult{
+		Success: true,
+		Message: "QR login session started",
+		Info: &QRLoginInfo{
+			SessionID: session.ID,
+			AuthURL:   session.AuthURL,
+			QRData:    session.AuthURL,
+			ExpiresAt: session.ExpiredAt.Format("2006-01-02T15:04:05Z07:00"),
+		},
+	}
+}
+
+// CancelQRLogin cancels any pending QR login session
+func (b *BridgeService) CancelQRLogin() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if qrLoginCancel != nil {
+		log.Info("BridgeService.CancelQRLogin: Cancelling QR login")
+		close(qrLoginCancel)
+		qrLoginCancel = nil
+	}
 }
 
 // SaveTokens persists auth tokens to a file
