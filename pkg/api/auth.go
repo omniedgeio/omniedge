@@ -13,6 +13,18 @@ import (
 type AuthResp struct {
 	Token        string `json:"token"`
 	RefreshToken string `json:"refreshToken"`
+	AccessToken  string `json:"access_token"`
+	IdToken      string `json:"id_token"`
+	ExpiresIn    int    `json:"expires_in"`
+}
+
+type DeviceCodeResp struct {
+	DeviceCode              string `json:"device_code"`
+	UserCode                string `json:"user_code"`
+	VerificationUri         string `json:"verification_uri"`
+	VerificationUriComplete string `json:"verification_uri_complete"`
+	ExpiresIn               int    `json:"expires_in"`
+	Interval                int    `json:"interval"`
 }
 
 type AuthMethod string
@@ -119,5 +131,95 @@ func (s *AuthService) Me() (*ProfileResponse, error) {
 		return nil, fmt.Errorf("Fail to get profile, error message: %s", resp.Message)
 	default:
 		return nil, fmt.Errorf("Internal error during profile fetch")
+	}
+}
+
+func (s *AuthService) DeviceFlowInit(clientId string, scope string) (*DeviceCodeResp, error) {
+	url := s.BaseUrl + "/oauth/device/code"
+	body := map[string]string{
+		"client_id": clientId,
+		"scope":     scope,
+	}
+	postBody, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
+	req.Header.Set("content-type", "application/json")
+	resp, _ := HandleCall(req)
+
+	switch resp := resp.(type) {
+	case *SuccessResponse:
+		dataJson, _ := json.Marshal(resp.Data)
+		deviceCode := DeviceCodeResp{}
+		if err := json.Unmarshal(dataJson, &deviceCode); err != nil {
+			return nil, err
+		}
+		return &deviceCode, nil
+	case *ErrorResponse:
+		return nil, errors.New(resp.Error())
+	default:
+		return nil, errors.New("unexpected response")
+	}
+}
+
+func (s *AuthService) DeviceFlowToken(clientId string, deviceCode string) (*AuthResp, error) {
+	url := s.BaseUrl + "/oauth/token"
+	body := map[string]string{
+		"client_id":   clientId,
+		"device_code": deviceCode,
+		"grant_type":  "urn:ietf:params:oauth:grant-type:device_code",
+	}
+	postBody, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
+	req.Header.Set("content-type", "application/json")
+	resp, _ := HandleCall(req)
+
+	switch resp := resp.(type) {
+	case *SuccessResponse:
+		authJson, _ := json.Marshal(resp.Data)
+		auth := AuthResp{}
+		if err := json.Unmarshal(authJson, &auth); err != nil {
+			return nil, err
+		}
+		// Bridge legacy Token field if necessary
+		if auth.Token == "" && auth.AccessToken != "" {
+			auth.Token = auth.AccessToken
+		}
+		return &auth, nil
+	case *ErrorResponse:
+		return nil, errors.New(resp.Error())
+	default:
+		return nil, errors.New("unexpected response")
+	}
+}
+
+func (s *AuthService) GetTokenByAuthCode(clientId string, code string, verifier string, redirectUri string) (*AuthResp, error) {
+	url := s.BaseUrl + "/oauth/token"
+	body := map[string]string{
+		"client_id":     clientId,
+		"code":          code,
+		"code_verifier": verifier,
+		"redirect_uri":  redirectUri,
+		"grant_type":    "authorization_code",
+	}
+	postBody, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
+	req.Header.Set("content-type", "application/json")
+	resp, _ := HandleCall(req)
+
+	switch resp := resp.(type) {
+	case *SuccessResponse:
+		authJson, _ := json.Marshal(resp.Data)
+		auth := AuthResp{}
+		if err := json.Unmarshal(authJson, &auth); err != nil {
+			return nil, err
+		}
+		// Bridge legacy Token field if necessary
+		if auth.Token == "" && auth.AccessToken != "" {
+			auth.Token = auth.AccessToken
+		}
+		return &auth, nil
+	case *ErrorResponse:
+		return nil, errors.New(resp.Error())
+	default:
+		return nil, errors.New("unexpected response")
 	}
 }
