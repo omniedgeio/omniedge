@@ -349,8 +349,6 @@ jobs:
             arch: amd64
           - platform: ubuntu-24.04
             arch: amd64
-          - platform: macos-13
-            arch: amd64
           - platform: macos-14
             arch: arm64
     runs-on: ${{ matrix.platform }}
@@ -401,13 +399,7 @@ jobs:
         if: startsWith(matrix.platform, 'macos')
         run: |
           brew install autoconf automake libtool coreutils
-          
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin-arm64
-          else
-            VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin-amd64
-          fi
-          
+          VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin-arm64
           codesign -s - ./out/omniedge
           zip -j ./omniedge-${{ github.ref_name }}-macos-${{ matrix.arch }}.zip ./out/omniedge
           sha256sum ./omniedge-${{ github.ref_name }}-macos-${{ matrix.arch }}.zip > ./omniedge-${{ github.ref_name }}-macos-${{ matrix.arch }}.zip.sha256
