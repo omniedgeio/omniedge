@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import { Events, Browser } from "@wailsio/runtime";
 import * as BridgeService from "../bindings/omniedge-desktop/bridgeservice.js";
-import { QRCodeSVG } from 'qrcode.react';
+import logo from './assets/images/logo-universal.png';
 
 function App() {
     const [status, setStatus] = useState('disconnected');
@@ -12,15 +12,12 @@ function App() {
     const [networks, setNetworks] = useState([]);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [profile, setProfile] = useState(null);
-    const [logo, setLogo] = useState(''); // logo not currently used in the render?
-    const [securityKey, setSecurityKey] = useState('');
     const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(true); // Start loading while checking auto-login
+    const [isLoading, setIsLoading] = useState(true);
     const [activeNetwork, setActiveNetwork] = useState(null);
     const [expandedNetworks, setExpandedNetworks] = useState({});
     const [networkDevices, setNetworkDevices] = useState({});
-    const [qrInfo, setQrInfo] = useState(null);
-    const [isQrMode, setIsQrMode] = useState(false);
+    const [isWaitingForBrowser, setIsWaitingForBrowser] = useState(false);
     const appRef = useRef(null);
 
     // Resize window to fit content
@@ -35,10 +32,9 @@ function App() {
     useEffect(() => {
         const timer = setTimeout(resizeToContent, 100); // Delay to ensure render
         return () => clearTimeout(timer);
-    }, [isLoggedIn, networks, expandedNetworks, isLoading, resizeToContent, isQrMode]);
+    }, [isLoggedIn, networks, expandedNetworks, isLoading, resizeToContent, isWaitingForBrowser]);
 
     useEffect(() => {
-        BridgeService.GetLogos().then(setLogo);
         BridgeService.GetDeviceName().then(setDeviceName);
 
         Events.On("status-changed", (event) => {
@@ -47,26 +43,14 @@ function App() {
             refreshConnectionInfo();
         });
 
-        // Login Listeners (Shared between QR and Browser)
+        // Login Listeners
         Events.On("login-success", () => {
             handleSuccessfulLogin();
         });
+
         Events.On("login-failed", (event) => {
             setError("Login failed: " + event.data);
-            setIsQrMode(false);
-            setQrInfo(null);
-            setIsLoading(false);
-        });
-
-        // Legacy QR Login Listeners
-        Events.On("qr-login-success", () => {
-            handleSuccessfulLogin();
-        });
-
-        Events.On("qr-login-failed", (event) => {
-            setError("QR Login failed: " + event.data);
-            setIsQrMode(false);
-            setQrInfo(null);
+            setIsWaitingForBrowser(false);
             setIsLoading(false);
         });
 
@@ -94,8 +78,7 @@ function App() {
             const nets = await BridgeService.GetNetworks();
             setNetworks(nets || []);
             setIsLoggedIn(true);
-            setIsQrMode(false);
-            setQrInfo(null);
+            setIsWaitingForBrowser(false);
         } catch (err) {
             console.error("handleSuccessfulLogin failed:", err);
             setError("Failed to load profile after login.");
@@ -111,32 +94,14 @@ function App() {
         setNetworkName(netName);
     };
 
-    const handleLogin = async () => {
-        setIsLoading(true);
-        setError('');
-        try {
-            const result = await BridgeService.Login(securityKey);
-            if (result.success) {
-                handleSuccessfulLogin();
-            } else {
-                setError(result.message);
-            }
-        } catch (err) {
-            setError("Login failed. Check security key.");
-        }
-        setIsLoading(false);
-    };
-
     const handleBrowserLogin = async () => {
         setIsLoading(true);
         setError('');
         try {
             const result = await BridgeService.StartBrowserLogin();
             if (result.success) {
-                // We don't call handleSuccessfulLogin here yet, 
-                // we wait for the "login-success" event from the backend
-                setQrInfo(result.info);
-                setError("Please complete the login in your browser...");
+                setIsWaitingForBrowser(true);
+                setError("");
                 setIsLoading(false);
             } else {
                 setError(result.message);
@@ -148,27 +113,10 @@ function App() {
         }
     };
 
-    const handleStartQrLogin = async () => {
-        setIsLoading(true);
-        setError('');
-        try {
-            const result = await BridgeService.StartQRLogin();
-            if (result.success) {
-                setQrInfo(result.info);
-                setIsQrMode(true);
-            } else {
-                setError(result.message);
-            }
-        } catch (err) {
-            setError("Failed to start QR login");
-        }
-        setIsLoading(false);
-    };
-
-    const handleCancelQrLogin = () => {
-        BridgeService.CancelQRLogin();
-        setIsQrMode(false);
-        setQrInfo(null);
+    const handleCancelBrowserLogin = () => {
+        // BridgeService.CancelBrowserLogin(); // If available
+        setIsWaitingForBrowser(false);
+        setError("");
     };
 
     const handleLogout = () => {
@@ -203,7 +151,6 @@ function App() {
     const toggleNetworkExpand = async (networkId) => {
         const isExpanded = !!expandedNetworks[networkId];
         setExpandedNetworks({ ...expandedNetworks, [networkId]: !isExpanded });
-        // Always fetch devices when expanding to ensure status is synchronized
         if (!isExpanded) {
             try {
                 const devs = await BridgeService.GetNetworkDevices(networkId);
@@ -236,170 +183,160 @@ function App() {
         Browser.OpenURL(url);
     };
 
-    if (!isLoggedIn) {
-        return (
-            <div className="app" ref={appRef}>
-                <div className="login-view">
-                    <div style={{ fontSize: 24, color: '#007AFF', marginBottom: 16 }}>⬡</div>
-                    <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>OmniEdge</h2>
-
-                    {!isQrMode ? (
-                        <>
-                            <p style={{ marginBottom: 20, fontSize: 12, opacity: 0.6 }}>Log in to your mesh network</p>
-                            <input
-                                type="password"
-                                placeholder="Security Key"
-                                className="security-input"
-                                value={securityKey}
-                                onChange={(e) => setSecurityKey(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                            />
-                            <button className="btn-primary" style={{ cursor: 'pointer' }} onClick={handleLogin}>
-                                {isLoading ? 'Connecting...' : 'Log in'}
-                            </button>
-                            <div style={{ marginTop: 12 }}>
-                                <button className="btn-primary" style={{ cursor: 'pointer' }} onClick={handleBrowserLogin}>
-                                    Log in with Browser
-                                </button>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="qr-container" style={{ textAlign: 'center' }}>
-                            <p style={{ marginBottom: 16, fontSize: 12, opacity: 0.6 }}>Scan with OmniEdge Mobile App</p>
-                            <div style={{ background: 'white', padding: 12, borderRadius: 8, display: 'inline-block', marginBottom: 16 }}>
-                                {qrInfo && <QRCodeSVG value={qrInfo.qr_data} size={150} />}
-                            </div>
-                            <button className="btn-secondary" style={{ width: '100%', cursor: 'pointer' }} onClick={handleCancelQrLogin}>
-                                Cancel
-                            </button>
-                        </div>
-                    )}
-
-                    {error && <div className="error-text" style={{ marginTop: 10 }}>{error}</div>}
-                </div>
-                <div className="divider"></div>
-                <div className="menu-item quit-row" onClick={() => BridgeService.Quit()}>
-                    <span>Quit</span>
-                    <span className="shortcut">⌘Q</span>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="app" ref={appRef}>
-            {/* Native Login/Logout Toggle */}
-            <div className="menu-item" onClick={handleLogout}>
-                Log out as {profile?.name || 'User'}
-            </div>
-            <div className="divider"></div>
-
-            {/* Logical Section: This Device Dashboard */}
-            <div className="detail-section no-hover">
-                <div className="detail-line">
-                    <span className="detail-label">Network:</span>
-                    <span className="detail-value truncate">
-                        {status === 'connected' ? networkName : 'Not connected'}
-                    </span>
+            {/* Header with Logo and Top-Right Action */}
+            <div className="app-header">
+                <div className="header-left">
+                    <span className="app-name">OmniEdge</span>
                 </div>
-                <div className="detail-line">
-                    <span className="detail-label">Device:</span>
-                    <span className="detail-value truncate">{deviceName}</span>
+                <div className="header-right">
+                    {!isLoggedIn ? (
+                        <button
+                            className={`btn-action ${isWaitingForBrowser ? 'waiting' : ''}`}
+                            onClick={handleBrowserLogin}
+                            disabled={isLoading || isWaitingForBrowser}
+                        >
+                            {isWaitingForBrowser ? (
+                                <div className="loader-mini"></div>
+                            ) : (
+                                'Log in'
+                            )}
+                        </button>
+                    ) : (
+                        <div className="profile-chip" onClick={handleLogout} title={`Log out from ${profile?.email}`}>
+                            <span className="profile-initial">{profile?.name?.[0]?.toUpperCase() || 'U'}</span>
+                            <div className={`user-status-indicator ${'online'}`}></div>
+                        </div>
+                    )}
                 </div>
-                <div className="detail-line">
-                    <span className="detail-label">IP:</span>
-                    <span className="detail-value">{virtualIP || '---.---.---.---'}</span>
-                </div>
-            </div>
-
-            <div className="divider"></div>
-
-            {/* Logical Section: network selection */}
-            <div className="menu-item subheader">
-                My Virtual Networks
             </div>
 
-            {networks.map(net => {
-                const isExpanded = expandedNetworks[net.id];
-                const isActive = activeNetwork === net.id || status === 'connected' && networkName === net.name;
+            <div className="main-content">
+                {isWaitingForBrowser && (
+                    <div className="status-banner">
+                        <span className="banner-text">Waiting for browser login...</span>
+                        <span className="banner-cancel" onClick={handleCancelBrowserLogin}>Cancel</span>
+                    </div>
+                )}
 
-                return (
-                    <div key={net.id}>
-                        <div className="menu-item" onClick={() => toggleNetworkExpand(net.id)}>
-                            <div className="network-row">
-                                <span className="truncate" style={{ fontWeight: isActive ? '500' : '400' }}>{net.name}</span>
-                                <div className="chevron" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}>
-                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
+                {error && <div className="error-banner">{error}</div>}
+
+                {!isLoggedIn ? (
+                    <div className="logged-out-view">
+                        <div className="placeholder-hero">
+                            <div className="hero-gradient"></div>
+                            <p>Private Mesh Network for Everyone</p>
+                        </div>
+                        <div className="locked-info">
+                            <div className="divider"></div>
+                            <div className="detail-section disabled">
+                                <div className="detail-line">
+                                    <span className="detail-label">Status</span>
+                                    <span className="status-pill">Offline</span>
                                 </div>
+                                <div className="detail-line">
+                                    <span className="detail-label">Virtual IP</span>
+                                    <span className="detail-value mono">---.---.---.---</span>
+                                </div>
+                            </div>
+                            <div className="divider"></div>
+                            <div className="subheader">Virtual Networks</div>
+                            <div className="empty-state">
+                                <span>No networks available. Please log in.</span>
                             </div>
                         </div>
-                        {isExpanded && (
-                            <div className="network-detail">
-                                <div className="detail-header">
-                                    <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.7 }}>Connection</span>
-                                    <div
-                                        className={`ios-switch ${isActive ? 'on' : ''}`}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            isActive ? handleDisconnect() : handleConnect(net.id);
-                                        }}
-                                        style={{ transform: 'scale(1.2)', transformOrigin: 'right' }}
-                                    >
-                                        <div className="dot"></div>
-                                    </div>
+                    </div>
+                ) : (
+                    <div className="dashboard-view">
+                        <div className="divider"></div>
+                        <div className="detail-section no-hover">
+                            <div className="detail-line">
+                                <span className="detail-label">Status</span>
+                                <span className={`status-pill ${status === 'connected' ? 'online' : ''}`}>
+                                    {status === 'connected' ? 'Connected' : 'Disconnected'}
+                                </span>
+                            </div>
+                            <div className="detail-line">
+                                <span className="detail-label">Virtual IP</span>
+                                <span className="detail-value mono">{virtualIP || '---.---.---.---'}</span>
+                            </div>
+                            {status === 'connected' && (
+                                <div className="detail-line">
+                                    <span className="detail-label">Network</span>
+                                    <span className="detail-value truncate">{networkName}</span>
                                 </div>
-                                <div className="divider" style={{ margin: '4px 0' }}></div>
-                                <div style={{ padding: '8px 0' }}>
-                                    {(networkDevices[net.id] || []).map(dev => (
-                                        <div key={dev.id || dev.virtual_ip}>
-                                            <div className="device-grid">
-                                                <div className="device-name">
-                                                    <span className="expand-icon">
-                                                        {dev.has_sub_devices ? "−" : ""}
-                                                    </span>
-                                                    <span className="truncate">{dev.name}</span>
+                            )}
+                        </div>
+
+                        <div className="divider"></div>
+                        <div className="subheader">Virtual Networks</div>
+
+                        <div className="networks-list">
+                            {networks.map(net => {
+                                const isExpanded = expandedNetworks[net.id];
+                                const isActive = activeNetwork === net.id || (status === 'connected' && networkName === net.name);
+
+                                return (
+                                    <div key={net.id} className="network-item-container">
+                                        <div className={`menu-item ${isActive ? 'menu-item--active' : ''}`} onClick={() => toggleNetworkExpand(net.id)}>
+                                            <div className="network-row">
+                                                <div className="network-info">
+                                                    {isActive && <div className="active-dot"></div>}
+                                                    <span className="truncate" style={{ fontWeight: isActive ? '600' : '400' }}>{net.name}</span>
                                                 </div>
-                                                <div className="device-ip">{dev.virtual_ip}</div>
-                                                <div className={`device-status ${dev.online ? 'status-online' : 'status-offline'}`}>
-                                                    <span className="status-dot"></span>
-                                                    {dev.online ? 'Online' : 'Offline'}
+                                                <div className="chevron" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none' }}>
+                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                                    </svg>
                                                 </div>
                                             </div>
-
-                                            {/* Sub-devices support */}
-                                            {dev.has_sub_devices && (dev.sub_devices || []).map(sub => (
-                                                <div key={sub.id} className="device-grid sub-device">
-                                                    <div className="device-name">
-                                                        <span className="truncate">{sub.name}</span>
-                                                    </div>
-                                                    <div className="device-ip">{sub.ip}</div>
-                                                    <div className={`device-latency ${sub.latency < 50 ? 'latency-fast' : sub.latency < 100 ? 'latency-medium' : 'latency-slow'}`}>
-                                                        {sub.latency} ms
+                                        </div>
+                                        {isExpanded && (
+                                            <div className="network-detail">
+                                                <div className="detail-header">
+                                                    <span className="detail-header-label">Connection</span>
+                                                    <div
+                                                        className={`ios-switch ${isActive ? 'on' : ''}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            isActive ? handleDisconnect() : handleConnect(net.id);
+                                                        }}
+                                                    >
+                                                        <div className="dot"></div>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    ))}
-                                    {(!networkDevices[net.id] || networkDevices[net.id].length === 0) && (
-                                        <div className="nested-item" style={{ opacity: 0.4 }}>
-                                            <span>No other devices found</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                                                <div className="divider-dashed" />
+                                                <div className="device-list-container">
+                                                    {(networkDevices[net.id] || []).map(dev => (
+                                                        <div key={dev.id || dev.virtual_ip} className="device-item">
+                                                            <div className="device-grid">
+                                                                <div className="device-name-container">
+                                                                    <span className={`status-dot-mini ${dev.online ? 'online' : ''}`}></span>
+                                                                    <span className="truncate">{dev.name}</span>
+                                                                </div>
+                                                                <div className="device-ip-mini">{dev.virtual_ip}</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {(!networkDevices[net.id] || networkDevices[net.id].length === 0) && (
+                                                        <div className="no-devices">No other devices online</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                );
-            })}
+                )}
+            </div>
 
             <div className="divider"></div>
-
-            {/* Logical Section: Utilities matching native OmniMainMenu.swift */}
-            <div className="footer">
-                <div className="menu-item utility-item" onClick={() => openURL('https://connect.omniedge.io/dashboard')}>
-                    Dashboard ...
+            <div className="app-footer">
+                <div className="menu-item" onClick={() => openURL('https://connect.omniedge.io/dashboard')}>
+                    <span>Dashboard...</span>
                 </div>
                 <div className="menu-item quit-row" onClick={() => BridgeService.Quit()}>
                     <span>Quit</span>

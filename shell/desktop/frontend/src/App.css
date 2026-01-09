@@ -2,100 +2,286 @@
     /* macOS Native Menu Palette - Hyper-Optimized */
     --menu-bg-light: rgba(255, 255, 255, 0.72);
     --menu-bg-dark: rgba(30, 30, 30, 0.72);
-    --text-primary: rgba(29, 29, 31, 0.9);
-    --text-primary-dark: rgba(245, 245, 247, 0.9);
+    --text-primary: rgba(29, 29, 31, 0.94);
+    --text-primary-dark: rgba(245, 245, 247, 0.94);
     --text-secondary: rgba(110, 110, 115, 0.76);
     --text-secondary-dark: rgba(161, 161, 166, 0.76);
     --accent-blue: #007aff;
     --selection-bg: #007aff;
-    --selection-text: rgba(255, 255, 255, 0.9);
-    --divider: rgba(0, 0, 0, 0.08);
-    /* 0.5px equivalent on Retina */
+    --selection-text: rgba(255, 255, 255, 0.95);
+    --divider: rgba(60, 60, 67, 0.12);
     --divider-dark: rgba(255, 255, 255, 0.12);
+    --status-green: #34c759;
+    --status-red: #ff3b30;
 }
 
 * {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
-    box-sizing: border-box;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    -webkit-user-select: none;
     user-select: none;
-    -webkit-font-smoothing: antialiased;
+    cursor: default;
 }
 
 body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     background: transparent;
+    color: var(--text-primary);
     overflow: hidden;
-    /* Hide all scrollbars */
-    margin: 0;
-    padding: 0;
+    font-size: 13px;
+    line-height: normal;
 }
 
-/* Hide scrollbars globally */
-::-webkit-scrollbar {
-    display: none;
+@media (prefers-color-scheme: dark) {
+    body {
+        color: var(--text-primary-dark);
+    }
 }
 
 .app {
     width: 320px;
-    /* Fixed width to match main.go */
-    height: auto;
-    /* Auto height based on content */
-    min-height: 100vh;
     background: var(--menu-bg-light);
-    backdrop-filter: blur(30px) saturate(200%);
-    -webkit-backdrop-filter: blur(30px) saturate(200%);
-    color: var(--text-primary);
+    backdrop-filter: blur(25px) saturate(190%);
+    -webkit-backdrop-filter: blur(25px) saturate(190%);
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
-    border: 0.5px solid rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15), 0 0 0 0.5px var(--divider);
+    animation: fadeIn 0.15s ease-out;
 }
 
 @media (prefers-color-scheme: dark) {
     .app {
         background: var(--menu-bg-dark);
-        color: var(--text-primary-dark);
-        border-color: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35), 0 0 0 0.5px var(--divider-dark);
     }
 }
 
-/* Base Menu Item */
-.menu-item {
-    padding: 10px 14px;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.985);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Header Styles */
+.app-header {
+    height: 44px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 10;
+}
+
+.header-left {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.logo-img {
+    width: 20px;
+    height: 20px;
+}
+
+.app-name {
+    font-weight: 600;
     font-size: 13px;
-    font-weight: 400;
-    /* macOS native is closer to Regular (400) */
-    min-height: 24px;
-    cursor: default;
+    letter-spacing: -0.1px;
 }
 
-.menu-item:hover:not(.subheader):not(.no-hover):not(.label-only) {
-    background: var(--selection-bg);
-    color: var(--selection-text);
-}
-
-.menu-item-content {
+.header-right {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+}
+
+.btn-action {
+    background: var(--accent-blue);
+    color: white;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: default;
+    transition: filter 0.1s;
+}
+
+.btn-action:hover {
+    filter: brightness(1.1);
+}
+
+.btn-action:active {
+    filter: brightness(0.9);
+}
+
+.btn-action.waiting {
+    background: var(--divider);
+    color: var(--text-secondary);
+    pointer-events: none;
+    padding: 4px 16px;
+}
+
+.loader-mini {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    border-top: 2px solid var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Profile Chip */
+.profile-chip {
+    width: 24px;
+    height: 24px;
+    background: linear-gradient(135deg, #8e8e93, #636366);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+.profile-chip:hover {
+    filter: brightness(1.1);
+}
+
+.profile-initial {
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.user-status-indicator {
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 8px;
+    height: 8px;
+    background: #8e8e93;
+    /* Default offline/gray */
+    border: 1.5px solid var(--menu-bg-light);
+    /* Create cutout effect */
+    border-radius: 50%;
+}
+
+@media (prefers-color-scheme: dark) {
+    .user-status-indicator {
+        border-color: var(--menu-bg-dark);
+    }
+}
+
+.user-status-indicator.online {
+    background: var(--status-green);
+    box-shadow: 0 0 4px rgba(52, 199, 89, 0.4);
+}
+
+/* Banner Styles */
+.status-banner {
+    background: rgba(0, 122, 255, 0.1);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    border-bottom: 0.5px solid var(--divider);
+}
+
+.banner-cancel {
+    color: var(--accent-blue);
+    font-weight: 500;
+}
+
+.error-banner {
+    background: rgba(255, 59, 48, 0.1);
+    color: var(--status-red);
+    padding: 8px 16px;
+    font-size: 11px;
+    border-bottom: 0.5px solid var(--divider);
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+}
+
+/* Logged Out View */
+.logged-out-view {
+    padding-bottom: 8px;
+}
+
+.placeholder-hero {
+    padding: 24px 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    background: radial-gradient(circle at 50% 120%, rgba(0, 122, 255, 0.15), transparent);
+    z-index: -1;
+}
+
+.placeholder-hero p {
+    font-size: 13px;
+    opacity: 0.7;
+    line-height: 1.4;
+}
+
+.detail-section.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(0.5);
+}
+
+.empty-state {
+    padding: 24px 16px;
+    text-align: center;
+    font-size: 12px;
+    opacity: 0.5;
+}
+
+/* Generic Layout Elements */
+.divider {
+    height: 0.5px;
+    background: var(--divider);
     width: 100%;
 }
 
-/* Subheader (Label items) */
+@media (prefers-color-scheme: dark) {
+    .divider {
+        background: var(--divider-dark);
+    }
+}
+
+.divider-dashed {
+    height: 1px;
+    border-top: 0.5px dashed var(--divider);
+    margin: 4px 16px;
+}
+
 .subheader {
+    padding: 10px 16px 6px;
     font-size: 11px;
-    font-weight: 500;
-    /* Reduced from 600 for better native aesthetic */
+    font-weight: 600;
+    text-transform: uppercase;
     letter-spacing: 0.2px;
     color: var(--text-secondary);
-    padding: 12px 14px 4px;
-    min-height: auto;
-    text-transform: uppercase;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -104,29 +290,71 @@ body {
     }
 }
 
-/* Multi-line Detail Section (matching native DetailMenuItem) */
+/* Menu Items & Interactive Rows */
+.menu-item {
+    padding: 0 16px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background 0.1s;
+}
+
+.menu-item:hover {
+    background: var(--selection-bg);
+    color: var(--selection-text);
+}
+
+.menu-item:active {
+    opacity: 0.8;
+}
+
+.menu-item--active {
+    background: rgba(52, 199, 89, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    .menu-item--active {
+        background: rgba(52, 199, 89, 0.15);
+    }
+}
+
+.quit-row {
+    color: var(--status-red);
+}
+
+.quit-row:hover {
+    background: var(--status-red);
+    color: white;
+}
+
+.shortcut {
+    font-size: 11px;
+    opacity: 0.6;
+    font-family: inherit;
+}
+
+.menu-item:hover .shortcut {
+    opacity: 0.9;
+}
+
+/* Dashboard Details */
 .detail-section {
-    padding: 6px 14px;
+    padding: 12px 16px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 8px;
 }
 
 .detail-line {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    font-size: 13px;
-    line-height: 1.5;
-    gap: 12px;
+    justify-content: space-between;
 }
 
 .detail-label {
+    font-size: 12px;
     color: var(--text-secondary);
-    width: 80px;
-    /* Reduced from 90 to close the gap in 233px width */
-    flex-shrink: 0;
-    font-size: 11px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -136,365 +364,206 @@ body {
 }
 
 .detail-value {
-    color: var(--text-primary);
-    word-break: break-all;
+    font-size: 12px;
+    font-weight: 500;
 }
 
-@media (prefers-color-scheme: dark) {
-    .detail-value {
-        color: var(--text-primary-dark);
-    }
+.mono {
+    font-family: "SF Mono", "Menlo", "Monaco", monospace;
+    font-size: 11px;
+    opacity: 0.9;
 }
 
-/* Divider (matching NSMenuItem.separator) */
-.divider {
-    height: 1px;
-    background: rgba(60, 60, 67, 0.18);
-    mix-blend-mode: color-burn;
-    margin: 4px 0;
+/* Status Pills */
+.status-pill {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--divider);
+    color: var(--text-secondary);
+    text-transform: uppercase;
 }
 
-@media (prefers-color-scheme: dark) {
-    .divider {
-        background: rgba(255, 255, 255, 0.12);
-        mix-blend-mode: normal;
-    }
+.status-pill.online {
+    background: rgba(52, 199, 89, 0.15);
+    color: var(--status-green);
 }
 
-/* Network Row with chevron on right */
+/* Network Selection */
 .network-row {
+    flex: 1;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    width: 100%;
-}
-
-.chevron {
-    margin-left: auto;
-    opacity: 0.5;
-}
-
-/* Network Detail Popup (matching design with dashed border) */
-.network-detail {
-    background: rgba(255, 255, 255, 0.95);
-    border: 2px dashed rgba(100, 100, 100, 0.3);
-    border-radius: 12px;
-    margin: 8px 12px;
-    padding: 14px 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-@media (prefers-color-scheme: dark) {
-    .network-detail {
-        background: rgba(40, 40, 40, 0.95);
-        border-color: rgba(180, 180, 180, 0.2);
-    }
-}
-
-.detail-header {
-    display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 0 14px 10px;
 }
 
-.nested-item {
-    font-size: 13px;
-    padding: 6px 14px;
+.network-info {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-/* Device Grid Layout (3 columns) */
-.device-grid {
-    display: grid;
-    grid-template-columns: 1fr 100px 50px;
-    align-items: center;
-    width: 100%;
-    padding: 4px 14px;
-    font-size: 12px;
-}
-
-.device-name {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--text-primary);
-    overflow: hidden;
-    min-width: 0;
-    /* Allow flex item to shrink below content size */
-}
-
-.device-name .truncate {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100px;
-    /* Limit width for truncation */
-}
-
-.device-ip {
-    color: var(--text-secondary);
-    font-family: ui-monospace, SFMono-Regular, SF Pro Mono, Menlo, monospace;
-}
-
-.device-latency {
-    text-align: right;
-    font-weight: 500;
-}
-
-/* Online Status Styling */
-.device-status {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 4px;
-    font-size: 11px;
-    font-weight: 500;
-}
-
-.status-dot {
+.active-dot {
     width: 6px;
     height: 6px;
+    background: var(--status-green);
     border-radius: 50%;
+    box-shadow: 0 0 4px rgba(52, 199, 89, 0.4);
 }
 
-.status-online {
-    color: #34c759;
+.chevron {
+    opacity: 0.5;
 }
 
-.status-online .status-dot {
-    background-color: #34c759;
+.network-detail {
+    background: rgba(0, 0, 0, 0.03);
+    padding: 8px 0;
+    animation: slideDown 0.2s ease-out;
 }
 
-.status-offline {
-    color: #8e8e93;
+@media (prefers-color-scheme: dark) {
+    .network-detail {
+        background: rgba(255, 255, 255, 0.03);
+    }
 }
 
-.status-offline .status-dot {
-    background-color: #8e8e93;
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-/* Legacy Latency Colors - kept for reference */
-.latency-fast {
-    color: #34c759;
-}
-
-.latency-medium {
-    color: #ff9500;
-}
-
-.latency-slow {
-    color: #8e8e93;
-}
-
-/* Hierarchy styling */
-.sub-device {
-    padding-left: 34px;
-    opacity: 0.8;
-}
-
-.expand-icon {
-    width: 16px;
-    height: 16px;
+.detail-header {
+    padding: 4px 16px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    cursor: default;
-    opacity: 0.6;
+    justify-content: space-between;
 }
 
-@media (prefers-color-scheme: dark) {
-    .device-name {
-        color: var(--text-primary-dark);
-    }
-
-    .device-ip {
-        color: var(--text-secondary-dark);
-    }
+.detail-header-label {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.7;
 }
 
-.nested-item .ip {
-    color: var(--text-secondary);
-}
-
-@media (prefers-color-scheme: dark) {
-    .nested-item .ip {
-        color: var(--text-secondary-dark);
-    }
-}
-
-/* iOS-style toggle used in native app */
+/* iOS Style Switch */
 .ios-switch {
     width: 32px;
     height: 18px;
-    background: #d1d1d6;
+    background: var(--divider);
     border-radius: 9px;
     position: relative;
     transition: background 0.2s;
-    flex-shrink: 0;
 }
 
 .ios-switch.on {
-    background: #34c759;
+    background: var(--status-green);
 }
 
 .ios-switch .dot {
-    width: 16px;
-    height: 16px;
-    background: white;
-    border-radius: 8px;
     position: absolute;
-    top: 1px;
-    left: 1px;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: white;
+    border-radius: 50%;
     transition: transform 0.2s;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .ios-switch.on .dot {
     transform: translateX(14px);
 }
 
-/* Footer & Utilities */
-.footer {
-    padding: 2px 0;
+/* Device List */
+.device-list-container {
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 4px 0;
 }
 
-.shortcut {
-    margin-left: auto;
-    font-size: 11px;
+.device-item {
+    padding: 4px 16px;
+}
+
+.device-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.device-name-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-dot-mini {
+    width: 6px;
+    height: 6px;
+    background: var(--divider);
+    border-radius: 50%;
+}
+
+.status-dot-mini.online {
+    background: var(--status-green);
+    box-shadow: 0 0 4px var(--status-green);
+}
+
+.device-name {
+    font-size: 12px;
+}
+
+.device-ip-mini {
+    font-family: "SF Mono", monospace;
+    font-size: 10px;
     opacity: 0.5;
 }
 
-.menu-item:hover .shortcut {
-    color: white;
-    opacity: 0.9;
+.no-devices {
+    padding: 12px 16px;
+    font-size: 11px;
+    opacity: 0.4;
+    text-align: center;
 }
 
-/* Utility Links */
-.utility-item {
-    color: var(--text-primary);
+/* Footer Section */
+.app-footer {
+    padding: 4px 0;
 }
 
-@media (prefers-color-scheme: dark) {
-    .utility-item {
-        color: var(--text-primary-dark);
-    }
-}
-
-/* Helpers */
+/* Utilities */
 .truncate {
-    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* Login Page Styling */
-.login-view {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 40px 30px;
-    text-align: center;
-    flex: 1;
+.loader {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--divider);
+    border-top: 3px solid var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
 }
 
-.login-view h2 {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 4px;
-}
-
-.login-view p {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-bottom: 24px;
-}
-
-.login-logo {
-    font-size: 48px;
-    margin-bottom: 20px;
-    background: linear-gradient(135deg, #007AFF, #5856D6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-.security-input {
-    width: 100%;
-    padding: 12px 16px;
-    font-size: 14px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.8);
-    color: var(--text-primary);
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    margin-bottom: 16px;
-}
-
-.security-input:focus {
-    border-color: var(--accent-blue);
-    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
-}
-
-.security-input::placeholder {
-    color: var(--text-secondary);
-}
-
-.btn-primary {
-    width: 100%;
-    padding: 12px 20px;
-    font-size: 14px;
-    font-weight: 600;
-    color: white;
-    background: linear-gradient(135deg, #007AFF, #5856D6);
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: transform 0.1s, box-shadow 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    line-height: 1.2;
-}
-
-.btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
-}
-
-.btn-primary:active {
-    transform: translateY(0);
-}
-
-.error-text {
-    color: #ff3b30;
-    font-size: 12px;
-    margin-top: 12px;
-}
-
-/* Dark mode login */
-@media (prefers-color-scheme: dark) {
-    .login-view h2 {
-        color: var(--text-primary-dark);
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
     }
 
-    .login-view p {
-        color: var(--text-secondary-dark);
-    }
-
-    .security-input {
-        background: rgba(60, 60, 60, 0.8);
-        border-color: rgba(255, 255, 255, 0.1);
-        color: var(--text-primary-dark);
-    }
-
-    .security-input::placeholder {
-        color: var(--text-secondary-dark);
+    100% {
+        transform: rotate(360deg);
     }
 }
