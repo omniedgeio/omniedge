@@ -2,15 +2,20 @@
 # Pre-installs all dependencies for faster CI builds
 FROM arm64v8/golang:1.25-bookworm
 
-# Install build tools and desktop dependencies in a single layer
+# Install build tools, desktop dependencies, and AppImage tools
 RUN apt-get update && apt-get install -y \
     wget make git autoconf automake build-essential libtool patch pkg-config \
     libgtk-3-dev libwebkit2gtk-4.1-dev \
     nodejs npm \
+    fuse libfuse2 file \
     && rm -rf /var/lib/apt/lists/*
 
 # Install nfpm for package building
 RUN go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+
+# Download linuxdeploy for AppImage creation
+RUN wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-aarch64.AppImage -O /usr/local/bin/linuxdeploy \
+    && chmod +x /usr/local/bin/linuxdeploy
 
 WORKDIR /app
 
@@ -44,5 +49,16 @@ RUN go build -o shell/desktop/bin/omniedge-helper ./cmd/omniedge-helper
 # Build DEB package
 RUN cd shell/desktop && GOARCH=arm64 $(go env GOPATH)/bin/nfpm package -p deb -f build/linux/nfpm/nfpm.yaml -t bin/
 
+# Build AppImage
+RUN cd shell/desktop && \
+    mkdir -p OmniEdge.AppDir/usr/bin && \
+    cp bin/OmniEdge OmniEdge.AppDir/usr/bin/omniedge && \
+    cp bin/omniedge-helper OmniEdge.AppDir/usr/bin/ && \
+    cp build/appicon.png OmniEdge.AppDir/omniedge.png && \
+    cp build/linux/desktop OmniEdge.AppDir/omniedge.desktop && \
+    /usr/local/bin/linuxdeploy --appimage-extract-and-run --appdir OmniEdge.AppDir --output appimage || true && \
+    mv OmniEdge*.AppImage bin/ || true
+
 # Default command shows built files
 CMD ["ls", "-la", "/app/shell/desktop/bin/"]
+

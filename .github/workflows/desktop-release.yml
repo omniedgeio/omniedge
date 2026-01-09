@@ -342,38 +342,16 @@ jobs:
           cp bin-arm64/OmniEdge shell/desktop/bin/
           cp bin-arm64/omniedge-helper shell/desktop/bin/
           cp bin-arm64/omniedge_*.deb shell/desktop/bin/ || true
+          cp bin-arm64/*.AppImage shell/desktop/bin/ || true
+          
+          # List extracted artifacts
+          ls -la shell/desktop/bin/
 
-      - name: Rename DEB package
+      - name: Rename packages
         working-directory: shell/desktop
         run: |
           mv bin/omniedge_*.deb bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.deb || true
-
-      - name: Build AppImage for ARM64
-        working-directory: shell/desktop
-        run: |
-          # Download linuxdeploy for aarch64
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-aarch64.AppImage || true
-          
-          if [ -f "linuxdeploy-aarch64.AppImage" ]; then
-            chmod +x linuxdeploy-aarch64.AppImage
-            
-            # Create AppDir
-            mkdir -p OmniEdge.AppDir/usr/bin
-            cp bin/OmniEdge OmniEdge.AppDir/usr/bin/omniedge
-            cp bin/omniedge-helper OmniEdge.AppDir/usr/bin/
-            cp build/appicon.png OmniEdge.AppDir/omniedge.png
-            cp build/linux/desktop OmniEdge.AppDir/omniedge.desktop
-            
-            # Build AppImage using QEMU
-            docker run --rm --platform linux/arm64 \
-              -v $(pwd):/work \
-              -w /work \
-              --privileged \
-              arm64v8/ubuntu:22.04 \
-              bash -c "apt-get update && apt-get install -y fuse libfuse2 file && ./linuxdeploy-aarch64.AppImage --appimage-extract-and-run --appdir OmniEdge.AppDir --output appimage || true"
-            
-            mv OmniEdge*.AppImage bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.AppImage || true
-          fi
+          mv bin/OmniEdge*.AppImage bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.AppImage || true
 
       - name: Upload DEB Artifact
         uses: actions/upload-artifact@v4
