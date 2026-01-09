@@ -278,6 +278,137 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
 
+  # Build Linux ARM64 packages (DEB, AppImage) using QEMU
+  build-linux-arm64:
+    name: Build Linux (arm64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build ARM64 binaries in Docker
+        run: |
+          # Create a build script
+          cat > build-arm64.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          # Install dependencies
+          apt-get update
+          apt-get install -y wget make git autoconf automake build-essential libtool patch pkg-config
+          apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+          apt-get install -y nodejs npm
+          
+          # Install Wails CLI
+          go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+          export PATH=$PATH:$(go env GOPATH)/bin
+          
+          # Install nfpm
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+          
+          # Build n2n library
+          cd /app/internal
+          go generate ./...
+          
+          # Build Desktop App
+          cd /app/shell/desktop
+          npm install
+          wails3 task linux:build
+          
+          # Build Helper
+          cd /app
+          CGO_ENABLED=1 GOARCH=arm64 go build -o shell/desktop/bin/omniedge-helper ./cmd/omniedge-helper
+          
+          # Build DEB package
+          cd /app/shell/desktop
+          GOARCH=arm64 nfpm package -p deb -f build/linux/nfpm/nfpm.yaml -t bin/
+          
+          echo "Build completed successfully"
+          EOF
+          chmod +x build-arm64.sh
+          
+          # Run build in ARM64 container
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/app \
+            -w /app \
+            arm64v8/golang:1.23-bookworm \
+            /app/build-arm64.sh
+
+      - name: Rename DEB package
+        working-directory: shell/desktop
+        run: |
+          mv bin/omniedge_*.deb bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.deb || true
+
+      - name: Build AppImage for ARM64
+        working-directory: shell/desktop
+        run: |
+          # Download linuxdeploy for aarch64
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-aarch64.AppImage || true
+          
+          if [ -f "linuxdeploy-aarch64.AppImage" ]; then
+            chmod +x linuxdeploy-aarch64.AppImage
+            
+            # Create AppDir
+            mkdir -p OmniEdge.AppDir/usr/bin
+            cp bin/OmniEdge OmniEdge.AppDir/usr/bin/omniedge
+            cp bin/omniedge-helper OmniEdge.AppDir/usr/bin/
+            cp build/appicon.png OmniEdge.AppDir/omniedge.png
+            cp build/linux/desktop OmniEdge.AppDir/omniedge.desktop
+            
+            # Build AppImage using QEMU
+            docker run --rm --platform linux/arm64 \
+              -v $(pwd):/work \
+              -w /work \
+              --privileged \
+              arm64v8/ubuntu:22.04 \
+              bash -c "apt-get update && apt-get install -y fuse libfuse2 file && ./linuxdeploy-aarch64.AppImage --appimage-extract-and-run --appdir OmniEdge.AppDir --output appimage || true"
+            
+            mv OmniEdge*.AppImage bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.AppImage || true
+          fi
+
+      - name: Upload DEB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64-deb
+          path: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.deb
+          if-no-files-found: warn
+
+      - name: Upload AppImage Artifact
+        uses: actions/upload-artifact@v4
+        if: hashFiles('shell/desktop/bin/omniedge-desktop-*-linux-arm64.AppImage') != ''
+        with:
+          name: omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64-appimage
+          path: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.AppImage
+          if-no-files-found: warn
+
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file_glob: true
+          file: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.*
+          tag: ${{ github.ref }}
+          overwrite: true
+
   # Build macOS (arm64 only)
   build-macos:
     name: Build macOS (arm64)
@@ -365,7 +496,7 @@ jobs:
   release-summary:
     name: Release Summary
     runs-on: ubuntu-latest
-    needs: [build-windows, build-linux, build-macos]
+    needs: [build-windows, build-linux, build-linux-arm64, build-macos]
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Get version
@@ -383,12 +514,17 @@ jobs:
           echo "#### Windows" >> $GITHUB_STEP_SUMMARY
           echo "- **NSIS Installer**: omniedge-desktop-${{ steps.version.outputs.version }}-windows-amd64.exe (includes TAP driver)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### Linux" >> $GITHUB_STEP_SUMMARY
+          echo "#### Linux (amd64)" >> $GITHUB_STEP_SUMMARY
           echo "- **DEB**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.deb (Ubuntu/Debian)" >> $GITHUB_STEP_SUMMARY
           echo "- **RPM**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.rpm (RHEL/CentOS/Fedora)" >> $GITHUB_STEP_SUMMARY
           echo "- **AppImage**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.AppImage (Universal)" >> $GITHUB_STEP_SUMMARY
           echo "- **Flatpak**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.flatpak (GNOME/Flathub)" >> $GITHUB_STEP_SUMMARY
           echo "- **Arch**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64-arch.tar.gz (Arch/AUR)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Linux (arm64)" >> $GITHUB_STEP_SUMMARY
+          echo "- **DEB**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.deb (Raspberry Pi/Ubuntu ARM64)" >> $GITHUB_STEP_SUMMARY
+          echo "- **AppImage**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.AppImage (ARM64 Universal)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### macOS" >> $GITHUB_STEP_SUMMARY
           echo "- **DMG**: omniedge-desktop-${{ steps.version.outputs.version }}-macos-arm64.dmg (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
+
