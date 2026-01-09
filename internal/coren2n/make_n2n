@@ -34,27 +34,26 @@ if [ "$openwrt" = 'openwrt' ]; then
 			;;
     esac
 elif [ "$OS_V" = 'Darwin' ]; then
-    # Apply utun patch for macOS (replaces tuntap with utun driver)
-    # Script runs from inside n2n directory: internal/coren2n/n2n/
+    case $arch in
+        amd64)
+            ./configure --host=x86_64-apple-darwin CC="clang -arch x86_64" CXX="clang++ -arch x86_64" CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -arch x86_64 -I." LDFLAGS="-arch x86_64"
+            ;;
+        arm64)
+            ./configure --host=aarch64-apple-darwin CC="clang -arch arm64" CXX="clang++ -arch arm64" CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -arch arm64 -I." LDFLAGS="-arch arm64"
+            ;;
+        *)
+            ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -I."
+            ;;
+    esac
+    
+    # Apply utun patch for macOS after configure
     PATCH_FILE="../../../patches/tuntap_osx_utun.c"
     if [ -f "$PATCH_FILE" ]; then
         echo "Applying macOS utun patch..."
-        cp "$PATCH_FILE" tuntap_osx.c
-    else
-        echo "Warning: utun patch not found at $PATCH_FILE"
+        cp -v "$PATCH_FILE" tuntap_osx.c
+        # Force absolute include to resolve persistent 'n2n.h not found' error
+        sed -i '' "s|#include \"n2n.h\"|#include \"$(pwd)/n2n.h\"|g" tuntap_osx.c
     fi
-    
-    case $arch in
-        amd64)
-            ./configure --host=x86_64-apple-darwin CC="clang -arch x86_64" CXX="clang++ -arch x86_64" CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -arch x86_64" LDFLAGS="-arch x86_64"
-            ;;
-        arm64)
-            ./configure --host=aarch64-apple-darwin CC="clang -arch arm64" CXX="clang++ -arch arm64" CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -arch arm64" LDFLAGS="-arch arm64"
-            ;;
-        *)
-            ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
-            ;;
-    esac
 else
     ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 fi
@@ -63,8 +62,14 @@ if [ "$arch" = 'riscv64' ]; then
         ./configure --host=riscv64-unknown-linux-gnu CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
 fi
 
+# Set custom flags in PLATOPTS (appended to CFLAGS by n2n Makefile)
+N2N_PLATOPTS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+if [ "$OS_V" = 'Darwin' ]; then
+    N2N_PLATOPTS="$N2N_PLATOPTS -I."
+fi
+
 if [ "$OS_V" = 'FreeBSD' ]; then
-        gmake
+        gmake PLATOPTS="$N2N_PLATOPTS" libn2n.a
 else
-        make
+        make PLATOPTS="$N2N_PLATOPTS" libn2n.a
 fi
