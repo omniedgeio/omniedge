@@ -1,7 +1,11 @@
 # OmniEdge Release Notes
 
 ## v1.0.1 (2026-01-09)
-### 🚀 Desktop UI/UX Polish
+### 🚀 New Features
+- **CLI Interactive Login**: The CLI now supports OAuth 2.0 Device Flow (`omniedge login`), allowing users to log in via browser without handling passwords directly.
+- **Desktop Session Login**: Desktop application now uses seamless browser-based session login for improved security and experience.
+
+### 🎨 Desktop UI/UX Polish
 - **Refined Header**: Implemented the official OmniEdge logo and clean typography.
 - **Identity Status**: Added a visual status indicator (green dot) to the user profile chip for clear connection feedback.
 - **Active Network**: The currently connected virtual network is now clearly highlighted with a distinct background and indicator in the dashboard list.

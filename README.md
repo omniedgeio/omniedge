@@ -83,10 +83,14 @@ Download CLI binaries from the [Releases page](https://github.com/omniedgeio/omn
 ### Login
 
 ```bash
-# Login with email
+# Interactive Login (New in v1.0.1)
+# Launches browser-based authentication via Device Flow
+omniedge login
+
+# Login with email (Legacy)
 omniedge login -u your@email.com
 
-# Login with API key (recommended for automation)
+# Login with API key (Recommended for automation)
 omniedge login -s YOUR_SECRET_KEY
 ```
 
