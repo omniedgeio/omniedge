@@ -51,36 +51,36 @@ func main() {
 	windowOpts := application.WebviewWindowOptions{
 		Title:     "OmniEdge",
 		Width:     320,
-		Height:    600,  // Initial height, resized by frontend
-		MinWidth:  320,  // Lock width
-		MaxWidth:  320,  // Lock width
-		MinHeight: 600,  // Allow shrinking
-		MaxHeight: 1000, // Allow growing
+		Height:    480, // Reduced initial height for a more compact popover
+		MinWidth:  320,
+		MaxWidth:  320,
+		MinHeight: 200,
+		MaxHeight: 800,
 		URL:       "/",
 		Hidden:    true,
+		Frameless: true, // Always frameless for the popover effect
 	}
 
 	// Platform-specific window styling
 	switch runtime.GOOS {
 	case "darwin":
 		windowOpts.Mac = application.MacWindow{
-			InvisibleTitleBarHeight: 50,
+			InvisibleTitleBarHeight: 0, // No title bar needed for popover
 			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
+			TitleBar:                application.MacTitleBarHidden,
 		}
 		windowOpts.BackgroundColour = application.NewRGBA(0, 0, 0, 0)
 		windowOpts.AlwaysOnTop = true
-		windowOpts.Frameless = true
 	case "windows":
 		// Windows: Use system chrome with transparency if available
 		windowOpts.BackgroundColour = application.NewRGBA(255, 255, 255, 255)
 		windowOpts.AlwaysOnTop = true
-		windowOpts.Frameless = false // Keep native title bar on Windows
+		windowOpts.Frameless = true // Also frameless on Windows for consistency
 	case "linux":
 		// Linux: Standard window with native chrome
 		windowOpts.BackgroundColour = application.NewRGBA(255, 255, 255, 255)
 		windowOpts.AlwaysOnTop = true
-		windowOpts.Frameless = false // Keep native title bar on Linux
+		windowOpts.Frameless = true // Also frameless on Linux for consistency
 	}
 
 	mainWindow := app.Window.NewWithOptions(windowOpts)
