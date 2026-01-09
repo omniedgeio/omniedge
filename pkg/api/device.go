@@ -31,7 +31,7 @@ type HeartbeatService struct {
 func (s *RegisterService) Register(opt *RegisterOption) (*DeviceResponse, error) {
 	var url string
 	var body map[string]string
-	url = s.BaseUrl + "/devices"
+	url = s.BaseUrl + "/devices/register"
 
 	body = map[string]string{
 		"name":          opt.Name,
