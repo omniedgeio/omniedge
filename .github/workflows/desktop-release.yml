@@ -12,7 +12,7 @@ on:
         default: '1.0.1'
 
 env:
-  GO_VERSION: '1.23'
+  GO_VERSION: '1.25'
   NODE_VERSION: '20'
 
 jobs:
@@ -349,7 +349,7 @@ jobs:
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/app \
             -w /app \
-            arm64v8/golang:1.23-bookworm \
+            arm64v8/golang:1.25-bookworm \
             /app/build-arm64.sh
 
       - name: Rename DEB package
