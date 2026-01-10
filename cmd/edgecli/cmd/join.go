@@ -107,15 +107,20 @@ var joinCmd = &cobra.Command{
 			log.Errorf("%+v", err)
 			return
 		}
-		// not persist cliVirtualNetworkId
-		viper.Set(cliVirtualNetworkId, "")
-		// not to persist join response (for security issue)
-		//viper.Set(keyJoinVirtualNetwork, joinResp)
+		// Persist join response for reconnect
+		viper.Set(keyJoinVirtualNetworkCommunityName, joinResp.CommunityName)
+		viper.Set(keyJoinVirtualNetworkSecretKey, joinResp.SecretKey)
+		viper.Set(keyJoinVirtualNetworkVirtualIP, joinResp.VirtualIP)
+		viper.Set(keyJoinVirtualNetworkNetMask, joinResp.SubnetMask)
+		viper.Set(keyJoinVirtualNetworkSuperNode, joinResp.Server.Host)
+		viper.Set(keyJoinVirtualNetworkNetworkID, vnId)
+		viper.Set(keyJoinVirtualNetworkAsExitNode, viper.GetBool(cliAsExitNode))
+
 		viper.Set(keyDeviceUUID, deviceId)
 		persistAuthFile()
 		log.Infof("Success to join virtual network")
 		log.Infof("Start to connect omniedge")
-		if err = start(device, joinResp, viper.GetBool(cliEnableRouting)); err != nil {
+		if err = start(device, joinResp, viper.GetBool(cliEnableRouting), viper.GetString(cliExitNode), vnId, viper.GetBool(cliAsExitNode)); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
@@ -142,7 +147,7 @@ func register(httpOption api.HttpOption) (*api.DeviceResponse, error) {
 	return device, err
 }
 
-func start(device *api.DeviceResponse, joinResponse *api.JoinVirtualNetworkResponse, enableRouting bool) error {
+func start(device *api.DeviceResponse, joinResponse *api.JoinVirtualNetworkResponse, enableRouting bool, exitNodeIP string, networkId string, isExitNode bool) error {
 	var randomMac string
 	var err error
 	if randomMac, err = core.GenerateRandomMac(); err != nil {
@@ -164,6 +169,9 @@ func start(device *api.DeviceResponse, joinResponse *api.JoinVirtualNetworkRespo
 		Token:         fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
 		BaseUrl:       core.ConfigV.GetString(RestEndpointUrl),
 		HardwareUUID:  hardwareId,
+		ExitNodeIP:    exitNodeIP,
+		IsExitNode:    isExitNode,
+		NetworkID:     networkId,
 	}
 	var service = core.StartService{
 		StartOption: startOption,
@@ -217,11 +225,16 @@ func init() {
 	var (
 		networkId      string
 		authConfigPath string
-		enableRoutine  bool
 	)
 	joinCmd.Flags().StringVarP(&networkId, cliVirtualNetworkId, "n", "", "id of the virtual network which you want to join")
+
 	_ = registerCmd.MarkFlagRequired(cliVirtualNetworkId)
 	joinCmd.Flags().StringVarP(&authConfigPath, cliAuthConfigFile, "f", "", "position to store the auth and config")
-	joinCmd.Flags().BoolVarP(&enableRoutine, cliEnableRouting, "r", false, "enable routing")
+	joinCmd.Flags().BoolP(cliEnableRouting, "r", false, "enable routing")
+	joinCmd.Flags().StringP(cliExitNode, "e", "", "exit node ip address")
+	joinCmd.Flags().Bool(cliAsExitNode, false, "enable this device as an exit node")
+	viper.BindPFlag(cliEnableRouting, joinCmd.Flags().Lookup(cliEnableRouting))
+	viper.BindPFlag(cliExitNode, joinCmd.Flags().Lookup(cliExitNode))
+	viper.BindPFlag(cliAsExitNode, joinCmd.Flags().Lookup(cliAsExitNode))
 	rootCmd.AddCommand(joinCmd)
 }

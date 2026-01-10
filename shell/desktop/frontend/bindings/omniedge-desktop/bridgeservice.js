@@ -214,6 +214,16 @@ export function SetAppIcon(icon) {
 }
 
 /**
+ * SetExitNode selects an exit node for the given network
+ * @param {string} networkID
+ * @param {string} exitNodeID
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetExitNode(networkID, exitNodeID) {
+    return $Call.ByID(1380828692, networkID, exitNodeID);
+}
+
+/**
  * SetMainWindow sets the main window reference for dynamic resizing
  * @param {application$0.WebviewWindow | null} window
  * @returns {$CancellablePromise<void>}

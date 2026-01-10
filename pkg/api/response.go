@@ -76,11 +76,14 @@ type DeviceResponse struct {
 }
 
 type DeviceVirtualNetworkResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	VirtualIP string    `json:"virtual_ip"`
-	LastSeen  time.Time `json:"last_seen"`
-	Online    bool      `json:"online"`
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	VirtualIP       string    `json:"virtual_ip"`
+	IsExitNode      bool      `json:"is_exit_node"`
+	LastSeen        time.Time `json:"last_seen"`
+	Online          bool      `json:"online"`
+	ExitNodeEnabled bool      `json:"exit_node_enabled"`
+	Platform        string    `json:"platform"`
 }
 
 type DeviceSubnetRouteResponse struct {
@@ -117,11 +120,14 @@ type VirtualNetworkResponse struct {
 }
 
 type VirtualNetworkDeviceResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	VirtualIP string    `json:"virtual_ip"`
-	LastSeen  time.Time `json:"last_seen"`
-	Online    bool      `json:"online"`
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	VirtualIP       string    `json:"virtual_ip"`
+	IsExitNode      bool      `json:"is_exit_node"`
+	LastSeen        time.Time `json:"last_seen"`
+	Online          bool      `json:"online"`
+	ExitNodeEnabled bool      `json:"exit_node_enabled"`
+	Platform        string    `json:"platform"`
 }
 
 type JoinVirtualNetworkResponse struct {
@@ -163,4 +169,10 @@ type ScanResult struct {
 	MacAddress string `mapstructure:"macAddress"`
 	Vendor     string `mapstructure:"vendor"`
 	OS         string `mapstructure:"os"`
+}
+
+type HeartbeatResponse struct {
+	Message   string            `json:"message"`
+	LastSeen  time.Time         `json:"last_seen"`
+	ExitNodes map[string]string `json:"exit_nodes"`
 }

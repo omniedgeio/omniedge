@@ -40,6 +40,9 @@ var startCmd = &cobra.Command{
 			Token:         viper.GetString(keyAuthResponseToken),
 			BaseUrl:       core.ConfigV.GetString(RestEndpointUrl),
 			HardwareUUID:  hardwareId,
+			ExitNodeIP:    viper.GetString(cliExitNode),
+			IsExitNode:    viper.GetBool(cliAsExitNode) || viper.GetBool(keyJoinVirtualNetworkAsExitNode),
+			NetworkID:     viper.GetString(keyJoinVirtualNetworkNetworkID),
 		}
 		var service = core.StartService{
 			StartOption: startOption,
@@ -54,8 +57,14 @@ func init() {
 	var (
 		authConfigPath string
 		enableRoutine  bool
+		exitNode       string
 	)
 	startCmd.Flags().StringVarP(&authConfigPath, cliAuthConfigFile, "f", "", "position to store the auth and config")
 	startCmd.Flags().BoolVarP(&enableRoutine, cliEnableRouting, "r", false, "enable routing")
-	//rootCmd.AddCommand(startCmd)
+	startCmd.Flags().StringVarP(&exitNode, cliExitNode, "e", "", "exit node ip address")
+	startCmd.Flags().Bool(cliAsExitNode, false, "enable this device as an exit node")
+	viper.BindPFlag(cliEnableRouting, startCmd.Flags().Lookup(cliEnableRouting))
+	viper.BindPFlag(cliExitNode, startCmd.Flags().Lookup(cliExitNode))
+	viper.BindPFlag(cliAsExitNode, startCmd.Flags().Lookup(cliAsExitNode))
+	rootCmd.AddCommand(startCmd)
 }

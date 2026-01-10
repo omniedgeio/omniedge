@@ -37,6 +37,13 @@ export class DeviceWithNetwork {
              */
             this["virtual_ip"] = "";
         }
+        if (!("is_exit_node" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["is_exit_node"] = false;
+        }
         if (!("last_seen" in $$source)) {
             /**
              * @member
@@ -141,6 +148,13 @@ export class NetworkInfo {
              * @type {string}
              */
             this["ip_range"] = "";
+        }
+        if (!("exit_node_ip" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["exit_node_ip"] = "";
         }
 
         Object.assign(this, $$source);

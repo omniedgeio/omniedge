@@ -24,6 +24,8 @@ const (
 	cliCidr          = "cidr"
 	cliScanResult    = "scan-result"
 	cliEnableRouting = "enable-routing"
+	cliExitNode      = "exit-node"
+	cliAsExitNode    = "as-exit-node"
 )
 
 const (
@@ -50,6 +52,8 @@ var (
 	keyJoinVirtualNetworkVirtualIP     = "joinVirtualNetwork.virtual_ip"
 	keyJoinVirtualNetworkNetMask       = "joinVirtualNetwork.subnet_mask"
 	keyJoinVirtualNetworkSuperNode     = "joinVirtualNetwork.server.host"
+	keyJoinVirtualNetworkNetworkID     = "joinVirtualNetwork.network_id"
+	keyJoinVirtualNetworkAsExitNode    = "joinVirtualNetwork.as_exit_node"
 
 	keyScanResult     = "scan.result"
 	keyScanIP         = "scan.ip"

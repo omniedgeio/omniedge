@@ -22,6 +22,7 @@ type RegisterService struct {
 
 type HeartbeatOption struct {
 	HardwareUUID string
+	IsExitNode   bool
 }
 
 type HeartbeatService struct {
@@ -60,12 +61,13 @@ func (s *RegisterService) Register(opt *RegisterOption) (*DeviceResponse, error)
 	}
 }
 
-func (s *HeartbeatService) Heartbeat(opt *HeartbeatOption) error {
+func (s *HeartbeatService) Heartbeat(opt *HeartbeatOption) (*HeartbeatResponse, error) {
 	var url string
 	url = s.BaseUrl + "/devices/heartbeat"
 
-	body := map[string]string{
-		"hardware_id": opt.HardwareUUID,
+	body := map[string]interface{}{
+		"hardware_id":  opt.HardwareUUID,
+		"is_exit_node": opt.IsExitNode,
 	}
 	postBody, _ := json.Marshal(body)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
@@ -73,15 +75,20 @@ func (s *HeartbeatService) Heartbeat(opt *HeartbeatOption) error {
 	req.Header.Set("Authorization", s.Token)
 	resp, err := HandleCall(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	log.Tracef("Heartbeat response %+v", resp)
 	switch resp.(type) {
 	case *SuccessResponse:
-		return nil
+		hbJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
+		hb := HeartbeatResponse{}
+		if err := json.Unmarshal(hbJson, &hb); err != nil {
+			return nil, fmt.Errorf("Fail to unmarshal heartbeat response: %v", err)
+		}
+		return &hb, nil
 	case *ErrorResponse:
-		return errors.New(fmt.Sprintf("Fail to send heartbeat, error message: %s", resp.(*ErrorResponse).Message))
+		return nil, errors.New(fmt.Sprintf("Fail to send heartbeat, error message: %s", resp.(*ErrorResponse).Message))
 	default:
-		return errors.New(fmt.Sprint("Internal error during heartbeat"))
+		return nil, errors.New(fmt.Sprint("Internal error during heartbeat"))
 	}
 }

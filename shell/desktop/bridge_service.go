@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -72,8 +74,10 @@ type BridgeService struct {
 	refreshToken         string
 	baseURL              string
 	hardwareUUID         string
+	deviceDBID           string // Database UUID of this device
 	appIcon              []byte
 	heartbeatDone        chan bool
+	isExitNode           bool
 	activeService        *core.StartService // Kept for reference, but legacy on macOS
 	helper               *bridge.HelperClient
 }
@@ -197,13 +201,52 @@ func (b *BridgeService) sendHeartbeat() {
 	}
 	opt := &api.HeartbeatOption{
 		HardwareUUID: b.hardwareUUID,
+		IsExitNode:   b.isExitNode,
 	}
-	err := hbService.Heartbeat(opt)
+	resp, err := hbService.Heartbeat(opt)
 	if err != nil {
 		log.Debugf("BridgeService: Heartbeat failed: %v", err)
-	} else {
+	} else if resp != nil {
 		log.Trace("BridgeService: Heartbeat sent successfully")
+		// Desktop app can monitor resp.ExitNodes[b.connectedNetworkID] if needed
+		// but the active core service already does this.
 	}
+}
+
+// ensureDeviceID ensures we have the database UUID for this device
+func (b *BridgeService) ensureDeviceID() (string, error) {
+	b.mu.Lock()
+	if b.deviceDBID != "" {
+		id := b.deviceDBID
+		b.mu.Unlock()
+		return id, nil
+	}
+	b.mu.Unlock()
+
+	if b.token == "" {
+		return "", fmt.Errorf("not logged in")
+	}
+
+	regService := api.RegisterService{
+		HttpOption: api.HttpOption{
+			BaseUrl: b.baseURL,
+			Token:   b.token,
+		},
+	}
+	deviceResp, err := regService.Register(&api.RegisterOption{
+		Name:         b.GetDeviceName(),
+		HardwareUUID: b.hardwareUUID,
+		OS:           runtime.GOOS,
+	})
+	if err != nil {
+		return "", fmt.Errorf("device registration failed: %w", err)
+	}
+
+	b.mu.Lock()
+	b.deviceDBID = deviceResp.ID
+	b.mu.Unlock()
+
+	return deviceResp.ID, nil
 }
 
 // CheckExistingConnection checks if there's an existing VPN connection
@@ -242,9 +285,10 @@ type LoginResult struct {
 
 // NetworkInfo represents basic network information
 type NetworkInfo struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	IPRange string `json:"ip_range"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	IPRange    string `json:"ip_range"`
+	ExitNodeIP string `json:"exit_node_ip"`
 }
 
 // Login authenticates with the OmniEdge API using a security key
@@ -600,7 +644,9 @@ func (b *BridgeService) GetNetworks() ([]NetworkInfo, error) {
 			Name:    net.Name,
 			IPRange: net.IPRange,
 		}
+		// Find own virtual network device record etc. (simplified for now)
 	}
+
 	return result, nil
 }
 
@@ -682,7 +728,12 @@ func (b *BridgeService) Connect(networkId string) error {
 		Token:         b.token,
 		BaseUrl:       b.baseURL,
 		HardwareUUID:  b.hardwareUUID,
+		ExitNodeIP:    "", // Will be updated via heartbeat if selected
+		NetworkID:     networkId,
 	}
+
+	// 4. Ensure we have the device DB ID
+	_, _ = b.ensureDeviceID()
 
 	// 4. Start VPN via Helper
 	if b.helper.IsAvailable() {
@@ -783,6 +834,19 @@ func (b *BridgeService) Quit() {
 }
 
 // GetStatus returns the current connection status
+func (b *BridgeService) SetIsExitNode(isExitNode bool) {
+	b.mu.Lock()
+	b.isExitNode = isExitNode
+	b.mu.Unlock()
+	log.Infof("BridgeService: Exit node mode set to %v", isExitNode)
+	// Immediately send heartbeat to update backend
+	go b.sendHeartbeat()
+}
+
+func (b *BridgeService) GetIsExitNode() bool {
+	return b.isExitNode
+}
+
 func (b *BridgeService) GetStatus() string {
 	return string(b.status)
 }
@@ -890,4 +954,39 @@ func (b *BridgeService) Ping(targetIP string) (int, error) {
 	}
 
 	return 0, fmt.Errorf("could not parse ping output")
+}
+
+// SetExitNode selects an exit node for the given network
+func (b *BridgeService) SetExitNode(networkID string, exitNodeID string) error {
+	deviceId, err := b.ensureDeviceID()
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/virtual-networks/%s/devices/%s/select-exit-node", b.baseURL, networkID, deviceId)
+
+	body := map[string]interface{}{
+		"exit_node_id": exitNodeID,
+	}
+	if exitNodeID == "" {
+		body["exit_node_id"] = nil
+	}
+
+	postBody, _ := json.Marshal(body)
+	req, _ := http.NewRequest("PUT", url, bytes.NewBuffer(postBody))
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Authorization", b.token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to select exit node: status %d", resp.StatusCode)
+	}
+
+	log.Infof("Successfully set exit node to %s for network %s", exitNodeID, networkID)
+	return nil
 }
