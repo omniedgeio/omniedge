@@ -15,6 +15,7 @@ function App() {
     const [profile, setProfile] = useState(null);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isConnecting, setIsConnecting] = useState(false);
     const [activeNetwork, setActiveNetwork] = useState(null);
     const [expandedNetworks, setExpandedNetworks] = useState({});
     const [networkDevices, setNetworkDevices] = useState({});
@@ -35,7 +36,7 @@ function App() {
     useEffect(() => {
         const timer = setTimeout(resizeToContent, 100); // Delay to ensure render
         return () => clearTimeout(timer);
-    }, [isLoggedIn, networks, expandedNetworks, isLoading, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode]);
+    }, [isLoggedIn, networks, expandedNetworks, isLoading, isConnecting, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode]);
 
     useEffect(() => {
         BridgeService.GetDeviceName().then(setDeviceName);
@@ -147,7 +148,7 @@ function App() {
     };
 
     const handleConnect = async (networkId) => {
-        setIsLoading(true);
+        setIsConnecting(true);
         setActiveNetwork(networkId); // Optimistic update
         try {
             await BridgeService.Connect(networkId);
@@ -158,11 +159,11 @@ function App() {
             setActiveNetwork(null); // Rollback
             setError("Connection failed: " + (err.message || "Unknown error"));
         }
-        setIsLoading(false);
+        setIsConnecting(false);
     };
 
     const handleDisconnect = async () => {
-        setIsLoading(true);
+        setIsConnecting(true);
         const prevNetwork = activeNetwork;
         setActiveNetwork(null); // Optimistic update
         try {
@@ -172,7 +173,7 @@ function App() {
             console.error(err);
             setActiveNetwork(prevNetwork); // Rollback
         }
-        setIsLoading(false);
+        setIsConnecting(false);
     };
 
     const toggleNetworkExpand = async (networkId) => {
@@ -252,7 +253,7 @@ function App() {
     const handleSelectExitNode = async (exitNodeId) => {
         if (!activeNetwork) return;
         try {
-            setIsLoading(true);
+            setIsConnecting(true);
             await BridgeService.SetExitNode(activeNetwork, exitNodeId);
             // Refresh networks to get updated selected_exit_node_id
             const nets = await BridgeService.GetNetworks();
@@ -261,7 +262,7 @@ function App() {
             console.error(err);
             setError("Failed to set exit node.");
         } finally {
-            setIsLoading(false);
+            setIsConnecting(false);
         }
     };
 
