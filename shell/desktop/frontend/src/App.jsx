@@ -27,9 +27,8 @@ function App() {
     // Resize window to fit content
     const resizeToContent = useCallback(() => {
         if (appRef.current) {
-            const contentHeight = appRef.current.scrollHeight + 20;
-            const finalHeight = Math.max(contentHeight, 480);
-            BridgeService.ResizeWindow(finalHeight);
+            const height = appRef.current.scrollHeight + -5; // Add padding
+            BridgeService.ResizeWindow(height);
         }
     }, []);
 
