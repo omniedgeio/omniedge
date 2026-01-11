@@ -64,6 +64,14 @@ export function Disconnect() {
 }
 
 /**
+ * GetConnectedNetworkID returns the ID of the currently connected network
+ * @returns {$CancellablePromise<string>}
+ */
+export function GetConnectedNetworkID() {
+    return $Call.ByID(4221383646);
+}
+
+/**
  * GetConnectedNetworkName returns the name of the currently joined network
  * @returns {$CancellablePromise<string>}
  */

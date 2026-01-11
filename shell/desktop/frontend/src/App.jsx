@@ -9,6 +9,7 @@ function App() {
     const [virtualIP, setVirtualIP] = useState('');
     const [deviceName, setDeviceName] = useState('');
     const [networkName, setNetworkName] = useState('');
+    const [connectedNetworkID, setConnectedNetworkID] = useState('');
     const [networks, setNetworks] = useState([]);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [profile, setProfile] = useState(null);
@@ -38,7 +39,6 @@ function App() {
 
     useEffect(() => {
         BridgeService.GetDeviceName().then(setDeviceName);
-
         Events.On("status-changed", (event) => {
             const newStatus = event.data;
             setStatus(newStatus);
@@ -97,6 +97,8 @@ function App() {
         setVirtualIP(vIP);
         const netName = await BridgeService.GetConnectedNetworkName();
         setNetworkName(netName);
+        const netID = await BridgeService.GetConnectedNetworkID();
+        setConnectedNetworkID(netID);
     };
 
     const handleBrowserLogin = async () => {
@@ -129,35 +131,45 @@ function App() {
         setIsLoggedIn(false);
         setProfile(null);
         setNetworks([]);
+        setActiveNetwork(null);
+        setConnectedNetworkID('');
         BridgeService.ClearTokens();
     };
 
     const handleConnect = async (networkId) => {
         setIsLoading(true);
+        setActiveNetwork(networkId); // Optimistic update
         try {
             await BridgeService.Connect(networkId);
-            setActiveNetwork(networkId);
+            // Refresh info immediately after connect call
+            await refreshConnectionInfo();
         } catch (err) {
             console.error(err);
+            setActiveNetwork(null); // Rollback
+            setError("Connection failed: " + (err.message || "Unknown error"));
         }
         setIsLoading(false);
     };
 
     const handleDisconnect = async () => {
         setIsLoading(true);
+        const prevNetwork = activeNetwork;
+        setActiveNetwork(null); // Optimistic update
         try {
             await BridgeService.Disconnect();
-            setActiveNetwork(null);
+            await refreshConnectionInfo();
         } catch (err) {
             console.error(err);
+            setActiveNetwork(prevNetwork); // Rollback
         }
         setIsLoading(false);
     };
 
     const toggleNetworkExpand = async (networkId) => {
+        if (!networkId) return;
         const isExpanded = !!expandedNetworks[networkId];
         setExpandedNetworks({ ...expandedNetworks, [networkId]: !isExpanded });
-        if (!isExpanded) {
+        if (!isExpanded && isLoggedIn) {
             try {
                 const devs = await BridgeService.GetNetworkDevices(networkId);
                 setNetworkDevices(prev => ({ ...prev, [networkId]: devs || [] }));
@@ -170,23 +182,29 @@ function App() {
     // Auto-refresh devices for expanded networks OR active network if exit nodes expanded
     useEffect(() => {
         const refreshInterval = setInterval(async () => {
+            if (!isLoggedIn) return;
+
             const networksToRefresh = new Set(Object.keys(expandedNetworks).filter(id => expandedNetworks[id]));
             if (isExitNodesExpanded && activeNetwork) {
                 networksToRefresh.add(activeNetwork);
             }
 
             for (const networkId of networksToRefresh) {
+                if (!networkId) continue;
                 try {
                     const devs = await BridgeService.GetNetworkDevices(networkId);
                     setNetworkDevices(prev => ({ ...prev, [networkId]: devs || [] }));
                 } catch (err) {
                     console.error('Auto-refresh devices error:', err);
+                    if (err.message && err.message.includes('not logged in')) {
+                        setIsLoggedIn(false);
+                    }
                 }
             }
         }, 10000);
 
         return () => clearInterval(refreshInterval);
-    }, [expandedNetworks, isExitNodesExpanded, activeNetwork]);
+    }, [expandedNetworks, isExitNodesExpanded, activeNetwork, isLoggedIn]);
 
     // Sync activeNetwork based on connection status
     useEffect(() => {
@@ -195,17 +213,24 @@ function App() {
             if (active && activeNetwork !== active.id) {
                 setActiveNetwork(active.id);
             }
+        } else if (!networkName && status === 'disconnected') {
+            setActiveNetwork(null);
         }
-    }, [networkName, networks, activeNetwork]);
+    }, [networkName, networks, activeNetwork, status]);
 
     // Initial fetch for active network devices
     useEffect(() => {
-        if (activeNetwork && !networkDevices[activeNetwork]) {
+        if (isLoggedIn && activeNetwork && !networkDevices[activeNetwork]) {
             BridgeService.GetNetworkDevices(activeNetwork).then(devs => {
                 setNetworkDevices(prev => ({ ...prev, [activeNetwork]: devs || [] }));
-            }).catch(console.error);
+            }).catch(err => {
+                console.error(err);
+                if (err.message && err.message.includes('not logged in')) {
+                    setIsLoggedIn(false);
+                }
+            });
         }
-    }, [activeNetwork]);
+    }, [activeNetwork, isLoggedIn]);
 
     const handleToggleIsExitNode = async (e) => {
         e.stopPropagation();
@@ -240,6 +265,9 @@ function App() {
             <div className="app-header">
                 <div className="header-left">
                     <span className="app-name">OmniEdge</span>
+                    <span className={`status-pill ${status === 'connected' ? 'online' : ''}`}>
+                        {status === 'connected' ? 'Connected' : 'Disconnected'}
+                    </span>
                 </div>
                 <div className="header-right">
                     <div className="login-status-container" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -302,13 +330,7 @@ function App() {
                         <div className="divider"></div>
                         <div className="detail-section no-hover">
                             <div className="detail-line">
-                                <span className="detail-label">Status</span>
-                                <span className={`status-pill ${status === 'connected' ? 'online' : ''}`}>
-                                    {status === 'connected' ? 'Connected' : 'Disconnected'}
-                                </span>
-                            </div>
-                            <div className="detail-line">
-                                <span className="detail-label">Virtual IP</span>
+                                <span className="detail-label">This Device</span>
                                 <span className="detail-value mono">{virtualIP || '---.---.---.---'}</span>
                             </div>
                             {status === 'connected' && (
@@ -334,7 +356,7 @@ function App() {
                         <div className="networks-list">
                             {networks.map(net => {
                                 const isExpanded = expandedNetworks[net.id];
-                                const isActive = activeNetwork === net.id || (status === 'connected' && networkName === net.name);
+                                const isActive = connectedNetworkID === net.id || activeNetwork === net.id;
 
                                 return (
                                     <div key={net.id} className="network-item-container">
@@ -408,7 +430,7 @@ function App() {
                             <div className="menu-item no-hover" style={{ height: '32px', paddingLeft: '36px' }}>
                                 <span className="detail-header-label" style={{ fontSize: '12px', opacity: 0.9 }}>Run as Exit Node</span>
                                 <div
-                                    className={`ios-switch header-toggle ${isBecomingExitNode ? 'on' : ''}`}
+                                    className={`ios-switch ${isBecomingExitNode ? 'on' : ''}`}
                                     onClick={handleToggleIsExitNode}
                                 >
                                     <div className="dot"></div>
@@ -477,7 +499,7 @@ function App() {
 
             <div className="divider"></div>
             <div className="app-footer">
-                <div className="menu-item" onClick={() => openURL('https://connect.omniedge.io/dashboard')}>
+                <div className="menu-item" onClick={() => openURL('https://connect.omniedge.io/dashboard/virtual-networks')}>
                     <span>Dashboard...</span>
                 </div>
                 <div className="menu-item quit-row" onClick={() => BridgeService.Quit()}>

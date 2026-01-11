@@ -45,6 +45,7 @@ func init() {
 type TokenData struct {
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
+	IsExitNode   bool   `json:"is_exit_node"`
 }
 
 // ConnectionStatus represents the VPN connection state
@@ -96,6 +97,10 @@ func NewBridgeService() *BridgeService {
 	}
 	// Try to stop any ghost VPNs via the helper on startup
 	go b.cleanupGhostVPN()
+
+	// Load settings on startup
+	b.LoadTokens()
+
 	return b
 }
 
@@ -265,6 +270,17 @@ func (b *BridgeService) CheckExistingConnection() {
 					if ip != nil && (ip[0] == 100 || ip[0] == 10) {
 						b.status = StatusConnected
 						b.virtualIP = ip.String()
+
+						// Try to identify which network this IP belongs to
+						if b.token != "" {
+							_, err := b.GetNetworks()
+							if err == nil {
+								// In OmniEdge, each device has a unique IP per network.
+								// For now, we'll try to find any network where this device is registered
+								// or just trust the current state if it matches a previous session.
+							}
+						}
+
 						b.updateTrayIcon()
 						if b.app != nil {
 							b.app.Event.Emit("status-changed", string(b.status))
@@ -507,6 +523,7 @@ func (b *BridgeService) SaveTokens() error {
 	data := TokenData{
 		Token:        b.token,
 		RefreshToken: b.refreshToken,
+		IsExitNode:   b.isExitNode,
 	}
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -535,7 +552,8 @@ func (b *BridgeService) LoadTokens() error {
 	}
 	b.token = data.Token
 	b.refreshToken = data.RefreshToken
-	log.Info("BridgeService: Tokens loaded from file")
+	b.isExitNode = data.IsExitNode
+	log.Infof("BridgeService: Tokens and settings loaded from file (IsExitNode: %v)", b.isExitNode)
 	return nil
 }
 
@@ -868,6 +886,10 @@ func (b *BridgeService) SetIsExitNode(isExitNode bool) {
 	b.isExitNode = isExitNode
 	b.mu.Unlock()
 	log.Infof("BridgeService: Exit node mode set to %v", isExitNode)
+
+	// Save setting
+	b.SaveTokens()
+
 	// Immediately send heartbeat to update backend
 	go b.sendHeartbeat()
 }
@@ -902,6 +924,14 @@ func (b *BridgeService) GetConnectedNetworkName() string {
 		return "" // Return empty when not connected
 	}
 	return b.connectedNetworkName
+}
+
+// GetConnectedNetworkID returns the ID of the currently connected network
+func (b *BridgeService) GetConnectedNetworkID() string {
+	if b.status != StatusConnected {
+		return ""
+	}
+	return b.connectedNetworkID
 }
 
 // GetLocalIP returns the local IP address
