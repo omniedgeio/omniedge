@@ -305,11 +305,11 @@ function App() {
                         <div className="locked-info">
                             <div className="divider"></div>
                             <div className="detail-section disabled">
-                                <div className="detail-line">
+                                <div className="detail-line aligned-row">
                                     <span className="detail-label">Status</span>
-                                    <span className="status-pill">Offline</span>
+                                    <span className="detail-value status-pill">Offline</span>
                                 </div>
-                                <div className="detail-line">
+                                <div className="detail-line aligned-row">
                                     <span className="detail-label">Virtual IP</span>
                                     <span className="detail-value mono">---.---.---.---</span>
                                 </div>
@@ -329,12 +329,12 @@ function App() {
                     <div className="dashboard-view">
                         <div className="divider"></div>
                         <div className="detail-section no-hover">
-                            <div className="detail-line">
+                            <div className="detail-line aligned-row">
                                 <span className="detail-label">This Device</span>
                                 <span className="detail-value mono">{virtualIP || '---.---.---.---'}</span>
                             </div>
                             {status === 'connected' && (
-                                <div className="detail-line">
+                                <div className="detail-line aligned-row">
                                     <span className="detail-label">Network</span>
                                     <span className="detail-value truncate">{networkName}</span>
                                 </div>

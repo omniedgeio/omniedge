@@ -378,6 +378,17 @@ body {
     justify-content: space-between;
 }
 
+.detail-line.aligned-row> :first-child {
+    min-width: 0;
+}
+
+.detail-line.aligned-row> :last-child {
+    width: 110px;
+    /* Fixed width to align IPs/Status on the right */
+    text-align: left;
+    flex-shrink: 0;
+}
+
 .detail-label {
     font-size: 12px;
     color: var(--text-secondary);
@@ -538,15 +549,23 @@ body {
 
 .device-grid {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr 110px;
     align-items: center;
     gap: 8px;
+}
+
+.device-ip-mini {
+    font-family: "SF Mono", monospace;
+    font-size: 10px;
+    opacity: 0.5;
+    text-align: left;
 }
 
 .device-name-container {
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
 }
 
 .status-dot-mini {
