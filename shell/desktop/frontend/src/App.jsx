@@ -80,9 +80,19 @@ function App() {
             const userProfile = await BridgeService.GetProfile();
             setProfile(userProfile);
             const nets = await BridgeService.GetNetworks();
-            setNetworks(nets || []);
+            const netsArray = nets || [];
+            setNetworks(netsArray);
             setIsLoggedIn(true);
             setIsWaitingForBrowser(false);
+
+            // Auto-connect flow: If not already connected to a network, connect to the first available one
+            const currentStatus = await BridgeService.GetStatus();
+            const currentNetID = await BridgeService.GetConnectedNetworkID();
+
+            if (currentStatus !== 'connected' && !currentNetID && netsArray.length > 0) {
+                console.log("Auto-connecting to first network:", netsArray[0].name);
+                handleConnect(netsArray[0].id);
+            }
         } catch (err) {
             console.error("handleSuccessfulLogin failed:", err);
             setError("Failed to load profile after login.");
