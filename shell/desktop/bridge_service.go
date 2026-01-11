@@ -707,7 +707,7 @@ func (b *BridgeService) Connect(networkId string) error {
 
 	if b.status == StatusConnecting {
 		b.mu.Unlock()
-		return fmt.Errorf("already connecting")
+		return nil
 	}
 
 	if b.status == StatusConnected && b.connectedNetworkID == networkId {

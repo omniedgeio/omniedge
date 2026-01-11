@@ -144,16 +144,19 @@ function App() {
         setNetworks([]);
         setActiveNetwork(null);
         setConnectedNetworkID('');
+        setError('');
         BridgeService.ClearTokens();
     };
 
     const handleConnect = async (networkId) => {
         setIsConnecting(true);
+        setError('');
         setActiveNetwork(networkId); // Optimistic update
         try {
             await BridgeService.Connect(networkId);
             // Refresh info immediately after connect call
             await refreshConnectionInfo();
+            setError('');
         } catch (err) {
             console.error(err);
             setActiveNetwork(null); // Rollback
@@ -164,11 +167,13 @@ function App() {
 
     const handleDisconnect = async () => {
         setIsConnecting(true);
+        setError('');
         const prevNetwork = activeNetwork;
         setActiveNetwork(null); // Optimistic update
         try {
             await BridgeService.Disconnect();
             await refreshConnectionInfo();
+            setError('');
         } catch (err) {
             console.error(err);
             setActiveNetwork(prevNetwork); // Rollback
