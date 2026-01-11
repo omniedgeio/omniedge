@@ -89,7 +89,7 @@ function App() {
             const currentStatus = await BridgeService.GetStatus();
             const currentNetID = await BridgeService.GetConnectedNetworkID();
 
-            if (currentStatus !== 'connected' && !currentNetID && netsArray.length > 0) {
+            if (currentStatus === 'disconnected' && !currentNetID && netsArray.length > 0) {
                 console.log("Auto-connecting to first network:", netsArray[0].name);
                 handleConnect(netsArray[0].id);
             }

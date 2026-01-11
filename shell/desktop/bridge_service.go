@@ -699,6 +699,9 @@ func (b *BridgeService) GetNetworks() ([]NetworkInfo, error) {
 
 // Connect initiates a VPN connection to the specified network
 func (b *BridgeService) Connect(networkId string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if b.token == "" {
 		return fmt.Errorf("not logged in")
 	}
@@ -837,6 +840,9 @@ func (b *BridgeService) Connect(networkId string) error {
 
 // Disconnect terminates the current VPN connection
 func (b *BridgeService) Disconnect() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	log.Info("BridgeService: Disconnect called")
 
 	// 1. Stop via helper if available

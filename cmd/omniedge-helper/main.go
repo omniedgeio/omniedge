@@ -152,11 +152,11 @@ func startVPN(opt core.StartOption) Response {
 	service := &core.StartService{
 		StartOption: opt,
 	}
+	activeVPN = service
 
 	// Start VPN in a goroutine because Start() is blocking in the current implementation
 	// We might need to refactor pkg/core to allow non-blocking start or handle it here.
 	go func() {
-		activeVPN = service
 		if err := service.Start(); err != nil {
 			log.Errorf("VPN Start error: %v", err)
 			activeVPN = nil
