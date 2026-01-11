@@ -102,6 +102,16 @@ sudo omniedge join
 
 # Direct mode - specify network ID
 sudo omniedge join -n "your-network-id"
+
+### Exit Node
+
+```bash
+# Become an Exit Node (Authorize on dashboard afterwards)
+sudo omniedge join --as-exit-node
+
+# Route all traffic through an Exit Node
+sudo omniedge join -e "100.100.0.1"
+```
 ```
 
 ## Mobile Apps
