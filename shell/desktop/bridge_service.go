@@ -700,10 +700,19 @@ func (b *BridgeService) GetNetworks() ([]NetworkInfo, error) {
 // Connect initiates a VPN connection to the specified network
 func (b *BridgeService) Connect(networkId string) error {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	if b.token == "" {
+		b.mu.Unlock()
 		return fmt.Errorf("not logged in")
+	}
+
+	if b.status == StatusConnecting {
+		b.mu.Unlock()
+		return fmt.Errorf("already connecting")
+	}
+
+	if b.status == StatusConnected && b.connectedNetworkID == networkId {
+		b.mu.Unlock()
+		return nil
 	}
 
 	// Initial cleanup to ensure utun is available
@@ -716,35 +725,49 @@ func (b *BridgeService) Connect(networkId string) error {
 		b.app.Event.Emit("status-changed", string(b.status))
 	}
 
+	baseURL := b.baseURL
+	token := b.token
+	hardwareUUID := b.hardwareUUID
+	deviceName := b.GetDeviceName()
+	b.mu.Unlock()
+
 	// 1. Register device first (creates or updates the device in the API)
 	regService := api.RegisterService{
 		HttpOption: api.HttpOption{
-			BaseUrl: b.baseURL,
-			Token:   b.token,
+			BaseUrl: baseURL,
+			Token:   token,
 		},
 	}
 	deviceResp, err := regService.Register(&api.RegisterOption{
-		Name:         b.GetDeviceName(),
-		HardwareUUID: b.hardwareUUID,
+		Name:         deviceName,
+		HardwareUUID: hardwareUUID,
 		OS:           runtime.GOOS,
 	})
 	if err != nil {
 		log.Warnf("BridgeService: Device registration failed: %v", err)
 		// Continue anyway - device might already exist
-	} else {
+	} else if deviceResp != nil {
 		log.Infof("BridgeService: Device registered with ID: %s", deviceResp.ID)
 	}
+
+	// Re-verify status after long-running API call
+	b.mu.Lock()
+	if b.status != StatusConnecting {
+		b.mu.Unlock()
+		return fmt.Errorf("connection aborted")
+	}
+	b.mu.Unlock()
 
 	// 2. Get Join info
 	vnService := api.VirtualNetworkService{
 		HttpOption: api.HttpOption{
-			BaseUrl: b.baseURL,
-			Token:   b.token,
+			BaseUrl: baseURL,
+			Token:   token,
 		},
 	}
 
 	// Use the registered device UUID if available, otherwise use hardware UUID
-	deviceId := b.hardwareUUID
+	deviceId := hardwareUUID
 	if deviceResp != nil && deviceResp.ID != "" {
 		deviceId = deviceResp.ID
 	}
@@ -755,19 +778,31 @@ func (b *BridgeService) Connect(networkId string) error {
 
 	joinResp, err := vnService.Join(joinOpt)
 	if err != nil {
-		b.status = StatusError
-		if b.app != nil {
-			b.app.Event.Emit("status-changed", string(b.status))
+		b.mu.Lock()
+		if b.status == StatusConnecting {
+			b.status = StatusError
+			if b.app != nil {
+				b.app.Event.Emit("status-changed", string(b.status))
+			}
 		}
+		b.mu.Unlock()
 		return err
 	}
+
+	// Re-verify status again
+	b.mu.Lock()
+	if b.status != StatusConnecting {
+		b.mu.Unlock()
+		return fmt.Errorf("connection aborted")
+	}
+	b.mu.Unlock()
 
 	// 2. Generate Random Mac
 	randomMac, _ := core.GenerateRandomMac()
 
 	// 3. Prepare Start Option
 	startOption := core.StartOption{
-		Hostname:      b.GetDeviceName(),
+		Hostname:      deviceName,
 		DeviceMac:     randomMac,
 		CommunityName: joinResp.CommunityName,
 		VirtualIP:     joinResp.VirtualIP,
@@ -775,9 +810,9 @@ func (b *BridgeService) Connect(networkId string) error {
 		DeviceMask:    joinResp.SubnetMask,
 		SuperNode:     joinResp.Server.Host,
 		EnableRouting: false,
-		Token:         b.token,
-		BaseUrl:       b.baseURL,
-		HardwareUUID:  b.hardwareUUID,
+		Token:         token,
+		BaseUrl:       baseURL,
+		HardwareUUID:  hardwareUUID,
 		ExitNodeIP:    "", // Will be updated via heartbeat if selected
 		NetworkID:     networkId,
 	}
@@ -789,25 +824,46 @@ func (b *BridgeService) Connect(networkId string) error {
 	if b.helper.IsAvailable() {
 		log.Infof("BridgeService: Starting VPN via privileged helper for %s", joinResp.CommunityName)
 		if err := b.helper.StartVPN(&startOption); err != nil {
-			b.status = StatusError
-			if b.app != nil {
-				b.app.Event.Emit("status-changed", string(b.status))
+			b.mu.Lock()
+			if b.status == StatusConnecting {
+				b.status = StatusError
+				if b.app != nil {
+					b.app.Event.Emit("status-changed", string(b.status))
+				}
 			}
+			b.mu.Unlock()
 			return fmt.Errorf("helper failed to start vpn: %w", err)
 		}
 	} else {
 		// Fallback for non-macOS or dev environments (though likely to fail without root)
 		log.Warn("BridgeService: Privileged helper not available, attempting in-process start...")
+		b.mu.Lock()
 		b.activeService = &core.StartService{
 			StartOption: startOption,
 		}
+		b.mu.Unlock()
 		if err := b.activeService.Start(); err != nil {
-			b.status = StatusError
-			if b.app != nil {
-				b.app.Event.Emit("status-changed", string(b.status))
+			b.mu.Lock()
+			if b.status == StatusConnecting {
+				b.status = StatusError
+				if b.app != nil {
+					b.app.Event.Emit("status-changed", string(b.status))
+				}
 			}
+			b.mu.Unlock()
 			return err
 		}
+	}
+
+	b.mu.Lock()
+	// Final re-verify before finalizing state
+	if b.status != StatusConnecting {
+		b.mu.Unlock()
+		// If we already started the VPN but user cancelled, we should stop it
+		if b.helper.IsAvailable() {
+			b.helper.StopVPN()
+		}
+		return fmt.Errorf("connection aborted after start")
 	}
 
 	b.status = StatusConnected
@@ -815,8 +871,13 @@ func (b *BridgeService) Connect(networkId string) error {
 	b.communityName = joinResp.CommunityName
 	b.connectedNetworkID = networkId
 
-	// Lookup actual network name from networks list
+	// Lookup actual network name from internal list?
+	// Note: b.GetNetworks also does an API call, so we should be careful or use the cached nets
+	b.mu.Unlock()
+
 	nets, err := b.GetNetworks()
+
+	b.mu.Lock()
 	if err == nil {
 		for _, net := range nets {
 			if net.ID == networkId {
@@ -835,6 +896,7 @@ func (b *BridgeService) Connect(networkId string) error {
 	if b.app != nil {
 		b.app.Event.Emit("status-changed", string(b.status))
 	}
+	b.mu.Unlock()
 	return nil
 }
 
