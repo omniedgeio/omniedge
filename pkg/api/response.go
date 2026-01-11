@@ -70,20 +70,22 @@ type ProfileResponse struct {
 type DeviceResponse struct {
 	ID              string                          `json:"id"`
 	Name            string                          `json:"name"`
+	HardwareID      string                          `json:"hardware_id"`
 	OS              string                          `json:"os"`
 	VirtualNetworks []*DeviceVirtualNetworkResponse `json:"virtual_networks,omitempty"`
 	Subnets         []*DeviceSubnetRouteResponse    `json:"subnets,omitempty"`
 }
 
 type DeviceVirtualNetworkResponse struct {
-	ID              string    `json:"id"`
-	Name            string    `json:"name"`
-	VirtualIP       string    `json:"virtual_ip"`
-	IsExitNode      bool      `json:"is_exit_node"`
-	LastSeen        time.Time `json:"last_seen"`
-	Online          bool      `json:"online"`
-	ExitNodeEnabled bool      `json:"exit_node_enabled"`
-	Platform        string    `json:"platform"`
+	ID                 string    `json:"id"`
+	Name               string    `json:"name"`
+	VirtualIP          string    `json:"virtual_ip"`
+	IsExitNode         bool      `json:"is_exit_node"`
+	LastSeen           time.Time `json:"last_seen"`
+	Online             bool      `json:"online"`
+	ExitNodeEnabled    bool      `json:"exit_node_enabled"`
+	SelectedExitNodeID string    `json:"selected_exit_node_id"`
+	Platform           string    `json:"platform"`
 }
 
 type DeviceSubnetRouteResponse struct {
@@ -120,14 +122,16 @@ type VirtualNetworkResponse struct {
 }
 
 type VirtualNetworkDeviceResponse struct {
-	ID              string    `json:"id"`
-	Name            string    `json:"name"`
-	VirtualIP       string    `json:"virtual_ip"`
-	IsExitNode      bool      `json:"is_exit_node"`
-	LastSeen        time.Time `json:"last_seen"`
-	Online          bool      `json:"online"`
-	ExitNodeEnabled bool      `json:"exit_node_enabled"`
-	Platform        string    `json:"platform"`
+	ID                 string    `json:"id"`
+	Name               string    `json:"name"`
+	VirtualIP          string    `json:"virtual_ip"`
+	HardwareID         string    `json:"hardware_id"`
+	IsExitNode         bool      `json:"is_exit_node"`
+	LastSeen           time.Time `json:"last_seen"`
+	Online             bool      `json:"online"`
+	ExitNodeEnabled    bool      `json:"exit_node_enabled"`
+	SelectedExitNodeID string    `json:"selected_exit_node_id"`
+	Platform           string    `json:"platform"`
 }
 
 type JoinVirtualNetworkResponse struct {

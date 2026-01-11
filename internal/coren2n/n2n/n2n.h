@@ -19,8 +19,6 @@
 #ifndef _N2N_H_
 #define _N2N_H_
 
-#define SKIP_MULTICAST_PEERS_DISCOVERY 1
-
 /*
   tunctl -t tun0
   tunctl -t tun1

@@ -285,10 +285,12 @@ type LoginResult struct {
 
 // NetworkInfo represents basic network information
 type NetworkInfo struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	IPRange    string `json:"ip_range"`
-	ExitNodeIP string `json:"exit_node_ip"`
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	IPRange            string `json:"ip_range"`
+	Role               int    `json:"role"`
+	ExitNodeIP         string `json:"exit_node_ip"`
+	SelectedExitNodeID string `json:"selected_exit_node_id"`
 }
 
 // Login authenticates with the OmniEdge API using a security key
@@ -637,14 +639,41 @@ func (b *BridgeService) GetNetworks() ([]NetworkInfo, error) {
 		return nil, err
 	}
 
+	// Fetch current device info to get selected exit nodes
+	regService := api.RegisterService{
+		HttpOption: api.HttpOption{
+			BaseUrl: b.baseURL,
+			Token:   b.token,
+		},
+	}
+	devices, _ := regService.ListDevices()
+	var myDevice *api.DeviceResponse
+	for i, d := range devices {
+		if d.HardwareID == b.hardwareUUID {
+			myDevice = &devices[i]
+			break
+		}
+	}
+
 	result := make([]NetworkInfo, len(nets))
 	for i, net := range nets {
-		result[i] = NetworkInfo{
-			ID:      net.ID,
-			Name:    net.Name,
-			IPRange: net.IPRange,
+		selectedExitNodeID := ""
+		if myDevice != nil {
+			for _, vnet := range myDevice.VirtualNetworks {
+				if vnet.ID == net.ID {
+					selectedExitNodeID = vnet.SelectedExitNodeID
+					break
+				}
+			}
 		}
-		// Find own virtual network device record etc. (simplified for now)
+
+		result[i] = NetworkInfo{
+			ID:                 net.ID,
+			Name:               net.Name,
+			IPRange:            net.IPRange,
+			Role:               net.Role,
+			SelectedExitNodeID: selectedExitNodeID,
+		}
 	}
 
 	return result, nil
@@ -895,6 +924,7 @@ type DeviceWithNetwork struct {
 	api.VirtualNetworkDeviceResponse
 	NetworkID string `json:"network_id"`
 	Online    bool   `json:"online"` // Calculated field - true if last_seen within 5 minutes
+	IsMe      bool   `json:"is_me"`
 }
 
 // GetNetworkDevices returns devices in a specific network
@@ -927,6 +957,7 @@ func (b *BridgeService) GetNetworkDevices(networkID string) ([]DeviceWithNetwork
 			VirtualNetworkDeviceResponse: d,
 			NetworkID:                    networkID,
 			Online:                       isOnline,
+			IsMe:                         d.HardwareID == b.hardwareUUID,
 		}
 	}
 	return result, nil

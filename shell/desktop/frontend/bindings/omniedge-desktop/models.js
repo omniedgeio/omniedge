@@ -37,6 +37,13 @@ export class DeviceWithNetwork {
              */
             this["virtual_ip"] = "";
         }
+        if (!("hardware_id" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["hardware_id"] = "";
+        }
         if (!("is_exit_node" in $$source)) {
             /**
              * @member
@@ -50,6 +57,27 @@ export class DeviceWithNetwork {
              * @type {time$0.Time}
              */
             this["last_seen"] = null;
+        }
+        if (!("exit_node_enabled" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["exit_node_enabled"] = false;
+        }
+        if (!("selected_exit_node_id" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["selected_exit_node_id"] = "";
+        }
+        if (!("platform" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["platform"] = "";
         }
         if (!("network_id" in $$source)) {
             /**
@@ -65,6 +93,13 @@ export class DeviceWithNetwork {
              * @type {boolean}
              */
             this["online"] = false;
+        }
+        if (!("is_me" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["is_me"] = false;
         }
 
         Object.assign(this, $$source);
@@ -149,12 +184,26 @@ export class NetworkInfo {
              */
             this["ip_range"] = "";
         }
+        if (!("role" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["role"] = 0;
+        }
         if (!("exit_node_ip" in $$source)) {
             /**
              * @member
              * @type {string}
              */
             this["exit_node_ip"] = "";
+        }
+        if (!("selected_exit_node_id" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["selected_exit_node_id"] = "";
         }
 
         Object.assign(this, $$source);

@@ -72,8 +72,8 @@ body {
 
 /* Header Styles */
 .app-header {
-    height: 44px;
-    padding: 0 16px;
+    height: 48px;
+    padding: 0 14px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -156,6 +156,17 @@ body {
     filter: brightness(1.1);
 }
 
+.profile-chip-tiny {
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #8e8e93, #636366);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
 .profile-initial {
     color: white;
     font-size: 11px;
@@ -169,10 +180,16 @@ body {
     width: 8px;
     height: 8px;
     background: #8e8e93;
-    /* Default offline/gray */
     border: 1.5px solid var(--menu-bg-light);
-    /* Create cutout effect */
     border-radius: 50%;
+}
+
+.user-status-indicator.mini {
+    width: 7px;
+    height: 7px;
+    border-width: 1px;
+    bottom: -1px;
+    right: -1px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -182,8 +199,8 @@ body {
 }
 
 .user-status-indicator.online {
-    background: var(--status-green);
-    box-shadow: 0 0 4px rgba(52, 199, 89, 0.4);
+    background: #34c759;
+    box-shadow: 0 0 2px rgba(52, 199, 89, 0.4);
 }
 
 /* Banner Styles */
@@ -272,16 +289,17 @@ body {
 .divider-dashed {
     height: 1px;
     border-top: 0.5px dashed var(--divider);
-    margin: 4px 16px;
+    margin: 6px 14px;
 }
 
 .subheader {
-    padding: 10px 16px 6px;
-    font-size: 11px;
+    padding: 8px 14px 4px;
+    font-size: 10.5px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.2px;
+    letter-spacing: 0.4px;
     color: var(--text-secondary);
+    opacity: 0.8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -292,17 +310,24 @@ body {
 
 /* Menu Items & Interactive Rows */
 .menu-item {
-    padding: 0 16px;
-    height: 32px;
+    margin: 0 5px;
+    padding: 0 10px;
+    height: 28px;
+    border-radius: 5px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: background 0.1s;
+    transition: background 0.08s;
 }
 
 .menu-item:hover {
     background: var(--selection-bg);
     color: var(--selection-text);
+}
+
+.menu-item.no-hover:hover {
+    background: transparent;
+    color: inherit;
 }
 
 .menu-item:active {
@@ -324,8 +349,8 @@ body {
 }
 
 .quit-row:hover {
-    background: var(--status-red);
-    color: white;
+    background: var(--status-red) !important;
+    color: white !important;
 }
 
 .shortcut {
@@ -483,6 +508,23 @@ body {
     transform: translateX(14px);
 }
 
+.ios-switch.header-toggle {
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+}
+
+.ios-switch.header-toggle .dot {
+    width: 18px;
+    height: 18px;
+    top: 2px;
+    left: 2px;
+}
+
+.ios-switch.header-toggle.on .dot {
+    transform: translateX(18px);
+}
+
 /* Device List */
 .device-list-container {
     max-height: 180px;
@@ -556,6 +598,177 @@ body {
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin: 0 auto;
+}
+
+.subheader-row {
+    margin: 0 5px;
+    padding: 0 10px;
+    height: 28px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.subheader-row:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+    .subheader-row:hover {
+        background: rgba(255, 255, 255, 0.06);
+    }
+}
+
+.exit-nodes-content {
+    background: rgba(0, 0, 0, 0.02);
+    padding: 8px 0;
+    animation: slideDown 0.2s ease-out;
+}
+
+@media (prefers-color-scheme: dark) {
+    .exit-nodes-content {
+        background: rgba(255, 255, 255, 0.02);
+    }
+}
+
+.menu-item-static {
+    padding: 0 16px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.exit-node-selection {
+    padding: 2px 0;
+}
+
+.selection-indicator {
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--accent-blue);
+}
+
+.exit-node-option {
+    margin: 0 5px;
+    padding: 0 10px 0 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 5px;
+    transition: background 0.08s;
+}
+
+.exit-node-option:hover {
+    background: var(--selection-bg);
+    color: var(--selection-text);
+}
+
+.exit-node-option:hover .selection-indicator {
+    color: var(--selection-text);
+}
+
+.exit-node-option.active {
+    background: rgba(0, 122, 255, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+    .exit-node-option.active {
+        background: rgba(0, 122, 255, 0.15);
+    }
+}
+
+.exit-node-option.active .selection-indicator {
+    color: var(--accent-blue);
+}
+
+.available-label {
+    padding: 10px 36px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.exit-node-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.exit-node-ip {
+    font-size: 10px;
+    opacity: 0.5;
+    margin-top: -2px;
+}
+
+.offline-tag {
+    font-size: 9px;
+    padding: 1px 4px;
+    background: var(--divider);
+    border-radius: 4px;
+    opacity: 0.6;
+}
+
+.exit-node-option.offline {
+    opacity: 0.5;
+}
+
+.no-exit-nodes,
+.exit-node-placeholder {
+    padding: 12px 36px;
+    font-size: 11px;
+    opacity: 0.5;
+    font-style: italic;
+}
+
+.ios-switch.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.detail-header-label.disabled {
+    opacity: 0.4;
+}
+
+.profile-header-row {
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.profile-header-row.dashboard {
+    padding: 10px 14px 6px;
+}
+
+.profile-avatar-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.profile-email-text {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.8;
+    color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+    .profile-email-text {
+        color: var(--text-primary-dark);
+    }
 }
 
 @keyframes spin {

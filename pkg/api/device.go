@@ -29,6 +29,34 @@ type HeartbeatService struct {
 	HttpOption
 }
 
+func (s *RegisterService) ListDevices() ([]DeviceResponse, error) {
+	var url = s.BaseUrl + "/devices"
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Authorization", s.Token)
+	resp, _ := HandleCall(req)
+	log.Tracef("ListDevices response %+v", resp)
+	switch resp.(type) {
+	case *SuccessResponse:
+		dataJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
+		var wrapper struct {
+			Data []DeviceResponse `json:"data"`
+		}
+		if err := json.Unmarshal(dataJson, &wrapper); err == nil && len(wrapper.Data) > 0 {
+			return wrapper.Data, nil
+		}
+		var devices []DeviceResponse
+		if err := json.Unmarshal(dataJson, &devices); err == nil {
+			return devices, nil
+		}
+		return []DeviceResponse{}, nil
+	case *ErrorResponse:
+		return nil, errors.New(fmt.Sprintf("Fail to list devices, error message: %s", resp.(*ErrorResponse).Message))
+	default:
+		return nil, errors.New(fmt.Sprint("Internal error during devices fetch"))
+	}
+}
+
 func (s *RegisterService) Register(opt *RegisterOption) (*DeviceResponse, error) {
 	var url string
 	var body map[string]string

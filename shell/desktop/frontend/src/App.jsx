@@ -17,6 +17,8 @@ function App() {
     const [activeNetwork, setActiveNetwork] = useState(null);
     const [expandedNetworks, setExpandedNetworks] = useState({});
     const [networkDevices, setNetworkDevices] = useState({});
+    const [isBecomingExitNode, setIsBecomingExitNode] = useState(false);
+    const [isExitNodesExpanded, setIsExitNodesExpanded] = useState(false);
     const [isWaitingForBrowser, setIsWaitingForBrowser] = useState(false);
     const appRef = useRef(null);
 
@@ -32,7 +34,7 @@ function App() {
     useEffect(() => {
         const timer = setTimeout(resizeToContent, 100); // Delay to ensure render
         return () => clearTimeout(timer);
-    }, [isLoggedIn, networks, expandedNetworks, isLoading, resizeToContent, isWaitingForBrowser]);
+    }, [isLoggedIn, networks, expandedNetworks, isLoading, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode]);
 
     useEffect(() => {
         BridgeService.GetDeviceName().then(setDeviceName);
@@ -53,6 +55,8 @@ function App() {
             setIsWaitingForBrowser(false);
             setIsLoading(false);
         });
+
+        BridgeService.GetIsExitNode().then(setIsBecomingExitNode);
 
         BridgeService.GetStatus().then(currStatus => {
             setStatus(currStatus);
@@ -84,6 +88,7 @@ function App() {
             setError("Failed to load profile after login.");
         } finally {
             setIsLoading(false);
+            setIsWaitingForBrowser(false);
         }
     };
 
@@ -120,6 +125,7 @@ function App() {
     };
 
     const handleLogout = () => {
+        BridgeService.Disconnect();
         setIsLoggedIn(false);
         setProfile(null);
         setNetworks([]);
@@ -161,23 +167,68 @@ function App() {
         }
     };
 
-    // Auto-refresh devices for expanded networks every 10 seconds
+    // Auto-refresh devices for expanded networks OR active network if exit nodes expanded
     useEffect(() => {
         const refreshInterval = setInterval(async () => {
-            for (const networkId of Object.keys(expandedNetworks)) {
-                if (expandedNetworks[networkId]) {
-                    try {
-                        const devs = await BridgeService.GetNetworkDevices(networkId);
-                        setNetworkDevices(prev => ({ ...prev, [networkId]: devs || [] }));
-                    } catch (err) {
-                        console.error('Auto-refresh devices error:', err);
-                    }
+            const networksToRefresh = new Set(Object.keys(expandedNetworks).filter(id => expandedNetworks[id]));
+            if (isExitNodesExpanded && activeNetwork) {
+                networksToRefresh.add(activeNetwork);
+            }
+
+            for (const networkId of networksToRefresh) {
+                try {
+                    const devs = await BridgeService.GetNetworkDevices(networkId);
+                    setNetworkDevices(prev => ({ ...prev, [networkId]: devs || [] }));
+                } catch (err) {
+                    console.error('Auto-refresh devices error:', err);
                 }
             }
         }, 10000);
 
         return () => clearInterval(refreshInterval);
-    }, [expandedNetworks]);
+    }, [expandedNetworks, isExitNodesExpanded, activeNetwork]);
+
+    // Sync activeNetwork based on connection status
+    useEffect(() => {
+        if (networkName && networks.length > 0) {
+            const active = networks.find(n => n.name === networkName);
+            if (active && activeNetwork !== active.id) {
+                setActiveNetwork(active.id);
+            }
+        }
+    }, [networkName, networks, activeNetwork]);
+
+    // Initial fetch for active network devices
+    useEffect(() => {
+        if (activeNetwork && !networkDevices[activeNetwork]) {
+            BridgeService.GetNetworkDevices(activeNetwork).then(devs => {
+                setNetworkDevices(prev => ({ ...prev, [activeNetwork]: devs || [] }));
+            }).catch(console.error);
+        }
+    }, [activeNetwork]);
+
+    const handleToggleIsExitNode = async (e) => {
+        e.stopPropagation();
+        const newVal = !isBecomingExitNode;
+        setIsBecomingExitNode(newVal);
+        await BridgeService.SetIsExitNode(newVal);
+    };
+
+    const handleSelectExitNode = async (exitNodeId) => {
+        if (!activeNetwork) return;
+        try {
+            setIsLoading(true);
+            await BridgeService.SetExitNode(activeNetwork, exitNodeId);
+            // Refresh networks to get updated selected_exit_node_id
+            const nets = await BridgeService.GetNetworks();
+            setNetworks(nets || []);
+        } catch (err) {
+            console.error(err);
+            setError("Failed to set exit node.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const openURL = (url) => {
         Browser.OpenURL(url);
@@ -191,24 +242,19 @@ function App() {
                     <span className="app-name">OmniEdge</span>
                 </div>
                 <div className="header-right">
-                    {!isLoggedIn ? (
-                        <button
-                            className={`btn-action ${isWaitingForBrowser ? 'waiting' : ''}`}
-                            onClick={handleBrowserLogin}
-                            disabled={isLoading || isWaitingForBrowser}
+                    <div className="login-status-container" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '12px', opacity: 0.8, fontWeight: 500 }}>
+                            {isLoggedIn ? 'Signed In' : 'Sign In'}
+                        </span>
+                        <div
+                            className={`ios-switch header-toggle ${isLoggedIn || isWaitingForBrowser ? 'on' : ''}`}
+                            onClick={isLoggedIn ? handleLogout : (isWaitingForBrowser ? handleCancelBrowserLogin : handleBrowserLogin)}
                         >
-                            {isWaitingForBrowser ? (
-                                <div className="loader-mini"></div>
-                            ) : (
-                                'Log in'
-                            )}
-                        </button>
-                    ) : (
-                        <div className="profile-chip" onClick={handleLogout} title={`Log out from ${profile?.email}`}>
-                            <span className="profile-initial">{profile?.name?.[0]?.toUpperCase() || 'U'}</span>
-                            <div className={`user-status-indicator ${'online'}`}></div>
+                            <div className="dot">
+                                {(isWaitingForBrowser || isLoading) && <div className="loader-mini" style={{ width: '12px', height: '12px', border: '2px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--accent-blue)' }}></div>}
+                            </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
 
@@ -241,6 +287,10 @@ function App() {
                                 </div>
                             </div>
                             <div className="divider"></div>
+                            <div className="profile-header-row">
+                                <span className="profile-email-text truncate">{profile?.email || ' '}</span>
+                            </div>
+                            <div className="divider"></div>
                             <div className="subheader">Virtual Networks</div>
                             <div className="empty-state">
                                 <span>No networks available. Please log in.</span>
@@ -268,7 +318,16 @@ function App() {
                                 </div>
                             )}
                         </div>
-
+                        <div className="divider"></div>
+                        <div className="profile-header-row dashboard">
+                            <div className="profile-avatar-container">
+                                <div className="profile-chip-tiny">
+                                    <span className="profile-initial" style={{ fontSize: '9px' }}>{profile?.email?.[0]?.toUpperCase() || 'U'}</span>
+                                </div>
+                                <div className="user-status-indicator online mini"></div>
+                            </div>
+                            <span className="profile-email-text truncate">{profile?.email}</span>
+                        </div>
                         <div className="divider"></div>
                         <div className="subheader">Virtual Networks</div>
 
@@ -332,6 +391,89 @@ function App() {
                     </div>
                 )}
             </div>
+            {isLoggedIn && (
+                <>
+                    <div className="divider"></div>
+                    <div className="subheader-row" onClick={() => setIsExitNodesExpanded(!isExitNodesExpanded)} style={{ cursor: 'pointer' }}>
+                        <div className="subheader">Exit Nodes</div>
+                        <div className="chevron" style={{ transform: isExitNodesExpanded ? 'rotate(90deg)' : 'none' }}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+
+                    {isExitNodesExpanded && (
+                        <div className="exit-nodes-content">
+                            <div className="menu-item no-hover" style={{ height: '32px', paddingLeft: '36px' }}>
+                                <span className="detail-header-label" style={{ fontSize: '12px', opacity: 0.9 }}>Run as Exit Node</span>
+                                <div
+                                    className={`ios-switch header-toggle ${isBecomingExitNode ? 'on' : ''}`}
+                                    onClick={handleToggleIsExitNode}
+                                >
+                                    <div className="dot"></div>
+                                </div>
+                            </div>
+
+                            <div className="divider-dashed" />
+
+                            {activeNetwork ? (
+                                <div className="exit-node-selection">
+                                    <div
+                                        className={`exit-node-option ${!networks.find(n => n.id === activeNetwork)?.selected_exit_node_id ? 'active' : ''}`}
+                                        onClick={() => handleSelectExitNode('')}
+                                    >
+                                        <div className="selection-indicator">
+                                            {!networks.find(n => n.id === activeNetwork)?.selected_exit_node_id && (
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <span style={{ fontSize: '13px' }}>No exit node</span>
+                                    </div>
+
+                                    <div className="available-label">Available Exit Nodes</div>
+                                    <div className="exit-node-list">
+                                        {(networkDevices[activeNetwork] || [])
+                                            .filter(dev => dev.is_exit_node && dev.exit_node_enabled && !dev.is_me)
+                                            .map(dev => {
+                                                const isSelected = networks.find(n => n.id === activeNetwork)?.selected_exit_node_id === dev.id;
+                                                return (
+                                                    <div
+                                                        key={dev.id}
+                                                        className={`exit-node-option ${isSelected ? 'active' : ''} ${!dev.online ? 'offline' : ''}`}
+                                                        onClick={dev.online ? () => handleSelectExitNode(dev.id) : undefined}
+                                                    >
+                                                        <div className="selection-indicator">
+                                                            {isSelected && (
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                                                </svg>
+                                                            )}
+                                                        </div>
+                                                        <div className="exit-node-info">
+                                                            <span className="truncate" style={{ fontSize: '13px', fontWeight: isSelected ? '500' : '400' }}>{dev.name}</span>
+                                                            <span className="exit-node-ip mono">{dev.virtual_ip}</span>
+                                                        </div>
+                                                        {!dev.online && <span className="offline-tag">Offline</span>}
+                                                    </div>
+                                                );
+                                            })}
+                                        {!(networkDevices[activeNetwork] || []).some(dev => dev.is_exit_node && dev.exit_node_enabled) && (
+                                            <div className="no-exit-nodes">No available exit nodes in this network</div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="exit-node-placeholder">
+                                    Connect to a network to select an exit node
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
+            )}
 
             <div className="divider"></div>
             <div className="app-footer">

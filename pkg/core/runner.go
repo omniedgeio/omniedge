@@ -50,11 +50,13 @@ func (s *StartService) Start() error {
 		go s.heartbeatLoop()
 	}
 
-	if s.ExitNodeIP != "" {
+	if s.ExitNodeIP != "" && s.ExitNodeIP != s.VirtualIP {
 		log.Infof("Setting up exit node: %s", s.ExitNodeIP)
 		if err := SetupExitNode(s.ExitNodeIP, s.SuperNode); err != nil {
 			log.Errorf("Fail to setup exit node: %v", err)
 		}
+	} else if s.ExitNodeIP == s.VirtualIP {
+		log.Warn("Ignoring local IP as exit node to avoid routing loops")
 	}
 
 	log.Info("Starting omniedge")
@@ -129,6 +131,10 @@ func (s *StartService) handleHeartbeatResponse(resp *api.HeartbeatResponse) {
 			if ip != nil && myIP != nil && maskIP != nil {
 				mask := net.IPMask(maskIP.To4())
 				myNet := net.IPNet{IP: myIP.Mask(mask), Mask: mask}
+				if newExitNodeIP == s.VirtualIP {
+					log.Info("Current device is selected as its own exit node. Ignoring to avoid routing loops.")
+					return
+				}
 				if !myNet.Contains(ip) {
 					log.Errorf("Security Warning: received exit node IP %s which is outside our virtual network. Ignoring.", newExitNodeIP)
 					return

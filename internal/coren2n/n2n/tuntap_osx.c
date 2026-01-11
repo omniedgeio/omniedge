@@ -8,7 +8,7 @@
  * (at your option) any later version.
  */
 
-#include "n2n.h"
+#include "/Users/yong/Data/Project-OmniEdge/Git/omniedge/internal/coren2n/n2n/n2n.h"
 
 #ifdef __APPLE__
 

@@ -80,6 +80,13 @@ export function GetDeviceName() {
 }
 
 /**
+ * @returns {$CancellablePromise<boolean>}
+ */
+export function GetIsExitNode() {
+    return $Call.ByID(1061140920);
+}
+
+/**
  * GetLocalIP returns the local IP address
  * @returns {$CancellablePromise<string>}
  */
@@ -127,7 +134,6 @@ export function GetProfile() {
 }
 
 /**
- * GetStatus returns the current connection status
  * @returns {$CancellablePromise<string>}
  */
 export function GetStatus() {
@@ -221,6 +227,15 @@ export function SetAppIcon(icon) {
  */
 export function SetExitNode(networkID, exitNodeID) {
     return $Call.ByID(1380828692, networkID, exitNodeID);
+}
+
+/**
+ * GetStatus returns the current connection status
+ * @param {boolean} isExitNode
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetIsExitNode(isExitNode) {
+    return $Call.ByID(3480273132, isExitNode);
 }
 
 /**

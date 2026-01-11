@@ -166,16 +166,32 @@ func (s *SessionService) getWebSocketURL(sessionID string) string {
 
 	parsed, err := url.Parse(baseURL)
 	if err == nil {
-		// Keep the existing path (e.g. /api/v2) and append the login/session part
-		if !strings.HasSuffix(parsed.Path, "/") {
-			parsed.Path += "/"
+		path := parsed.Path
+		if !strings.HasSuffix(path, "/") {
+			path += "/"
 		}
-		parsed.Path += "login/session/" + sessionID
+		// Ensure /auth prefix is correctly handled if not already in BaseUrl
+		if !strings.Contains(path, "/auth/") {
+			path += "auth/"
+		}
+		if !strings.HasSuffix(path, "/") {
+			path += "/"
+		}
+		parsed.Path = path + "login/session/" + sessionID
 		return parsed.String()
 	}
 
-	// Fallback: simple string replacement
-	res := baseURL + "/login/session/" + sessionID
-	log.Debugf("getWebSocketURL result: %s", res)
+	// Fallback: simple string replacement with /auth prefix
+	res := baseURL
+	if !strings.Contains(res, "/auth") {
+		if !strings.HasSuffix(res, "/") {
+			res += "/"
+		}
+		res += "auth"
+	}
+	if !strings.HasSuffix(res, "/") {
+		res += "/"
+	}
+	res += "login/session/" + sessionID
 	return res
 }
