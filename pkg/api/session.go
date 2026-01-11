@@ -120,34 +120,54 @@ func (s *SessionService) ConnectAndWaitForToken(sessionID string, timeoutSeconds
 	log.Infof("SessionService: Successfully connected to WebSocket %s", wsURL)
 	defer conn.Close()
 
-	// Set read deadline
-	if timeoutSeconds > 0 {
-		conn.SetReadDeadline(time.Now().Add(time.Duration(timeoutSeconds) * time.Second))
-	}
+	resultChan := make(chan *WebSocketTokenResponse, 1)
+	errChan := make(chan error, 1)
 
-	// Wait for token message
-	for {
-		_, message, err := conn.ReadMessage()
-		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				return nil, errors.New("WebSocket closed without receiving tokens")
+	// Single reader goroutine
+	go func() {
+		for {
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+					errChan <- errors.New("WebSocket closed without receiving tokens")
+				} else {
+					errChan <- fmt.Errorf("WebSocket read error: %w", err)
+				}
+				return
 			}
-			return nil, fmt.Errorf("WebSocket read error: %w", err)
+
+			log.Debugf("Received WebSocket message: %s", string(message))
+
+			var tokenResp WebSocketTokenResponse
+			if err := json.Unmarshal(message, &tokenResp); err == nil && tokenResp.Token != "" {
+				log.Info("Received authentication tokens via WebSocket")
+				resultChan <- &tokenResp
+				return
+			}
 		}
+	}()
 
-		log.Debugf("Received WebSocket message: %s", string(message))
+	pingTicker := time.NewTicker(30 * time.Second)
+	defer pingTicker.Stop()
 
-		// Parse token response
-		var tokenResp WebSocketTokenResponse
-		if err := json.Unmarshal(message, &tokenResp); err != nil {
-			log.Warnf("Failed to parse WebSocket message as token: %v", err)
-			continue
-		}
+	timeout := time.Duration(timeoutSeconds) * time.Second
+	if timeoutSeconds <= 0 {
+		timeout = 15 * time.Minute
+	}
+	timeoutChan := time.After(timeout)
 
-		// Validate we got actual tokens
-		if tokenResp.Token != "" && tokenResp.RefreshToken != "" {
-			log.Info("Received authentication tokens via WebSocket")
-			return &tokenResp, nil
+	for {
+		select {
+		case res := <-resultChan:
+			return res, nil
+		case err := <-errChan:
+			return nil, err
+		case <-pingTicker.C:
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return nil, fmt.Errorf("failed to send ping: %w", err)
+			}
+		case <-timeoutChan:
+			return nil, errors.New("timeout waiting for authentication")
 		}
 	}
 }
