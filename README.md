@@ -112,7 +112,6 @@ sudo omniedge join --as-exit-node
 # Route all traffic through an Exit Node
 sudo omniedge join -e "100.100.0.1"
 ```
-```
 
 ## Mobile Apps
 
