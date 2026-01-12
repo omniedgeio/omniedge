@@ -44,6 +44,7 @@ Download the latest desktop app from the [Releases page](https://github.com/omni
 |----------|---------|----------|
 | **Windows** | NSIS Installer | `omniedge-desktop-{version}-windows-amd64.exe` |
 | **macOS** | DMG (Apple Silicon) | `omniedge-desktop-{version}-macos-arm64.dmg` |
+| **macOS** | DMG (Intel) | `omniedge-desktop-{version}-macos-amd64.dmg` |
 | **Linux** | DEB (Ubuntu/Debian) | `omniedge-desktop-{version}-linux-amd64.deb` |
 | **Linux** | RPM (Fedora/RHEL) | `omniedge-desktop-{version}-linux-amd64.rpm` |
 | **Linux** | AppImage (Universal) | `omniedge-desktop-{version}-linux-amd64.AppImage` |
@@ -74,6 +75,7 @@ Download CLI binaries from the [Releases page](https://github.com/omniedgeio/omn
 | Platform | Filename |
 |----------|----------|
 | **macOS CLI** (Apple Silicon) | `omniedge-{version}-macos-arm64.zip` |
+| **macOS CLI** (Intel) | `omniedge-{version}-macos-amd64.zip` |
 | **FreeBSD 14** | `omniedge-{version}-freebsd-14.zip` |
 | **RISC-V** | `omniedge-{version}-riscv64.zip` |
 | **LoongArch** | `omniedge-{version}-loongarch64.zip` |
