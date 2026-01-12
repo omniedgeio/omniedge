@@ -391,8 +391,8 @@ jobs:
           sudo -E apt-get install -y openssl build-essential libssl-dev zip
           make generate
           VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build
-          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
-          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
+          zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}.zip ./out/omniedge
+          sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}.zip.sha256
       - name: build
         if: startsWith(matrix.platform, 'macos')
         run: |
@@ -408,9 +408,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: |
-            omniedge-${{ github.ref_name }}-${{ matrix.platform }}*.zip
+            omniedge-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}*.zip
             *.sha256
-          name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}
+          name: omniedge-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}
           if-no-files-found: error
           
       - name: Upload package to GitHub Release
