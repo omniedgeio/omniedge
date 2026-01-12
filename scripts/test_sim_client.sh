@@ -19,11 +19,15 @@ docker rm -f client-sim 2>/dev/null || true
 
 docker run -d --name client-sim --hostname Client-Sim-Box \
   --privileged --cap-add NET_ADMIN --device /dev/net/tun \
-  -v $(pwd)/out:/app \
+  -v "$(pwd)":/src \
   debian:stable-slim sleep infinity
 
-echo "--- 6. Setting up Docker Client Environment ---"
-docker exec client-sim sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping ca-certificates"
+echo "--- 6. Setting up Docker Client Environment & Building ---"
+docker exec client-sim sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping ca-certificates golang-go build-essential libssl-dev pkg-config git"
+
+# Build inside container to ensure Linux binary
+echo "Building OmniEdge inside container..."
+docker exec client-sim sh -c "cd /src && make generate && BUILD_ENV=prod make build"
 
 # Fix machine-id with a stable value to ensure identity consistency
 docker exec client-sim sh -c "echo 550e8400e29b41d4a716446655440000 > /etc/machine-id"
@@ -33,10 +37,10 @@ docker exec client-sim sh -c "if [ ! -d /dev/net ]; then mkdir /dev/net; fi"
 docker exec client-sim sh -c "if [ ! -e /dev/net/tun ]; then mknod /dev/net/tun c 10 200; fi"
 
 echo "--- 7. Clean Login on Docker Client ---"
-docker exec client-sim /app/omniedge login -s "$OMNIEDGE_SECRET_KEY"
+docker exec client-sim /src/out/omniedge login -s "$OMNIEDGE_SECRET_KEY"
 
 echo "--- 8. Starting Docker Client ---"
-docker exec -d client-sim sh -c "/app/omniedge join -n $OMNIEDGE_NETWORK_ID -e $EXIT_NODE_IP > /app/client.log 2>&1"
+docker exec -d client-sim sh -c "/src/out/omniedge join -n $OMNIEDGE_NETWORK_ID -e $EXIT_NODE_IP > /src/client.log 2>&1"
 
 echo "--- Waiting for Client IP and Routing ---"
 MAX_RETRIES=30
