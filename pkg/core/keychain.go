@@ -1,6 +1,8 @@
 package core
 
 import (
+	"strings"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/zalando/go-keyring"
 )
@@ -14,7 +16,11 @@ const (
 func SaveSecureToken(token string) error {
 	err := keyring.Set(keyringService, keyringAccount, token)
 	if err != nil {
-		log.Errorf("Failed to save token to keychain: %v", err)
+		if strings.Contains(err.Error(), "org.freedesktop.secrets") {
+			log.Debugf("Secret service not available, skipping keychain save (will fallback to file): %v", err)
+		} else {
+			log.Errorf("Failed to save token to keychain: %v", err)
+		}
 		return err
 	}
 	return nil
@@ -27,7 +33,11 @@ func LoadSecureToken() (string, error) {
 		if err == keyring.ErrNotFound {
 			return "", nil
 		}
-		log.Errorf("Failed to load token from keychain: %v", err)
+		if strings.Contains(err.Error(), "org.freedesktop.secrets") {
+			log.Debugf("Secret service not available, skipping keychain load: %v", err)
+		} else {
+			log.Errorf("Failed to load token from keychain: %v", err)
+		}
 		return "", err
 	}
 	return token, nil
@@ -37,7 +47,11 @@ func LoadSecureToken() (string, error) {
 func ClearSecureToken() error {
 	err := keyring.Delete(keyringService, keyringAccount)
 	if err != nil && err != keyring.ErrNotFound {
-		log.Errorf("Failed to delete token from keychain: %v", err)
+		if strings.Contains(err.Error(), "org.freedesktop.secrets") {
+			log.Debugf("Secret service not available, skipping keychain delete: %v", err)
+		} else {
+			log.Errorf("Failed to delete token from keychain: %v", err)
+		}
 		return err
 	}
 	return nil
