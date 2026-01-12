@@ -16,8 +16,8 @@ OmniEdge enables seamless connectivity between your devices across networks. Per
 - 🖥️ **Cross-platform Desktop App** - Windows, macOS, Linux with system tray
 - 📦 **Multiple Linux Packages** - DEB, RPM, AppImage, Flatpak, Arch
 - 🪟 **Windows Support** - NSIS installer with bundled TAP driver
-- 🍎 **Multi-Arch macOS** - Native support for both Apple Silicon and Intel Macs
-- 🛡️ **Verified Connectivity** - Every release is automatically tested for real-world connection health
+- 🍎 **Universal macOS Support** - Native DMG/CLI for both Apple Silicon and Intel Macs
+- 🛡️ **Verified Stability** - Every release is automatically tested via real-world connectivity probes
 - 💓 **Real-time heartbeat** - Device online status visible in dashboard
 - 🏗️ **Emerging architectures** - RISC-V, LoongArch, FreeBSD 14
 
@@ -111,11 +111,10 @@ sudo omniedge join -n "your-network-id"
 Join a network and configure exit node functionality:
 
 ```bash
-# Become an Exit Node (implies -r, device routes traffic for others)
+# Become an Exit Node (Automatically enables routing, persists across sessions)
 sudo omniedge join --as-exit-node
 
-# Route all your traffic through a specific Exit Node IP
-# (Automatically syncs your selection with the dashboard)
+# Route traffic via an Exit Node IP (Synchronizes selection with dashboard)
 sudo omniedge join -e "100.100.0.1"
 ```
 

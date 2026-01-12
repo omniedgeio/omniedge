@@ -2,17 +2,21 @@
  
 ## v1.0.2-beta.0 (2026-01-12)
 ### 🚀 New Features & Improvements
-- **Automated Connection Verification**: Every release now undergoes a full end-to-end connection test (build -> login -> join -> ping) to ensure stability before artifacts are published.
-- **Universal macOS Support**: Desktop DMG and CLI binaries now support both **Intel (x64)** and **Apple Silicon (arm64)** architectures.
-- **Improved Exit Node Logic**: 
-    - The CLI `--as-exit-node` flag now automatically enables routing (`-r`), simplifying the setup.
-    - Added backend synchronization for exit node selection (`-e`) to match dashboard state.
-- **Release Automation**: Formalized a SemVer-based branching model with automated pre-release marking for Beta and RC channels.
-- **Branding & UI**: 
-    - Introduced a fresh "Blue" icon suite across macOS and Windows.
-    - Enforced a 480px minimum window height for a more stable desktop UI.
-    - Decoupled login and connection loading states for smoother UX.
-- **Standardized Environment**: All release channels now explicitly target the `prod` environment for maximum reliability.
+- **Advanced Exit Node Support**: 
+    - **Smart CLI Flags**: The `--as-exit-node` flag now automatically implies `-r` (routing), reducing command complexity.
+    - **Cloud Synchronization**: Exit node selection (`-e`) now persists across sessions and synchronizes directly with the OmniEdge dashboard.
+    - **Desktop Controls**: Introduced "Run as Exit Node" toggle and device selection menu to the system tray.
+    - **Persistent State**: "Run as Exit Node" preference is now saved locally and restored on launch.
+- **Desktop UI/UX Refinement**:
+    - **Accessory Mode (macOS)**: Optimized the app to live exclusively in the menu bar, hiding the Dock icon for a less intrusive experience.
+    - **Decoupled Loading**: Separated login and connection states to prevent UI flickering during network transitions.
+    - **Stable Layout**: Enforced a 480px minimum height for the desktop window to ensure consistent content display.
+    - **Universal Support**: Native performance on both **Intel (x64)** and **Apple Silicon (arm64)** macOS.
+- **Reliability & Verification**:
+    - **Automated Pulse Test**: Every release is now guarded by a mandatory connection test (login -> join -> ping) verifying real-world connectivity.
+    - **Production Guard**: Standardized all release channels to use the production environment by default for representative testing.
+
+---
 
 ---
 
