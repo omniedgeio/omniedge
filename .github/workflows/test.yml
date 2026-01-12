@@ -53,9 +53,8 @@ jobs:
           MAX_RETRIES=30
           COUNT=0
           while [ $COUNT -lt $MAX_RETRIES ]; do
-            # Check for omniedge interface (usually utun* or omniedge*)
-            # We look for the IP in the logs or via ip command
-            ip4=$(/sbin/ip -o -4 addr show | grep -E "utun|omniedge" | awk '{print $4}' | cut -d/ -f1 || true)
+            # Check for omniedge interface (usually omniedge*, oe*, or tun*/tap*)
+            ip4=$(/sbin/ip -o -4 addr show | grep -E "omniedge|oe|tun|tap" | awk '{print $4}' | cut -d/ -f1 | head -n 1 || true)
             if [ ! -z "$ip4" ]; then
               echo "Connected! Assigned IP: $ip4"
               echo "ip-address=$ip4" >> $GITHUB_STEP_SUMMARY
