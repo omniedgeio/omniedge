@@ -4,11 +4,13 @@ on:
   push:
     tags:
       - 'v*.*.*'
+      - 'v*.*.*-beta.*'
+      - 'v*.*.*-rc.*'
 jobs:
   build-binary:
     name: Docker cross build
     env:
-      ENVIRONMENT: prod
+      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
     strategy:
       matrix:
         platform: [amd64,arm,arm64]
@@ -107,10 +109,11 @@ jobs:
           overwrite: true
           file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
+          prerelease: ${{ contains(github.ref, '-') }}
   build-openwrt-1:
     name: Build openwrt binary
     env:
-      ENVIRONMENT: prod
+      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
     strategy:
       matrix:
         platform: [amd64,arm64,arm]
@@ -198,10 +201,11 @@ jobs:
           overwrite: true
           file: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
+          prerelease: ${{ contains(github.ref, '-') }}
   build-mips-mipsle-openwrt:
     name: Build openwrt binary
     env:
-      ENVIRONMENT: prod
+      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
     strategy:
       matrix:
         platform: [mips,mipsle ]
@@ -236,11 +240,12 @@ jobs:
           overwrite: true
           file: omniedge-${{ github.ref_name }}-openwrt-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
+          prerelease: ${{ contains(github.ref, '-') }}
 
   build-other-binary:
     name: Build on ${{ matrix.platform }}
     env:
-      ENVIRONMENT: prod
+      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
     strategy:
       matrix:
         platform: [ riscv64, loongarch64 ]
@@ -291,11 +296,12 @@ jobs:
           overwrite: true
           file: omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
+          prerelease: ${{ contains(github.ref, '-') }}
   build-freebsd-binary:
     runs-on: ubuntu-latest
     name: Build on FreeBSD
     env:
-      ENVIRONMENT: prod
+      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
     steps:
       - name: Checkout with tag
         uses: actions/checkout@v4
@@ -338,10 +344,11 @@ jobs:
           overwrite: true
           file: omniedge-${{ github.ref_name }}-freebsd-14.zip
           tag: ${{ github.ref }}
+          prerelease: ${{ contains(github.ref, '-') }}
   build-for-distr:
     name: Build on ${{ matrix.platform }} (${{ matrix.arch }})
     env:
-      ENVIRONMENT: prod
+      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
     strategy:
       matrix:
         include:
@@ -426,6 +433,7 @@ jobs:
           overwrite: true
           file: omniedge-${{ github.ref_name }}-*.zip*
           tag: ${{ github.ref }}
+          prerelease: ${{ contains(github.ref, '-') }}
   notify:
     name: Trigger updates in dependent repos
     runs-on: ubuntu-latest

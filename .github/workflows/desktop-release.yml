@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*.*.*'
+      - 'v*.*.*-beta.*'
+      - 'v*.*.*-rc.*'
   workflow_dispatch:
     inputs:
       version:
@@ -64,8 +66,10 @@ jobs:
           wails3 task windows:build
 
       - name: Build Helper
+        env:
+          BUILD_ENV: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
         run: |
-          go build -o shell/desktop/bin/omniedge-helper.exe ./cmd/omniedge-helper
+          go build -ldflags "-X main.Env=${BUILD_ENV}" -o shell/desktop/bin/omniedge-helper.exe ./cmd/omniedge-helper
 
       - name: Create NSIS Installer
         working-directory: shell/desktop
@@ -91,6 +95,7 @@ jobs:
           file: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-windows-amd64.exe
           tag: ${{ github.ref }}
           overwrite: true
+          prerelease: ${{ contains(github.ref, '-') }}
 
   # Build Linux packages (deb, rpm, AppImage, Flatpak, Arch)
   build-linux:
@@ -149,8 +154,10 @@ jobs:
           wails3 task linux:build
 
       - name: Build Helper
+        env:
+          BUILD_ENV: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
         run: |
-          CGO_ENABLED=1 go build -o shell/desktop/bin/omniedge-helper ./cmd/omniedge-helper
+          CGO_ENABLED=1 go build -ldflags "-X main.Env=${BUILD_ENV}" -o shell/desktop/bin/omniedge-helper ./cmd/omniedge-helper
 
       # --- DEB Package ---
       - name: Build DEB package
@@ -277,6 +284,7 @@ jobs:
           file: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.*
           tag: ${{ github.ref }}
           overwrite: true
+          prerelease: ${{ contains(github.ref, '-') }}
 
   # Build Linux ARM64 packages (DEB, AppImage) using QEMU
   build-linux-arm64:
@@ -377,6 +385,7 @@ jobs:
           file: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.*
           tag: ${{ github.ref }}
           overwrite: true
+          prerelease: ${{ contains(github.ref, '-') }}
 
   # Build macOS (arm64 only)
   build-macos:
@@ -431,8 +440,9 @@ jobs:
       - name: Build Helper
         env:
           GOARCH: ${{ matrix.arch }}
+          BUILD_ENV: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
         run: |
-          CGO_ENABLED=1 go build -o shell/desktop/bin/omniedge-helper ./cmd/omniedge-helper
+          CGO_ENABLED=1 go build -ldflags "-X main.Env=${BUILD_ENV}" -o shell/desktop/bin/omniedge-helper ./cmd/omniedge-helper
 
       - name: Create DMG
         working-directory: shell/desktop
@@ -467,6 +477,7 @@ jobs:
           file: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}.dmg
           tag: ${{ github.ref }}
           overwrite: true
+          prerelease: ${{ contains(github.ref, '-') }}
 
   # Summary job
   release-summary:
