@@ -1,4 +1,14 @@
 # OmniEdge Release Notes
+ 
+## v1.0.2-beta.0 (2026-01-12)
+### 🚀 New Features & Improvements
+- **Automated Connection Test**: Integrated a reusable [connection test](.github/workflows/test.yml) into the release pipeline to verify login, join, and network health (ping) before publishing builds.
+- **Improved Release Strategy**: Established a robust Semantic Versioning strategy with automated pre-release marking for Beta and RC tags.
+- **Multi-Arch macOS Support**: Added Intel (amd64) support for both CLI and Desktop release workflows, alongside existing Apple Silicon support.
+- **CLI Refinements**: Consolidated exit-node flags (`--as-exit-node` now implies `-r`) and added backend synchronization for exit-node selection.
+
+---
+
 
 ## v1.0.1 (2026-01-09)
 ### 🚀 New Features
