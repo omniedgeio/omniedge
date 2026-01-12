@@ -6,7 +6,7 @@ package coren2n
 //go:generate sh -c "rm -rf n2n; git clone -b 2.6-stable-omni https://github.com/omniedgeio/n2n.git; cp make_n2n n2n/; cd n2n; chmod +x make_n2n; ./make_n2n"
 
 /*
-#cgo CFLAGS: -g3 -Wall -In2n
+#cgo CFLAGS: -g3 -Wall -I${SRCDIR}/n2n
 #cgo LDFLAGS: -ln2n -L${SRCDIR}/n2n
 #include "edge.h"
 */

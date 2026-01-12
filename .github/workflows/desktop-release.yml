@@ -296,109 +296,7 @@ jobs:
           overwrite: true
           prerelease: ${{ contains(github.ref, '-') }}
 
-  # Build Linux ARM64 packages (DEB, AppImage) using QEMU
-  build-linux-arm64:
-    #needs: test-connection
-    name: Build Linux (arm64)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            VERSION="${GITHUB_REF#refs/tags/v}"
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-desktop-arm64-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-desktop-arm64-
-
-      - name: Build ARM64 Desktop with Dockerfile
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/arm64
-          push: false
-          load: true
-          file: docker/Dockerfile-desktop-arm64
-          build-args: |
-            VERSION=${{ steps.version.outputs.version }}
-          tags: desktop-arm64:latest
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-      - name: Extract build artifacts
-        run: |
-          docker run --name desktop-arm64 -d desktop-arm64:latest sleep 30
-          docker cp desktop-arm64:/app/shell/desktop/bin/ ./bin-arm64/
-          docker rm -f desktop-arm64
-          
-          # Copy artifacts to expected location
-          mkdir -p shell/desktop/bin
-          cp bin-arm64/OmniEdge shell/desktop/bin/
-          cp bin-arm64/omniedge-helper shell/desktop/bin/
-          cp bin-arm64/omniedge_*.deb shell/desktop/bin/ || true
-          cp bin-arm64/*.AppImage shell/desktop/bin/ || true
-          
-          # List extracted artifacts
-          ls -la shell/desktop/bin/
-
-      - name: Rename packages
-        working-directory: shell/desktop
-        run: |
-          mv bin/omniedge_*.deb bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.deb || true
-          mv bin/OmniEdge*.AppImage bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.AppImage || true
-
-      - name: Upload DEB Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64-deb
-          path: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.deb
-          if-no-files-found: warn
-
-      - name: Upload AppImage Artifact
-        uses: actions/upload-artifact@v4
-        if: hashFiles('shell/desktop/bin/omniedge-desktop-*-linux-arm64.AppImage') != ''
-        with:
-          name: omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64-appimage
-          path: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.AppImage
-          if-no-files-found: warn
-
-      - name: Upload to Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file_glob: true
-          file: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.*
-          tag: ${{ github.ref }}
-          overwrite: true
-          prerelease: ${{ contains(github.ref, '-') }}
-
-  # Build macOS (arm64 only)
+  # Build macOS 
   build-macos:
     #needs: test-connection
     name: Build macOS (${{ matrix.arch }})
@@ -521,10 +419,6 @@ jobs:
           echo "- **AppImage**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.AppImage (Universal)" >> $GITHUB_STEP_SUMMARY
           echo "- **Flatpak**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64.flatpak (GNOME/Flathub)" >> $GITHUB_STEP_SUMMARY
           echo "- **Arch**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-amd64-arch.tar.gz (Arch/AUR)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### Linux (arm64)" >> $GITHUB_STEP_SUMMARY
-          echo "- **DEB**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.deb (Raspberry Pi/Ubuntu ARM64)" >> $GITHUB_STEP_SUMMARY
-          echo "- **AppImage**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.AppImage (ARM64 Universal)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### macOS" >> $GITHUB_STEP_SUMMARY
           echo "- **Apple Silicon (arm64)**: omniedge-desktop-${{ steps.version.outputs.version }}-macos-arm64.dmg" >> $GITHUB_STEP_SUMMARY
