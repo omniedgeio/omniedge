@@ -21,6 +21,17 @@ build-darwin-arm64: go.sum
 	CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go generate ./...
 	CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o out/omniedge cmd/edgecli/main.go
 
+build-desktop-darwin-amd64:
+	cd shell/desktop && wails3 task darwin:build ARCH=amd64 OUTPUT=../../out/OmniEdge-amd64
+
+build-desktop-darwin-arm64:
+	cd shell/desktop && wails3 task darwin:build ARCH=arm64 OUTPUT=../../out/OmniEdge-arm64
+
+build-desktop-darwin-universal:
+	cd shell/desktop && wails3 task darwin:package:universal
+	mkdir -p out
+	cp -R shell/desktop/bin/OmniEdge.app out/
+
 build-riscv64: go.sum generate
 	rm -rf ./out
 	CGO_ENABLED=1 GOOS=linux GOARCH=riscv64 go generate ./...
