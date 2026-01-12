@@ -7,7 +7,14 @@ on:
       - 'v*.*.*-beta.*'
       - 'v*.*.*-rc.*'
 jobs:
+  test-connection:
+    uses: ./.github/workflows/test.yml
+    secrets:
+      OMNIEDGE_SECRET_KEY: ${{ secrets.OMNEIDGE_SECURITY_KEY }}
+      OMNIEDGE_NETWORK_ID: ${{ secrets.OMNEIDGE_VIRTUALNETWORK_ID }}
+
   build-binary:
+    needs: test-connection
     name: Docker cross build
     env:
       ENVIRONMENT: prod
@@ -111,6 +118,7 @@ jobs:
           tag: ${{ github.ref }}
           prerelease: ${{ contains(github.ref, '-') }}
   build-openwrt-1:
+    needs: test-connection
     name: Build openwrt binary
     env:
       ENVIRONMENT: prod
@@ -203,6 +211,7 @@ jobs:
           tag: ${{ github.ref }}
           prerelease: ${{ contains(github.ref, '-') }}
   build-mips-mipsle-openwrt:
+    needs: test-connection
     name: Build openwrt binary
     env:
       ENVIRONMENT: prod
@@ -243,6 +252,7 @@ jobs:
           prerelease: ${{ contains(github.ref, '-') }}
 
   build-other-binary:
+    needs: test-connection
     name: Build on ${{ matrix.platform }}
     env:
       ENVIRONMENT: prod
@@ -298,6 +308,7 @@ jobs:
           tag: ${{ github.ref }}
           prerelease: ${{ contains(github.ref, '-') }}
   build-freebsd-binary:
+    needs: test-connection
     runs-on: ubuntu-latest
     name: Build on FreeBSD
     env:
@@ -346,6 +357,7 @@ jobs:
           tag: ${{ github.ref }}
           prerelease: ${{ contains(github.ref, '-') }}
   build-for-distr:
+    needs: test-connection
     name: Build on ${{ matrix.platform }} (${{ matrix.arch }})
     env:
       ENVIRONMENT: prod
@@ -383,27 +395,6 @@ jobs:
           VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build
           zip -j ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip ./out/omniedge
           sha256sum ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip > ./omniedge-${{ github.ref_name }}-${{ matrix.platform }}.zip.sha256
-        
-      - name: Test and output ip address
-        if: startsWith(matrix.platform, 'ubuntu-22.04')
-        env:
-          OMNIEDGE_SECRET_KEY: ${{ secrets.OMNEIDGE_SECURITY_KEY }}
-          OMNIEDGE_NETWORK_ID: ${{ secrets.OMNEIDGE_VIRTUALNETWORK_ID }}
-        run: |
-          if [ -z "$OMNIEDGE_SECRET_KEY" ]; then
-            echo "Skipping test: OMNEIDGE_SECURITY_KEY not configured"
-            exit 0
-          fi
-          chmod +x ./out/omniedge
-          sudo hostname Compile-Action
-          ./out/omniedge login -s "$OMNIEDGE_SECRET_KEY"
-          sleep 2
-          sudo ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" &
-
-          ip4=$(/sbin/ip -o -4 addr list Compile-Action | awk '{print $4}' | cut -d/ -f1)
-          echo $ip4
-          echo "ip-address=$ip4" >> $GITHUB_OUTPUT
-
       - name: build
         if: startsWith(matrix.platform, 'macos')
         run: |

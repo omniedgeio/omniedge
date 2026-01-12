@@ -18,8 +18,15 @@ env:
   NODE_VERSION: '20'
 
 jobs:
+  test-connection:
+    uses: ./.github/workflows/test.yml
+    secrets:
+      OMNIEDGE_SECRET_KEY: ${{ secrets.OMNEIDGE_SECURITY_KEY }}
+      OMNIEDGE_NETWORK_ID: ${{ secrets.OMNEIDGE_VIRTUALNETWORK_ID }}
+
   # Build Windows installer with TAP driver
   build-windows:
+    needs: test-connection
     name: Build Windows (amd64)
     runs-on: windows-latest
     steps:
@@ -99,6 +106,7 @@ jobs:
 
   # Build Linux packages (deb, rpm, AppImage, Flatpak, Arch)
   build-linux:
+    needs: test-connection
     name: Build Linux (${{ matrix.arch }})
     runs-on: ubuntu-latest
     strategy:
@@ -288,6 +296,7 @@ jobs:
 
   # Build Linux ARM64 packages (DEB, AppImage) using QEMU
   build-linux-arm64:
+    needs: test-connection
     name: Build Linux (arm64)
     runs-on: ubuntu-latest
     steps:
@@ -389,6 +398,7 @@ jobs:
 
   # Build macOS (arm64 only)
   build-macos:
+    needs: test-connection
     name: Build macOS (${{ matrix.arch }})
     runs-on: macos-latest
     strategy:

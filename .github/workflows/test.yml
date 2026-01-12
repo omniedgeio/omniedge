@@ -1,0 +1,70 @@
+name: Connection Test
+
+on:
+  workflow_call:
+    secrets:
+      OMNIEDGE_SECRET_KEY:
+        required: true
+      OMNIEDGE_NETWORK_ID:
+        required: true
+
+jobs:
+  verify-connection:
+    name: Verify OmniEdge Connection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build CLI
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y openssl build-essential libssl-dev zip
+          make generate
+          BUILD_ENV=prod make build
+
+      - name: Test Connection
+        env:
+          OMNIEDGE_SECRET_KEY: ${{ secrets.OMNIEDGE_SECRET_KEY }}
+          OMNIEDGE_NETWORK_ID: ${{ secrets.OMNIEDGE_NETWORK_ID }}
+        run: |
+          if [ -z "$OMNIEDGE_SECRET_KEY" ]; then
+            echo "Skipping test: OMNIEDGE_SECRET_KEY not configured"
+            exit 1
+          fi
+          
+          chmod +x ./out/omniedge
+          sudo hostname Compile-Action
+          
+          # Login
+          ./out/omniedge login -s "$OMNIEDGE_SECRET_KEY"
+          sleep 2
+          
+          # Join in background
+          sudo ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" > omniedge.log 2>&1 &
+          
+          # Wait for interface and IP
+          echo "Waiting for connection..."
+          MAX_RETRIES=30
+          COUNT=0
+          while [ $COUNT -lt $MAX_RETRIES ]; do
+            # Check for omniedge interface (usually utun* or omniedge*)
+            # We look for the IP in the logs or via ip command
+            ip4=$(/sbin/ip -o -4 addr show | grep -E "utun|omniedge" | awk '{print $4}' | cut -d/ -f1 || true)
+            if [ ! -z "$ip4" ]; then
+              echo "Connected! Assigned IP: $ip4"
+              echo "ip-address=$ip4" >> $GITHUB_STEP_SUMMARY
+              exit 0
+            fi
+            sleep 2
+            COUNT=$((COUNT+1))
+          done
+          
+          echo "Connection timeout after 60 seconds."
+          cat omniedge.log
+          exit 1
