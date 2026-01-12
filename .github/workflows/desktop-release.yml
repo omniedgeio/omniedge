@@ -380,8 +380,11 @@ jobs:
 
   # Build macOS (arm64 only)
   build-macos:
-    name: Build macOS (arm64)
-    runs-on: macos-14  # M1/M2 runner for arm64
+    name: Build macOS (${{ matrix.arch }})
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -420,10 +423,14 @@ jobs:
 
       - name: Build Desktop App
         working-directory: shell/desktop
+        env:
+          GOARCH: ${{ matrix.arch }}
         run: |
           wails3 task darwin:build
 
       - name: Build Helper
+        env:
+          GOARCH: ${{ matrix.arch }}
         run: |
           CGO_ENABLED=1 go build -o shell/desktop/bin/omniedge-helper ./cmd/omniedge-helper
 
@@ -444,20 +451,20 @@ jobs:
           codesign --force --deep --sign - bin/OmniEdge.app
           
           # Create DMG
-          hdiutil create -volname "OmniEdge" -srcfolder bin/OmniEdge.app -ov -format UDZO bin/omniedge-desktop-${{ steps.version.outputs.version }}-macos-arm64.dmg
+          hdiutil create -volname "OmniEdge" -srcfolder bin/OmniEdge.app -ov -format UDZO bin/omniedge-desktop-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}.dmg
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: omniedge-desktop-${{ steps.version.outputs.version }}-macos-arm64
-          path: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-macos-arm64.dmg
+          name: omniedge-desktop-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}
+          path: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}.dmg
 
       - name: Upload to Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-macos-arm64.dmg
+          file: shell/desktop/bin/omniedge-desktop-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}.dmg
           tag: ${{ github.ref }}
           overwrite: true
 
@@ -495,5 +502,6 @@ jobs:
           echo "- **AppImage**: omniedge-desktop-${{ steps.version.outputs.version }}-linux-arm64.AppImage (ARM64 Universal)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### macOS" >> $GITHUB_STEP_SUMMARY
-          echo "- **DMG**: omniedge-desktop-${{ steps.version.outputs.version }}-macos-arm64.dmg (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Apple Silicon (arm64)**: omniedge-desktop-${{ steps.version.outputs.version }}-macos-arm64.dmg" >> $GITHUB_STEP_SUMMARY
+          echo "- **Intel (x64)**: omniedge-desktop-${{ steps.version.outputs.version }}-macos-amd64.dmg" >> $GITHUB_STEP_SUMMARY
 

@@ -349,8 +349,10 @@ jobs:
             arch: amd64
           - platform: ubuntu-24.04
             arch: amd64
-          - platform: macos-14
+          - platform: macos-latest
             arch: arm64
+          - platform: macos-latest
+            arch: amd64
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout with tag
@@ -399,7 +401,7 @@ jobs:
         if: startsWith(matrix.platform, 'macos')
         run: |
           brew install autoconf automake libtool coreutils
-          VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin-arm64
+          VERSION=${{ github.ref_name }} BUILD_ENV=${{ env.ENVIRONMENT }} make build-darwin-${{ matrix.arch }}
           codesign -s - ./out/omniedge
           zip -j ./omniedge-${{ github.ref_name }}-macos-${{ matrix.arch }}.zip ./out/omniedge
           sha256sum ./omniedge-${{ github.ref_name }}-macos-${{ matrix.arch }}.zip > ./omniedge-${{ github.ref_name }}-macos-${{ matrix.arch }}.zip.sha256

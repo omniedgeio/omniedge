@@ -114,9 +114,6 @@ sudo omniedge join --as-exit-node
 # Route all your traffic through a specific Exit Node IP
 # (Automatically syncs your selection with the dashboard)
 sudo omniedge join -e "100.100.0.1"
-
-# Enable routing manually (useful for non-exit-node gateways)
-sudo omniedge join -r
 ```
 
 ## Mobile Apps
