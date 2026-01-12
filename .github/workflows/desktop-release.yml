@@ -20,9 +20,7 @@ env:
 jobs:
   test-connection:
     uses: ./.github/workflows/test.yml
-    secrets:
-      OMNIEDGE_SECRET_KEY: ${{ secrets.OMNEIDGE_SECURITY_KEY }}
-      OMNIEDGE_NETWORK_ID: ${{ secrets.OMNEIDGE_VIRTUALNETWORK_ID }}
+    secrets: inherit
 
   # Build Windows installer with TAP driver
   build-windows:
