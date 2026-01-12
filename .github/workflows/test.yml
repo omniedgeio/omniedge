@@ -96,6 +96,9 @@ jobs:
           
           # Fix machine-id with a stable value to ensure identity consistency
           docker exec client-sim sh -c "echo 550e8400e29b41d4a716446655440000 > /etc/machine-id"
+
+          docker exec client-sim sh -c "if [ ! -d /dev/net ]; then mkdir /dev/net; fi"
+          docker exec client-sim sh -c "if [ ! -e /dev/net/tun ]; then mknod /dev/net/tun c 10 200; fi"
           
           # 7. Clean Login on Docker Client
           echo "Logging in on Docker Client..."
@@ -132,8 +135,4 @@ jobs:
           docker exec client-sim ip addr show || true
           echo "--- Client Routing Table ---"
           docker exec client-sim ip route show || true
-          echo "--- Client Logs ---"
-          docker exec client-sim cat /app/client.log || true
-          echo "--- Exit Node Host Logs ---"
-          cat exitnode.log || true
           exit 1
