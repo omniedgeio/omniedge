@@ -82,9 +82,9 @@ jobs:
             exit 1
           fi
 
-          # 5. Start Docker Client Simulation (Clean Isolation)
+          # 5. Start Docker Client Simulation (Privileged for TAP support)
           docker run -d --name client-sim --hostname Client-Sim-Box \
-            --cap-add NET_ADMIN --device /dev/net/tun \
+            --privileged --cap-add NET_ADMIN --device /dev/net/tun \
             -v $(pwd)/out:/app \
             -e OMNIEDGE_SECRET_KEY="$OMNIEDGE_SECRET_KEY" \
             -e OMNIEDGE_NETWORK_ID="$OMNIEDGE_NETWORK_ID" \
