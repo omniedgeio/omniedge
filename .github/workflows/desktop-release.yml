@@ -303,7 +303,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        arch: [arm64]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -422,5 +422,4 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### macOS" >> $GITHUB_STEP_SUMMARY
           echo "- **Apple Silicon (arm64)**: omniedge-desktop-${{ steps.version.outputs.version }}-macos-arm64.dmg" >> $GITHUB_STEP_SUMMARY
-          echo "- **Intel (x64)**: omniedge-desktop-${{ steps.version.outputs.version }}-macos-amd64.dmg" >> $GITHUB_STEP_SUMMARY
 
