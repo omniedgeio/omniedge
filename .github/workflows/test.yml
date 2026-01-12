@@ -1,12 +1,6 @@
 name: Connection Test
 
 on:
-  workflow_call:
-    secrets:
-      OMNIEDGE_SECRET_KEY:
-        required: true
-      OMNIEDGE_NETWORK_ID:
-        required: true
   push:
     tags:
       - 'v*.*.*'
@@ -35,8 +29,8 @@ jobs:
 
       - name: Test Connection
         env:
-          OMNIEDGE_SECRET_KEY: ${{ secrets.OMNIEDGE_SECRET_KEY || secrets.OMNEIDGE_SECURITY_KEY }}
-          OMNIEDGE_NETWORK_ID: ${{ secrets.OMNIEDGE_NETWORK_ID || secrets.OMNEIDGE_VIRTUALNETWORK_ID }}
+          OMNIEDGE_SECRET_KEY: ${{ secrets.OMNIEDGE_SECRET_KEY }}
+          OMNIEDGE_NETWORK_ID: ${{ secrets.OMNIEDGE_NETWORK_ID }}
         run: |
           if [ -z "$OMNIEDGE_SECRET_KEY" ]; then
             echo "Skipping test: OMNIEDGE_SECRET_KEY not configured"
@@ -51,18 +45,20 @@ jobs:
           sleep 2
           
           # Join in background
-          sudo ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" > omniedge.log 2>&1 &
+          echo "Starting OmniEdge join..."
+          sudo -E nohup ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" > omniedge.log 2>&1 &
           
           # Wait for interface and IP
           echo "Waiting for connection..."
           MAX_RETRIES=30
           COUNT=0
           while [ $COUNT -lt $MAX_RETRIES ]; do
-            # Check for omniedge interface (usually omniedge*, oe*, or tun*/tap*)
-            ip4=$(/sbin/ip -o -4 addr show | grep -E "omniedge|oe|tun|tap" | awk '{print $4}' | cut -d/ -f1 | head -n 1 || true)
+            # Check for OmniEdge IP (100.100.x.x)
+            ip4=$(ip -4 addr show | grep -oE "100\.100\.[0-9]+\.[0-9]+" | head -n 1 || true)
             if [ ! -z "$ip4" ]; then
               echo "Connected! Assigned IP: $ip4"
-              echo "ip-address=$ip4" >> $GITHUB_STEP_SUMMARY
+              echo "### Connection Status: Success ✅" >> $GITHUB_STEP_SUMMARY
+              echo "- **Assigned IP**: $ip4" >> $GITHUB_STEP_SUMMARY
               
               # Ping test
               echo "Pinging 100.100.0.122..."
@@ -81,5 +77,13 @@ jobs:
           done
           
           echo "Connection timeout after 60 seconds."
+          echo "### Network Debug Info" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ip addr show >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "### OmniEdge Logs" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat omniedge.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
           cat omniedge.log
           exit 1
