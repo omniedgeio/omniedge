@@ -19,64 +19,44 @@ var joinCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
 		core.LoadClientConfig()
-		endpointUrl := core.ConfigV.GetString(RestEndpointUrl)
-
-		// 1. Authentication (Secret Key or Auth File)
-		secretKey := viper.GetString(cliSecretKey)
-		if secretKey != "" {
-			log.Infof("Authenticating using secret key...")
-			authService := api.AuthService{
-				HttpOption: api.HttpOption{BaseUrl: endpointUrl},
-			}
-			authResp, err := authService.Login(&api.AuthOption{
-				SecretKey:  secretKey,
-				AuthMethod: api.LoginBySecretKey,
-			})
-			if err != nil {
-				log.Errorf("Failed to authenticate using secret key: %v", err)
-				return
-			}
-			viper.Set(keyAuthResponse, authResp)
-			viper.Set(keyAuthResponseToken, authResp.Token)
-			viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
-		} else {
-			// Load existing auth
-			if err := loadAuthFile(); err != nil {
-				log.Errorf("%+v", err)
-				return
-			}
-			// Refresh token if needed
-			refreshToken := viper.GetString(keyAuthResponseRefreshToken)
-			if refreshToken != "" {
-				refreshTokenOption := &api.RefreshTokenOption{
-					RefreshToken: refreshToken,
-				}
-				authService := api.AuthService{
-					HttpOption: api.HttpOption{BaseUrl: endpointUrl},
-				}
-				if authResp, err := authService.Refresh(refreshTokenOption); err != nil {
-					log.Warnf("Token refresh failed: %v. Attempting to use existing token.", err)
-				} else {
-					viper.Set(keyAuthResponse, authResp)
-					viper.Set(keyAuthResponseToken, authResp.Token)
-					viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
-				}
-			}
+		if err := loadAuthFile(); err != nil {
+			log.Errorf("%+v", err)
+			return
 		}
-
-		// 2. Network Selection
+		endpointUrl := core.ConfigV.GetString(RestEndpointUrl)
 		var vnId = viper.GetString(cliVirtualNetworkId)
 		var deviceId = viper.GetString(keyDeviceUUID)
 		var deviceName = viper.GetString(keyDeviceName)
+
 		var device *api.DeviceResponse
 		var err error
+
+		refreshToken := viper.GetString(keyAuthResponseRefreshToken)
+		if refreshToken != "" {
+			refreshTokenOption := &api.RefreshTokenOption{
+				RefreshToken: refreshToken,
+			}
+			var refreshTokenHttpOption = api.HttpOption{
+				BaseUrl: endpointUrl,
+			}
+			authService := api.AuthService{
+				HttpOption: refreshTokenHttpOption,
+			}
+			if authResp, err := authService.Refresh(refreshTokenOption); err != nil {
+				log.Errorf("%+v", err)
+				return
+			} else {
+				viper.Set(keyAuthResponse, authResp)
+				viper.Set(keyAuthResponseToken, authResp.Token)
+				viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
+			}
+		}
 
 		var httpOption = api.HttpOption{
 			Token:   fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
 			BaseUrl: endpointUrl,
 		}
-
-		// check device id exists in config
+		//check device id exists in config
 		if deviceId == "" || deviceName == "" {
 			if device, err = register(httpOption); err != nil {
 				log.Errorf("%+v", err)
@@ -100,11 +80,11 @@ var joinCmd = &cobra.Command{
 				log.Errorf("%+v", err)
 				return
 			}
-			if len(resp) == 0 {
+			if cap(resp) == 0 {
 				log.Errorf("You do not have omniedge network")
 				return
 			}
-			if len(resp) == 1 {
+			if cap(resp) == 1 {
 				vnId = resp[0].ID
 			} else {
 				vnId, err = prompt(resp)
@@ -115,7 +95,6 @@ var joinCmd = &cobra.Command{
 				viper.Set(keyVirtualNetworks, resp)
 			}
 		}
-
 		var joinOption = &api.JoinOption{
 			VirtualNetworkId: vnId,
 			DeviceId:         deviceId,
@@ -128,7 +107,6 @@ var joinCmd = &cobra.Command{
 			log.Errorf("%+v", err)
 			return
 		}
-
 		// Persist join response for reconnect
 		viper.Set(keyJoinVirtualNetworkCommunityName, joinResp.CommunityName)
 		viper.Set(keyJoinVirtualNetworkSecretKey, joinResp.SecretKey)
@@ -291,10 +269,8 @@ func init() {
 	joinCmd.Flags().BoolVarP(&enableRouting, cliEnableRouting, "r", false, "enable routing (automatically enabled with --as-exit-node)")
 	joinCmd.Flags().StringP(cliExitNode, "e", "", "exit node ip address")
 	joinCmd.Flags().Bool(cliAsExitNode, false, "enable this device to act as an exit node (implies -r)")
-	joinCmd.Flags().StringP(cliSecretKey, "s", "", "secret-key of omniedge (for one-step join)")
 	viper.BindPFlag(cliEnableRouting, joinCmd.Flags().Lookup(cliEnableRouting))
 	viper.BindPFlag(cliExitNode, joinCmd.Flags().Lookup(cliExitNode))
 	viper.BindPFlag(cliAsExitNode, joinCmd.Flags().Lookup(cliAsExitNode))
-	viper.BindPFlag(cliSecretKey, joinCmd.Flags().Lookup(cliSecretKey))
 	rootCmd.AddCommand(joinCmd)
 }
