@@ -7,6 +7,11 @@ on:
         required: true
       OMNIEDGE_NETWORK_ID:
         required: true
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-beta.*'
+      - 'v*.*.*-rc.*'
 
 jobs:
   verify-connection:
@@ -30,8 +35,8 @@ jobs:
 
       - name: Test Connection
         env:
-          OMNIEDGE_SECRET_KEY: ${{ secrets.OMNIEDGE_SECRET_KEY }}
-          OMNIEDGE_NETWORK_ID: ${{ secrets.OMNIEDGE_NETWORK_ID }}
+          OMNIEDGE_SECRET_KEY: ${{ secrets.OMNIEDGE_SECRET_KEY || secrets.OMNEIDGE_SECURITY_KEY }}
+          OMNIEDGE_NETWORK_ID: ${{ secrets.OMNIEDGE_NETWORK_ID || secrets.OMNEIDGE_VIRTUALNETWORK_ID }}
         run: |
           if [ -z "$OMNIEDGE_SECRET_KEY" ]; then
             echo "Skipping test: OMNIEDGE_SECRET_KEY not configured"
