@@ -58,7 +58,18 @@ jobs:
             if [ ! -z "$ip4" ]; then
               echo "Connected! Assigned IP: $ip4"
               echo "ip-address=$ip4" >> $GITHUB_STEP_SUMMARY
-              exit 0
+              
+              # Ping test
+              echo "Pinging 100.100.0.122..."
+              if ping -c 4 -W 5 100.100.0.122; then
+                echo "Ping success!"
+                echo "Ping test: Success" >> $GITHUB_STEP_SUMMARY
+                exit 0
+              else
+                echo "Ping failed!"
+                echo "Ping test: Failed" >> $GITHUB_STEP_SUMMARY
+                exit 1
+              fi
             fi
             sleep 2
             COUNT=$((COUNT+1))
