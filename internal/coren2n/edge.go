@@ -7,6 +7,7 @@ package coren2n
 
 /*
 #cgo CFLAGS: -g3 -Wall -I${SRCDIR}/n2n
+#cgo darwin,amd64 CFLAGS: -I${SRCDIR}
 #cgo LDFLAGS: -ln2n -L${SRCDIR}/n2n
 #include "edge.h"
 */
