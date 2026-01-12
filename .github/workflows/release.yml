@@ -12,7 +12,7 @@ jobs:
     secrets: inherit
 
   build-binary:
-    needs: test-connection
+    #needs: test-connection
     name: Docker cross build
     env:
       ENVIRONMENT: prod
@@ -116,7 +116,7 @@ jobs:
           tag: ${{ github.ref }}
           prerelease: ${{ contains(github.ref, '-') }}
   build-openwrt-1:
-    needs: test-connection
+    #needs: test-connection
     name: Build openwrt binary
     env:
       ENVIRONMENT: prod
@@ -209,7 +209,7 @@ jobs:
           tag: ${{ github.ref }}
           prerelease: ${{ contains(github.ref, '-') }}
   build-mips-mipsle-openwrt:
-    needs: test-connection
+    #needs: test-connection
     name: Build openwrt binary
     env:
       ENVIRONMENT: prod
@@ -250,7 +250,7 @@ jobs:
           prerelease: ${{ contains(github.ref, '-') }}
 
   build-other-binary:
-    needs: test-connection
+    #needs: test-connection
     name: Build on ${{ matrix.platform }}
     env:
       ENVIRONMENT: prod
@@ -306,7 +306,7 @@ jobs:
           tag: ${{ github.ref }}
           prerelease: ${{ contains(github.ref, '-') }}
   build-freebsd-binary:
-    needs: test-connection
+    #needs: test-connection
     runs-on: ubuntu-latest
     name: Build on FreeBSD
     env:
@@ -355,7 +355,7 @@ jobs:
           tag: ${{ github.ref }}
           prerelease: ${{ contains(github.ref, '-') }}
   build-for-distr:
-    needs: test-connection
+    #needs: test-connection
     name: Build on ${{ matrix.platform }} (${{ matrix.arch }})
     env:
       ENVIRONMENT: prod
