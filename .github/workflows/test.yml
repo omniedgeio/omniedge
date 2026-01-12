@@ -83,7 +83,7 @@ jobs:
           fi
 
           # 5. Start Docker Client Simulation (Privileged for TAP support)
-          docker run -d --name client-sim --hostname Client-Sim-Box \
+          docker run -d --name client-sim --hostname client-sim \
             --privileged --cap-add NET_ADMIN --device /dev/net/tun \
             -v $(pwd)/out:/app \
             -e OMNIEDGE_SECRET_KEY="$OMNIEDGE_SECRET_KEY" \
@@ -119,11 +119,17 @@ jobs:
               echo "- **Exit Node Host**: $EXIT_NODE_IP" >> $GITHUB_STEP_SUMMARY
               echo "- **Client Container**: $CLIENT_IP" >> $GITHUB_STEP_SUMMARY
               
+              echo "Waiting 10s for peer discovery..."
+              sleep 10
+              
               if docker exec client-sim ping -c 4 -W 5 1.1.1.1; then
                 echo "Internet access through tunnel: OK"
                 exit 0
               else
                 echo "Internet access through tunnel: FAILED"
+                echo "--- Debugging ---"
+                docker exec client-sim ip neighbor show || true
+                docker exec client-sim ping -c 4 -W 5 "$EXIT_NODE_IP" || true
                 exit 1
               fi
             fi

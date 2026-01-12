@@ -23,7 +23,7 @@ docker run -d --name client-sim --hostname client-sim \
   debian:stable-slim sleep infinity
 
 echo "--- 6. Setting up Docker Client Environment & Building ---"
-docker exec client-sim sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping ca-certificates golang-go build-essential libssl-dev pkg-config git wget make autoconf automake libtool patch"
+docker exec client-sim sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping ca-certificates golang-go build-essential libssl-dev pkg-config git wget make autoconf automake libtool patch net-tools"
 
 # Build inside container to ensure Linux binary
 echo "Building OmniEdge inside container..."
@@ -45,6 +45,7 @@ docker exec -d client-sim sh -c "/src/out/omniedge join -n $OMNIEDGE_NETWORK_ID 
 echo "--- Waiting for Client IP and Routing ---"
 MAX_RETRIES=30
 for i in $(seq 1 $MAX_RETRIES); do
+    # Search for OmniEdge interface (might be OmniEdge0, OmniEdge1, etc.)
     CLIENT_IP=$(docker exec client-sim ip -4 addr show | grep -oE "100\.100\.[0-9]+\.[0-9]+" | head -n 1 || true)
     ROUTE_CHECK=$(docker exec client-sim ip route show | grep default | grep "$EXIT_NODE_IP" || true)
     
@@ -53,6 +54,9 @@ for i in $(seq 1 $MAX_RETRIES); do
         echo "Exit Node Host: $EXIT_NODE_IP"
         echo "Client Container: $CLIENT_IP"
         
+        echo "Waiting 10s for n2n state and peer discovery..."
+        sleep 10
+        
         echo "--- Verification: Pinging 1.1.1.1 through tunnel ---"
         if docker exec client-sim ping -c 4 -W 5 1.1.1.1; then
             echo "Internet access through tunnel: OK"
@@ -60,6 +64,15 @@ for i in $(seq 1 $MAX_RETRIES); do
             exit 0
         else
             echo "Internet access through tunnel: FAILED"
+            echo "--- Debugging Connectivity ---"
+            echo "IP Neighbor Status:"
+            docker exec client-sim ip neighbor show || true
+            echo "ARP Cache:"
+            docker exec client-sim arp -an || true
+            echo "Pinging Exit Node $EXIT_NODE_IP directly..."
+            docker exec client-sim ping -c 4 -W 5 "$EXIT_NODE_IP" || true
+            echo "--- Client Logs ---"
+            docker exec client-sim cat /src/client.log || true
             exit 1
         fi
     fi
@@ -74,5 +87,5 @@ docker exec client-sim ip addr show || true
 echo "--- Client Routing Table ---"
 docker exec client-sim ip route show || true
 echo "--- Client Logs ---"
-docker exec client-sim cat /app/client.log || true
+docker exec client-sim cat /src/client.log || true
 exit 1

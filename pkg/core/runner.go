@@ -50,6 +50,13 @@ func (s *StartService) Start() error {
 		go s.heartbeatLoop()
 	}
 
+	if s.IsExitNode {
+		log.Info("Device is acting as an exit node, enabling forwarding and NAT")
+		if err := EnableExitNodeForwarding(); err != nil {
+			log.Errorf("Failed to enable exit node forwarding: %v", err)
+		}
+	}
+
 	if s.ExitNodeIP != "" && s.ExitNodeIP != s.VirtualIP {
 		log.Infof("Setting up exit node: %s", s.ExitNodeIP)
 		if err := SetupExitNode(s.ExitNodeIP, s.SuperNode); err != nil {
@@ -79,6 +86,9 @@ func (s *StartService) SetExitNode(exitNodeIP string) error {
 }
 
 func (s *StartService) Stop() {
+	if s.IsExitNode {
+		DisableExitNodeForwarding()
+	}
 	RestoreExitNode()
 	if s.edge != nil {
 		s.edge.Stop()
@@ -156,8 +166,9 @@ func (s *StartService) createEdge() *omnin2n.Edge {
 	edge.CommunityName = s.CommunityName
 	edge.SuperNodeNum = 0
 	edge.RegisterInterval = 20
-	// Use a fixed, safe interface name on Linux to avoid EINVAL from complex hostnames
-	edge.DeviceName = "omni0"
+	// Use a branded template name on Linux. %d allows the kernel to pick
+	// the next available index (OmniEdge0, OmniEdge1, etc.)
+	edge.DeviceName = "OmniEdge%d"
 	edge.DeviceIPMode = "static"
 	edge.DeviceIP = s.VirtualIP
 	edge.DeviceMask = s.DeviceMask

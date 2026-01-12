@@ -80,6 +80,30 @@ func RestoreExitNode() error {
 	return err
 }
 
+// EnableExitNodeForwarding enables IP forwarding and NAT for acting as an exit node
+func EnableExitNodeForwarding() error {
+	switch runtime.GOOS {
+	case "linux":
+		return enableForwardingLinux()
+	case "darwin":
+		return enableForwardingDarwin()
+	default:
+		return fmt.Errorf("exit node forwarding not supported on %s", runtime.GOOS)
+	}
+}
+
+// DisableExitNodeForwarding disables IP forwarding and NAT
+func DisableExitNodeForwarding() error {
+	switch runtime.GOOS {
+	case "linux":
+		return disableForwardingLinux()
+	case "darwin":
+		return disableForwardingDarwin()
+	default:
+		return nil
+	}
+}
+
 func runCmd(name string, args ...string) (string, error) {
 	cmd := exec.Command(name, args...)
 	out, err := cmd.CombinedOutput()
@@ -89,9 +113,94 @@ func runCmd(name string, args ...string) (string, error) {
 	return string(out), nil
 }
 
-// Linux
+// --- Linux Forwarding & NAT ---
+
+func enableForwardingLinux() error {
+	// 1. Enable IP Forwarding
+	_, err := runCmd("sudo", "sysctl", "-w", "net.ipv4.ip_forward=1")
+	if err != nil {
+		log.Warnf("Failed to enable IP forwarding via sysctl: %v. VPN may still work if already enabled.", err)
+	}
+
+	// 2. Detect external interface
+	out, err := runCmd("sh", "-c", "ip route get 8.8.8.8 | head -n1 | awk '{print $5}'")
+	if err != nil {
+		return fmt.Errorf("failed to detect external interface: %v", err)
+	}
+	extIf := strings.TrimSpace(out)
+	if extIf == "" {
+		return fmt.Errorf("could not determine external interface")
+	}
+
+	// 3. Add NAT Masquerade rule (idempotent check)
+	checkCmd := fmt.Sprintf("sudo iptables -t nat -C POSTROUTING -s 100.100.0.0/16 -o %s -j MASQUERADE", extIf)
+	_, err = runCmd("sh", "-c", checkCmd)
+	if err != nil {
+		// Rule doesn't exist, add it
+		addCmd := fmt.Sprintf("sudo iptables -t nat -A POSTROUTING -s 100.100.0.0/16 -o %s -j MASQUERADE", extIf)
+		_, err = runCmd("sh", "-c", addCmd)
+		if err != nil {
+			return fmt.Errorf("failed to add iptables NAT rule: %v", err)
+		}
+	}
+
+	log.Infof("Exit node forwarding enabled on %s", extIf)
+	return nil
+}
+
+func disableForwardingLinux() error {
+	out, err := runCmd("sh", "-c", "ip route get 8.8.8.8 | head -n1 | awk '{print $5}'")
+	if err == nil {
+		extIf := strings.TrimSpace(out)
+		if extIf != "" {
+			delCmd := fmt.Sprintf("sudo iptables -t nat -D POSTROUTING -s 100.100.0.0/16 -o %s -j MASQUERADE", extIf)
+			_, _ = runCmd("sh", "-c", delCmd)
+		}
+	}
+	return nil
+}
+
+// --- Darwin Forwarding & NAT ---
+
+func enableForwardingDarwin() error {
+	// 1. Enable IP Forwarding
+	_, err := runCmd("sudo", "sysctl", "-w", "net.inet.ip.forwarding=1")
+	if err != nil {
+		log.Warnf("Failed to enable IP forwarding via sysctl: %v", err)
+	}
+
+	// 2. Detect external interface
+	out, err := runCmd("sh", "-c", "route -n get 8.8.8.8 | grep interface | awk '{print $2}'")
+	if err != nil {
+		return fmt.Errorf("failed to detect external interface: %v", err)
+	}
+	extIf := strings.TrimSpace(out)
+	if extIf == "" {
+		return fmt.Errorf("could not determine external interface")
+	}
+
+	// 3. Configure PF NAT
+	pfRule := fmt.Sprintf("nat on %s from 100.100.0.0/16 to any -> (%s)", extIf, extIf)
+	pfConfig := fmt.Sprintf("echo \"%s\" | sudo pfctl -a omniedge -f -", pfRule)
+
+	_, err = runCmd("sh", "-c", pfConfig)
+	if err != nil {
+		return fmt.Errorf("failed to configure pfctl NAT: %v", err)
+	}
+
+	_, _ = runCmd("sudo", "pfctl", "-e") // Ensure PF is enabled
+
+	log.Infof("Exit node forwarding enabled on %s (macOS PF)", extIf)
+	return nil
+}
+
+func disableForwardingDarwin() error {
+	_, _ = runCmd("sudo", "pfctl", "-a", "omniedge", "-F", "nat")
+	return nil
+}
+
+// Linux Exit Node Setup
 func setupExitNodeLinux(exitNodeIP, supernodeIP string) error {
-	// 1. Get current gateway
 	out, err := runCmd("sh", "-c", "ip route get 8.8.8.8 | head -n1 | awk '{ print $3 }'")
 	if err != nil {
 		return err
@@ -101,18 +210,15 @@ func setupExitNodeLinux(exitNodeIP, supernodeIP string) error {
 		return fmt.Errorf("could not determine current gateway")
 	}
 
-	// 2. Add route to supernode via original gateway
 	_, err = runCmd("ip", "route", "add", supernodeIP, "via", originalGateway)
 	if err != nil {
 		return err
 	}
 
-	// 3. Change default gateway
 	_, _ = runCmd("ip", "route", "del", "default")
-
 	_, err = runCmd("ip", "route", "add", "default", "via", exitNodeIP)
 	if err != nil {
-		restoreExitNodeLinux() // Try to cleanup
+		restoreExitNodeLinux()
 		return err
 	}
 
@@ -129,12 +235,10 @@ func restoreExitNodeLinux() error {
 		runCmd("ip", "route", "del", supernodeRouteIP, "via", originalGateway)
 	}
 	return nil
-
 }
 
-// Darwin
+// Darwin Exit Node Setup
 func setupExitNodeDarwin(exitNodeIP, supernodeIP string) error {
-	// 1. Get current gateway
 	out, err := runCmd("sh", "-c", "route -n get default | grep gateway | awk '{print $2}'")
 	if err != nil {
 		return err
@@ -144,13 +248,11 @@ func setupExitNodeDarwin(exitNodeIP, supernodeIP string) error {
 		return fmt.Errorf("could not determine current gateway")
 	}
 
-	// 2. Add route to supernode via original gateway
 	_, err = runCmd("route", "-n", "add", "-net", supernodeIP, originalGateway)
 	if err != nil {
 		return err
 	}
 
-	// 3. Change default gateway
 	_, _ = runCmd("route", "delete", "default")
 	_, err = runCmd("route", "-n", "add", "-net", "0.0.0.0", exitNodeIP)
 	if err != nil {
@@ -173,20 +275,14 @@ func restoreExitNodeDarwin() error {
 	return nil
 }
 
-// Windows
+// Windows Exit Node Setup
 func setupExitNodeWindows(exitNodeIP, supernodeIP string) error {
-	// Windows implementation usually requires administrative privileges
-	// 1. Get current gateway (simplified, ideally use netsh or powershell)
 	out, err := runCmd("sh", "-c", "route print 0.0.0.0 | findstr 0.0.0.0")
 	if err != nil {
-		// Try alternative for standard windows shell if 'sh' is missing
 		out, err = runCmd("cmd", "/c", "route print 0.0.0.0")
 	}
-	// Note: Parsing Windows route print output is complex.
-	// This is a placeholder for the logic.
 	log.Debugf("Windows route print output: %s", out)
 
-	// Placeholder logic
 	_, _ = runCmd("route", "delete", "0.0.0.0")
 	_, err = runCmd("route", "ADD", supernodeIP, "MASK", "255.255.255.255", originalGateway)
 	_, err = runCmd("route", "ADD", "0.0.0.0", "MASK", "0.0.0.0", exitNodeIP)
