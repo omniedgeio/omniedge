@@ -108,14 +108,14 @@ sudo omniedge join -n "your-network-id"
 Join a network and configure exit node functionality:
 
 ```bash
-# Become an Exit Node (current device routes traffic for others)
+# Become an Exit Node (implies -r, device routes traffic for others)
 sudo omniedge join --as-exit-node
 
 # Route all your traffic through a specific Exit Node IP
-# Note: Ensure the exit node is authorized on the dashboard
+# (Automatically syncs your selection with the dashboard)
 sudo omniedge join -e "100.100.0.1"
 
-# Enable routing (useful when acting as a gateway)
+# Enable routing manually (useful for non-exit-node gateways)
 sudo omniedge join -r
 ```
 

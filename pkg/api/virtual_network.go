@@ -166,3 +166,29 @@ func (s *VirtualNetworkService) GetDevices(networkID string) ([]VirtualNetworkDe
 		return nil, errors.New(fmt.Sprint("Internal error during devices fetch"))
 	}
 }
+func (s *VirtualNetworkService) SelectExitNode(networkID string, deviceID string, exitNodeID string) error {
+	url := fmt.Sprintf("%s/virtual-networks/%s/devices/%s/select-exit-node", s.BaseUrl, networkID, deviceID)
+
+	body := map[string]interface{}{
+		"exit_node_id": exitNodeID,
+	}
+	if exitNodeID == "" {
+		body["exit_node_id"] = nil
+	}
+
+	postBody, _ := json.Marshal(body)
+	req, _ := http.NewRequest("PUT", url, bytes.NewBuffer(postBody))
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Authorization", s.Token)
+
+	resp, _ := HandleCall(req)
+	log.Tracef("SelectExitNode response %+v", resp)
+	switch resp.(type) {
+	case *SuccessResponse:
+		return nil
+	case *ErrorResponse:
+		return errors.New(fmt.Sprintf("Fail to select exit node, error message: %s", resp.(*ErrorResponse).Message))
+	default:
+		return errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
+	}
+}

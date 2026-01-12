@@ -114,13 +114,48 @@ var joinCmd = &cobra.Command{
 		viper.Set(keyJoinVirtualNetworkNetMask, joinResp.SubnetMask)
 		viper.Set(keyJoinVirtualNetworkSuperNode, joinResp.Server.Host)
 		viper.Set(keyJoinVirtualNetworkNetworkID, vnId)
-		viper.Set(keyJoinVirtualNetworkAsExitNode, viper.GetBool(cliAsExitNode))
+
+		isExitNode := viper.GetBool(cliAsExitNode)
+		viper.Set(keyJoinVirtualNetworkAsExitNode, isExitNode)
+
+		// If acting as exit node, automatically enable routing
+		enableRouting := viper.GetBool(cliEnableRouting)
+		if isExitNode {
+			enableRouting = true
+			log.Info("Acting as exit node: automatically enabling routing")
+		}
+
+		// Sync exit node selection with backend if specified
+		exitNodeIP := viper.GetString(cliExitNode)
+		if exitNodeIP != "" {
+			log.Infof("Selecting exit node: %s", exitNodeIP)
+			// Find device ID for this IP in the network
+			devs, err := service.GetDevices(vnId)
+			if err == nil {
+				var targetDeviceID string
+				for _, d := range devs {
+					if d.VirtualIP == exitNodeIP {
+						targetDeviceID = d.ID
+						break
+					}
+				}
+				if targetDeviceID != "" {
+					if err := service.SelectExitNode(vnId, deviceId, targetDeviceID); err != nil {
+						log.Warnf("Failed to sync exit node selection to backend: %v", err)
+					} else {
+						log.Info("Successfully synced exit node selection to backend")
+					}
+				} else {
+					log.Warnf("Could not find device with IP %s in network %s for backend sync", exitNodeIP, vnId)
+				}
+			}
+		}
 
 		viper.Set(keyDeviceUUID, deviceId)
 		persistAuthFile()
 		log.Infof("Success to join virtual network")
 		log.Infof("Start to connect omniedge")
-		if err = start(device, joinResp, viper.GetBool(cliEnableRouting), viper.GetString(cliExitNode), vnId, viper.GetBool(cliAsExitNode)); err != nil {
+		if err = start(device, joinResp, enableRouting, exitNodeIP, vnId, isExitNode); err != nil {
 			log.Errorf("%+v", err)
 			return
 		}
@@ -225,14 +260,15 @@ func init() {
 	var (
 		networkId      string
 		authConfigPath string
+		enableRouting  bool
 	)
 	joinCmd.Flags().StringVarP(&networkId, cliVirtualNetworkId, "n", "", "id of the virtual network which you want to join")
 
 	_ = registerCmd.MarkFlagRequired(cliVirtualNetworkId)
 	joinCmd.Flags().StringVarP(&authConfigPath, cliAuthConfigFile, "f", "", "position to store the auth and config")
-	joinCmd.Flags().BoolP(cliEnableRouting, "r", false, "enable routing")
+	joinCmd.Flags().BoolVarP(&enableRouting, cliEnableRouting, "r", false, "enable routing (automatically enabled with --as-exit-node)")
 	joinCmd.Flags().StringP(cliExitNode, "e", "", "exit node ip address")
-	joinCmd.Flags().Bool(cliAsExitNode, false, "enable this device as an exit node")
+	joinCmd.Flags().Bool(cliAsExitNode, false, "enable this device to act as an exit node (implies -r)")
 	viper.BindPFlag(cliEnableRouting, joinCmd.Flags().Lookup(cliEnableRouting))
 	viper.BindPFlag(cliExitNode, joinCmd.Flags().Lookup(cliExitNode))
 	viper.BindPFlag(cliAsExitNode, joinCmd.Flags().Lookup(cliAsExitNode))
