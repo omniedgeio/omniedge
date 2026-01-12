@@ -108,15 +108,19 @@ jobs:
           fi
           echo "Exit Node started at: $EXIT_NODE_IP"
 
-          # 2. Start Client in Docker (Using Debian Slim for compatibility and size)
-          docker run -d --name client-sim \
+          # 2. Start Client in Docker (Isolated Network)
+          # Use hostname to ensure unique device naming in OmniEdge
+          docker run -d --name client-sim --hostname Client-Sim-Box \
             --cap-add NET_ADMIN --device /dev/net/tun \
             -v $(pwd)/out:/app \
-            -v /home/runner/.omniedge:/root/.omniedge \
+            -v /home/runner/.omniedge/auth.json:/root/host_auth.json:ro \
             debian:stable-slim sleep infinity
 
-          # 3. Fast Setup and Join
-          docker exec client-sim sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping"
+          # 3. Setup Client (TLS Fix + Identification Fix)
+          docker exec client-sim sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping ca-certificates"
+          
+          # Initialize auth but remove host's device-uuid and virtual-ip to force a new registration
+          docker exec client-sim sh -c "mkdir -p /root/.omniedge && cp /root/host_auth.json /root/.omniedge/auth.json && sed -i '/device-uuid/d' /root/.omniedge/auth.json && sed -i '/virtual-ip/d' /root/.omniedge/auth.json"
           
           echo "Starting Client in Docker..."
           docker exec -d client-sim sh -c "/app/omniedge join -n $OMNIEDGE_NETWORK_ID -e $EXIT_NODE_IP > /app/client.log 2>&1"
@@ -144,6 +148,10 @@ jobs:
           done
           
           echo "Exit Node Simulation Timeout"
+          echo "--- Client IP Status ---"
+          docker exec client-sim ip addr show || true
+          echo "--- Client Routing Table ---"
+          docker exec client-sim ip route show || true
           echo "--- Client Logs ---"
           docker exec client-sim cat /app/client.log || true
           echo "--- Exit Node Host Logs ---"
