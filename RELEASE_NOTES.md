@@ -16,7 +16,6 @@
     - **Automated Pulse Test**: Every release is now guarded by a mandatory connection test (login -> join -> ping) verifying real-world connectivity.
     - **Production Guard**: Standardized all release channels to use the production environment by default for representative testing.
 
----
 
 ---
 

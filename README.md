@@ -31,7 +31,7 @@ The easiest way to install OmniEdge CLI:
 curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/omniedge-install.sh | bash
 ```
 
-To install a specific version:
+To install a specific version(beta/rc):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/omniedge-install.sh | OMNIEDGE_VERSION=v1.0.2-beta.0 bash
