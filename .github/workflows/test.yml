@@ -33,7 +33,7 @@ jobs:
           make generate
           BUILD_ENV=prod make build
 
-      - name: 1. Basic Connection Test
+      - name: Connection and Exit Node Simulation
         env:
           OMNIEDGE_SECRET_KEY: ${{ secrets.OMNIEDGE_SECRET_KEY }}
           OMNIEDGE_NETWORK_ID: ${{ secrets.OMNIEDGE_NETWORK_ID }}
@@ -44,56 +44,18 @@ jobs:
           fi
           
           chmod +x ./out/omniedge
-          sudo hostname Compile-Action
+          sudo hostname Exit-Node-Host
           
-          # Login
+          # 1. Login on Host
           ./out/omniedge login -s "$OMNIEDGE_SECRET_KEY"
           sleep 2
           
-          # Join in background
-          echo "Starting OmniEdge join..."
-          sudo -E nohup ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" > omniedge.log 2>&1 &
-          
-          # Wait for interface and IP
-          echo "Waiting for connection..."
-          MAX_RETRIES=30
-          COUNT=0
-          while [ $COUNT -lt $MAX_RETRIES ]; do
-            ip4=$(ip -4 addr show | grep -oE "100\.100\.[0-9]+\.[0-9]+" | head -n 1 || true)
-            if [ ! -z "$ip4" ]; then
-              echo "Connected! Assigned IP: $ip4"
-              echo "### Basic Connection: Success ✅" >> $GITHUB_STEP_SUMMARY
-              echo "- **Assigned IP**: $ip4" >> $GITHUB_STEP_SUMMARY
-              
-              echo "Pinging 100.100.0.122..."
-              if ping -c 4 -W 5 100.100.0.122; then
-                echo "Ping success!"
-                echo "Ping test: Success" >> $GITHUB_STEP_SUMMARY
-                sudo pkill omniedge || true
-                exit 0
-              else
-                echo "Ping failed!"
-                exit 1
-              fi
-            fi
-            sleep 2
-            COUNT=$((COUNT+1))
-          done
-          
-          echo "Connection timeout"
-          cat omniedge.log
-          exit 1
-
-      - name: 2. Exit Node Simulation Test
-        env:
-          OMNIEDGE_SECRET_KEY: ${{ secrets.OMNIEDGE_SECRET_KEY }}
-          OMNIEDGE_NETWORK_ID: ${{ secrets.OMNIEDGE_NETWORK_ID }}
-        run: |
-          # 1. Start Exit Node on Host
-          sudo hostname Exit-Node-Host
+          # 2. Start Host as Exit Node (Merging normal join and exit-node role)
+          echo "Starting OmniEdge as Exit Node on host..."
           sudo -E nohup ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" --as-exit-node > exitnode.log 2>&1 &
           
-          echo "Waiting for Exit Node IP..."
+          # 3. Wait for Host IP
+          echo "Waiting for Host IP..."
           EXIT_NODE_IP=""
           for i in {1..30}; do
             EXIT_NODE_IP=$(ip -4 addr show | grep -oE "100\.100\.[0-9]+\.[0-9]+" | head -n 1 || true)
@@ -102,39 +64,53 @@ jobs:
           done
           
           if [ -z "$EXIT_NODE_IP" ]; then
-            echo "Failed to start Exit Node"
+            echo "Failed to start Exit Node on host"
             cat exitnode.log
             exit 1
           fi
-          echo "Exit Node started at: $EXIT_NODE_IP"
+          echo "Host Connected! IP: $EXIT_NODE_IP"
+          echo "### Host Exit Node: Success ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- **Host IP**: $EXIT_NODE_IP" >> $GITHUB_STEP_SUMMARY
 
-          # 2. Start Client in Docker
+          # 4. Host Connectivity Check
+          echo "Checking host connectivity..."
+          if ping -c 4 -W 5 100.100.0.122; then
+            echo "Host ping success!"
+          else
+            echo "Host ping failed!"
+            cat exitnode.log
+            exit 1
+          fi
+
+          # 5. Start Docker Client Simulation
+          # Using fixed device-uuid and hostname "Client-Sim-Box"
           docker run -d --name client-sim --hostname Client-Sim-Box \
             --cap-add NET_ADMIN --device /dev/net/tun \
             -v $(pwd)/out:/app \
             -v /home/runner/.omniedge/auth.json:/root/host_auth.json:ro \
             debian:stable-slim sleep infinity
 
-          # 3. Setup Client (Machine ID + TLS Fix + Identity Fix)
+          # 6. Setup Docker Client Environment
           docker exec client-sim sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping ca-certificates"
-          
-          # Fix machine-id to ensure uniqueness and machineid.ID() works
           docker exec client-sim sh -c "cat /proc/sys/kernel/random/uuid > /etc/machine-id"
           
-          # Initialize auth but remove ALL host-specific identifiers to force a clean registration
-          docker exec client-sim sh -c "mkdir -p /root/.omniedge && cp /root/host_auth.json /root/.omniedge/auth.json && sed -i '/device-uuid/d' /root/.omniedge/auth.json && sed -i '/virtual-ip/d' /root/.omniedge/auth.json && sed -i '/mac-address/d' /root/.omniedge/auth.json"
+          # 7. Configure Docker Client Identity
+          # Injecting fixed device-uuid and removing host-specific IP/MAC
+          docker exec client-sim sh -c "mkdir -p /root/.omniedge && cp /root/host_auth.json /root/.omniedge/auth.json"
+          docker exec client-sim sh -c "sed -i 's/}/, \"device-uuid\": \"550e8400-e29b-41d4-a716-446655440000\"}/' /root/.omniedge/auth.json"
+          docker exec client-sim sh -c "sed -i '/virtual-ip/d' /root/.omniedge/auth.json && sed -i '/mac-address/d' /root/.omniedge/auth.json"
           
-          echo "Starting Client in Docker..."
+          echo "Starting Docker Client..."
           docker exec -d client-sim sh -c "/app/omniedge join -n $OMNIEDGE_NETWORK_ID -e $EXIT_NODE_IP > /app/client.log 2>&1"
           
+          # 8. Verification Loop for Docker Client and Exit Node Routing
           echo "Waiting for Client IP and Routing..."
           for i in {1..30}; do
             CLIENT_IP=$(docker exec client-sim ip -4 addr show | grep -oE "100\.100\.[0-9]+\.[0-9]+" | head -n 1 || true)
             ROUTE_CHECK=$(docker exec client-sim ip route show | grep default | grep "$EXIT_NODE_IP" || true)
             
-            # Ensure it's NOT the same IP as the host
             if [ ! -z "$CLIENT_IP" ] && [ "$CLIENT_IP" != "$EXIT_NODE_IP" ] && [ ! -z "$ROUTE_CHECK" ]; then
-              echo "Client connected with unique IP! IP: $CLIENT_IP"
+              echo "Client connected with unique IP: $CLIENT_IP"
               echo "### Exit Node Simulation: Success ✅" >> $GITHUB_STEP_SUMMARY
               echo "- **Exit Node Host**: $EXIT_NODE_IP" >> $GITHUB_STEP_SUMMARY
               echo "- **Client Container**: $CLIENT_IP" >> $GITHUB_STEP_SUMMARY
@@ -151,6 +127,8 @@ jobs:
           done
           
           echo "Exit Node Simulation Failed or Timeout"
+          echo "--- Host IP ---"
+          ip addr show
           echo "--- Client IP Status ---"
           docker exec client-sim ip addr show || true
           echo "--- Client Routing Table ---"
