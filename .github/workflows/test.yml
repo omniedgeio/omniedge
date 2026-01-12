@@ -35,9 +35,9 @@ jobs:
 
       - name: Test Connection
         env:
-          # Support both explicit passed secrets and repo secrets for standalone/call runs
-          OMNIEDGE_SECRET_KEY: ${{ secrets.OMNIEDGE_SECRET_KEY || secrets.OMNEIDGE_SECURITY_KEY }}
-          OMNIEDGE_NETWORK_ID: ${{ secrets.OMNIEDGE_NETWORK_ID || secrets.OMNEIDGE_VIRTUALNETWORK_ID }}
+          # Use standard secret names
+          OMNIEDGE_SECRET_KEY: ${{ secrets.OMNIEDGE_SECRET_KEY }}
+          OMNIEDGE_NETWORK_ID: ${{ secrets.OMNIEDGE_NETWORK_ID }}
         run: |
           if [ -z "$OMNIEDGE_SECRET_KEY" ]; then
             echo "Skipping test: OMNIEDGE_SECRET_KEY not configured"
