@@ -10,7 +10,7 @@ jobs:
   build-binary:
     name: Docker cross build
     env:
-      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
+      ENVIRONMENT: prod
     strategy:
       matrix:
         platform: [amd64,arm,arm64]
@@ -113,7 +113,7 @@ jobs:
   build-openwrt-1:
     name: Build openwrt binary
     env:
-      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
+      ENVIRONMENT: prod
     strategy:
       matrix:
         platform: [amd64,arm64,arm]
@@ -205,7 +205,7 @@ jobs:
   build-mips-mipsle-openwrt:
     name: Build openwrt binary
     env:
-      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
+      ENVIRONMENT: prod
     strategy:
       matrix:
         platform: [mips,mipsle ]
@@ -245,7 +245,7 @@ jobs:
   build-other-binary:
     name: Build on ${{ matrix.platform }}
     env:
-      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
+      ENVIRONMENT: prod
     strategy:
       matrix:
         platform: [ riscv64, loongarch64 ]
@@ -301,7 +301,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Build on FreeBSD
     env:
-      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
+      ENVIRONMENT: prod
     steps:
       - name: Checkout with tag
         uses: actions/checkout@v4
@@ -348,7 +348,7 @@ jobs:
   build-for-distr:
     name: Build on ${{ matrix.platform }} (${{ matrix.arch }})
     env:
-      ENVIRONMENT: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
+      ENVIRONMENT: prod
     strategy:
       matrix:
         include:

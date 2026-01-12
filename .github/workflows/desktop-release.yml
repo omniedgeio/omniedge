@@ -67,7 +67,7 @@ jobs:
 
       - name: Build Helper
         env:
-          BUILD_ENV: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
+          BUILD_ENV: prod
         run: |
           go build -ldflags "-X main.Env=${BUILD_ENV}" -o shell/desktop/bin/omniedge-helper.exe ./cmd/omniedge-helper
 
@@ -155,7 +155,7 @@ jobs:
 
       - name: Build Helper
         env:
-          BUILD_ENV: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
+          BUILD_ENV: prod
         run: |
           CGO_ENABLED=1 go build -ldflags "-X main.Env=${BUILD_ENV}" -o shell/desktop/bin/omniedge-helper ./cmd/omniedge-helper
 
@@ -440,7 +440,7 @@ jobs:
       - name: Build Helper
         env:
           GOARCH: ${{ matrix.arch }}
-          BUILD_ENV: ${{ contains(github.ref, '-') && 'test' || 'prod' }}
+          BUILD_ENV: prod
         run: |
           CGO_ENABLED=1 go build -ldflags "-X main.Env=${BUILD_ENV}" -o shell/desktop/bin/omniedge-helper ./cmd/omniedge-helper
 
