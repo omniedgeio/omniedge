@@ -50,7 +50,7 @@ jobs:
           ./out/omniedge login -s "$OMNIEDGE_SECRET_KEY"
           sleep 2
           
-          # 2. Start Host as Exit Node (Merging normal join and exit-node role)
+          # 2. Start Host as Exit Node
           echo "Starting OmniEdge as Exit Node on host..."
           sudo -E nohup ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" --as-exit-node > exitnode.log 2>&1 &
           
@@ -82,28 +82,29 @@ jobs:
             exit 1
           fi
 
-          # 5. Start Docker Client Simulation
-          # Using fixed device-uuid and hostname "Client-Sim-Box"
+          # 5. Start Docker Client Simulation (Clean Isolation)
           docker run -d --name client-sim --hostname Client-Sim-Box \
             --cap-add NET_ADMIN --device /dev/net/tun \
             -v $(pwd)/out:/app \
-            -v /home/runner/.omniedge/auth.json:/root/host_auth.json:ro \
+            -e OMNIEDGE_SECRET_KEY="$OMNIEDGE_SECRET_KEY" \
+            -e OMNIEDGE_NETWORK_ID="$OMNIEDGE_NETWORK_ID" \
+            -e EXIT_NODE_IP="$EXIT_NODE_IP" \
             debian:stable-slim sleep infinity
 
           # 6. Setup Docker Client Environment
           docker exec client-sim sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping ca-certificates"
+          
+          # Fix machine-id to ensure uniqueness
           docker exec client-sim sh -c "cat /proc/sys/kernel/random/uuid > /etc/machine-id"
           
-          # 7. Configure Docker Client Identity
-          # Injecting fixed device-uuid and removing host-specific IP/MAC
-          docker exec client-sim sh -c "mkdir -p /root/.omniedge && cp /root/host_auth.json /root/.omniedge/auth.json"
-          docker exec client-sim sh -c "sed -i 's/}/, \"device-uuid\": \"550e8400-e29b-41d4-a716-446655440000\"}/' /root/.omniedge/auth.json"
-          docker exec client-sim sh -c "sed -i '/virtual-ip/d' /root/.omniedge/auth.json && sed -i '/mac-address/d' /root/.omniedge/auth.json"
+          # 7. Clean Login on Docker Client
+          echo "Logging in on Docker Client..."
+          docker exec client-sim /app/omniedge login -s "$OMNIEDGE_SECRET_KEY"
           
           echo "Starting Docker Client..."
           docker exec -d client-sim sh -c "/app/omniedge join -n $OMNIEDGE_NETWORK_ID -e $EXIT_NODE_IP > /app/client.log 2>&1"
           
-          # 8. Verification Loop for Docker Client and Exit Node Routing
+          # 8. Verification Loop
           echo "Waiting for Client IP and Routing..."
           for i in {1..30}; do
             CLIENT_IP=$(docker exec client-sim ip -4 addr show | grep -oE "100\.100\.[0-9]+\.[0-9]+" | head -n 1 || true)
@@ -127,8 +128,6 @@ jobs:
           done
           
           echo "Exit Node Simulation Failed or Timeout"
-          echo "--- Host IP ---"
-          ip addr show
           echo "--- Client IP Status ---"
           docker exec client-sim ip addr show || true
           echo "--- Client Routing Table ---"
