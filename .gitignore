@@ -47,4 +47,8 @@ Thumbs.db
 
 # Temporary
 *.tmp
-*.loglocal-auth.json
+*.log
+local-auth.json
+client.log
+
+.task
