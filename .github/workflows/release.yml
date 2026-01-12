@@ -426,7 +426,7 @@ jobs:
   notify:
     name: Trigger updates in dependent repos
     runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
+    if: "startsWith(github.ref, 'refs/tags/') && !contains(github.ref, '-beta') && !contains(github.ref, '-rc')"
     needs: 
       - build-binary
       - build-openwrt-1
