@@ -47,7 +47,7 @@ jobs:
           sudo hostname Exit-Node-Host
           
           # 1. Login on Host
-          ./out/omniedge login -s "$OMNIEDGE_SECRET_KEY" -f auth.json
+          ./out/omniedge login -s "$OMNIEDGE_SECRET_KEY"
           sleep 2
           
           # 2. Start 
