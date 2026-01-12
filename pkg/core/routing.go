@@ -42,16 +42,29 @@ func SetupExitNode(exitNodeIP string, supernodeHost string) error {
 	}
 	supernodeRouteIP = addrs[0].String()
 
+	var setupErr error
 	switch runtime.GOOS {
 	case "linux":
-		return setupExitNodeLinux(exitNodeIP, supernodeRouteIP)
+		setupErr = setupExitNodeLinux(exitNodeIP, supernodeRouteIP)
 	case "darwin":
-		return setupExitNodeDarwin(exitNodeIP, supernodeRouteIP)
+		setupErr = setupExitNodeDarwin(exitNodeIP, supernodeRouteIP)
 	case "windows":
-		return setupExitNodeWindows(exitNodeIP, supernodeRouteIP)
+		setupErr = setupExitNodeWindows(exitNodeIP, supernodeRouteIP)
 	default:
-		return fmt.Errorf("exit node not supported on %s", runtime.GOOS)
+		setupErr = fmt.Errorf("exit node not supported on %s", runtime.GOOS)
 	}
+
+	if setupErr != nil {
+		return setupErr
+	}
+
+	// Setup DNS to ensure internet access works through the tunnel
+	if err := SetupDNS(); err != nil {
+		log.Warnf("Failed to setup DNS: %v. Internet access may be limited.", err)
+	}
+
+	isExitNodeActive = true
+	return nil
 }
 
 // RestoreExitNode restores the system's original routing configuration
@@ -59,6 +72,8 @@ func RestoreExitNode() error {
 	if !isExitNodeActive {
 		return nil
 	}
+
+	_ = RestoreDNS()
 
 	var err error
 	switch runtime.GOOS {
@@ -102,6 +117,81 @@ func DisableExitNodeForwarding() error {
 	default:
 		return nil
 	}
+}
+
+// SetupDNS configures a public DNS (8.8.8.8) to ensure connectivity through the tunnel
+func SetupDNS() error {
+	switch runtime.GOOS {
+	case "linux":
+		return setupDNSLinux()
+	case "darwin":
+		return setupDNSDarwin()
+	default:
+		return nil
+	}
+}
+
+// RestoreDNS restores the original DNS settings
+func RestoreDNS() error {
+	switch runtime.GOOS {
+	case "linux":
+		return restoreDNSLinux()
+	case "darwin":
+		return restoreDNSDarwin()
+	default:
+		return nil
+	}
+}
+
+func setupDNSLinux() error {
+	// 1. Backup /etc/resolv.conf if it's a file
+	_, err := runCmd("sh", "-c", "test -f /etc/resolv.conf && ! test -L /etc/resolv.conf")
+	if err == nil {
+		_, _ = runCmd("sudo", "cp", "/etc/resolv.conf", "/etc/resolv.conf.omniedge_bak")
+	}
+
+	// 2. Set nameserver 8.8.8.8
+	log.Info("Setting DNS to 8.8.8.8 (Linux)")
+	_, err = runCmd("sh", "-c", "echo \"nameserver 8.8.8.8\" | sudo tee /etc/resolv.conf")
+	return err
+}
+
+func restoreDNSLinux() error {
+	_, err := runCmd("sh", "-c", "test -f /etc/resolv.conf.omniedge_bak")
+	if err == nil {
+		log.Info("Restoring DNS from backup (Linux)")
+		_, _ = runCmd("sudo", "mv", "/etc/resolv.conf.omniedge_bak", "/etc/resolv.conf")
+	}
+	return nil
+}
+
+func setupDNSDarwin() error {
+	// 1. Get primary service
+	out, err := runCmd("sh", "-c", "networksetup -listallnetworkservices | grep -v '*' | head -n 1")
+	if err != nil {
+		return err
+	}
+	service := strings.TrimSpace(out)
+	if service == "" {
+		return fmt.Errorf("no network service found")
+	}
+
+	// 2. Set DNS
+	log.Infof("Setting DNS to 8.8.8.8 for service %s (macOS)", service)
+	_, err = runCmd("sudo", "networksetup", "-setdnsservers", service, "8.8.8.8")
+	return err
+}
+
+func restoreDNSDarwin() error {
+	out, err := runCmd("sh", "-c", "networksetup -listallnetworkservices | grep -v '*' | head -n 1")
+	if err == nil {
+		service := strings.TrimSpace(out)
+		if service != "" {
+			log.Infof("Restoring DNS to Empty (DHCP default) for service %s (macOS)", service)
+			_, _ = runCmd("sudo", "networksetup", "-setdnsservers", service, "Empty")
+		}
+	}
+	return nil
 }
 
 func runCmd(name string, args ...string) (string, error) {
@@ -210,29 +300,28 @@ func setupExitNodeLinux(exitNodeIP, supernodeIP string) error {
 		return fmt.Errorf("could not determine current gateway")
 	}
 
-	_, err = runCmd("ip", "route", "add", supernodeIP, "via", originalGateway)
+	_, err = runCmd("sudo", "ip", "route", "add", supernodeIP, "via", originalGateway)
 	if err != nil {
 		return err
 	}
 
-	_, _ = runCmd("ip", "route", "del", "default")
-	_, err = runCmd("ip", "route", "add", "default", "via", exitNodeIP)
+	_, _ = runCmd("sudo", "ip", "route", "del", "default")
+	_, err = runCmd("sudo", "ip", "route", "add", "default", "via", exitNodeIP)
 	if err != nil {
 		restoreExitNodeLinux()
 		return err
 	}
 
-	isExitNodeActive = true
 	return nil
 }
 
 func restoreExitNodeLinux() error {
 	if originalGateway != "" {
-		runCmd("ip", "route", "del", "default")
-		runCmd("ip", "route", "add", "default", "via", originalGateway)
+		_, _ = runCmd("sudo", "ip", "route", "del", "default")
+		_, _ = runCmd("sudo", "ip", "route", "add", "default", "via", originalGateway)
 	}
 	if supernodeRouteIP != "" && originalGateway != "" {
-		runCmd("ip", "route", "del", supernodeRouteIP, "via", originalGateway)
+		_, _ = runCmd("sudo", "ip", "route", "del", supernodeRouteIP, "via", originalGateway)
 	}
 	return nil
 }
@@ -248,29 +337,28 @@ func setupExitNodeDarwin(exitNodeIP, supernodeIP string) error {
 		return fmt.Errorf("could not determine current gateway")
 	}
 
-	_, err = runCmd("route", "-n", "add", "-net", supernodeIP, originalGateway)
+	_, err = runCmd("sudo", "route", "-n", "add", "-net", supernodeIP, originalGateway)
 	if err != nil {
 		return err
 	}
 
-	_, _ = runCmd("route", "delete", "default")
-	_, err = runCmd("route", "-n", "add", "-net", "0.0.0.0", exitNodeIP)
+	_, _ = runCmd("sudo", "route", "delete", "default")
+	_, err = runCmd("sudo", "route", "-n", "add", "-net", "0.0.0.0", exitNodeIP)
 	if err != nil {
 		restoreExitNodeDarwin()
 		return err
 	}
 
-	isExitNodeActive = true
 	return nil
 }
 
 func restoreExitNodeDarwin() error {
-	runCmd("route", "delete", "-net", "0.0.0.0")
+	_, _ = runCmd("sudo", "route", "delete", "-net", "0.0.0.0")
 	if originalGateway != "" {
-		runCmd("route", "-n", "add", "-net", "0.0.0.0", originalGateway)
+		_, _ = runCmd("sudo", "route", "-n", "add", "-net", "0.0.0.0", originalGateway)
 	}
 	if supernodeRouteIP != "" && originalGateway != "" {
-		runCmd("route", "delete", "-net", supernodeRouteIP)
+		_, _ = runCmd("sudo", "route", "delete", "-net", supernodeRouteIP)
 	}
 	return nil
 }
@@ -287,13 +375,12 @@ func setupExitNodeWindows(exitNodeIP, supernodeIP string) error {
 	_, err = runCmd("route", "ADD", supernodeIP, "MASK", "255.255.255.255", originalGateway)
 	_, err = runCmd("route", "ADD", "0.0.0.0", "MASK", "0.0.0.0", exitNodeIP)
 
-	isExitNodeActive = true
 	return nil
 }
 
 func restoreExitNodeWindows() error {
-	runCmd("route", "delete", "0.0.0.0")
-	runCmd("route", "ADD", "0.0.0.0", "MASK", "0.0.0.0", originalGateway)
-	runCmd("route", "delete", supernodeRouteIP)
+	_, _ = runCmd("route", "delete", "0.0.0.0")
+	_, _ = runCmd("route", "ADD", "0.0.0.0", "MASK", "0.0.0.0", originalGateway)
+	_, _ = runCmd("route", "delete", supernodeRouteIP)
 	return nil
 }
