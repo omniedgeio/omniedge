@@ -55,12 +55,3 @@ The `svenstaro/upload-release-action` should be configured to mark non-standard 
 | **Stable** | `vX.Y.Z` | Official Release | `latest` on website/docs |
 | **Beta/RC** | `vX.Y.Z-suffix` | Pre-release | "Beta" downloads section |
 
-> [!IMPORTANT]
-> To ensure consistent behavior and representative testing, all release channels (Stable, Beta, and RC) utilize the production (`prod`) environment.
-
-## 5. Next Steps
-
-1. [ ] Update `release.yml` and `desktop-release.yml` triggers.
-2. [ ] Update release actions to handle the `prerelease` flag dynamically.
-3. [ ] Configure `BUILD_ENV` to `prod` for all releases.
-4. [ ] Establish a `develop` branch if not already existing.
