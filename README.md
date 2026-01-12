@@ -16,7 +16,8 @@ OmniEdge enables seamless connectivity between your devices across networks. Per
 - 🖥️ **Cross-platform Desktop App** - Windows, macOS, Linux with system tray
 - 📦 **Multiple Linux Packages** - DEB, RPM, AppImage, Flatpak, Arch
 - 🪟 **Windows Support** - NSIS installer with bundled TAP driver
-- ✨ **Native macOS `utun` support** - No third-party kernel extensions needed
+- 🍎 **Multi-Arch macOS** - Native support for both Apple Silicon and Intel Macs
+- 🛡️ **Verified Connectivity** - Every release is automatically tested for real-world connection health
 - 💓 **Real-time heartbeat** - Device online status visible in dashboard
 - 🏗️ **Emerging architectures** - RISC-V, LoongArch, FreeBSD 14
 

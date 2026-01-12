@@ -2,10 +2,17 @@
  
 ## v1.0.2-beta.0 (2026-01-12)
 ### 🚀 New Features & Improvements
-- **Automated Connection Test**: Integrated a reusable [connection test](.github/workflows/test.yml) into the release pipeline to verify login, join, and network health (ping) before publishing builds.
-- **Improved Release Strategy**: Established a robust Semantic Versioning strategy with automated pre-release marking for Beta and RC tags.
-- **Multi-Arch macOS Support**: Added Intel (amd64) support for both CLI and Desktop release workflows, alongside existing Apple Silicon support.
-- **CLI Refinements**: Consolidated exit-node flags (`--as-exit-node` now implies `-r`) and added backend synchronization for exit-node selection.
+- **Automated Connection Verification**: Every release now undergoes a full end-to-end connection test (build -> login -> join -> ping) to ensure stability before artifacts are published.
+- **Universal macOS Support**: Desktop DMG and CLI binaries now support both **Intel (x64)** and **Apple Silicon (arm64)** architectures.
+- **Improved Exit Node Logic**: 
+    - The CLI `--as-exit-node` flag now automatically enables routing (`-r`), simplifying the setup.
+    - Added backend synchronization for exit node selection (`-e`) to match dashboard state.
+- **Release Automation**: Formalized a SemVer-based branching model with automated pre-release marking for Beta and RC channels.
+- **Branding & UI**: 
+    - Introduced a fresh "Blue" icon suite across macOS and Windows.
+    - Enforced a 480px minimum window height for a more stable desktop UI.
+    - Decoupled login and connection loading states for smoother UX.
+- **Standardized Environment**: All release channels now explicitly target the `prod` environment for maximum reliability.
 
 ---
 
