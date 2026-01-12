@@ -17,13 +17,13 @@ echo "--- 5. Starting Docker Client Simulation ---"
 # Remove existing container if any
 docker rm -f client-sim 2>/dev/null || true
 
-docker run -d --name client-sim --hostname Client-Sim-Box \
+docker run -d --name client-sim --hostname client-sim \
   --privileged --cap-add NET_ADMIN --device /dev/net/tun \
   -v "$(pwd)":/src \
   debian:stable-slim sleep infinity
 
 echo "--- 6. Setting up Docker Client Environment & Building ---"
-docker exec client-sim sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping ca-certificates golang-go build-essential libssl-dev pkg-config git"
+docker exec client-sim sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping ca-certificates golang-go build-essential libssl-dev pkg-config git wget make autoconf automake libtool patch"
 
 # Build inside container to ensure Linux binary
 echo "Building OmniEdge inside container..."

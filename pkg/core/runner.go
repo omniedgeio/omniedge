@@ -156,7 +156,8 @@ func (s *StartService) createEdge() *omnin2n.Edge {
 	edge.CommunityName = s.CommunityName
 	edge.SuperNodeNum = 0
 	edge.RegisterInterval = 20
-	edge.DeviceName = s.Hostname
+	// Use a fixed, safe interface name on Linux to avoid EINVAL from complex hostnames
+	edge.DeviceName = "omni0"
 	edge.DeviceIPMode = "static"
 	edge.DeviceIP = s.VirtualIP
 	edge.DeviceMask = s.DeviceMask
