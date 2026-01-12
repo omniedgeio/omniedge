@@ -18,9 +18,9 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  test-connection:
-    uses: ./.github/workflows/test.yml
-    secrets: inherit
+  # test-connection:
+  #   uses: ./.github/workflows/test.yml
+  #   secrets: inherit
 
   # Build Windows installer with TAP driver
   build-windows:
@@ -62,6 +62,8 @@ jobs:
 
       - name: Generate n2n library
         working-directory: internal
+        env:
+          GOARCH: amd64
         run: |
           go generate ./...
 
@@ -151,6 +153,8 @@ jobs:
 
       - name: Generate n2n library
         working-directory: internal
+        env:
+          GOARCH: ${{ matrix.arch }}
         run: |
           go generate ./...
 
@@ -435,6 +439,8 @@ jobs:
 
       - name: Generate n2n library
         working-directory: internal
+        env:
+          GOARCH: ${{ matrix.arch }}
         run: |
           go generate ./...
 

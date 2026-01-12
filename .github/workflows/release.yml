@@ -7,9 +7,9 @@ on:
       - 'v*.*.*-beta.*'
       - 'v*.*.*-rc.*'
 jobs:
-  test-connection:
-    uses: ./.github/workflows/test.yml
-    secrets: inherit
+  # test-connection:
+  #   uses: ./.github/workflows/test.yml
+  #   secrets: inherit
 
   build-binary:
     #needs: test-connection

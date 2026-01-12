@@ -37,9 +37,11 @@ elif [ "$OS_V" = 'Darwin' ]; then
     case $arch in
         amd64)
             ./configure --host=x86_64-apple-darwin CC="clang -arch x86_64" CXX="clang++ -arch x86_64" CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -arch x86_64 -I." LDFLAGS="-arch x86_64"
+            N2N_PLATOPTS="$N2N_PLATOPTS -arch x86_64"
             ;;
         arm64)
             ./configure --host=aarch64-apple-darwin CC="clang -arch arm64" CXX="clang++ -arch arm64" CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -arch arm64 -I." LDFLAGS="-arch arm64"
+            N2N_PLATOPTS="$N2N_PLATOPTS -arch arm64"
             ;;
         *)
             ./configure CFLAGS="-DSKIP_MULTICAST_PEERS_DISCOVERY -I."
@@ -63,7 +65,7 @@ if [ "$arch" = 'riscv64' ]; then
 fi
 
 # Set custom flags in PLATOPTS (appended to CFLAGS by n2n Makefile)
-N2N_PLATOPTS="-DSKIP_MULTICAST_PEERS_DISCOVERY"
+N2N_PLATOPTS="$N2N_PLATOPTS -DSKIP_MULTICAST_PEERS_DISCOVERY"
 if [ "$OS_V" = 'Darwin' ]; then
     N2N_PLATOPTS="$N2N_PLATOPTS -I."
 fi

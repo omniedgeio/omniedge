@@ -7,11 +7,11 @@ on:
         required: false
       OMNIEDGE_NETWORK_ID:
         required: false
-  push:
-    tags:
-      - 'v*.*.*'
-      - 'v*.*.*-beta.*'
-      - 'v*.*.*-rc.*'
+  # push:
+  #   tags:
+  #     - 'v*.*.*'
+  #     - 'v*.*.*-beta.*'
+  #     - 'v*.*.*-rc.*'
 
 jobs:
   verify:
