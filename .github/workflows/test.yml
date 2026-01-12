@@ -46,7 +46,7 @@ jobs:
           chmod +x ./out/omniedge
           sudo hostname Compile-Action
           
-          # Login (Only once per runner session)
+          # Login
           ./out/omniedge login -s "$OMNIEDGE_SECRET_KEY"
           sleep 2
           
@@ -69,8 +69,6 @@ jobs:
               if ping -c 4 -W 5 100.100.0.122; then
                 echo "Ping success!"
                 echo "Ping test: Success" >> $GITHUB_STEP_SUMMARY
-                
-                # Stop OmniEdge before next test to release interface
                 sudo pkill omniedge || true
                 exit 0
               else
@@ -83,6 +81,7 @@ jobs:
           done
           
           echo "Connection timeout"
+          cat omniedge.log
           exit 1
 
       - name: 2. Exit Node Simulation Test
@@ -90,7 +89,7 @@ jobs:
           OMNIEDGE_SECRET_KEY: ${{ secrets.OMNIEDGE_SECRET_KEY }}
           OMNIEDGE_NETWORK_ID: ${{ secrets.OMNIEDGE_NETWORK_ID }}
         run: |
-          # 1. Start Exit Node on Host (using existing auth)
+          # 1. Start Exit Node on Host
           sudo hostname Exit-Node-Host
           sudo -E nohup ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" --as-exit-node > exitnode.log 2>&1 &
           
@@ -109,20 +108,18 @@ jobs:
           fi
           echo "Exit Node started at: $EXIT_NODE_IP"
 
-          # 2. Start Client in Docker
-          # We mount the host's .omniedge folder into the container to share the auth.json session
+          # 2. Start Client in Docker (Using Debian Slim for compatibility and size)
           docker run -d --name client-sim \
             --cap-add NET_ADMIN --device /dev/net/tun \
             -v $(pwd)/out:/app \
             -v /home/runner/.omniedge:/root/.omniedge \
-            ubuntu:22.04 sleep infinity
+            debian:stable-slim sleep infinity
 
-          # 3. Setup Client and Join (Uses shared auth session, NO redundant login)
-          docker exec client-sim apt-get update
-          docker exec client-sim apt-get install -y iproute2 iputils-ping
+          # 3. Fast Setup and Join
+          docker exec client-sim sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping"
           
           echo "Starting Client in Docker..."
-          docker exec -d client-sim /app/omniedge join -n "$OMNIEDGE_NETWORK_ID" -e "$EXIT_NODE_IP"
+          docker exec -d client-sim sh -c "/app/omniedge join -n $OMNIEDGE_NETWORK_ID -e $EXIT_NODE_IP > /app/client.log 2>&1"
           
           echo "Waiting for Client IP and Routing..."
           for i in {1..30}; do
@@ -147,4 +144,8 @@ jobs:
           done
           
           echo "Exit Node Simulation Timeout"
+          echo "--- Client Logs ---"
+          docker exec client-sim cat /app/client.log || true
+          echo "--- Exit Node Host Logs ---"
+          cat exitnode.log || true
           exit 1
