@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -195,6 +196,20 @@ func restoreDNSDarwin() error {
 }
 
 func runCmd(name string, args ...string) (string, error) {
+	if name == "sudo" {
+		// If we are already root, skip sudo
+		if os.Getuid() == 0 {
+			name = args[0]
+			args = args[1:]
+		} else {
+			// Check if sudo is available
+			if _, err := exec.LookPath("sudo"); err != nil {
+				log.Warn("sudo not found in PATH, attempting to run without it")
+				name = args[0]
+				args = args[1:]
+			}
+		}
+	}
 	cmd := exec.Command(name, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

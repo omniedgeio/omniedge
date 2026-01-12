@@ -37,10 +37,10 @@ docker exec client-sim sh -c "if [ ! -d /dev/net ]; then mkdir /dev/net; fi"
 docker exec client-sim sh -c "if [ ! -e /dev/net/tun ]; then mknod /dev/net/tun c 10 200; fi"
 
 echo "--- 7. Clean Login on Docker Client ---"
-docker exec client-sim /src/out/omniedge login -s "$OMNIEDGE_SECRET_KEY"
+docker exec client-sim /src/out/omniedge login -s "$OMNIEDGE_SECRET_KEY" -f /src/local-auth.json
 
 echo "--- 8. Starting Docker Client ---"
-docker exec -d client-sim sh -c "/src/out/omniedge join -n $OMNIEDGE_NETWORK_ID -e $EXIT_NODE_IP > /src/client.log 2>&1"
+docker exec -d client-sim sh -c "/src/out/omniedge join -n $OMNIEDGE_NETWORK_ID -e $EXIT_NODE_IP -f /src/local-auth.json > /src/client.log 2>&1"
 
 echo "--- Waiting for Client IP and Routing ---"
 MAX_RETRIES=30

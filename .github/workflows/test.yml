@@ -47,12 +47,12 @@ jobs:
           sudo hostname Exit-Node-Host
           
           # 1. Login on Host
-          ./out/omniedge login -s "$OMNIEDGE_SECRET_KEY"
+          ./out/omniedge login -s "$OMNIEDGE_SECRET_KEY" -f auth.json
           sleep 2
           
           # 2. Start Host as Exit Node
           echo "Starting OmniEdge as Exit Node on host..."
-          sudo -E nohup ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" --as-exit-node > exitnode.log 2>&1 &
+          sudo -E nohup ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" --as-exit-node -f auth.json > exitnode.log 2>&1 &
           
           # 3. Wait for Host IP
           echo "Waiting for Host IP..."
@@ -74,7 +74,7 @@ jobs:
 
           # 4. Host Connectivity Check
           echo "Checking host connectivity..."
-          if ping -c 4 -W 5 100.100.0.122; then
+          if ping -c 4 -W 5 "$EXIT_NODE_IP"; then
             echo "Host ping success!"
           else
             echo "Host ping failed!"
@@ -100,12 +100,12 @@ jobs:
           docker exec client-sim sh -c "if [ ! -d /dev/net ]; then mkdir /dev/net; fi"
           docker exec client-sim sh -c "if [ ! -e /dev/net/tun ]; then mknod /dev/net/tun c 10 200; fi"
           
-          # 7. Clean Login on Docker Client
+          # 7. Clean Login on Docker Client (use /app mapping)
           echo "Logging in on Docker Client..."
-          docker exec client-sim /app/omniedge login -s "$OMNIEDGE_SECRET_KEY"
+          docker exec client-sim /app/omniedge login -s "$OMNIEDGE_SECRET_KEY" -f /app/auth.json
           
           echo "Starting Docker Client..."
-          docker exec -d client-sim sh -c "/app/omniedge join -n $OMNIEDGE_NETWORK_ID -e $EXIT_NODE_IP > /app/client.log 2>&1"
+          docker exec -d client-sim sh -c "/app/omniedge join -n $OMNIEDGE_NETWORK_ID -e $EXIT_NODE_IP -f /app/auth.json > /app/client.log 2>&1"
           
           # 8. Verification Loop
           echo "Waiting for Client IP and Routing..."
