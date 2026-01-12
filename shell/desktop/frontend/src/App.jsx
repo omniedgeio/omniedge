@@ -316,7 +316,7 @@ function App() {
                     <div className="logged-out-view">
                         <div className="placeholder-hero">
                             <div className="hero-gradient"></div>
-                            <p>Private Mesh Network for Everyone</p>
+                            <p> Secure P2P mesh networking for AI devices, IoT, and edge computing</p>
                         </div>
                         <div className="locked-info">
                             <div className="divider"></div>
