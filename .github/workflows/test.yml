@@ -94,3 +94,101 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat omniedge.log
           exit 1
+
+  verify-exit-node:
+    name: Verify Exit Node Simulation
+    needs: verify-connection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build CLI
+        run: |
+          sudo -E apt-get -y update
+          sudo -E apt-get install -y openssl build-essential libssl-dev zip
+          make generate
+          BUILD_ENV=prod make build
+
+      - name: Run Exit Node and Client Simulation
+        env:
+          OMNIEDGE_SECRET_KEY: ${{ secrets.OMNIEDGE_SECRET_KEY }}
+          OMNIEDGE_NETWORK_ID: ${{ secrets.OMNIEDGE_NETWORK_ID }}
+        run: |
+          if [ -z "$OMNIEDGE_SECRET_KEY" ]; then
+            echo "Skipping test: OMNIEDGE_SECRET_KEY not configured"
+            exit 1
+          fi
+          
+          # 1. Start Exit Node on Host
+          chmod +x ./out/omniedge
+          sudo hostname Exit-Node-Host
+          ./out/omniedge login -s "$OMNIEDGE_SECRET_KEY"
+          sudo -E nohup ./out/omniedge join -n "$OMNIEDGE_NETWORK_ID" --as-exit-node > exitnode.log 2>&1 &
+          
+          echo "Waiting for Exit Node IP..."
+          EXIT_NODE_IP=""
+          for i in {1..30}; do
+            EXIT_NODE_IP=$(ip -4 addr show | grep -oE "100\.100\.[0-9]+\.[0-9]+" | head -n 1 || true)
+            if [ ! -z "$EXIT_NODE_IP" ]; then break; fi
+            sleep 2
+          done
+          
+          if [ -z "$EXIT_NODE_IP" ]; then
+            echo "Failed to start Exit Node"
+            cat exitnode.log
+            exit 1
+          fi
+          echo "Exit Node started at: $EXIT_NODE_IP"
+
+          # 2. Start Client in Docker (Isolated Network)
+          docker run -d --name client-sim \
+            --cap-add NET_ADMIN --device /dev/net/tun \
+            -v $(pwd)/out:/app \
+            -e OMNIEDGE_SECRET_KEY="$OMNIEDGE_SECRET_KEY" \
+            -e OMNIEDGE_NETWORK_ID="$OMNIEDGE_NETWORK_ID" \
+            -e EXIT_NODE_IP="$EXIT_NODE_IP" \
+            ubuntu:22.04 sleep infinity
+
+          # 3. Setup Client and Join
+          docker exec client-sim apt-get update
+          docker exec client-sim apt-get install -y curl iproute2 iputils-ping
+          docker exec client-sim /app/omniedge login -s "$OMNIEDGE_SECRET_KEY"
+          
+          echo "Starting Client in Docker..."
+          docker exec -d client-sim /app/omniedge join -n "$OMNIEDGE_NETWORK_ID" -e "$EXIT_NODE_IP"
+          
+          echo "Waiting for Client IP and Routing..."
+          for i in {1..30}; do
+            # Check for OmniEdge IP and Default Route
+            CLIENT_IP=$(docker exec client-sim ip -4 addr show | grep -oE "100\.100\.[0-9]+\.[0-9]+" | head -n 1 || true)
+            ROUTE_CHECK=$(docker exec client-sim ip route show | grep default | grep "$EXIT_NODE_IP" || true)
+            
+            if [ ! -z "$CLIENT_IP" ] && [ ! -z "$ROUTE_CHECK" ]; then
+              echo "Client connected! IP: $CLIENT_IP"
+              echo "Route verified: $ROUTE_CHECK"
+              
+              echo "### Exit Node Simulation: Success ✅" >> $GITHUB_STEP_SUMMARY
+              echo "- **Exit Node Host**: $EXIT_NODE_IP" >> $GITHUB_STEP_SUMMARY
+              echo "- **Client Container**: $CLIENT_IP" >> $GITHUB_STEP_SUMMARY
+              
+              # Final Traffic Check
+              echo "Verifying traffic through Exit Node..."
+              if docker exec client-sim ping -c 4 -W 5 1.1.1.1; then
+                echo "Internet access through tunnel: OK"
+                exit 0
+              else
+                echo "Internet access through tunnel: FAILED"
+                exit 1
+              fi
+            fi
+            sleep 2
+          done
+          
+          echo "Exit Node Simulation Timeout"
+          exit 1
