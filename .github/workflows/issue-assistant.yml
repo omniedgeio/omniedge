@@ -1,20 +1,40 @@
-name: Issue Assistant
+name: AI Issue Assistant
 on:
   issues:
     types: [opened]
-
 jobs:
-  analyze:
+  respond:
     runs-on: ubuntu-latest
     permissions:
       issues: write
-      contents: read
     steps:
-      - uses: workflowkit/issue-assistant@v1.0.0
+      - name: Query Cloudflare Workers AI
+        id: ai_query
+        run: |
+          # Prepare the prompt
+          ISSUE_BODY=$(echo '${{ github.event.issue.body }}' | jq -sRr @json)
+          
+          # Call Cloudflare API
+          RESPONSE=$(curl -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/ai/run/@cf/meta/llama-3-8b-instruct" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -d "{ \"messages\": [ \
+                  { \"role\": \"system\", \"content\": \"You are a helpful assistant for this GitHub project. Summarize the issue and provide a brief initial troubleshooting step.\" }, \
+                  { \"role\": \"user\", \"content\": $ISSUE_BODY } \
+                ] }" )
+
+          # Extract only the response text
+          RESULT=$(echo $RESPONSE | jq -r '.result.response')
+          
+          # Save result for the next step
+          echo "ai_text<<EOF" >> $GITHUB_OUTPUT
+          echo "$RESULT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post Comment
+        uses: peter-evans/create-or-update-comment@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          ai_type: "openai"  # or "claude"
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          # claude_api_key: ${{ secrets.CLAUDE_API_KEY }}  # if using claude
-          enable_comment: "true"   # required: at least one feature must be enabled
-          enable_label: "false"    # required: at least one feature must be enabled
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### 🤖 AI Assistant
+            ${{ steps.ai_query.outputs.ai_text }}
