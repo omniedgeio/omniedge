@@ -34,7 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main
 To install a specific version(beta/rc):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/omniedge-install.sh | OMNIEDGE_VERSION=v1.0.2-beta.0 bash
+curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/omniedge-install.sh | OMNIEDGE_VERSION=v1.0.1 bash
 ```
 
 ## Desktop Applications

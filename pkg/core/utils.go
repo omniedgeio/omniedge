@@ -103,16 +103,16 @@ func getMacAddress() (string, error) {
 func RevealHardwareUUID() (string, error) {
 	id, err := machineid.ID()
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("Fail to generate hardware id, err is %+v", err))
+		return "", fmt.Errorf("fail to generate hardware id, err is %+v", err)
 	}
 	id = strings.ToLower(strings.Replace(id, "-", "", -1))
 	idBytes, err := hex.DecodeString(id)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("Fail to generate hardware id, err is %+v", err))
+		return "", fmt.Errorf("fail to generate hardware id, err is %+v", err)
 	}
 	hardwareUUID, err := uuid.FromBytes(idBytes)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("Fail to generate hardware id, err is %+v", err))
+		return "", fmt.Errorf("fail to generate hardware id, err is %+v", err)
 	}
 	return hardwareUUID.String(), nil
 }

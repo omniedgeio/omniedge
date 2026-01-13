@@ -70,19 +70,19 @@ func (s *AuthService) Login(opt *AuthOption) (*AuthResp, error) {
 	req.Header.Set("content-type", "application/json")
 	resp, _ := HandleCall(req)
 	log.Tracef("LoginByPassword response %+v", resp)
-	switch resp.(type) {
+	switch resp := resp.(type) {
 	case *SuccessResponse:
-		authJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
+		authJson, _ := json.Marshal(resp.Data)
 		auth := AuthResp{}
 		if err := json.Unmarshal(authJson, &auth); err != nil {
-			return nil, errors.New(fmt.Sprintf("Fail to unmarshal response's data ,err is %+v", err))
+			return nil, fmt.Errorf("fail to unmarshal response's data ,err is %+v", err)
 		}
 		log.Debugf("auth token is %+v", auth)
 		return &auth, nil
 	case *ErrorResponse:
-		return nil, errors.New(fmt.Sprintf("Fail to login, error message: %s", resp.(*ErrorResponse).Message))
+		return nil, fmt.Errorf("fail to login, error message: %s", resp.Message)
 	default:
-		return nil, errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
+		return nil, fmt.Errorf("this client has some unpredictable problems, please contact the omniedge team")
 	}
 }
 
@@ -98,19 +98,19 @@ func (s *AuthService) Refresh(opt *RefreshTokenOption) (*AuthResp, error) {
 	req.Header.Set("content-type", "application/json")
 	resp, _ := HandleCall(req)
 	log.Tracef("RefreshToken response %+v", resp)
-	switch resp.(type) {
+	switch resp := resp.(type) {
 	case *SuccessResponse:
-		authJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
+		authJson, _ := json.Marshal(resp.Data)
 		auth := AuthResp{}
 		if err := json.Unmarshal(authJson, &auth); err != nil {
-			return nil, errors.New(fmt.Sprintf("Fail to unmarshal response's data ,err is %+v", err))
+			return nil, fmt.Errorf("fail to unmarshal response's data ,err is %+v", err)
 		}
 		log.Debugf("auth token is %+v", auth)
 		return &auth, nil
 	case *ErrorResponse:
-		return nil, errors.New(fmt.Sprintf("Fail to login, error message: %s", resp.(*ErrorResponse).Message))
+		return nil, fmt.Errorf("fail to login, error message: %s", resp.Message)
 	default:
-		return nil, errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
+		return nil, fmt.Errorf("this client has some unpredictable problems, please contact the omniedge team")
 	}
 }
 func (s *AuthService) Me() (*ProfileResponse, error) {

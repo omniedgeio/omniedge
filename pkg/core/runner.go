@@ -1,7 +1,11 @@
 package core
 
 import (
+	"fmt"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -52,14 +56,15 @@ func (s *StartService) Start() error {
 
 	if s.IsExitNode {
 		log.Info("Device is acting as an exit node, enabling forwarding and NAT")
-		if err := EnableExitNodeForwarding(); err != nil {
+		cidr := s.getVirtualCIDR()
+		if err := EnableExitNodeForwarding(cidr); err != nil {
 			log.Errorf("Failed to enable exit node forwarding: %v", err)
 		}
 	}
 
 	if s.ExitNodeIP != "" && s.ExitNodeIP != s.VirtualIP {
 		log.Infof("Setting up exit node: %s", s.ExitNodeIP)
-		if err := SetupExitNode(s.ExitNodeIP, s.SuperNode); err != nil {
+		if err := SetupExitNode(s.ExitNodeIP, s.SuperNode, s.VirtualIP); err != nil {
 			log.Errorf("Fail to setup exit node: %v", err)
 		}
 	} else if s.ExitNodeIP == s.VirtualIP {
@@ -68,9 +73,26 @@ func (s *StartService) Start() error {
 
 	log.Info("Starting omniedge")
 	log.Infof("Listening address: %s", s.edge.DeviceIP)
+
+	// Clean up PID file on exit
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		log.Info("OmniEdge service received exit signal, performing cleanup...")
+		s.Stop()
+		os.Remove(GetPidFile())
+		// If we are in daemon mode (CLI background), we must exit the process.
+		// For desktop app, we usually let Wails handle the final exit.
+		if os.Getenv("OMNIEDGE_DAEMON") == "1" {
+			os.Exit(0)
+		}
+	}()
+
 	if err := s.edge.Start(); err != nil {
 		log.Errorf("fail to start omniedge, error info:\n %s", err.Error())
 		RestoreExitNode()
+		os.Remove(GetPidFile())
 		return err
 	}
 	return nil
@@ -82,12 +104,12 @@ func (s *StartService) SetExitNode(exitNodeIP string) error {
 		return RestoreExitNode()
 	}
 	log.Infof("Selecting exit node: %s", exitNodeIP)
-	return SetupExitNode(exitNodeIP, s.SuperNode)
+	return SetupExitNode(exitNodeIP, s.SuperNode, s.VirtualIP)
 }
 
 func (s *StartService) Stop() {
 	if s.IsExitNode {
-		DisableExitNodeForwarding()
+		DisableExitNodeForwarding(s.getVirtualCIDR())
 	}
 	RestoreExitNode()
 	if s.edge != nil {
@@ -182,6 +204,21 @@ func (s *StartService) createEdge() *omnin2n.Edge {
 	edge.LocalPort = GetRandomPort()
 	edge.ManagementPort = GetRandomPort()
 
-	edge.MTU = 1500
+	edge.MTU = 1400
 	return edge
+}
+
+func (s *StartService) getVirtualCIDR() string {
+	ip := net.ParseIP(s.VirtualIP)
+	maskIP := net.ParseIP(s.DeviceMask)
+	if ip == nil || maskIP == nil {
+		return ""
+	}
+	mask := net.IPMask(maskIP.To4())
+	if mask == nil {
+		return ""
+	}
+	network := ip.Mask(mask)
+	ones, _ := mask.Size()
+	return fmt.Sprintf("%s/%d", network.String(), ones)
 }

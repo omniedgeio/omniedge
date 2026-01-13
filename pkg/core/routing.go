@@ -12,13 +12,14 @@ import (
 )
 
 var (
-	originalGateway  string
-	supernodeRouteIP string
-	isExitNodeActive bool
+	originalGateway   string
+	supernodeRouteIPs []string
+	isExitNodeActive  bool
+	dnsInterface      string
 )
 
 // SetupExitNode configures the system to use the specified exit node
-func SetupExitNode(exitNodeIP string, supernodeHost string) error {
+func SetupExitNode(exitNodeIP string, supernodeHost string, localVIP string) error {
 	if exitNodeIP == "" {
 		return nil
 	}
@@ -41,27 +42,26 @@ func SetupExitNode(exitNodeIP string, supernodeHost string) error {
 	if err != nil || len(addrs) == 0 {
 		return fmt.Errorf("failed to resolve supernode host %s: %v", host, err)
 	}
-	supernodeRouteIP = addrs[0].String()
+
+	supernodeRouteIPs = []string{}
+	for _, addr := range addrs {
+		supernodeRouteIPs = append(supernodeRouteIPs, addr.String())
+	}
 
 	var setupErr error
 	switch runtime.GOOS {
 	case "linux":
-		setupErr = setupExitNodeLinux(exitNodeIP, supernodeRouteIP)
+		setupErr = setupExitNodeLinux(exitNodeIP)
 	case "darwin":
-		setupErr = setupExitNodeDarwin(exitNodeIP, supernodeRouteIP)
+		setupErr = setupExitNodeDarwin(exitNodeIP)
 	case "windows":
-		setupErr = setupExitNodeWindows(exitNodeIP, supernodeRouteIP)
+		setupErr = setupExitNodeWindows(exitNodeIP)
 	default:
 		setupErr = fmt.Errorf("exit node not supported on %s", runtime.GOOS)
 	}
 
 	if setupErr != nil {
 		return setupErr
-	}
-
-	// Setup DNS to ensure internet access works through the tunnel
-	if err := SetupDNS(); err != nil {
-		log.Warnf("Failed to setup DNS: %v. Internet access may be limited.", err)
 	}
 
 	isExitNodeActive = true
@@ -73,8 +73,6 @@ func RestoreExitNode() error {
 	if !isExitNodeActive {
 		return nil
 	}
-
-	_ = RestoreDNS()
 
 	var err error
 	switch runtime.GOOS {
@@ -91,40 +89,40 @@ func RestoreExitNode() error {
 	if err == nil {
 		isExitNodeActive = false
 		originalGateway = ""
-		supernodeRouteIP = ""
+		supernodeRouteIPs = []string{}
 	}
 	return err
 }
 
 // EnableExitNodeForwarding enables IP forwarding and NAT for acting as an exit node
-func EnableExitNodeForwarding() error {
+func EnableExitNodeForwarding(cidr string) error {
 	switch runtime.GOOS {
 	case "linux":
-		return enableForwardingLinux()
+		return enableForwardingLinux(cidr)
 	case "darwin":
-		return enableForwardingDarwin()
+		return enableForwardingDarwin(cidr)
 	default:
 		return fmt.Errorf("exit node forwarding not supported on %s", runtime.GOOS)
 	}
 }
 
 // DisableExitNodeForwarding disables IP forwarding and NAT
-func DisableExitNodeForwarding() error {
+func DisableExitNodeForwarding(cidr string) error {
 	switch runtime.GOOS {
 	case "linux":
-		return disableForwardingLinux()
+		return disableForwardingLinux(cidr)
 	case "darwin":
-		return disableForwardingDarwin()
+		return disableForwardingDarwin(cidr)
 	default:
 		return nil
 	}
 }
 
 // SetupDNS configures a public DNS (8.8.8.8) to ensure connectivity through the tunnel
-func SetupDNS() error {
+func SetupDNS(localVIP string) error {
 	switch runtime.GOOS {
 	case "linux":
-		return setupDNSLinux()
+		return setupDNSLinux(localVIP)
 	case "darwin":
 		return setupDNSDarwin()
 	default:
@@ -144,31 +142,89 @@ func RestoreDNS() error {
 	}
 }
 
-func setupDNSLinux() error {
-	// 1. Backup /etc/resolv.conf if it's a file
-	_, err := runCmd("sh", "-c", "test -f /etc/resolv.conf && ! test -L /etc/resolv.conf")
+func setupDNSLinux(localVIP string) error {
+	iface, err := findInterfaceByIP(localVIP)
 	if err == nil {
-		_, _ = runCmd("sudo", "cp", "/etc/resolv.conf", "/etc/resolv.conf.omniedge_bak")
+		dnsInterface = iface
+		// 1. Try resolvectl (Modern systemd-based distros)
+		if _, err := exec.LookPath("resolvectl"); err == nil {
+			log.Infof("Using resolvectl to set DNS for %s (Linux)", iface)
+			_, err1 := RunCmd("sudo", "resolvectl", "dns", iface, "8.8.8.8")
+			_, err2 := RunCmd("sudo", "resolvectl", "domain", iface, "~.")
+			if err1 == nil && err2 == nil {
+				return nil
+			}
+			log.Warnf("resolvectl failed: %v, %v. Falling back...", err1, err2)
+		}
+
+		// 2. Try resolvconf (Common on Debian/Ubuntu non-systemd or mixed)
+		if _, err := exec.LookPath("resolvconf"); err == nil {
+			log.Infof("Using resolvconf to set DNS for %s (Linux)", iface)
+			cmd := fmt.Sprintf("echo \"nameserver 8.8.8.8\" | sudo resolvconf -a %s", iface)
+			if _, err := RunCmd("sh", "-c", cmd); err == nil {
+				return nil
+			}
+		}
 	}
 
-	// 2. Set nameserver 8.8.8.8
+	// 3. Last Resort: direct /etc/resolv.conf modification (Destructive)
+	log.Warn("No DNS manager found (resolvectl/resolvconf). Falling back to direct /etc/resolv.conf modification.")
+
+	// Backup /etc/resolv.conf if it's a file
+	_, err = RunCmd("sh", "-c", "test -f /etc/resolv.conf && ! test -L /etc/resolv.conf")
+	if err == nil {
+		_, _ = RunCmd("sudo", "cp", "/etc/resolv.conf", "/etc/resolv.conf.omniedge_bak")
+	}
+
+	// Set nameserver 8.8.8.8
 	log.Info("Setting DNS to 8.8.8.8 (Linux)")
-	_, err = runCmd("sh", "-c", "echo \"nameserver 8.8.8.8\" | sudo tee /etc/resolv.conf")
+	_, err = RunCmd("sh", "-c", "echo \"nameserver 8.8.8.8\" | sudo tee /etc/resolv.conf")
 	return err
 }
 
+func findInterfaceByIP(ip string) (string, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			if strings.Contains(addr.String(), ip) {
+				return iface.Name, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("interface not found for IP %s", ip)
+}
+
 func restoreDNSLinux() error {
-	_, err := runCmd("sh", "-c", "test -f /etc/resolv.conf.omniedge_bak")
+	if dnsInterface != "" {
+		if _, err := exec.LookPath("resolvectl"); err == nil {
+			log.Infof("Reverting DNS for %s (Linux resolvectl)", dnsInterface)
+			_, _ = RunCmd("sudo", "resolvectl", "revert", dnsInterface)
+		}
+		if _, err := exec.LookPath("resolvconf"); err == nil {
+			log.Infof("Removing DNS for %s (Linux resolvconf)", dnsInterface)
+			_, _ = RunCmd("sudo", "resolvconf", "-d", dnsInterface)
+		}
+		dnsInterface = ""
+	}
+
+	_, err := RunCmd("sh", "-c", "test -f /etc/resolv.conf.omniedge_bak")
 	if err == nil {
 		log.Info("Restoring DNS from backup (Linux)")
-		_, _ = runCmd("sudo", "mv", "/etc/resolv.conf.omniedge_bak", "/etc/resolv.conf")
+		_, _ = RunCmd("sudo", "mv", "/etc/resolv.conf.omniedge_bak", "/etc/resolv.conf")
 	}
 	return nil
 }
 
 func setupDNSDarwin() error {
 	// 1. Get primary service
-	out, err := runCmd("sh", "-c", "networksetup -listallnetworkservices | grep -v '*' | head -n 1")
+	out, err := RunCmd("sh", "-c", "networksetup -listallnetworkservices | grep -v '*' | head -n 1")
 	if err != nil {
 		return err
 	}
@@ -179,23 +235,23 @@ func setupDNSDarwin() error {
 
 	// 2. Set DNS
 	log.Infof("Setting DNS to 8.8.8.8 for service %s (macOS)", service)
-	_, err = runCmd("sudo", "networksetup", "-setdnsservers", service, "8.8.8.8")
+	_, err = RunCmd("sudo", "networksetup", "-setdnsservers", service, "8.8.8.8")
 	return err
 }
 
 func restoreDNSDarwin() error {
-	out, err := runCmd("sh", "-c", "networksetup -listallnetworkservices | grep -v '*' | head -n 1")
+	out, err := RunCmd("sh", "-c", "networksetup -listallnetworkservices | grep -v '*' | head -n 1")
 	if err == nil {
 		service := strings.TrimSpace(out)
 		if service != "" {
 			log.Infof("Restoring DNS to Empty (DHCP default) for service %s (macOS)", service)
-			_, _ = runCmd("sudo", "networksetup", "-setdnsservers", service, "Empty")
+			_, _ = RunCmd("sudo", "networksetup", "-setdnsservers", service, "Empty")
 		}
 	}
 	return nil
 }
 
-func runCmd(name string, args ...string) (string, error) {
+func RunCmd(name string, args ...string) (string, error) {
 	if name == "sudo" {
 		// If we are already root, skip sudo
 		if os.Getuid() == 0 {
@@ -220,15 +276,18 @@ func runCmd(name string, args ...string) (string, error) {
 
 // --- Linux Forwarding & NAT ---
 
-func enableForwardingLinux() error {
+func enableForwardingLinux(cidr string) error {
+	if cidr == "" {
+		cidr = "100.100.0.0/16" // Fallback
+	}
 	// 1. Enable IP Forwarding
-	_, err := runCmd("sudo", "sysctl", "-w", "net.ipv4.ip_forward=1")
+	_, err := RunCmd("sudo", "sysctl", "-w", "net.ipv4.ip_forward=1")
 	if err != nil {
 		log.Warnf("Failed to enable IP forwarding via sysctl: %v. VPN may still work if already enabled.", err)
 	}
 
 	// 2. Detect external interface
-	out, err := runCmd("sh", "-c", "ip route get 8.8.8.8 | head -n1 | awk '{print $5}'")
+	out, err := RunCmd("sh", "-c", "ip route get 8.8.8.8 | head -n1 | awk '{print $5}'")
 	if err != nil {
 		return fmt.Errorf("failed to detect external interface: %v", err)
 	}
@@ -238,28 +297,31 @@ func enableForwardingLinux() error {
 	}
 
 	// 3. Add NAT Masquerade rule (idempotent check)
-	checkCmd := fmt.Sprintf("sudo iptables -t nat -C POSTROUTING -s 100.100.0.0/16 -o %s -j MASQUERADE", extIf)
-	_, err = runCmd("sh", "-c", checkCmd)
+	checkCmd := fmt.Sprintf("sudo iptables -t nat -C POSTROUTING -s %s -o %s -j MASQUERADE", cidr, extIf)
+	_, err = RunCmd("sh", "-c", checkCmd)
 	if err != nil {
 		// Rule doesn't exist, add it
-		addCmd := fmt.Sprintf("sudo iptables -t nat -A POSTROUTING -s 100.100.0.0/16 -o %s -j MASQUERADE", extIf)
-		_, err = runCmd("sh", "-c", addCmd)
+		addCmd := fmt.Sprintf("sudo iptables -t nat -A POSTROUTING -s %s -o %s -j MASQUERADE", cidr, extIf)
+		_, err = RunCmd("sh", "-c", addCmd)
 		if err != nil {
 			return fmt.Errorf("failed to add iptables NAT rule: %v", err)
 		}
 	}
 
-	log.Infof("Exit node forwarding enabled on %s", extIf)
+	log.Infof("Exit node forwarding enabled for %s on %s", cidr, extIf)
 	return nil
 }
 
-func disableForwardingLinux() error {
-	out, err := runCmd("sh", "-c", "ip route get 8.8.8.8 | head -n1 | awk '{print $5}'")
+func disableForwardingLinux(cidr string) error {
+	if cidr == "" {
+		cidr = "100.100.0.0/16"
+	}
+	out, err := RunCmd("sh", "-c", "ip route get 8.8.8.8 | head -n1 | awk '{print $5}'")
 	if err == nil {
 		extIf := strings.TrimSpace(out)
 		if extIf != "" {
-			delCmd := fmt.Sprintf("sudo iptables -t nat -D POSTROUTING -s 100.100.0.0/16 -o %s -j MASQUERADE", extIf)
-			_, _ = runCmd("sh", "-c", delCmd)
+			delCmd := fmt.Sprintf("sudo iptables -t nat -D POSTROUTING -s %s -o %s -j MASQUERADE", cidr, extIf)
+			_, _ = RunCmd("sh", "-c", delCmd)
 		}
 	}
 	return nil
@@ -267,15 +329,18 @@ func disableForwardingLinux() error {
 
 // --- Darwin Forwarding & NAT ---
 
-func enableForwardingDarwin() error {
+func enableForwardingDarwin(cidr string) error {
+	if cidr == "" {
+		cidr = "100.100.0.0/16"
+	}
 	// 1. Enable IP Forwarding
-	_, err := runCmd("sudo", "sysctl", "-w", "net.inet.ip.forwarding=1")
+	_, err := RunCmd("sudo", "sysctl", "-w", "net.inet.ip.forwarding=1")
 	if err != nil {
 		log.Warnf("Failed to enable IP forwarding via sysctl: %v", err)
 	}
 
 	// 2. Detect external interface
-	out, err := runCmd("sh", "-c", "route -n get 8.8.8.8 | grep interface | awk '{print $2}'")
+	out, err := RunCmd("sh", "-c", "route -n get 8.8.8.8 | grep interface | awk '{print $2}'")
 	if err != nil {
 		return fmt.Errorf("failed to detect external interface: %v", err)
 	}
@@ -285,28 +350,28 @@ func enableForwardingDarwin() error {
 	}
 
 	// 3. Configure PF NAT
-	pfRule := fmt.Sprintf("nat on %s from 100.100.0.0/16 to any -> (%s)", extIf, extIf)
+	pfRule := fmt.Sprintf("nat on %s from %s to any -> (%s)", extIf, cidr, extIf)
 	pfConfig := fmt.Sprintf("echo \"%s\" | sudo pfctl -a omniedge -f -", pfRule)
 
-	_, err = runCmd("sh", "-c", pfConfig)
+	_, err = RunCmd("sh", "-c", pfConfig)
 	if err != nil {
 		return fmt.Errorf("failed to configure pfctl NAT: %v", err)
 	}
 
-	_, _ = runCmd("sudo", "pfctl", "-e") // Ensure PF is enabled
+	_, _ = RunCmd("sudo", "pfctl", "-e") // Ensure PF is enabled
 
-	log.Infof("Exit node forwarding enabled on %s (macOS PF)", extIf)
+	log.Infof("Exit node forwarding enabled for %s on %s (macOS PF)", cidr, extIf)
 	return nil
 }
 
-func disableForwardingDarwin() error {
-	_, _ = runCmd("sudo", "pfctl", "-a", "omniedge", "-F", "nat")
+func disableForwardingDarwin(cidr string) error {
+	_, _ = RunCmd("sudo", "pfctl", "-a", "omniedge", "-F", "all")
 	return nil
 }
 
 // Linux Exit Node Setup
-func setupExitNodeLinux(exitNodeIP, supernodeIP string) error {
-	out, err := runCmd("sh", "-c", "ip route get 8.8.8.8 | head -n1 | awk '{ print $3 }'")
+func setupExitNodeLinux(exitNodeIP string) error {
+	out, err := RunCmd("sh", "-c", "ip route get 8.8.8.8 | head -n1 | awk '{ print $3 }'")
 	if err != nil {
 		return err
 	}
@@ -315,13 +380,16 @@ func setupExitNodeLinux(exitNodeIP, supernodeIP string) error {
 		return fmt.Errorf("could not determine current gateway")
 	}
 
-	_, err = runCmd("sudo", "ip", "route", "add", supernodeIP, "via", originalGateway)
-	if err != nil {
-		return err
+	for _, ip := range supernodeRouteIPs {
+		_, _ = RunCmd("sudo", "ip", "route", "add", ip, "via", originalGateway)
 	}
 
-	_, _ = runCmd("sudo", "ip", "route", "del", "default")
-	_, err = runCmd("sudo", "ip", "route", "add", "default", "via", exitNodeIP)
+	// Clamp MSS to avoid fragmentation issues over the tunnel
+	_, _ = RunCmd("sudo", "iptables", "-t", "mangle", "-A", "FORWARD", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", "1360")
+	_, _ = RunCmd("sudo", "iptables", "-t", "mangle", "-A", "OUTPUT", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", "1360")
+
+	_, _ = RunCmd("sudo", "ip", "route", "del", "default")
+	_, err = RunCmd("sudo", "ip", "route", "add", "default", "via", exitNodeIP)
 	if err != nil {
 		restoreExitNodeLinux()
 		return err
@@ -331,19 +399,22 @@ func setupExitNodeLinux(exitNodeIP, supernodeIP string) error {
 }
 
 func restoreExitNodeLinux() error {
+	_, _ = RunCmd("sudo", "iptables", "-t", "mangle", "-D", "FORWARD", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", "1360")
+	_, _ = RunCmd("sudo", "iptables", "-t", "mangle", "-D", "OUTPUT", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", "1360")
+
 	if originalGateway != "" {
-		_, _ = runCmd("sudo", "ip", "route", "del", "default")
-		_, _ = runCmd("sudo", "ip", "route", "add", "default", "via", originalGateway)
+		_, _ = RunCmd("sudo", "ip", "route", "del", "default")
+		_, _ = RunCmd("sudo", "ip", "route", "add", "default", "via", originalGateway)
 	}
-	if supernodeRouteIP != "" && originalGateway != "" {
-		_, _ = runCmd("sudo", "ip", "route", "del", supernodeRouteIP, "via", originalGateway)
+	for _, ip := range supernodeRouteIPs {
+		_, _ = RunCmd("sudo", "ip", "route", "del", ip, "via", originalGateway)
 	}
 	return nil
 }
 
 // Darwin Exit Node Setup
-func setupExitNodeDarwin(exitNodeIP, supernodeIP string) error {
-	out, err := runCmd("sh", "-c", "route -n get default | grep gateway | awk '{print $2}'")
+func setupExitNodeDarwin(exitNodeIP string) error {
+	out, err := RunCmd("sh", "-c", "route -n get default | grep gateway | awk '{print $2}'")
 	if err != nil {
 		return err
 	}
@@ -352,13 +423,18 @@ func setupExitNodeDarwin(exitNodeIP, supernodeIP string) error {
 		return fmt.Errorf("could not determine current gateway")
 	}
 
-	_, err = runCmd("sudo", "route", "-n", "add", "-net", supernodeIP, originalGateway)
-	if err != nil {
-		return err
+	for _, ip := range supernodeRouteIPs {
+		_, _ = RunCmd("sudo", "route", "-n", "add", "-net", ip, originalGateway)
 	}
 
-	_, _ = runCmd("sudo", "route", "delete", "default")
-	_, err = runCmd("sudo", "route", "-n", "add", "-net", "0.0.0.0", exitNodeIP)
+	// Clamp MSS on macOS using PF
+	pfRule := fmt.Sprintf("scrub on any all reassemble tcp max-mss 1360")
+	pfConfig := fmt.Sprintf("echo \"%s\" | sudo pfctl -a omniedge-mss -f -", pfRule)
+	_, _ = RunCmd("sh", "-c", pfConfig)
+	_, _ = RunCmd("sudo", "pfctl", "-e")
+
+	_, _ = RunCmd("sudo", "route", "delete", "default")
+	_, err = RunCmd("sudo", "route", "-n", "add", "-net", "0.0.0.0", exitNodeIP)
 	if err != nil {
 		restoreExitNodeDarwin()
 		return err
@@ -368,34 +444,46 @@ func setupExitNodeDarwin(exitNodeIP, supernodeIP string) error {
 }
 
 func restoreExitNodeDarwin() error {
-	_, _ = runCmd("sudo", "route", "delete", "-net", "0.0.0.0")
+	_, _ = RunCmd("sudo", "pfctl", "-a", "omniedge-mss", "-F", "all")
+	_, _ = RunCmd("sudo", "route", "delete", "-net", "0.0.0.0")
 	if originalGateway != "" {
-		_, _ = runCmd("sudo", "route", "-n", "add", "-net", "0.0.0.0", originalGateway)
+		_, _ = RunCmd("sudo", "route", "-n", "add", "-net", "0.0.0.0", originalGateway)
 	}
-	if supernodeRouteIP != "" && originalGateway != "" {
-		_, _ = runCmd("sudo", "route", "delete", "-net", supernodeRouteIP)
+	for _, ip := range supernodeRouteIPs {
+		_, _ = RunCmd("sudo", "route", "delete", "-net", ip)
 	}
 	return nil
 }
 
 // Windows Exit Node Setup
-func setupExitNodeWindows(exitNodeIP, supernodeIP string) error {
-	out, err := runCmd("sh", "-c", "route print 0.0.0.0 | findstr 0.0.0.0")
+func setupExitNodeWindows(exitNodeIP string) error {
+	// Use powershell to get the default gateway IP reliably
+	out, err := RunCmd("powershell", "-Command", "Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Sort-Object RouteMetric | Select-Object -ExpandProperty NextHop -First 1")
 	if err != nil {
-		out, err = runCmd("cmd", "/c", "route print 0.0.0.0")
+		return fmt.Errorf("failed to get windows gateway: %v", err)
 	}
-	log.Debugf("Windows route print output: %s", out)
+	originalGateway = strings.TrimSpace(out)
+	if originalGateway == "" || originalGateway == "0.0.0.0" {
+		return fmt.Errorf("could not determine windows gateway")
+	}
 
-	_, _ = runCmd("route", "delete", "0.0.0.0")
-	_, err = runCmd("route", "ADD", supernodeIP, "MASK", "255.255.255.255", originalGateway)
-	_, err = runCmd("route", "ADD", "0.0.0.0", "MASK", "0.0.0.0", exitNodeIP)
+	for _, ip := range supernodeRouteIPs {
+		_, _ = RunCmd("route", "ADD", ip, "MASK", "255.255.255.255", originalGateway, "METRIC", "1")
+	}
 
-	return nil
+	_, _ = RunCmd("route", "DELETE", "0.0.0.0", "MASK", "0.0.0.0")
+	_, err = RunCmd("route", "ADD", "0.0.0.0", "MASK", "0.0.0.0", exitNodeIP, "METRIC", "1")
+
+	return err
 }
 
 func restoreExitNodeWindows() error {
-	_, _ = runCmd("route", "delete", "0.0.0.0")
-	_, _ = runCmd("route", "ADD", "0.0.0.0", "MASK", "0.0.0.0", originalGateway)
-	_, _ = runCmd("route", "delete", supernodeRouteIP)
+	_, _ = RunCmd("route", "DELETE", "0.0.0.0", "MASK", "0.0.0.0")
+	if originalGateway != "" {
+		_, _ = RunCmd("route", "ADD", "0.0.0.0", "MASK", "0.0.0.0", originalGateway, "METRIC", "1")
+	}
+	for _, ip := range supernodeRouteIPs {
+		_, _ = RunCmd("route", "DELETE", ip)
+	}
 	return nil
 }

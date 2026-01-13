@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/manifoldco/promptui"
 	api "github.com/omniedgeio/omniedge/pkg/api"
 	core "github.com/omniedgeio/omniedge/pkg/core"
 	log "github.com/sirupsen/logrus"
@@ -152,108 +150,17 @@ var joinCmd = &cobra.Command{
 		}
 
 		viper.Set(keyDeviceUUID, deviceId)
-		persistAuthFile()
 		log.Infof("Success to join virtual network")
 		log.Infof("Start to connect omniedge")
-		if err = start(device, joinResp, enableRouting, exitNodeIP, vnId, isExitNode); err != nil {
-			log.Errorf("%+v", err)
-			return
-		}
+
+		// Set flags for startCmd and run it
+		viper.Set(cliVirtualNetworkId, vnId)
+		viper.Set(cliEnableRouting, enableRouting)
+		viper.Set(cliExitNode, exitNodeIP)
+		viper.Set(cliAsExitNode, isExitNode)
+
+		startCmd.Run(cmd, args)
 	},
-}
-
-func register(httpOption api.HttpOption) (*api.DeviceResponse, error) {
-	hardwareId, err := core.RevealHardwareUUID()
-	if err != nil {
-		return nil, err
-	}
-	registerOption := &api.RegisterOption{
-		Name:         core.RevealHostName(),
-		HardwareUUID: hardwareId,
-		OS:           core.RevealOS(),
-	}
-	registerService := api.RegisterService{
-		HttpOption: httpOption,
-	}
-	var device *api.DeviceResponse
-	if device, err = registerService.Register(registerOption); err != nil {
-		return nil, err
-	}
-	return device, err
-}
-
-func start(device *api.DeviceResponse, joinResponse *api.JoinVirtualNetworkResponse, enableRouting bool, exitNodeIP string, networkId string, isExitNode bool) error {
-	var randomMac string
-	var err error
-	if randomMac, err = core.GenerateRandomMac(); err != nil {
-		return err
-	}
-
-	// Get actual hardware UUID for heartbeat
-	hardwareId, _ := core.RevealHardwareUUID()
-
-	var startOption = core.StartOption{
-		Hostname:      device.Name,
-		DeviceMac:     randomMac,
-		CommunityName: joinResponse.CommunityName,
-		VirtualIP:     joinResponse.VirtualIP,
-		SecretKey:     joinResponse.SecretKey,
-		DeviceMask:    joinResponse.SubnetMask,
-		SuperNode:     joinResponse.Server.Host,
-		EnableRouting: enableRouting,
-		Token:         fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
-		BaseUrl:       core.ConfigV.GetString(RestEndpointUrl),
-		HardwareUUID:  hardwareId,
-		ExitNodeIP:    exitNodeIP,
-		IsExitNode:    isExitNode,
-		NetworkID:     networkId,
-	}
-	var service = core.StartService{
-		StartOption: startOption,
-	}
-	if err := service.Start(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func prompt(networks []api.VirtualNetworkResponse) (string, error) {
-	templates := &promptui.SelectTemplates{
-		Label:    "choose the network",
-		Active:   "\U0001F336 {{ .Name | cyan }}",
-		Inactive: "  {{ .Name | cyan }}",
-		Selected: "\U0001F336 {{ .Name | red | cyan }}",
-		Details: `
---------- Virtual Network ----------
-{{ "Name:" | faint }}	{{ .Name }}
-{{ "Cidr:" | faint }}	{{ .IPRange}}
-{{ "Role:" | faint }}	{{ .Role}}
-{{ "ID:" | faint }}	{{ .ID}}`,
-	}
-
-	searcher := func(input string, index int) bool {
-		network := networks[index]
-		name := strings.Replace(strings.ToLower(network.Name), " ", "", -1)
-		input = strings.Replace(strings.ToLower(input), " ", "", -1)
-
-		return strings.Contains(name, input)
-	}
-
-	prompt := promptui.Select{
-		Label:     "Choose Virtual Network",
-		Items:     networks,
-		Templates: templates,
-		Size:      6,
-		Searcher:  searcher,
-	}
-
-	i, _, err := prompt.Run()
-
-	if err != nil {
-		return "", err
-	}
-	fmt.Printf("You choose number %d: %s\n", i+1, networks[i].Name)
-	return networks[i].ID, nil
 }
 
 func init() {

@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"math/rand"
 	"strings"
-	"time"
 )
 
 type PKCEInfo struct {
@@ -15,7 +14,6 @@ type PKCEInfo struct {
 }
 
 func init() {
-	rand.Seed(time.Now().UnixNano())
 }
 
 func GeneratePKCE() (*PKCEInfo, error) {
