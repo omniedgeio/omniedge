@@ -23,6 +23,19 @@
     - `omniedge stop`: Gracefully terminate the background engine and restore system routes.
 - **Process Management**: Integrated background daemonization for both CLI and Desktop environments.
 
+### 🔐 Authentication & Security
+- **Secure Persistence**:
+    - **No Plaintext Secrets**: Sensitive data (passwords, secret keys) is no longer stored in `auth.json`.
+    - **Keychain Sync**: Refresh tokens are now properly synchronized with macOS Keychain to prevent valid sessions from becoming stale.
+    - **Restricted Permissions**: Configuration files now default to `0600` (owner-only access) for enhanced security.
+- **Robust Token Management**:
+    - **Refresh Token Fix**: Fixed an issue where non-rotating keys could be overwritten, ensuring long-lived sessions persist correctly.
+    - **Legacy Removal**: Completely removed insecure username/password login methods in favor of Browser-based OAuth and Security Keys.
+
+### 🐛 Bug Fixes
+- **Exit Node Propagation**: `start --as-exit-node` now correctly signals the backend, ensuring the device is listed as an available exit node.
+- **Root Daemon Management**: `omniedge stop` now intelligently handles permission errors, requesting sudo if needed to terminate a root-owned daemon.
+
 ---
 
 ## v1.0.2 (2026-01-12)
