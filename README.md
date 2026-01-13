@@ -3,13 +3,15 @@
 > Secure P2P mesh networking for AI devices, IoT, and edge computing
 
 [![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/releases)
-[![License](https://img.shields.io/github/license/omniedgeio/omniedge)](LICENSE)
 [![CLI Release](https://github.com/omniedgeio/omniedge/actions/workflows/release.yml/badge.svg)](https://github.com/omniedgeio/omniedge/actions/workflows/release.yml)
 [![Desktop Release](https://github.com/omniedgeio/omniedge/actions/workflows/desktop-release.yml/badge.svg)](https://github.com/omniedgeio/omniedge/actions/workflows/desktop-release.yml)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/omniedgeio/omniedge)](go.mod)
-[![Wails Version](https://img.shields.io/badge/Wails-v3.0.0--alpha-red)](shell/desktop/go.mod)
+<br />
 [![Platforms](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows%20%7C%20FreeBSD%20%7C%20Android-blue)](#)
 [![Arch](https://img.shields.io/badge/Arch-amd64%20%7C%20arm64%20%7C%20armv7%20%7C%20riscv64%20%7C%20mips-lightgrey)](#)
+<br />
+[![License](https://img.shields.io/github/license/omniedgeio/omniedge)](LICENSE)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/omniedgeio/omniedge)](go.mod)
+[![Wails Version](https://img.shields.io/badge/Wails-v3.0.0--alpha-red)](shell/desktop/go.mod)
 
 OmniEdge enables seamless connectivity between your devices across networks. Perfect for:
 - 🤖 **AI/ML Devices**: NVIDIA Jetson, AI edge computers

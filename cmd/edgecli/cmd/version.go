@@ -11,7 +11,7 @@ var versionCmd = &cobra.Command{
 	Aliases: []string{},
 	Short:   "",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Omniedge %s\n", Version)
+		fmt.Printf("omniedge %s\n", Version)
 	},
 }
 

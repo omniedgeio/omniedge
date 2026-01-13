@@ -58,7 +58,7 @@
    DriverVer = 10/08/2020,9.24.6.601
 
 [Strings]
-   DeviceDescription = "Omniedge TAP-Windows Adapter V9"
+   DeviceDescription = "OmniEdge TAP-Windows Adapter V9"
    Provider = "TAP-Windows Provider V9"
 
 ;----------------------------------------------------------------

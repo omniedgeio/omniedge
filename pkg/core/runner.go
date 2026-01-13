@@ -114,7 +114,7 @@ func (s *StartService) Stop() {
 	RestoreExitNode()
 	if s.edge != nil {
 		s.edge.Stop()
-		log.Info("Omniedge stopped")
+		log.Info("omniedge stopped")
 	}
 }
 

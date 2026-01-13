@@ -17,7 +17,7 @@ import (
 var loginCmd = &cobra.Command{
 	Use:     "login",
 	Aliases: []string{},
-	Short:   "Login Omniedge network",
+	Short:   "Login OmniEdge network",
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
 		core.LoadClientConfig()
