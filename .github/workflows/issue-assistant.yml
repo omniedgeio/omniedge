@@ -2,6 +2,7 @@ name:  Repo Assistant
 on:
   issues:
     types: [opened]
+  workflow_dispatch: # Allows manual trigger from the UI
 
 jobs:
   respond:
