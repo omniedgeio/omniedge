@@ -1,5 +1,5 @@
 #golang:386
-FROM i386/golang:1.23-bookworm
+FROM i386/golang:1.24-bookworm
 
 # install golang
 RUN apt update

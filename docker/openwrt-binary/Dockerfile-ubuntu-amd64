@@ -1,5 +1,5 @@
 #golang:amd64 for OpenWrt cross-compilation
-FROM amd64/golang:1.23-bookworm
+FROM amd64/golang:1.24-bookworm
 
 ARG OPENWRT_SDK=https://downloads.openwrt.org/releases/23.05.0/targets/x86/64/openwrt-sdk-23.05.0-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz
 

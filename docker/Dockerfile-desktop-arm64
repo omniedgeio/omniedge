@@ -1,6 +1,6 @@
 # ARM64 Desktop Build Dockerfile
 # Pre-installs all dependencies for faster CI builds
-FROM arm64v8/golang:1.25-bookworm
+FROM arm64v8/golang:1.24-bookworm
 
 # Install build tools, desktop dependencies, and AppImage tools
 RUN apt-get update && apt-get install -y \

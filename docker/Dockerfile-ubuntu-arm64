@@ -1,5 +1,5 @@
 #golang:arm64v8
-FROM arm64v8/golang:1.23-bookworm
+FROM arm64v8/golang:1.24-bookworm
 
 # install build tools
 RUN apt update

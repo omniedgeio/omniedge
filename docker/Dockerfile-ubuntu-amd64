@@ -1,5 +1,5 @@
 #golang:amd64
-FROM golang:1.23-bookworm
+FROM golang:1.24-bookworm
 
 # install build tools
 RUN apt update
