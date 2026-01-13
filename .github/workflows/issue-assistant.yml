@@ -1,0 +1,20 @@
+name: Issue Assistant
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - uses: workflowkit/issue-assistant@v1.0.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          ai_type: "openai"  # or "claude"
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          # claude_api_key: ${{ secrets.CLAUDE_API_KEY }}  # if using claude
+          enable_comment: "true"   # required: at least one feature must be enabled
+          enable_label: "false"    # required: at least one feature must be enabled
