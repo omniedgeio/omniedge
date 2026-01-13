@@ -1,4 +1,4 @@
-name: Repo-Aware AI Assistant
+name: Full-Context AI Assistant
 on:
   issues:
     types: [opened]
@@ -8,58 +8,67 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
-      contents: read # Required to read your README
+      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Prepare Repo Context
-        id: context
-        run: |
-          # 1. Get the README (limited to first 2000 words to save tokens)
-          README_CONTENT=$(head -c 8000 README.md | jq -sRr @json)
-          
-          # 2. Get a directory tree to show the project structure
-          REPO_STRUCTURE=$(tree -L 2 -I 'node_modules|.git' | jq -sRr @json)
-          
-          echo "readme=$README_CONTENT" >> $GITHUB_OUTPUT
-          echo "structure=$REPO_STRUCTURE" >> $GITHUB_OUTPUT
-
       - name: Query Cloudflare Workers AI
         id: ai_query
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          ISSUE_BODY=$(echo '${{ github.event.issue.body }}' | jq -sRr @json)
+          # 1. Use jq to build the payload. 
+          # --rawfile reads the entire README.md directly into a variable.
+          # --arg takes the issue body from the environment variable.
           
-          # The System Prompt is now "Repo-Aware"
-          SYSTEM_PROMPT="You are an expert maintainer of this repository. 
-          Use the following context to answer questions. 
-          If you don't know the answer based on the context, ask the user for more technical details.
-          
-          ### REPOSITORY README ###
-          ${{ steps.context.outputs.readme }}
-          
-          ### REPOSITORY STRUCTURE ###
-          ${{ steps.context.outputs.structure }}"
-          
-          # Call Cloudflare API
-          RESPONSE=$(curl -X POST \
-            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/ai/run/@cf/meta/llama-3-8b-instruct" \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-            -d "{ \"messages\": [ \
-                  { \"role\": \"system\", \"content\": $(echo $SYSTEM_PROMPT | jq -sR .) }, \
-                  { \"role\": \"user\", \"content\": $ISSUE_BODY } \
-                ] }" )
+          JSON_PAYLOAD=$(jq -n \
+            --rawfile readme README.md \
+            --arg issue "$ISSUE_BODY" \
+            '{
+              messages: [
+                { 
+                  role: "system", 
+                  content: ("You are a technical support assistant for this repository. Use the following README content to answer the user: \n\n" + $readme) 
+                },
+                { 
+                  role: "user", 
+                  content: $issue 
+                }
+              ]
+            }')
 
-          RESULT=$(echo $RESPONSE | jq -r '.result.response')
+          # 2. Call Cloudflare API
+          # Using @- tells curl to read the JSON payload from the pipe (stdin)
+          RESPONSE=$(echo "$JSON_PAYLOAD" | curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/ai/run/@cf/meta/llama-3-8b-instruct" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d @-)
+
+          # 3. Extract result
+          RESULT=$(echo "$RESPONSE" | jq -r '.result.response')
           
-          echo "ai_text<<EOF" >> $GITHUB_OUTPUT
-          echo "$RESULT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Check if the result is empty or null (Cloudflare error)
+          if [ "$RESULT" == "null" ] || [ -z "$RESULT" ]; then
+            echo "Error: Cloudflare AI did not return a response."
+            echo "Full API Response: $RESPONSE"
+            exit 1
+          fi
+
+          # 4. Save result for the next step
+          {
+            echo "ai_text<<EOF"
+            echo "$RESULT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Post Comment
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
-            ### 🤖 Repository Assistant
+            ### 🤖 AI Assistant
             ${{ steps.ai_query.outputs.ai_text }}
