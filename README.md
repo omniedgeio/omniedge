@@ -111,18 +111,6 @@ omniedge status
 omniedge stop
 ```
 
-### Authentication
-
-OmniEdge uses OAuth 2.0 Device Flow by default.
-
-```bash
-# Trigger browser-based login separately
-omniedge login
-
-# Login with API key (Recommended for automation)
-omniedge login -s YOUR_SECRET_KEY
-```
-
 ## Mobile Apps
 
 Coming soon...

@@ -47,8 +47,8 @@ var registerCmd = &cobra.Command{
 		}
 		viper.Set(keyDevice, device)
 		persistAuthFile()
-		log.Infof("Successful to register the device")
-		log.Infof("Current device detail is %+v", device)
+		log.Debugf("Successful to register the device")
+		log.Debugf("Current device detail is %+v", device)
 	},
 }
 

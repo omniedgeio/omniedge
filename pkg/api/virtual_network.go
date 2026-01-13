@@ -52,21 +52,20 @@ func (s *VirtualNetworkService) List() ([]VirtualNetworkResponse, error) {
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Authorization", s.Token)
 	resp, _ := HandleCall(req)
-	log.Infof("List Virtual Network response %+v", resp)
-	switch resp.(type) {
+	log.Debugf("List Virtual Network response %+v", resp)
+	switch r := resp.(type) {
 	case *SuccessResponse:
-		vnJson, _ := json.Marshal(resp.(*SuccessResponse).Data)
+		vnJson, _ := json.Marshal(r.Data)
 		var vnResp []VirtualNetworkResponse
 		if err := json.Unmarshal(vnJson, &vnResp); err != nil {
-			return nil, errors.New(fmt.Sprintf("Fail to unmarshal response's data ,err is %+v", err))
+			return nil, fmt.Errorf("fail to unmarshal response's data ,err is %+v", err)
 		}
 		return vnResp, nil
 	case *ErrorResponse:
-		return nil, errors.New(fmt.Sprintf("Fail to list user's virtual network, error message: %s", resp.(*ErrorResponse).Message))
+		return nil, fmt.Errorf("fail to list user's virtual network, error message: %s", r.Message)
 	default:
-		return nil, errors.New(fmt.Sprint("This client has some unpredictable problems, please contact the omniedge team."))
+		return nil, fmt.Errorf("this client has some unpredictable problems, please contact the omniedge team")
 	}
-
 }
 
 func (s *VirtualNetworkService) Join(opt *JoinOption) (*JoinVirtualNetworkResponse, error) {

@@ -12,7 +12,7 @@ import (
 
 type AuthResp struct {
 	Token        string `json:"token"`
-	RefreshToken string `json:"refreshToken"`
+	RefreshToken string `json:"refresh_token"`
 	AccessToken  string `json:"access_token"`
 	IdToken      string `json:"id_token"`
 	ExpiresIn    int    `json:"expires_in"`
@@ -77,7 +77,11 @@ func (s *AuthService) Login(opt *AuthOption) (*AuthResp, error) {
 		if err := json.Unmarshal(authJson, &auth); err != nil {
 			return nil, fmt.Errorf("fail to unmarshal response's data ,err is %+v", err)
 		}
-		log.Debugf("auth token is %+v", auth)
+		// Bridge legacy Token field if necessary
+		if auth.Token == "" && auth.AccessToken != "" {
+			auth.Token = auth.AccessToken
+		}
+		log.Debugf("Login success. token is present: %v", auth.Token != "")
 		return &auth, nil
 	case *ErrorResponse:
 		return nil, fmt.Errorf("fail to login, error message: %s", resp.Message)
@@ -105,7 +109,11 @@ func (s *AuthService) Refresh(opt *RefreshTokenOption) (*AuthResp, error) {
 		if err := json.Unmarshal(authJson, &auth); err != nil {
 			return nil, fmt.Errorf("fail to unmarshal response's data ,err is %+v", err)
 		}
-		log.Debugf("auth token is %+v", auth)
+		// Bridge legacy Token field if necessary
+		if auth.Token == "" && auth.AccessToken != "" {
+			auth.Token = auth.AccessToken
+		}
+		log.Debugf("Refresh success. token is present: %v", auth.Token != "")
 		return &auth, nil
 	case *ErrorResponse:
 		return nil, fmt.Errorf("fail to login, error message: %s", resp.Message)

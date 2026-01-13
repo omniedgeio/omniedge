@@ -126,7 +126,7 @@ var loginCmd = &cobra.Command{
 		authJSON, _ := json.Marshal(authResp)
 		_ = core.SaveSecureToken(string(authJSON))
 
-		log.Infof("successful to login")
+		log.Debugf("successful to login")
 	},
 }
 

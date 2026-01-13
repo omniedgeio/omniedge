@@ -25,20 +25,20 @@ var startCmd = &cobra.Command{
 		if err := loadAuthFile(); err != nil {
 			log.Info("Not logged in. Initiating login flow...")
 			loginCmd.Run(cmd, args)
-			// Reload auth after interactive login
 			if err := loadAuthFile(); err != nil {
-				log.Fatalf("Login failed or cancelled: %v", err)
+				log.Fatalf("Login failed: %v", err)
 			}
 		}
 
-		endpointUrl := core.ConfigV.GetString(RestEndpointUrl)
 		var vnId = viper.GetString(cliVirtualNetworkId)
 		var deviceId = viper.GetString(keyDeviceUUID)
 		var deviceName = viper.GetString(keyDeviceName)
 
 		// 3. Refresh Token if needed
 		refreshToken := viper.GetString(keyAuthResponseRefreshToken)
+		endpointUrl := core.ConfigV.GetString(RestEndpointUrl)
 		if refreshToken != "" {
+			log.Debug("Attempting to refresh token...")
 			authService := api.AuthService{
 				HttpOption: api.HttpOption{BaseUrl: endpointUrl},
 			}
@@ -46,21 +46,42 @@ var startCmd = &cobra.Command{
 				viper.Set(keyAuthResponse, authResp)
 				viper.Set(keyAuthResponseToken, authResp.Token)
 				viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
+				persistAuthFile()
+			} else {
+				log.Warnf("Token refresh failed: %v. Initiating fresh login...", err)
+				loginCmd.Run(cmd, args)
+				if err := loadAuthFile(); err != nil {
+					log.Fatalf("Login failed: %v", err)
+				}
 			}
 		}
 
-		httpOption := api.HttpOption{
-			Token:   fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
-			BaseUrl: endpointUrl,
+		// 4. Register Device if needed
+		getHttpOption := func() api.HttpOption {
+			token := viper.GetString(keyAuthResponseToken)
+			if !strings.HasPrefix(token, "Bearer ") && token != "" {
+				token = "Bearer " + token
+			}
+			return api.HttpOption{
+				Token:   token,
+				BaseUrl: endpointUrl,
+			}
 		}
 
-		// 4. Register Device if needed
 		var device *api.DeviceResponse
 		var err error
 		if deviceId == "" || deviceName == "" {
-			if device, err = register(httpOption); err != nil {
-				log.Errorf("Failed to register device: %v", err)
-				return
+			device, err = register(getHttpOption())
+			if err != nil && strings.Contains(err.Error(), "E_UNAUTHORIZED_ACCESS") {
+				log.Warn("Session expired or unauthorized. Please login again.")
+				loginCmd.Run(cmd, args)
+				if err := loadAuthFile(); err != nil {
+					log.Fatalf("Login failed: %v", err)
+				}
+				device, err = register(getHttpOption())
+			}
+			if err != nil {
+				log.Fatalf("Failed to register device: %v", err)
 			}
 			deviceId = device.ID
 			deviceName = device.Name
@@ -68,8 +89,10 @@ var startCmd = &cobra.Command{
 			device = &api.DeviceResponse{ID: deviceId, Name: deviceName}
 		}
 
-		// 5. Select Network if not provided
-		vnService := api.VirtualNetworkService{HttpOption: httpOption}
+		persistAuthFile()
+
+		// 6. Select Network if not provided
+		vnService := api.VirtualNetworkService{HttpOption: getHttpOption()}
 		if vnId == "" {
 			networks, err := vnService.List()
 			if err != nil {
@@ -121,7 +144,20 @@ var startCmd = &cobra.Command{
 		persistAuthFile()
 
 		// 7. Daemonize after all interactive prompts are done
-		if err := core.Daemonize(); err != nil {
+		// Prepare arguments for the potential elevated daemon
+		// to ensure it doesn't prompt for network selection again.
+		daemonArgs := []string{"start", "-n", vnId}
+		if enableRouting {
+			daemonArgs = append(daemonArgs, "-r")
+		}
+		if exitNodeIP := viper.GetString(cliExitNode); exitNodeIP != "" {
+			daemonArgs = append(daemonArgs, "-e", exitNodeIP)
+		}
+		if isExitNode {
+			daemonArgs = append(daemonArgs, "--as-exit-node")
+		}
+
+		if err := core.Daemonize(daemonArgs...); err != nil {
 			log.Fatalf("Failed to daemonize: %v", err)
 		}
 
@@ -138,7 +174,7 @@ var startCmd = &cobra.Command{
 			DeviceMask:    joinResp.SubnetMask,
 			SuperNode:     joinResp.Server.Host,
 			EnableRouting: enableRouting,
-			Token:         fmt.Sprintf("Bearer %s", viper.GetString(keyAuthResponseToken)),
+			Token:         getHttpOption().Token,
 			BaseUrl:       endpointUrl,
 			HardwareUUID:  hardwareId,
 			ExitNodeIP:    viper.GetString(cliExitNode),

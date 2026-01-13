@@ -24,6 +24,11 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		viper.SetEnvPrefix("omniedge")
 		viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
+		if viper.GetBool("debug") {
+			log.SetLevel(log.DebugLevel)
+		} else {
+			log.SetLevel(log.InfoLevel)
+		}
 	},
 }
 
@@ -33,6 +38,11 @@ func Execute() {
 	}
 }
 
+func init() {
+	rootCmd.PersistentFlags().Bool("debug", false, "Enable debug logging")
+	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+}
+
 func bindFlags(cmd *cobra.Command) {
 	if err := viper.BindPFlags(cmd.LocalFlags()); err != nil {
 		log.Fatal(CouldNotBindFlags)
@@ -40,8 +50,11 @@ func bindFlags(cmd *cobra.Command) {
 }
 
 func loadAuthFile() error {
-	// Try loading from secure keychain first
-	if secureData, err := core.LoadSecureToken(); err == nil && secureData != "" {
+	// Try loading from secure keychain first, but skip if we are root
+	// as accessing user's keychain from sudo is often blocked or hung.
+	if core.IsRoot() {
+		log.Debug("Running as root, skipping keychain and falling back to config file.")
+	} else if secureData, err := core.LoadSecureToken(); err == nil && secureData != "" {
 		var authResp api.AuthResp
 		if err := json.Unmarshal([]byte(secureData), &authResp); err == nil {
 			// Bridge legacy Token field if needed
@@ -63,6 +76,7 @@ func loadAuthFile() error {
 	if err != nil {
 		return errors.New("fail to parse the path of the auth file")
 	}
+	log.Debugf("Loading auth from file: %s", handledAuthFile)
 	viper.SetConfigFile(handledAuthFile)
 	viper.SetConfigType("json")
 	if err = viper.ReadInConfig(); err != nil {

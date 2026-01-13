@@ -25,7 +25,7 @@
 
 ---
 
-## v1.0.1 (2026-01-12)
+## v1.0.2 (2026-01-12)
 ### 🚀 New Features & Improvements
 - **Advanced Exit Node Support**: 
     - **Smart CLI Flags**: The `--as-exit-node` flag now automatically implies `-r` (routing), reducing command complexity.

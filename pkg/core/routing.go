@@ -428,7 +428,7 @@ func setupExitNodeDarwin(exitNodeIP string) error {
 	}
 
 	// Clamp MSS on macOS using PF
-	pfRule := fmt.Sprintf("scrub on any all reassemble tcp max-mss 1360")
+	pfRule := "scrub on any all reassemble tcp max-mss 1360"
 	pfConfig := fmt.Sprintf("echo \"%s\" | sudo pfctl -a omniedge-mss -f -", pfRule)
 	_, _ = RunCmd("sh", "-c", pfConfig)
 	_, _ = RunCmd("sudo", "pfctl", "-e")

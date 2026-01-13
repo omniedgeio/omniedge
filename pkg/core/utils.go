@@ -131,6 +131,10 @@ func RevealOS() string {
 
 }
 
+func IsRoot() bool {
+	return os.Geteuid() == 0
+}
+
 func GenerateRandomMac() (string, error) {
 	buf := make([]byte, 6)
 	_, err := rand.Read(buf)
