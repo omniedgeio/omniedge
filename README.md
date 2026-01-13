@@ -4,6 +4,10 @@
 
 [![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/releases)
 [![License](https://img.shields.io/github/license/omniedgeio/omniedge)](LICENSE)
+[![Build Verification](https://github.com/omniedgeio/omniedge/actions/workflows/verify-build.yml/badge.svg)](https://github.com/omniedgeio/omniedge/actions/workflows/verify-build.yml)
+[![E2E Connectivity](https://github.com/omniedgeio/omniedge/actions/workflows/test-e2e.yml/badge.svg)](https://github.com/omniedgeio/omniedge/actions/workflows/test-e2e.yml)
+[![CLI Release](https://github.com/omniedgeio/omniedge/actions/workflows/release.yml/badge.svg)](https://github.com/omniedgeio/omniedge/actions/workflows/release.yml)
+[![Desktop Release](https://github.com/omniedgeio/omniedge/actions/workflows/desktop-release.yml/badge.svg)](https://github.com/omniedgeio/omniedge/actions/workflows/desktop-release.yml)
 
 OmniEdge enables seamless connectivity between your devices across networks. Perfect for:
 - 🤖 **AI/ML Devices**: NVIDIA Jetson, AI edge computers
