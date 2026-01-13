@@ -1,6 +1,6 @@
 # OmniEdge
 
-> Secure P2P mesh networking for AI devices, IoT, and edge computing
+> Secure P2P Mesh Networking for Humanoid Robots, Edge AI, and Industrial Automation.
 
 <!-- Releases & Build Status -->
 [![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/releases)
@@ -24,26 +24,23 @@
 <!-- Community & Activity -->
 [![GitHub Stars](https://img.shields.io/github/stars/omniedgeio/omniedge?style=social)](https://github.com/omniedgeio/omniedge/stargazers)
 [![Twitter Follow](https://img.shields.io/twitter/follow/omniedgeio?style=social)](https://twitter.com/omniedgeio)
-[![Discord](https://img.shields.io/discord/1079361536739770368?label=Discord&logo=discord&logoColor=white)](https://connect.omniedge.io/discord)
+[![Discord](https://img.shields.io/discord/1079361536739770368?label=Discord&logo=discord&logoColor=white)](https://discord.gg/afGrMMtN)
 [![GitHub issues](https://img.shields.io/github/issues/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/issues)
 [![GitHub last commit](https://img.shields.io/github/last-commit/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/commits)
 
-OmniEdge enables seamless connectivity between your devices across networks. Perfect for:
-- 🤖 **AI/ML Devices**: NVIDIA Jetson, AI edge computers
-- 🍓 **Raspberry Pi**: All models from Pi 3 to Pi 5
-- 📡 **OpenWrt Routers**: Mesh your network infrastructure
-- 🖥️ **Servers**: Linux, macOS, FreeBSD, Windows
-- 🏭 **Industrial & Robotics**: Layer 2 VPN for real-time protocols (EtherCAT, PROFINET, etc.) in Humanoid Robots
+OmniEdge enables seamless, low-latency connectivity between devices across any network. It is specifically optimized for:
+- 🤖 **Humanoid Robotics**: Ultra-low latency P2P for real-time control and sensor fusion.
+- � **Industrial Automation**: Native Layer 2 VPN support for **EtherCAT**, **PROFINET**, and **EtherNet/IP**.
+- � **Robot Operating System (ROS2)**: Full support for multicast/broadcast discovery across remote sites.
+- 🧠 **Edge AI**: NVIDIA Jetson, Orin, and dedicated AI edge computers.
+- 📡 **Infrastructure**: OpenWrt routers, 5G/4G gateways, and Raspberry Pi (3/4/5).
 
-## Highlights
-
-- 🖥️ **Cross-platform Desktop App** - Windows, macOS, Linux with system tray
-- 📦 **Multiple Linux Packages** - DEB, RPM, AppImage, Flatpak, Arch
-- 🪟 **Windows Support** - NSIS installer with bundled TAP driver
-- 🍎 **Universal macOS Support** - Native DMG/CLI for both Apple Silicon and Intel Macs
-- 🛡️ **Verified Stability** - Every release is automatically tested via real-world connectivity probes
-- 💓 **Real-time heartbeat** - Device online status visible in dashboard
-- 🏗️ **Emerging architectures** - RISC-V, LoongArch, FreeBSD 14
+- 🌐 **True P2P Connectivity** - Direct device-to-device communication using high-performance NAT traversal.
+- 🔗 **Native Layer 2 Support** - Bridging Ethernet frames for industrial protocols and legacy applications.
+- 🖥️ **Desktop Tray App** - Seamless management on Windows, macOS, and Linux (DEB, RPM, AppImage, Flatpak).
+- 🍎 **Universal macOS Support** - Native binaries for both Apple Silicon (arm64) and Intel (x86_64).
+- 🛡️ **Zero-Config Security** - AES-256 encrypted tunnels with certificate-based authentication.
+- 🏗️ **Multi-Arch Support** - Optimized for RISC-V, LoongArch, ARMv7, and FreeBSD 14.
 
 [🌐 Website](https://connect.omniedge.io) • [📚 Docs](https://connect.omniedge.io/docs) • [💬 Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
 
@@ -151,8 +148,8 @@ See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
 
 ## License
 
-[GPL-3.0](LICENSE)
+Distributed under the [GPL-3.0 License](LICENSE).
 
 ---
 
-Built with ❤️ by [OmniEdge](https://connect.omniedge.io)
+© 2021-2026 **OmniEdge Inc.** • Built with ❤️ for the Robotics Community.
