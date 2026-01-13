@@ -1,5 +1,30 @@
 # OmniEdge Release Notes
- 
+
+## v1.1.0 (2026-01-13)
+### 🚀 Core Networking & Robustness
+- **Optimization & Performance**:
+    - **Dynamic MSS Clamping**: Fixed TCP "hanging" issues by setting MSS to 1360 across all platforms.
+    - **Safe MTU**: Defaulted to 1400 for better VPN encapsulation headroom.
+    - **Multi-Supernode Tracking**: Improved stability by tracking and routing all resolved IPs for a supernode host.
+- **Platform-Specific Enhancements**:
+    - **Windows Reliability**: Switched to PowerShell for 100% reliable gateway detection.
+    - **Modern Linux DNS**: Implemented non-destructive DNS management via `resolvectl` and `resolvconf`.
+    - **System DNS Integrity**: Strictly respects system DNS settings, avoiding overrides unless explicitly required.
+- **Dynamic Routing**:
+    - **Smart NAT**: Automatically calculates virtual CIDR for NAT masquerading based on assigned VIP and mask.
+
+### 🛠️ Simplified CLI & Experience
+- **Unified `start` Command**: 
+    - Automatically triggers browser-based login if not authenticated.
+    - Launches interactive network selection after login.
+    - Automatically forks to the background (daemon mode) after interaction.
+- **New Lifecycle Commands**:
+    - `omniedge status`: View real-time connection info, IP, and PID.
+    - `omniedge stop`: Gracefully terminate the background engine and restore system routes.
+- **Process Management**: Integrated background daemonization for both CLI and Desktop environments.
+
+---
+
 ## v1.0.1 (2026-01-12)
 ### 🚀 New Features & Improvements
 - **Advanced Exit Node Support**: 

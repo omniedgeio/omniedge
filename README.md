@@ -83,39 +83,44 @@ Download CLI binaries from the [Releases page](https://github.com/omniedgeio/omn
 
 ## Usage
 
-### Login
+The CLI is now fully automated. Running `start` will handle login, network selection, and background daemonization.
+
+### Start & Connection
 
 ```bash
-# Interactive Login (New in v1.0.1)
-# Launches browser-based authentication via Device Flow
-omniedge login
+# Basic start - trigger login and interactive network selection
+omniedge start
 
-# Login with email (Legacy)
-omniedge login -u your@email.com
+# Connect to a specific network directly
+omniedge start -n "your-network-id"
+
+# Act as an Exit Node
+omniedge start --as-exit-node
+
+# Route traffic via an Exit Node IP
+omniedge start -e "100.64.0.1"
+```
+
+### Management
+
+```bash
+# Show current connection status, IP, and PID
+omniedge status
+
+# Disconnect and stop background service
+omniedge stop
+```
+
+### Authentication
+
+OmniEdge uses OAuth 2.0 Device Flow by default.
+
+```bash
+# Trigger browser-based login separately
+omniedge login
 
 # Login with API key (Recommended for automation)
 omniedge login -s YOUR_SECRET_KEY
-```
-
-### Join Network
-
-```bash
-# Interactive mode - choose network from list
-sudo omniedge join
-
-# Direct mode - specify network ID
-sudo omniedge join -n "your-network-id"
-
-### Exit Node
-
-Join a network and configure exit node functionality:
-
-```bash
-# Become an Exit Node (Automatically enables routing, persists across sessions)
-sudo omniedge join --as-exit-node
-
-# Route traffic via an Exit Node IP (Synchronizes selection with dashboard)
-sudo omniedge join -e "100.100.0.1"
 ```
 
 ## Mobile Apps
