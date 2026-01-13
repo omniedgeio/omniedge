@@ -24,16 +24,16 @@
 <!-- Community & Activity -->
 [![GitHub Stars](https://img.shields.io/github/stars/omniedgeio/omniedge?style=social)](https://github.com/omniedgeio/omniedge/stargazers)
 [![Twitter Follow](https://img.shields.io/twitter/follow/omniedgeio?style=social)](https://twitter.com/omniedgeio)
-[![Discord](https://img.shields.io/discord/1079361536739770368?label=Discord&logo=discord&logoColor=white)](https://discord.gg/afGrMMtN)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289DA?logo=discord&logoColor=white)](https://connect.omniedge.io/discord)
 [![GitHub issues](https://img.shields.io/github/issues/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/issues)
 [![GitHub last commit](https://img.shields.io/github/last-commit/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/commits)
 
 OmniEdge enables seamless, low-latency connectivity between devices across any network. It is specifically optimized for:
 
 - 🤖 **Humanoid Robotics**: Ultra-low latency P2P for real-time control and sensor fusion.
-- � **Industrial Automation**: Native Layer 2 VPN support for **EtherCAT**, **PROFINET**, and **EtherNet/IP**.
-- � **Robot Operating System (ROS2)**: Full support for multicast/broadcast discovery across remote sites.
-- 🧠 **Edge AI**: NVIDIA Jetson, Orin, Thor,and dedicated AI edge computers.
+- ⚙️ **Industrial Automation**: Native Layer 2 VPN support for **EtherCAT**, **PROFINET**, and **EtherNet/IP**.
+- 📟 **Robot Operating System (ROS2)**: Full support for multicast/broadcast discovery across remote sites.
+- 🧠 **Edge AI**: NVIDIA Jetson, Orin, Thor, and dedicated AI edge computers.
 - 📡 **Infrastructure**: OpenWrt routers, 5G/4G gateways, and Raspberry Pi (3/4/5).
 
 ## Highlights
