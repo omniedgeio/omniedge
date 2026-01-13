@@ -1,32 +1,57 @@
-name: AI Issue Assistant
+name: Repo-Aware AI Assistant
 on:
   issues:
     types: [opened]
+
 jobs:
   respond:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      contents: read # Required to read your README
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Prepare Repo Context
+        id: context
+        run: |
+          # 1. Get the README (limited to first 2000 words to save tokens)
+          README_CONTENT=$(head -c 8000 README.md | jq -sRr @json)
+          
+          # 2. Get a directory tree to show the project structure
+          REPO_STRUCTURE=$(tree -L 2 -I 'node_modules|.git' | jq -sRr @json)
+          
+          echo "readme=$README_CONTENT" >> $GITHUB_OUTPUT
+          echo "structure=$REPO_STRUCTURE" >> $GITHUB_OUTPUT
+
       - name: Query Cloudflare Workers AI
         id: ai_query
         run: |
-          # Prepare the prompt
           ISSUE_BODY=$(echo '${{ github.event.issue.body }}' | jq -sRr @json)
+          
+          # The System Prompt is now "Repo-Aware"
+          SYSTEM_PROMPT="You are an expert maintainer of this repository. 
+          Use the following context to answer questions. 
+          If you don't know the answer based on the context, ask the user for more technical details.
+          
+          ### REPOSITORY README ###
+          ${{ steps.context.outputs.readme }}
+          
+          ### REPOSITORY STRUCTURE ###
+          ${{ steps.context.outputs.structure }}"
           
           # Call Cloudflare API
           RESPONSE=$(curl -X POST \
             "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/ai/run/@cf/meta/llama-3-8b-instruct" \
             -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
             -d "{ \"messages\": [ \
-                  { \"role\": \"system\", \"content\": \"You are a helpful assistant for this GitHub project. Summarize the issue and provide a brief initial troubleshooting step.\" }, \
+                  { \"role\": \"system\", \"content\": $(echo $SYSTEM_PROMPT | jq -sR .) }, \
                   { \"role\": \"user\", \"content\": $ISSUE_BODY } \
                 ] }" )
 
-          # Extract only the response text
           RESULT=$(echo $RESPONSE | jq -r '.result.response')
           
-          # Save result for the next step
           echo "ai_text<<EOF" >> $GITHUB_OUTPUT
           echo "$RESULT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -36,5 +61,5 @@ jobs:
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
-            ### 🤖 AI Assistant
+            ### 🤖 Repository Assistant
             ${{ steps.ai_query.outputs.ai_text }}
