@@ -70,12 +70,11 @@ download_and_verify() {
 
 output_usage(){
     echo ""
-    echo "${GREEN}✓ OmniEdge CLI installed successfully!${NC}"
+    echo -e "${GREEN}✓ OmniEdge CLI installed successfully!${NC}"
     echo ""
     echo "Usage:"
-    echo "  ${YELLOW}omniedge login -u your@email.com${NC}    # Login with email"
-    echo "  ${YELLOW}omniedge login -s YOUR_SECRET_KEY${NC}   # Login with API key"
-    echo "  ${YELLOW}sudo omniedge join${NC}                  # Join a network"
+    echo -e "  ${YELLOW}omniedge start${NC}    # Start OmniEdge"
+    echo -e "  ${YELLOW}omniedge stop${NC}   # Stop OmniEdge"
     echo ""
     echo "Documentation: https://connect.omniedge.io/docs"
     echo ""
