@@ -42,7 +42,7 @@ OmniEdge enables seamless, low-latency connectivity between devices across any n
 - 🔗 **Native Layer 2 Support** - Bridging Ethernet frames for industrial protocols and legacy applications.
 - 🖥️ **Desktop Tray App** - Seamless management on Windows, macOS, and Linux (DEB, RPM, AppImage, Flatpak).
 - 🍎 **Universal macOS Support** - Native binaries for both Apple Silicon (arm64) and Intel (x86_64).
-- 🛡️ **Zero-Config Security** - AES-256 encrypted tunnels with certificate-based authentication.
+- 🛡️ **Zero-Config Security** - Encrypted tunnels with certificate-based authentication.
 - 🏗️ **Multi-Arch Support** - Optimized for RISC-V, LoongArch, ARMv7, and FreeBSD 14.
 
 [🌐 Website](https://connect.omniedge.io) • [📚 Docs](https://connect.omniedge.io/docs) • [💬 Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
