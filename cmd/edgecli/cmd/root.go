@@ -51,10 +51,28 @@ func bindFlags(cmd *cobra.Command) {
 }
 
 func loadAuthFile() error {
-	// Try loading from secure keychain first, but skip if we are root
-	// as accessing user's keychain from sudo is often blocked or hung.
+	// 1. Try to load from Config File first
+	var authFile = viper.GetString(cliAuthConfigFile)
+	if authFile == "" {
+		authFile = Option.AuthFileDefaultPath
+	}
+	handledAuthFile, err := core.HandleFilePrefix(authFile)
+	var fileErr error
+	if err != nil {
+		fileErr = errors.New("fail to parse the path of the auth file")
+	} else {
+		log.Debugf("Loading auth from file: %s", handledAuthFile)
+		viper.SetConfigFile(handledAuthFile)
+		viper.SetConfigType("json")
+		if err = viper.ReadInConfig(); err != nil {
+			// Save error, but continue checking Keychain
+			fileErr = fmt.Errorf("fail to read omniedge file, please login first. err is %w", err)
+		}
+	}
+
+	// 2. Try loading from secure keychain and overlay (skip if root)
 	if core.IsRoot() {
-		log.Debug("Running as root, skipping keychain and falling back to config file.")
+		log.Debug("Running as root, skipping keychain.")
 	} else if secureData, err := core.LoadSecureToken(); err == nil && secureData != "" {
 		var authResp api.AuthResp
 		if err := json.Unmarshal([]byte(secureData), &authResp); err == nil {
@@ -62,28 +80,26 @@ func loadAuthFile() error {
 			if authResp.Token == "" && authResp.AccessToken != "" {
 				authResp.Token = authResp.AccessToken
 			}
-			viper.Set(keyAuthResponse, authResp)
-			viper.Set(keyAuthResponseToken, authResp.Token)
-			viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
-			return nil
+
+			// Overlay secure data into Viper
+			// Only overwrite if the secure data actually has the field, allowing auth.json
+			// to "backfill" missing fields (like refresh_token) if keychain is stale.
+			if authResp.Token != "" {
+				viper.Set(keyAuthResponse, authResp)
+				viper.Set(keyAuthResponseToken, authResp.Token)
+			}
+			if authResp.RefreshToken != "" {
+				viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
+			}
+			// If we laid down a valid token from keychain, we consider auth loaded successfully
+			if authResp.Token != "" {
+				return nil
+			}
 		}
 	}
 
-	var authFile = viper.GetString(cliAuthConfigFile)
-	if authFile == "" {
-		authFile = Option.AuthFileDefaultPath
-	}
-	handledAuthFile, err := core.HandleFilePrefix(authFile)
-	if err != nil {
-		return errors.New("fail to parse the path of the auth file")
-	}
-	log.Debugf("Loading auth from file: %s", handledAuthFile)
-	viper.SetConfigFile(handledAuthFile)
-	viper.SetConfigType("json")
-	if err = viper.ReadInConfig(); err != nil {
-		return fmt.Errorf("fail to read omniedge file, please login first. err is %w", err)
-	}
-	return nil
+	// 3. If Keychain didn't provide a valid session, return the file error
+	return fileErr
 }
 
 func persistAuthFile() {
