@@ -43,11 +43,21 @@ jobs:
             -d @payload.json)
 
           # 4. Extract the response text
-          RESULT=$(echo "$RESPONSE" | jq -r '.result.response')
+          # The v1/responses endpoint returns an 'output' array. 
+          # Index 0 is often 'reasoning', and Index 1 is the 'text' answer.
+          
+          # We use -r for raw output and filter for the text content
+          RESULT=$(echo "$RESPONSE" | jq -r '.output[] | select(.type == "message") | .content[0].text')
+
+          # If the above filter fails, try the index-based fallback
+          if [ "$RESULT" == "null" ] || [ -z "$RESULT" ]; then
+            RESULT=$(echo "$RESPONSE" | jq -r '.output[1].content[0].text')
+          fi
           
           # Check for errors in the response
           if [ "$RESULT" == "null" ] || [ -z "$RESULT" ]; then
-            echo "AI Error Response: $RESPONSE"
+            echo "Failed to parse AI response. Full JSON:"
+            echo "$RESPONSE"
             exit 1
           fi
 
