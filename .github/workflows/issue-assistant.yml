@@ -1,4 +1,4 @@
-name: Full-Context AI Assistant
+name:  Repo Assistant
 on:
   issues:
     types: [opened]
@@ -20,45 +20,41 @@ jobs:
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          # 1. Use jq to build the payload. 
-          # --rawfile reads the entire README.md directly into a variable.
-          # --arg takes the issue body from the environment variable.
+          # 1. Combine README and Issue into a single input string.
+          # We use jq's --rawfile to safely read the full README.
+          # Then we create a single "input" string for the model.
           
-          JSON_PAYLOAD=$(jq -n \
+          FULL_INPUT=$(jq -n \
             --rawfile readme README.md \
             --arg issue "$ISSUE_BODY" \
+            '"Use the following README as your knowledge base to answer the question at the end.\n\nREADME:\n" + $readme + "\n\nQUESTION FROM USER:\n" + $issue')
+
+          # 2. Build the final JSON payload for the /v1/responses endpoint
+          JSON_PAYLOAD=$(jq -n \
+            --arg model "@cf/openai/gpt-oss-120b" \
+            --arg input "$FULL_INPUT" \
             '{
-              messages: [
-                { 
-                  role: "system", 
-                  content: ("You are a technical support assistant for this repository. Use the following README content to answer the user: \n\n" + $readme) 
-                },
-                { 
-                  role: "user", 
-                  content: $issue 
-                }
-              ]
+              model: $model,
+              input: $input
             }')
-            
-          # 2. Call Cloudflare API
-          # Using @- tells curl to read the JSON payload from the pipe (stdin)
+
+          # 3. Call the v1/responses endpoint
           RESPONSE=$(echo "$JSON_PAYLOAD" | curl -s -X POST \
-            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/ai/run/@cf/openai/gpt-oss-20b" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/ai/v1/responses" \
             -H "Authorization: Bearer $CF_TOKEN" \
             -H "Content-Type: application/json" \
             -d @-)
 
-          # 3. Extract result
+          # 4. Extract the response text
+          # Note: The v1/responses endpoint structure usually nests text in .result.response
           RESULT=$(echo "$RESPONSE" | jq -r '.result.response')
           
-          # Check if the result is empty or null (Cloudflare error)
           if [ "$RESULT" == "null" ] || [ -z "$RESULT" ]; then
-            echo "Error: Cloudflare AI did not return a response."
+            echo "Error: AI response was empty or API error occurred."
             echo "Full API Response: $RESPONSE"
             exit 1
           fi
 
-          # 4. Save result for the next step
           {
             echo "ai_text<<EOF"
             echo "$RESULT"
