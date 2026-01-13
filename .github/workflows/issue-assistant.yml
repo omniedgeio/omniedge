@@ -39,11 +39,11 @@ jobs:
                 }
               ]
             }')
-
+            
           # 2. Call Cloudflare API
           # Using @- tells curl to read the JSON payload from the pipe (stdin)
           RESPONSE=$(echo "$JSON_PAYLOAD" | curl -s -X POST \
-            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/ai/run/@cf/meta/llama-3-8b-instruct" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/ai/run/@cf/openai/gpt-oss-20b" \
             -H "Authorization: Bearer $CF_TOKEN" \
             -H "Content-Type: application/json" \
             -d @-)
