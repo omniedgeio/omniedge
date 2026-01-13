@@ -26,7 +26,7 @@
 ### 🔐 Authentication & Security
 - **Secure Persistence**:
     - **No Plaintext Secrets**: Sensitive data (passwords, secret keys) is no longer stored in `auth.json`.
-    - **Keychain Sync**: Refresh tokens are now properly synchronized with macOS Keychain to prevent valid sessions from becoming stale.
+    - **Keychain Sync**: Refresh tokens are now properly synchronized to prevent valid sessions from becoming stale.
     - **Restricted Permissions**: Configuration files now default to `0600` (owner-only access) for enhanced security.
 - **Robust Token Management**:
     - **Refresh Token Fix**: Fixed an issue where non-rotating keys could be overwritten, ensuring long-lived sessions persist correctly.
