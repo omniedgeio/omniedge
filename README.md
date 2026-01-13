@@ -33,6 +33,7 @@ OmniEdge enables seamless connectivity between your devices across networks. Per
 - 🍓 **Raspberry Pi**: All models from Pi 3 to Pi 5
 - 📡 **OpenWrt Routers**: Mesh your network infrastructure
 - 🖥️ **Servers**: Linux, macOS, FreeBSD, Windows
+- 🏭 **Industrial & Robotics**: Layer 2 VPN for real-time protocols (EtherCAT, PROFINET, etc.) in Humanoid Robots
 
 ## Highlights
 
