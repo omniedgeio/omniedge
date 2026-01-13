@@ -24,7 +24,7 @@
 <!-- Community & Activity -->
 [![GitHub Stars](https://img.shields.io/github/stars/omniedgeio/omniedge?style=social)](https://github.com/omniedgeio/omniedge/stargazers)
 [![Twitter Follow](https://img.shields.io/twitter/follow/omniedgeio?style=social)](https://twitter.com/omniedgeio)
-[![Discord](https://img.shields.io/discord/1079361536739770368?label=Discord&logo=discord&logoColor=white)](https://discord.gg/afGrMMtN)
+[![Discord](https://img.shields.io/discord/1079361536739770368?label=Discord&logo=discord&logoColor=white)](https://connect.omniedge.io/discord)
 [![GitHub issues](https://img.shields.io/github/issues/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/issues)
 [![GitHub last commit](https://img.shields.io/github/last-commit/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/commits)
 
