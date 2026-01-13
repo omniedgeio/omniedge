@@ -32,7 +32,7 @@ OmniEdge enables seamless, low-latency connectivity between devices across any n
 - 🤖 **Humanoid Robotics**: Ultra-low latency P2P for real-time control and sensor fusion.
 - � **Industrial Automation**: Native Layer 2 VPN support for **EtherCAT**, **PROFINET**, and **EtherNet/IP**.
 - � **Robot Operating System (ROS2)**: Full support for multicast/broadcast discovery across remote sites.
-- 🧠 **Edge AI**: NVIDIA Jetson, Orin, and dedicated AI edge computers.
+- 🧠 **Edge AI**: NVIDIA Jetson, Orin, Thor,and dedicated AI edge computers.
 - 📡 **Infrastructure**: OpenWrt routers, 5G/4G gateways, and Raspberry Pi (3/4/5).
 
 - 🌐 **True P2P Connectivity** - Direct device-to-device communication using high-performance NAT traversal.
@@ -152,4 +152,4 @@ Distributed under the [GPL-3.0 License](LICENSE).
 
 ---
 
-© 2021-2026 **OmniEdge Inc.** • Built with ❤️ for the Robotics Community.
+Built with ❤️ by [OmniEdge](https://connect.omniedge.io)
