@@ -46,7 +46,9 @@ var joinCmd = &cobra.Command{
 			} else {
 				viper.Set(keyAuthResponse, authResp)
 				viper.Set(keyAuthResponseToken, authResp.Token)
-				viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
+				if authResp.RefreshToken != "" {
+					viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
+				}
 			}
 		}
 

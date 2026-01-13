@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -37,14 +38,27 @@ var stopCmd = &cobra.Command{
 
 		fmt.Printf("Stopping OmniEdge (PID: %d)...\n", pid)
 		// Signal clean exit
-		err = process.Signal(os.Interrupt)
-		if err != nil {
-			// Fallback to Kill if Interrupt fails
-			process.Kill()
+		if err := process.Signal(os.Interrupt); err != nil {
+			// Permission error? Try sudo
+			if strings.Contains(err.Error(), "operation not permitted") {
+				fmt.Printf("Permission denied. Attempting to stop with sudo...\n")
+				cmd := exec.Command("sudo", "kill", "-SIGINT", strconv.Itoa(pid))
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					log.Errorf("Failed to stop process with sudo: %v", err)
+				} else {
+					fmt.Println("OmniEdge stopped via sudo.")
+				}
+			} else {
+				log.Errorf("Failed to signal process: %v", err)
+			}
+		} else {
+			fmt.Println("OmniEdge stopped.")
 		}
 
+		// Clean up PID file just in case the daemon didn't
 		os.Remove(pidFile)
-		fmt.Println("OmniEdge stopped.")
 	},
 }
 

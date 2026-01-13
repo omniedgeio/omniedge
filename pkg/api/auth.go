@@ -31,12 +31,9 @@ type AuthMethod string
 
 const (
 	LoginBySecretKey AuthMethod = "LoginBySecretKey"
-	LoginByPassword  AuthMethod = "LoginByPassword"
 )
 
 type AuthOption struct {
-	Username   string
-	Password   string
 	SecretKey  string
 	AuthMethod AuthMethod
 }
@@ -52,13 +49,6 @@ type AuthService struct {
 func (s *AuthService) Login(opt *AuthOption) (*AuthResp, error) {
 	var url string
 	var body map[string]string
-	if opt.AuthMethod == LoginByPassword {
-		url = s.BaseUrl + "/auth/login/password"
-		body = map[string]string{
-			"email":    opt.Username,
-			"password": opt.Password,
-		}
-	}
 	if opt.AuthMethod == LoginBySecretKey {
 		url = s.BaseUrl + "/auth/login/security-key"
 		body = map[string]string{
@@ -183,6 +173,7 @@ func (s *AuthService) DeviceFlowToken(clientId string, deviceCode string) (*Auth
 	switch resp := resp.(type) {
 	case *SuccessResponse:
 		authJson, _ := json.Marshal(resp.Data)
+		log.Debugf("DeviceFlowToken Raw Response: %s", string(authJson)) // Debug Log
 		auth := AuthResp{}
 		if err := json.Unmarshal(authJson, &auth); err != nil {
 			return nil, err

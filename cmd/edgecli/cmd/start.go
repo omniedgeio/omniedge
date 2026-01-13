@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"strings"
@@ -45,8 +46,17 @@ var startCmd = &cobra.Command{
 			if authResp, err := authService.Refresh(&api.RefreshTokenOption{RefreshToken: refreshToken}); err == nil {
 				viper.Set(keyAuthResponse, authResp)
 				viper.Set(keyAuthResponseToken, authResp.Token)
-				viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
+				// Only update refresh token if a new one is provided.
+				// Some backends rotate it, others keep the old one until expiration.
+				if authResp.RefreshToken != "" {
+					viper.Set(keyAuthResponseRefreshToken, authResp.RefreshToken)
+				}
 				persistAuthFile()
+
+				// Also update keychain to keep it in sync
+				if authJson, err := json.Marshal(authResp); err == nil {
+					_ = core.SaveSecureToken(string(authJson))
+				}
 			} else {
 				log.Warnf("Token refresh failed: %v. Initiating fresh login...", err)
 				loginCmd.Run(cmd, args)
@@ -247,22 +257,16 @@ func init() {
 		enableRouting  bool
 		exitNode       string
 		networkId      string
-		username       string
-		password       string
 	)
 	startCmd.Flags().StringVarP(&networkId, cliVirtualNetworkId, "n", "", "network id to join")
 	startCmd.Flags().StringVarP(&authConfigPath, cliAuthConfigFile, "f", "", "auth config file path")
 	startCmd.Flags().BoolVarP(&enableRouting, cliEnableRouting, "r", false, "enable routing")
 	startCmd.Flags().StringVarP(&exitNode, cliExitNode, "e", "", "exit node ip address")
 	startCmd.Flags().Bool(cliAsExitNode, false, "act as an exit node")
-	startCmd.Flags().StringVarP(&username, cliUsername, "u", "", "username of omniedge")
-	startCmd.Flags().StringVarP(&password, cliPassword, "p", "", "password of omniedge")
 
 	viper.BindPFlag(cliVirtualNetworkId, startCmd.Flags().Lookup(cliVirtualNetworkId))
 	viper.BindPFlag(cliEnableRouting, startCmd.Flags().Lookup(cliEnableRouting))
 	viper.BindPFlag(cliExitNode, startCmd.Flags().Lookup(cliExitNode))
 	viper.BindPFlag(cliAsExitNode, startCmd.Flags().Lookup(cliAsExitNode))
-	viper.BindPFlag(cliUsername, startCmd.Flags().Lookup(cliUsername))
-	viper.BindPFlag(cliPassword, startCmd.Flags().Lookup(cliPassword))
 	rootCmd.AddCommand(startCmd)
 }

@@ -11,21 +11,15 @@ var Option = CliOption{
 }
 
 const (
-	cliUsername       = "username"
-	cliPassword       = "password"
-	cliSecretKey      = "secretKey"
-	cliAuthConfigFile = "file"
-
-	cliInterface = "interface"
-
+	cliSecretKey        = "secretKey"
+	cliAuthConfigFile   = "file"
 	cliVirtualNetworkId = "network"
-
-	cliScanTimeout   = "timeout"
-	cliCidr          = "cidr"
-	cliScanResult    = "scan-result"
-	cliEnableRouting = "enable-routing"
-	cliExitNode      = "exit-node"
-	cliAsExitNode    = "as-exit-node"
+	cliScanTimeout      = "timeout"
+	cliCidr             = "cidr"
+	cliScanResult       = "scan-result"
+	cliEnableRouting    = "enable-routing"
+	cliExitNode         = "exit-node"
+	cliAsExitNode       = "as-exit-node"
 )
 
 const (
@@ -39,9 +33,8 @@ const (
 var (
 	keyAuthResponse             = "authresponse"
 	keyAuthResponseToken        = "authresponse.token"
-	keyAuthResponseRefreshToken = "authresponse.refreshtoken"
+	keyAuthResponseRefreshToken = "authresponse.refresh_token"
 	keyVirtualNetworks          = "virtualNetworks"
-	keyHostname                 = "keyHostname"
 	keyDevice                   = "device"
 	keyDeviceName               = "device.name"
 	keyDeviceUUID               = "device.uuid"

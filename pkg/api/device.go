@@ -101,6 +101,9 @@ func (s *HeartbeatService) Heartbeat(opt *HeartbeatOption) (*HeartbeatResponse, 
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(postBody))
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Authorization", s.Token)
+
+	log.Debugf("Sending Heartbeat payload: %+v", body) // Added debug log
+
 	resp, err := HandleCall(req)
 	if err != nil {
 		return nil, err
