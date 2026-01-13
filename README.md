@@ -12,6 +12,14 @@
 [![License](https://img.shields.io/github/license/omniedgeio/omniedge)](LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/omniedgeio/omniedge)](go.mod)
 [![Wails Version](https://img.shields.io/badge/Wails-v3.0.0--alpha-red)](shell/desktop/go.mod)
+[![Go Report Card](https://goreportcard.com/badge/github.com/omniedgeio/omniedge)](https://goreportcard.com/report/github.com/omniedgeio/omniedge)
+<br />
+[![GitHub Stars](https://img.shields.io/github/stars/omniedgeio/omniedge?style=social)](https://github.com/omniedgeio/omniedge/stargazers)
+[![Discord](https://img.shields.io/discord/1079361536739770368?label=Discord&logo=discord&logoColor=white)](https://discord.gg/d4faRPYj)
+[![Twitter Follow](https://img.shields.io/twitter/follow/omniedgeio?style=social)](https://twitter.com/omniedgeio)
+[![GitHub issues](https://img.shields.io/github/issues/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/issues)
+[![GitHub last commit](https://img.shields.io/github/last-commit/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/commits)
+[![GitHub all releases](https://img.shields.io/github/downloads/omniedgeio/omniedge/total?label=Downloads&color=orange)](https://github.com/omniedgeio/omniedge/releases)
 
 OmniEdge enables seamless connectivity between your devices across networks. Perfect for:
 - 🤖 **AI/ML Devices**: NVIDIA Jetson, AI edge computers
