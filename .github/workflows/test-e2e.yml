@@ -1,0 +1,47 @@
+name: E2E Connectivity Test
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.24'
+  BUILD_ENV: dev
+
+jobs:
+  test-e2e:
+    name: E2E ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install iproute2mac
+
+      - name: Run E2E Test
+        run: |
+          chmod +x scripts/test_e2e.sh
+          # Run with sudo to allow interface creation and binding
+          sudo -E ./scripts/test_e2e.sh

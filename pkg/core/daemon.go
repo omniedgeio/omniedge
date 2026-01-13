@@ -9,6 +9,9 @@ import (
 )
 
 func GetPidFile() string {
+	if path := os.Getenv("OMNIEDGE_PID_FILE"); path != "" {
+		return path
+	}
 	if runtime.GOOS == "windows" {
 		return filepath.Join(os.Getenv("APPDATA"), "omniedge", "omniedge.pid")
 	}
@@ -16,6 +19,9 @@ func GetPidFile() string {
 }
 
 func GetLogFile() string {
+	if path := os.Getenv("OMNIEDGE_LOG_FILE"); path != "" {
+		return path
+	}
 	if runtime.GOOS == "windows" {
 		return filepath.Join(os.Getenv("APPDATA"), "omniedge", "omniedge.log")
 	}

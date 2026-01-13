@@ -32,6 +32,12 @@ func LoadClientConfig() {
 		data, _ = Asset("config/dev.yml")
 	}
 	ConfigV.SetConfigType("yaml")
+
+	// Enable environment variable overrides
+	ConfigV.SetEnvPrefix("OMNIEDGE")
+	ConfigV.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
+	ConfigV.AutomaticEnv()
+
 	if err := ConfigV.ReadConfig(bytes.NewReader(data)); err != nil {
 		log.Fatalf("Fail to load client config, please cotact team omniedge")
 	}
