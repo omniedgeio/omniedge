@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	api "github.com/omniedgeio/omniedge/pkg/api"
@@ -97,8 +98,17 @@ func persistAuthFile() {
 	if err = core.HandleFileStatus(handledAuthFile); err != nil {
 		log.Fatalf("Fail to create omniedge file, err is %s", err.Error())
 	}
+
+	// Sanitize: do not persist sensitive input flags or transient network keys
+	viper.Set(cliSecretKey, "")
+	viper.Set(keyJoinVirtualNetwork, nil)
+
 	if err := viper.WriteConfigAs(handledAuthFile); err != nil {
 		log.Fatalf("Fail to write config into file, err is %s", err.Error())
+	}
+	// Secure the file permissions: 0600 (read/write for owner only)
+	if err := os.Chmod(handledAuthFile, 0600); err != nil {
+		log.Warnf("Failed to set restrictive permissions on auth file: %v", err)
 	}
 }
 

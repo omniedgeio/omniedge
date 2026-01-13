@@ -6,6 +6,8 @@ package core
 import (
 	"os/exec"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 func setDetachAttr(cmd *exec.Cmd) {
@@ -15,5 +17,5 @@ func setDetachAttr(cmd *exec.Cmd) {
 }
 
 func dupFD(fd int, target int) {
-	syscall.Dup2(fd, target)
+	unix.Dup2(fd, target)
 }

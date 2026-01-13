@@ -71,7 +71,7 @@ func HandleFileStatus(file string) error {
 	dir := filepath.Dir(file)
 	if _, err := os.Stat(file); err != nil {
 		if os.IsNotExist(err) {
-			return os.MkdirAll(dir, os.ModePerm)
+			return os.MkdirAll(dir, 0700)
 		} else {
 			return err
 		}

@@ -12,7 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 var loginCmd = &cobra.Command{
@@ -22,10 +21,7 @@ var loginCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		bindFlags(cmd)
 		core.LoadClientConfig()
-		var username = viper.GetString(cliUsername)
-		var password string
 		var secretKey string
-		password = viper.GetString(cliPassword)
 		secretKey = viper.GetString(cliSecretKey)
 		endpointUrl := core.ConfigV.GetString(RestEndpointUrl)
 
@@ -39,23 +35,7 @@ var loginCmd = &cobra.Command{
 		var authResp *api.AuthResp
 		var err error
 
-		if username != "" {
-			if password == "" {
-				fmt.Print("Enter Password:")
-				bytePassword, err := terminal.ReadPassword(0)
-				if err != nil {
-					log.Panic(err)
-				}
-				password = string(bytePassword)
-				fmt.Println()
-			}
-			authOption := &api.AuthOption{
-				Username:   username,
-				Password:   password,
-				AuthMethod: api.LoginByPassword,
-			}
-			authResp, err = authService.Login(authOption)
-		} else if secretKey != "" || os.Getenv(omniedgeSecretKey) != "" {
+		if secretKey != "" || os.Getenv(omniedgeSecretKey) != "" {
 			if secretKey == "" {
 				secretKey = os.Getenv(omniedgeSecretKey)
 			}
@@ -132,13 +112,9 @@ var loginCmd = &cobra.Command{
 
 func init() {
 	var (
-		username       string
-		password       string
 		secretKey      string
 		authConfigPath string
 	)
-	loginCmd.Flags().StringVarP(&username, cliUsername, "u", "", "username of omniedge")
-	loginCmd.Flags().StringVarP(&password, cliPassword, "p", "", "password of omniedge ( not recommend text password here)")
 	loginCmd.Flags().StringVarP(&secretKey, cliSecretKey, "s", "", "secret-key of omniedge")
 	loginCmd.Flags().StringVarP(&authConfigPath, cliAuthConfigFile, "f", "", "position to store the auth and config")
 	rootCmd.AddCommand(loginCmd)
