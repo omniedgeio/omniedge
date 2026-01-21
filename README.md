@@ -19,6 +19,7 @@
 <!-- Platforms & Architecture -->
 [![Platforms](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows%20%7C%20FreeBSD%20%7C%20Android-blue)](#)
 [![Arch](https://img.shields.io/badge/Arch-amd64%20%7C%20arm64%20%7C%20armv7%20%7C%20riscv64%20%7C%20mips-lightgrey)](#)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fomniedgeio%2Fomniedge.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fomniedgeio%2Fomniedge?ref=badge_shield)
 <br />
 
 <!-- Community & Activity -->
@@ -156,3 +157,6 @@ Distributed under the [GPL-3.0 License](LICENSE).
 ---
 
 Built with ❤️ by [OmniEdge](https://connect.omniedge.io)
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fomniedgeio%2Fomniedge.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fomniedgeio%2Fomniedge?ref=badge_large)
