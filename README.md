@@ -11,6 +11,13 @@ OmniEdge enables seamless connectivity between your devices across networks. Per
 - 📡 **OpenWrt Routers**: Mesh your network infrastructure
 - 🖥️ **Servers**: Linux, macOS, FreeBSD, Windows
 
+## V2 Migration & License Notice
+
+OmniEdge has transitioned from its legacy Go-based implementation (using n2n and licensed under GPL-3) to a modern, high-performance Rust-based architecture (using OmniNervous and dual-licensed under MIT/Apache-2.0).
+
+-   **New Repository (Main)**: This repository now contains the V2 Rust implementation.
+-   **Legacy Repository**: The previous Go/n2n implementation (GPL-3) is preserved at [omniedgeio/omniedge-legacy](https://github.com/omniedgeio/omniedge-legacy).
+
 ## Highlights
 
 - 🖥️ **Cross-platform Desktop App** - Windows, macOS, Linux with system tray
@@ -36,19 +43,20 @@ curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main
 
 The new Desktop application is built with Tauri v2 and React. 
 
-| Platform | Package | Architecture |
-|----------|---------|--------------|
-| **Windows** | MSI/EXE | x64, ARM64 |
-| **macOS** | DMG/APP | Universal (Silicon & Intel) |
-| **Linux** | AppImage, DEB, RPM | x64, ARM64 |
+| Platform    | Package            | Architecture                |
+| ----------- | ------------------ | --------------------------- |
+| **Windows** | MSI/EXE            | x64, ARM64                  |
+| **macOS**   | DMG/APP            | Universal (Silicon & Intel) |
+| **Linux**   | AppImage, DEB, RPM | x64, ARM64                  |
 
 ## Architecture
 
-OmniEdge is now built in pure Rust for maximum efficiency and safety.
+OmniEdge is built in pure Rust for maximum efficiency and safety, leveraging the **OmniNervous** daemon for peer-to-peer connectivity.
 
 - **omni-core**: Unified connection management and state machine.
+- **omninervous**: High-performance P2P orchestration daemon.
 - **omni-tun**: Platform-specific WireGuard TUN interface management.
-- **omni-api**: High-performance API client for the OmniEdge control plane.
+- **omni-api**: Performance API client for the OmniEdge control plane.
 - **ui/desktop**: Modern desktop shell using Tauri v2.
 
 See [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md) for details.
