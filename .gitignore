@@ -1,66 +1,54 @@
-# Rust
+# --- Rust ---
 target/
 **/*.rs.bk
+Cargo.lock.orig
 
-# Node.js
+# --- Node.js / React ---
 node_modules/
 .npm
-.eslintcache
-
-# n2n library (generated)
-internal/n2n
-
-# Go binaries
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# Test binary
-*.test
-
-# Coverage
-*.out
-coverage.html
-
-# Build output
-out/
-bin/
 dist/
+build/
+.eslintcache
+*.tsbuildinfo
 
-# Desktop app builds
-shell/desktop/bin/
-shell/desktop/node_modules/
-shell/desktop/frontend/dist/
-*.AppImage
-*.flatpak
-*.dmg
-*.deb
-*.rpm
+# --- Tauri ---
+ui/desktop/src-tauri/target/
+ui/desktop/src-tauri/gen/
+ui/desktop/src-tauri/binaries/*
+!ui/desktop/src-tauri/binaries/.gitkeep
 
-# Dependencies
-# vendor/
-
-# IDE
+# --- IDEs ---
 .vscode/
 .idea/
+*.swp
+*.swo
+.zed/
 
-# Config (local)
-app.yaml
-sqlboiler.toml
-
-# OS
+# --- OS Specific ---
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Temporary
-*.tmp
+# --- Logs & Temporary ---
+# Ignore all log files but keep the log directory if it exists as a container
 *.log
-local-auth.json
-client.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.task/
+*.tmp
 
-.task
-target
+# --- Environment & Local Config ---
+.env
+.env.local
+.env.*.local
+local-auth.json
+app.yaml
+
+# --- Repository Meta ---
+.agents/
+.agent/
+.gemini/
+
 doc
-.agents
