@@ -36,7 +36,7 @@ OmniEdge has transitioned from its legacy Go-based implementation (using n2n and
 The easiest way to install OmniEdge CLI:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/omniedge-install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/scripts/omniedge-install.sh | bash
 ```
 
 ## Desktop Applications
