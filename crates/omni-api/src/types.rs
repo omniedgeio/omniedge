@@ -106,14 +106,14 @@ pub struct VirtualNetworkResponse {
     #[serde(alias = "uuid")]
     pub id: String,
     pub name: String,
-    #[serde(rename = "ipRange", alias = "ip_range", default)]
+    #[serde(rename = "ip_range", alias = "ipRange", default)]
     pub ip_range: String,
     #[serde(default)]
     pub role: i32,
     pub server: Option<ServerResponse>,
     #[serde(
-        rename = "selectedExitNodeId",
-        alias = "selected_exit_node_id",
+        rename = "selected_exit_node_id",
+        alias = "selectedExitNodeId",
         default
     )]
     pub selected_exit_node_id: Option<String>,
@@ -124,26 +124,26 @@ pub struct VirtualNetworkDeviceResponse {
     #[serde(alias = "uuid")]
     pub id: String,
     pub name: String,
-    #[serde(rename = "hardwareId", alias = "hardware_id", default)]
+    #[serde(rename = "hardware_id", alias = "hardwareId", default)]
     pub hardware_id: String,
-    #[serde(rename = "platform", alias = "os", default)]
+    #[serde(rename = "os", alias = "platform", alias = "os", default)]
     pub os: String,
     #[serde(
-        rename = "virtualIp",
-        alias = "virtual_ip",
+        rename = "virtual_ip",
+        alias = "virtualIp",
         alias = "virtual_IP",
         default
     )]
     pub virtual_ip: String,
-    #[serde(rename = "isExitNode", alias = "is_exit_node", default)]
+    #[serde(rename = "is_exit_node", alias = "isExitNode", default)]
     pub is_exit_node: bool,
     #[serde(default)]
     pub online: bool,
-    #[serde(rename = "exitNodeEnabled", alias = "exit_node_enabled", default)]
+    #[serde(rename = "exit_node_enabled", alias = "exitNodeEnabled", default)]
     pub exit_node_enabled: bool,
     #[serde(
-        rename = "selectedExitNodeId",
-        alias = "selected_exit_node_id",
+        rename = "selected_exit_node_id",
+        alias = "selectedExitNodeId",
         default
     )]
     pub selected_exit_node_id: Option<String>,
@@ -151,8 +151,8 @@ pub struct VirtualNetworkDeviceResponse {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct JoinVirtualNetworkResponse {
-    #[serde(rename = "communityName", alias = "community_name", default)]
-    pub community_name: String,
+    #[serde(alias = "communityName", alias = "community_name", default)]
+    pub cluster: String,
     #[serde(rename = "secretKey", alias = "secret_key", default)]
     pub secret_key: String,
     #[serde(
@@ -170,7 +170,7 @@ pub struct JoinVirtualNetworkResponse {
 impl std::fmt::Debug for JoinVirtualNetworkResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("JoinVirtualNetworkResponse")
-            .field("community_name", &self.community_name)
+            .field("cluster", &self.cluster)
             .field("secret_key", &"***REDACTED***")
             .field("virtual_ip", &self.virtual_ip)
             .field("subnet_mask", &self.subnet_mask)

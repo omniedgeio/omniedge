@@ -5,15 +5,15 @@ use std::process::Command;
 pub struct RoutingManager;
 
 impl RoutingManager {
-    pub fn setup_exit_node(exit_node_ip: &str, supernode_host: &str) -> Result<()> {
+    pub fn setup_exit_node(exit_node_ip: &str, nucleus_host: &str) -> Result<()> {
         #[cfg(target_os = "linux")]
-        return Self::setup_linux(exit_node_ip, supernode_host);
+        return Self::setup_linux(exit_node_ip, nucleus_host);
 
         #[cfg(target_os = "macos")]
-        return Self::setup_macos(exit_node_ip, supernode_host);
+        return Self::setup_macos(exit_node_ip, nucleus_host);
 
         #[cfg(target_os = "windows")]
-        return Self::setup_windows(exit_node_ip, supernode_host);
+        return Self::setup_windows(exit_node_ip, nucleus_host);
 
         #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
         Err(anyhow!("Exit node not supported on this OS"))
@@ -35,25 +35,25 @@ impl RoutingManager {
 
     // --- Linux Implementation Shell ---
     #[cfg(target_os = "linux")]
-    fn setup_linux(exit_node_ip: &str, supernode_host: &str) -> Result<()> {
+    fn setup_linux(exit_node_ip: &str, nucleus_host: &str) -> Result<()> {
         info!(
             "Setting up exit node on Linux: {} via {}",
-            exit_node_ip, supernode_host
+            exit_node_ip, nucleus_host
         );
 
-        // 1. Resolve supernode IP
-        let host = if let Some(pos) = supernode_host.find(':') {
-            &supernode_host[..pos]
+        // 1. Resolve nucleus IP
+        let host = if let Some(pos) = nucleus_host.find(':') {
+            &nucleus_host[..pos]
         } else {
-            supernode_host
+            nucleus_host
         };
 
         let output = Self::run_command("getent", &["ahosts", host])?;
-        let supernode_ip = output
+        let nucleus_ip = output
             .lines()
             .next()
             .and_then(|l| l.split_whitespace().next())
-            .context("Failed to resolve supernode host")?;
+            .context("Failed to resolve nucleus host")?;
 
         // 2. Get primary interface
         let iface = Self::get_primary_interface()?;
@@ -77,14 +77,14 @@ impl RoutingManager {
             ));
         }
 
-        // 4. Add route to supernode via original gateway
+        // 4. Add route to nucleus via original gateway
         Self::run_command(
             "sudo",
             &[
                 "ip",
                 "route",
                 "add",
-                supernode_ip,
+                nucleus_ip,
                 "via",
                 original_gateway,
                 "dev",
@@ -166,10 +166,10 @@ impl RoutingManager {
 
     // --- macOS Implementation Shell ---
     #[cfg(target_os = "macos")]
-    fn setup_macos(exit_node_ip: &str, supernode_host: &str) -> Result<()> {
+    fn setup_macos(exit_node_ip: &str, nucleus_host: &str) -> Result<()> {
         info!(
             "Setting up exit node on macOS: {} via {}",
-            exit_node_ip, supernode_host
+            exit_node_ip, nucleus_host
         );
 
         let iface = Self::get_primary_interface()?;
@@ -198,7 +198,7 @@ impl RoutingManager {
             return Err(anyhow!("Could not determine current gateway"));
         }
 
-        // Add route to supernode via original gateway
+        // Add route to nucleus via original gateway
         Self::run_command(
             "sudo",
             &[
@@ -206,7 +206,7 @@ impl RoutingManager {
                 "-n",
                 "add",
                 "-net",
-                supernode_host,
+                nucleus_host,
                 original_gateway,
             ],
         )?;
@@ -278,7 +278,7 @@ impl RoutingManager {
 
     // --- Windows Implementation Shell ---
     #[cfg(target_os = "windows")]
-    fn setup_windows(exit_node_ip: &str, _supernode_host: &str) -> Result<()> {
+    fn setup_windows(exit_node_ip: &str, _nucleus_host: &str) -> Result<()> {
         info!("Setting up exit node on Windows: {}", exit_node_ip);
         let iface = Self::get_primary_interface()?;
 

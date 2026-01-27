@@ -7,7 +7,7 @@ use omni_core::{CliConfig, ConnectionManager, ConnectionState};
 use std::sync::Arc;
 use tauri::{
     image::Image,
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, Runtime,
 };
@@ -73,6 +73,7 @@ async fn try_auto_login(state: tauri::State<'_, AppState>) -> Result<bool, Strin
 
 #[tauri::command]
 async fn login_pwd(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     email: String,
     password: String,
@@ -88,6 +89,7 @@ async fn login_pwd(
         config.auth_response = Some(auth);
         let _ = config.save();
     }
+    update_tray_icon(&app, manager.get_state().await);
     Ok(())
 }
 
@@ -476,6 +478,7 @@ async fn start_device_flow(state: tauri::State<'_, AppState>) -> Result<DeviceCo
 
 #[tauri::command]
 async fn poll_device_flow(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     device_code: String,
 ) -> Result<AuthResp, String> {
@@ -489,6 +492,7 @@ async fn poll_device_flow(
         config.auth_response = Some(auth.clone());
         let _ = config.save();
     }
+    update_tray_icon(&app, manager.get_state().await);
     Ok(auth)
 }
 
@@ -503,6 +507,7 @@ async fn start_session_login(state: tauri::State<'_, AppState>) -> Result<Sessio
 
 #[tauri::command]
 async fn wait_for_session_login(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     session_id: String,
 ) -> Result<AuthResp, String> {
@@ -528,6 +533,7 @@ async fn wait_for_session_login(
         config.auth_response = Some(auth.clone());
         let _ = config.save();
     }
+    update_tray_icon(&app, manager.get_state().await);
     Ok(auth)
 }
 
@@ -580,7 +586,10 @@ async fn set_as_exit_node(state: tauri::State<'_, AppState>, enabled: bool) -> R
         Err(_) => {
             // Fallback to local
             let mut manager = state.manager.lock().await;
-            manager.set_as_exit_node(enabled);
+            manager
+                .set_as_exit_node(enabled)
+                .await
+                .map_err(|e| e.to_string())?;
         }
     }
     Ok(())
@@ -608,6 +617,91 @@ async fn is_exit_node(state: tauri::State<'_, AppState>) -> Result<bool, String>
     }
 }
 
+async fn build_tray_menu<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    manager: &ConnectionManager,
+) -> Result<Menu<R>, String> {
+    let menu = Menu::new(app).map_err(|e| e.to_string())?;
+
+    let show_i = MenuItem::with_id(app, "show", "Show OmniEdge", true, None::<&str>).map_err(|e| e.to_string())?;
+    let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>).map_err(|e| e.to_string())?;
+
+    // 1. App Name / Version Header
+    let header_name = MenuItem::with_id(app, "header", "OmniEdge", false, None::<&str>).map_err(|e| e.to_string())?;
+    menu.append(&header_name).map_err(|e| e.to_string())?;
+
+    // 2. Auth Status
+    let auth_status = if manager.get_base_url().is_empty() {
+        "Sign In..."
+    } else {
+        "Logged In"
+    };
+    let auth_i = MenuItem::with_id(app, "auth", auth_status, true, None::<&str>).map_err(|e| e.to_string())?;
+    menu.append(&auth_i).map_err(|e| e.to_string())?;
+
+    menu.append(&tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+    // 3. Virtual Networks as Submenus
+    if let Ok(networks) = manager.get_networks().await {
+        if networks.is_empty() {
+             let no_net = MenuItem::with_id(app, "no_net", "No Virtual Networks", false, None::<&str>).map_err(|e| e.to_string())?;
+             menu.append(&no_net).map_err(|e| e.to_string())?;
+        }
+
+        let connected_id = manager.get_connected_network_id().await;
+
+        for net in networks {
+            let is_connected = connected_id.as_ref() == Some(&net.id);
+            let net_title = if is_connected {
+                format!("{} (Connected)", net.name)
+            } else {
+                net.name.clone()
+            };
+
+            let net_submenu = Submenu::with_id(app, format!("net:{}", net.id), net_title, true).map_err(|e| e.to_string())?;
+
+            // Submenu Item: Toggle Connection
+            let toggle_id = if is_connected {
+                format!("disconnect:{}", net.id)
+            } else {
+                format!("connect:{}", net.id)
+            };
+            let toggle_text = if is_connected { "Disconnect" } else { "Connect" };
+            let toggle_i = MenuItem::with_id(app, toggle_id, toggle_text, true, None::<&str>).map_err(|e| e.to_string())?;
+            net_submenu.append(&toggle_i).map_err(|e| e.to_string())?;
+
+            net_submenu.append(&tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+            // Submenu Items: Devices
+            if let Ok(devices) = manager.get_network_devices(&net.id).await {
+                if devices.is_empty() {
+                     let no_dev = MenuItem::with_id(app, "no_dev", "No other devices", false, None::<&str>).map_err(|e| e.to_string())?;
+                     net_submenu.append(&no_dev).map_err(|e| e.to_string())?;
+                } else {
+                    for dev in devices {
+                        let status_dot = if dev.online { "● " } else { "○ " };
+                        let dev_text = format!("{}{}", status_dot, dev.name);
+                        let dev_i = MenuItem::with_id(app, format!("dev:{}", dev.id), dev_text, false, None::<&str>).map_err(|e| e.to_string())?;
+                        net_submenu.append(&dev_i).map_err(|e| e.to_string())?;
+                    }
+                }
+            } else {
+                let loading = MenuItem::with_id(app, "loading", "Loading devices...", false, None::<&str>).map_err(|e| e.to_string())?;
+                net_submenu.append(&loading).map_err(|e| e.to_string())?;
+            }
+
+            menu.append(&net_submenu).map_err(|e| e.to_string())?;
+        }
+    }
+
+    menu.append(&tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+    // 4. Standard Footer
+    menu.append_items(&[&show_i, &quit_i]).map_err(|e| e.to_string())?;
+
+    Ok(menu)
+}
+
 fn update_tray_icon<R: Runtime>(app: &tauri::AppHandle<R>, state: ConnectionState) {
     if let Some(tray) = app.tray_by_id("main") {
         let icon_name = match state {
@@ -621,6 +715,16 @@ fn update_tray_icon<R: Runtime>(app: &tauri::AppHandle<R>, state: ConnectionStat
                 let _ = tray.set_icon(Some(icon));
             }
         }
+
+        // Trigger menu refresh on state change
+        let handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let state = handle.state::<AppState>();
+            let manager = state.manager.lock().await;
+            if let Ok(menu) = build_tray_menu(&handle, &manager).await {
+                let _ = tray.set_menu(Some(menu));
+            }
+        });
     }
 }
 
@@ -736,30 +840,37 @@ pub fn run() {
                 app.set_menu(app_menu)?;
             }
 
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let show_i = MenuItem::with_id(app, "show", "Show OmniEdge", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
-
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
-                .menu(&menu)
                 .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "quit" => {
+                .on_menu_event(|app, event| {
+                    let id = event.id.as_ref();
+                    if id == "quit" {
                         let handle = app.clone();
                         tauri::async_runtime::spawn(async move {
                             let state = handle.state::<AppState>();
                             let _ = disconnect(handle.clone(), state).await;
                             handle.exit(0);
                         });
-                    }
-                    "show" => {
+                    } else if id == "show" {
                         if let Some(window) = app.get_webview_window("main") {
-                            window.show().unwrap();
-                            window.set_focus().unwrap();
+                            let _ = window.show();
+                            let _ = window.set_focus();
                         }
+                    } else if id.starts_with("connect:") {
+                        let network_id = id.strip_prefix("connect:").unwrap().to_string();
+                        let handle = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let state = handle.state::<AppState>();
+                            let _ = connect(handle.clone(), state, network_id, None, None, None).await;
+                        });
+                    } else if id.starts_with("disconnect:") {
+                        let handle = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let state = handle.state::<AppState>();
+                            let _ = disconnect(handle.clone(), state).await;
+                        });
                     }
-                    _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
@@ -773,6 +884,18 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Initial menu population
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let state = handle.state::<AppState>();
+                let manager = state.manager.lock().await;
+                if let Ok(menu) = build_tray_menu(&handle, &manager).await {
+                    if let Some(tray) = handle.tray_by_id("main") {
+                        let _ = tray.set_menu(Some(menu));
+                    }
+                }
+            });
 
             if let Some(window) = app.get_webview_window("main") {
                 let w = window.clone();

@@ -25,8 +25,14 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
 
 #[cfg(windows)]
 fn run_service() -> anyhow::Result<()> {
+    use tokio::sync::broadcast;
+    let (tx, _rx) = broadcast::channel(1);
+    let tx_stop = tx.clone();
+
     let service_handler = move |event| match event {
         ServiceControl::Stop => {
+            info!("Received STOP signal from Windows Service Control");
+            let _ = tx_stop.send(());
             windows_service::service_control_handler::ServiceControlHandlerResult::NoError
         }
         ServiceControl::Interrogate => {
@@ -49,10 +55,12 @@ fn run_service() -> anyhow::Result<()> {
 
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
-        if let Err(e) = run_helper_server().await {
+        if let Err(e) = run_helper_server(tx.subscribe()).await {
             error!("Helper server error: {}", e);
         }
     });
+
+    info!("Service loop finished, stopping service...");
 
     status_handle.set_service_status(ServiceStatus {
         service_type: ServiceType::OWN_PROCESS,
@@ -67,7 +75,7 @@ fn run_service() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn run_helper_server() -> anyhow::Result<()> {
+async fn run_helper_server(mut shutdown_rx: tokio::sync::broadcast::Receiver<()>) -> anyhow::Result<()> {
     info!("OmniEdge Helper server starting...");
     let server = Arc::new(HelperServer::new(
         "https://api.omniedge.io/api/v2".to_string(),
@@ -94,14 +102,22 @@ async fn run_helper_server() -> anyhow::Result<()> {
         info!("Listening on Unix Socket: {}", socket_path);
 
         loop {
-            match listener.accept().await {
-                Ok((socket, _)) => {
-                    let server_ref = Arc::clone(&server);
-                    tokio::spawn(async move {
-                        handle_connection(socket, server_ref).await;
-                    });
+            tokio::select! {
+                accept_res = listener.accept() => {
+                    match accept_res {
+                        Ok((socket, _)) => {
+                            let server_ref = Arc::clone(&server);
+                            tokio::spawn(async move {
+                                handle_connection(socket, server_ref).await;
+                            });
+                        }
+                        Err(e) => error!("Accept error: {}", e),
+                    }
                 }
-                Err(e) => error!("Accept error: {}", e),
+                _ = shutdown_rx.recv() => {
+                    info!("Shutdown signal received, closing Unix socket listener...");
+                    break;
+                }
             }
         }
     }
@@ -124,15 +140,24 @@ async fn run_helper_server() -> anyhow::Result<()> {
                 }
             };
 
-            if server_instance.connect().await.is_ok() {
-                let server_ref = Arc::clone(&server);
-                tokio::spawn(async move {
-                    handle_connection(server_instance, server_ref).await;
-                });
+            tokio::select! {
+                connect_res = server_instance.connect() => {
+                    if connect_res.is_ok() {
+                        let server_ref = Arc::clone(&server);
+                        tokio::spawn(async move {
+                            handle_connection(server_instance, server_ref).await;
+                        });
+                    }
+                }
+                _ = shutdown_rx.recv() => {
+                    info!("Shutdown signal received, closing Named Pipe listener...");
+                    break;
+                }
             }
             first = false;
         }
     }
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -267,16 +292,47 @@ fn main() -> anyhow::Result<()> {
     {
         // Try to start as a service. If it fails (e.g. running from console), run normally.
         if let Err(_e) = service_dispatcher::start("OmniEdgeHelper", ffi_service_main) {
+            info!("Failed to start as service (expected if running from terminal), falling back to console mode");
             let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(async { run_helper_server().await })?;
+            rt.block_on(async {
+                let (tx, _rx) = tokio::sync::broadcast::channel(1);
+                let tx_stop = tx.clone();
+                
+                tokio::spawn(async move {
+                    if let Ok(_) = tokio::signal::ctrl_c().await {
+                        info!("Received Ctrl+C, shutting down helper...");
+                        let _ = tx_stop.send(());
+                    }
+                });
+
+                run_helper_server(tx.subscribe()).await
+            })?;
         }
     }
 
     #[cfg(not(windows))]
     {
         let rt = tokio::runtime::Runtime::new()?;
-        rt.block_on(async { run_helper_server().await })?;
+        rt.block_on(async {
+            let (tx, _rx) = tokio::sync::broadcast::channel(1);
+            let tx_stop = tx.clone();
+
+            use tokio::signal::unix::{signal, SignalKind};
+            let mut sigint = signal(SignalKind::interrupt())?;
+            let mut sigterm = signal(SignalKind::terminate())?;
+
+            tokio::spawn(async move {
+                tokio::select! {
+                    _ = sigint.recv() => info!("Received SIGINT, shutting down..."),
+                    _ = sigterm.recv() => info!("Received SIGTERM, shutting down..."),
+                }
+                let _ = tx_stop.send(());
+            });
+
+            run_helper_server(tx.subscribe()).await
+        })?;
     }
 
+    info!("OmniEdge Helper stopped clean.");
     Ok(())
 }

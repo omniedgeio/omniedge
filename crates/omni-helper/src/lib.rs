@@ -96,11 +96,17 @@ impl HelperServer {
             "set_as_exit_node" => {
                 let enabled = req.args["enabled"].as_bool().unwrap_or(false);
                 let mut manager = self.manager.lock().await;
-                manager.set_as_exit_node(enabled);
-                HelperResponse {
-                    success: true,
-                    message: format!("Exit node status updated to: {}", enabled),
-                    data: None,
+                match manager.set_as_exit_node(enabled).await {
+                    Ok(_) => HelperResponse {
+                        success: true,
+                        message: format!("Exit node status updated to: {}", enabled),
+                        data: None,
+                    },
+                    Err(e) => HelperResponse {
+                        success: false,
+                        message: format!("Failed to update exit node status: {}", e),
+                        data: None,
+                    },
                 }
             }
             "is_exit_node" => {

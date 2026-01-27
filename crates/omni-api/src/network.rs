@@ -66,6 +66,23 @@ impl<'a> NetworkService<'a> {
         }
     }
 
+    pub async fn update_device(
+        &self,
+        network_id: &str,
+        device_id: &str,
+        is_exit_node: bool,
+    ) -> Result<()> {
+        let path = format!(
+            "/api/v2/virtual-networks/{}/devices/{}",
+            network_id, device_id
+        );
+        let builder = self.client.put(&path).json(&json!({
+            "is_exit_node": is_exit_node,
+        }));
+        let _resp: serde_json::Value = self.client.send(builder).await?;
+        Ok(())
+    }
+
     pub async fn select_exit_node(
         &self,
         network_id: &str,

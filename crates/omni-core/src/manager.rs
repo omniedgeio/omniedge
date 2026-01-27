@@ -174,7 +174,7 @@ impl ConnectionManager {
         let proto = Arc::new(
             OmniProto::new(
                 &join_resp.server.host,
-                join_resp.community_name,
+                join_resp.cluster,
                 join_resp.secret_key,
                 vip_addr,
                 0,
@@ -185,11 +185,11 @@ impl ConnectionManager {
 
         // 2. Setup TUN
         let mut tun_instance: Option<OmniTun> = None;
-        let mut port = 7788;
+        let mut port = 51820;
 
         #[cfg(target_os = "windows")]
         {
-            let if_names = ["OmniEdge", "OmniEdgeVPN", "OmniNet"];
+            let if_names = ["OmniEdge"];
             let mut setup_success = false;
             let mut last_err = String::new();
 
@@ -267,8 +267,8 @@ impl ConnectionManager {
         // 5. Setup Exit Node Routing if requested
         if let Some(ref exit_ip) = self.exit_node_ip {
             info!("Configuring system to use exit node: {}", exit_ip);
-            let supernode_host = &join_resp.server.host;
-            if let Err(e) = crate::routing::RoutingManager::setup_exit_node(exit_ip, supernode_host)
+            let nucleus_host = &join_resp.server.host;
+            if let Err(e) = crate::routing::RoutingManager::setup_exit_node(exit_ip, nucleus_host)
             {
                 error!("Failed to setup exit node routing: {}", e);
             }
@@ -649,12 +649,12 @@ impl ConnectionManager {
         if let ConnectionState::Connected = *self.state.read().await {
             if let Some(ip) = exit_node_ip {
                 info!("Enabling exit node routing to: {}", ip);
-                // We need the supernode host to add a persistent route to it
+                // We need the nucleus host to add a persistent route to it
                 // For simplicity, we can try to get it from the current proto if available
                 if let Some(ref proto) = self.proto {
                     let _ = crate::routing::RoutingManager::setup_exit_node(
                         ip,
-                        proto.get_server_host(),
+                        proto.get_nucleus_host(),
                     );
                 }
             } else {
@@ -665,7 +665,7 @@ impl ConnectionManager {
         Ok(())
     }
 
-    pub fn set_as_exit_node(&mut self, enabled: bool) {
+    pub async fn set_as_exit_node(&mut self, enabled: bool) -> Result<()> {
         info!("Setting as_exit_node to: {}", enabled);
         self.as_exit_node.store(enabled, Ordering::SeqCst);
 
@@ -675,12 +675,28 @@ impl ConnectionManager {
             let _ = config.save();
         }
 
+        // Sync with backend if connected
+        if let (Some(client), Some(net_id), Some(dev_id)) = (
+            &self.api_client,
+            &self.current_network_id,
+            &self.device_id,
+        ) {
+            let net_service = NetworkService::new(client);
+            if let Err(e) = net_service.update_device(net_id, dev_id, enabled).await {
+                error!("Failed to sync exit node status to backend: {}", e);
+                // We continue because local state is updated, but this indicates a sync issue
+            } else {
+                info!("Successfully synced exit node status to backend.");
+            }
+        }
+
         if let Some(tx) = &self.heartbeat_tx {
             let tx = tx.clone();
             tokio::spawn(async move {
                 let _ = tx.send(()).await;
             });
         }
+        Ok(())
     }
 
     pub fn is_exit_node(&self) -> bool {

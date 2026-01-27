@@ -15,21 +15,20 @@ pub struct PeerUpdate {
 
 pub struct OmniProto {
     client: NucleusClient,
-    supernode_host: String,
+    nucleus_host: String,
 }
 
 impl OmniProto {
-    /// Create a new OmniProto instance using legacy OmniEdge naming
+    /// Create a new OmniProto instance
     pub async fn new(
-        supernode_host: &str,
-        community_name: String,
+        nucleus_host: &str,
+        cluster: String,
         secret_key: String,
         virtual_ip: Ipv4Addr,
         listen_port: u16,
         public_key: [u8; 32],
     ) -> Result<Self> {
-        // Map legacy n2n names to OmniNervous Nucleus names
-        let cluster = community_name;
+        // Map legacy secret_key to psk
         let psk = if secret_key.is_empty() {
             None
         } else {
@@ -37,7 +36,7 @@ impl OmniProto {
         };
 
         let client = NucleusClient::new(
-            supernode_host,
+            nucleus_host,
             cluster,
             public_key,
             virtual_ip,
@@ -48,12 +47,12 @@ impl OmniProto {
 
         Ok(Self {
             client,
-            supernode_host: supernode_host.to_string(),
+            nucleus_host: nucleus_host.to_string(),
         })
     }
 
-    pub fn get_server_host(&self) -> &str {
-        &self.supernode_host
+    pub fn get_nucleus_host(&self) -> &str {
+        &self.nucleus_host
     }
 
     pub async fn register(&self, socket: &UdpSocket) -> Result<()> {
