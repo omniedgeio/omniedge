@@ -38,6 +38,8 @@ yarn-error.log*
 pnpm-debug.log*
 .task/
 *.tmp
+doc/exit_node.md
+doc/openapi.yaml
 
 # --- Environment & Local Config ---
 .env
