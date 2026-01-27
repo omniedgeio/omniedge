@@ -1,0 +1,87 @@
+name: "Release CLI"
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-beta.*'
+      - 'v*.*.*-rc.*'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build CLI - ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact_name: omniedge-linux-x64
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact_name: omniedge-linux-arm64
+          - target: armv7-unknown-linux-musleabihf
+            os: ubuntu-latest
+            artifact_name: omniedge-linux-armv7
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact_name: omniedge-macos-x64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact_name: omniedge-macos-arm64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact_name: omniedge-windows-x64.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross (Linux targets)
+        if: contains(matrix.target, 'linux')
+        run: cargo install cross --git https://github.com/cross-rs/cross.git
+
+      - name: Build (Mac/Windows)
+        if: (!contains(matrix.target, 'linux'))
+        run: cargo build --release --bin omniedge --target ${{ matrix.target }}
+
+      - name: Build (Linux Cross)
+        if: contains(matrix.target, 'linux')
+        run: cross build --release --bin omniedge --target ${{ matrix.target }}
+
+      - name: Rename and Package
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            cp target/${{ matrix.target }}/release/omniedge.exe dist/${{ matrix.artifact_name }}
+          else
+            cp target/${{ matrix.target }}/release/omniedge dist/${{ matrix.artifact_name }}
+          fi
+          cd dist
+          zip -j ../${{ matrix.artifact_name }}.zip ./*
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.zip
+
+      - name: Upload to Release
+        uses: svenstaro/upload-release-action@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ matrix.artifact_name }}.zip
+          tag: ${{ github.ref }}
+          overwrite: true
+          prerelease: ${{ contains(github.ref, '-') }}

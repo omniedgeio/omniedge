@@ -1,0 +1,22 @@
+version: '3'
+
+tasks:
+  build:
+    summary: Builds the application
+    cmds:
+      - npm run tauri build
+
+  dev:
+    summary: Runs the application in development mode
+    cmds:
+      - npm run tauri dev
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - npm run tauri build
+
+  setup:
+    summary: Installs dependencies
+    cmds:
+      - npm install

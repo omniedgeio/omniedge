@@ -1,0 +1,11 @@
+[package]
+name = "omni-tun"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[dependencies]
+omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "omninervous", tag = "v0.2.5" }
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+log = "0.4"

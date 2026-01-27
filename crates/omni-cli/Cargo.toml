@@ -1,0 +1,33 @@
+[package]
+name = "omniedge-cli"
+version = "2.0.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[dependencies]
+omni-api = { path = "../omni-api" }
+omni-proto = { path = "../omni-proto" }
+omni-tun = { path = "../omni-tun" }
+omni-core = { path = "../omni-core" }
+clap = { version = "4.4", features = ["derive"] }
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+log = "0.4"
+dirs = "5.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+whoami = "1.4"
+flexi_logger = "0.27"
+machineid-rs = "1.2"
+uuid = { version = "1.0", features = ["v4"] }
+hex = "0.4"
+base64 = "0.21"
+network-interface = "1.1"
+mac_address = "1.1"
+local-ip-address = "0.5"
+regex = "1.10"
+ipnetwork = "0.20"
+is_elevated = "0.1"
+
+[target.'cfg(windows)'.dependencies]
+windows-service = "0.7"

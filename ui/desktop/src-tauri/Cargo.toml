@@ -1,0 +1,41 @@
+[package]
+name = "omniedge"
+version = "2.0.0"
+description = "A Tauri App"
+authors = ["you"]
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "tauri_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+omni-core = { path = "../../../crates/omni-core" }
+omni-api = { path = "../../../crates/omni-api" }
+omni-helper = { path = "../../../crates/omni-helper" }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+winreg = "0.52.0"
+whoami = "1.5.0"
+futures-util = "0.3"
+winapi = { version = "0.3", features = ["processthreadsapi", "securitybaseapi", "winnt"] }
+libc = "0.2"
+omni-proto = { path = "../../../crates/omni-proto" }
+omni-tun = { path = "../../../crates/omni-tun" }
+hex = "0.4"
+log = "0.4"
+flexi_logger = "0.29"
+

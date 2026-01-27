@@ -1,0 +1,16 @@
+[package]
+name = "omni-api"
+version = "2.0.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+log = "0.4"
+
+[dev-dependencies]
+mockito = "1.2"

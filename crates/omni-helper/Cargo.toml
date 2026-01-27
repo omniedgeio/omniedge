@@ -1,0 +1,25 @@
+[package]
+name = "omni-helper"
+version = "2.0.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[dependencies]
+tokio = { version = "1.20", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+log = "0.4"
+flexi_logger = "0.27"
+omni-core = { path = "../omni-core" }
+omni-api = { path = "../omni-api" }
+futures-util = "0.3"
+
+winapi = { version = "0.3", features = ["winbase", "winnt", "securitybaseapi", "handleapi", "namedpipeapi"] }
+omni-proto = { path = "../omni-proto" }
+omni-tun = { path = "../omni-tun" }
+hex = "0.4"
+whoami = "1.5.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-service = "0.7"

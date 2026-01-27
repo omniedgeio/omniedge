@@ -1,0 +1,66 @@
+# Rust
+target/
+**/*.rs.bk
+
+# Node.js
+node_modules/
+.npm
+.eslintcache
+
+# n2n library (generated)
+internal/n2n
+
+# Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Coverage
+*.out
+coverage.html
+
+# Build output
+out/
+bin/
+dist/
+
+# Desktop app builds
+shell/desktop/bin/
+shell/desktop/node_modules/
+shell/desktop/frontend/dist/
+*.AppImage
+*.flatpak
+*.dmg
+*.deb
+*.rpm
+
+# Dependencies
+# vendor/
+
+# IDE
+.vscode/
+.idea/
+
+# Config (local)
+app.yaml
+sqlboiler.toml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+*.tmp
+*.log
+local-auth.json
+client.log
+
+.task
+target
+doc
+.agents
