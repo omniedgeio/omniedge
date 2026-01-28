@@ -185,6 +185,8 @@ impl ConnectionManager {
 
         let effective_device_id = if let Ok(ref resp) = device_resp {
             info!("Device registered/updated successfully. ID: {}", resp.id);
+            // Update self.device_id with the actual device UUID from the API
+            self.device_id = Some(resp.id.clone());
             &resp.id
         } else {
             let e = device_resp.as_ref().unwrap_err();
@@ -345,7 +347,6 @@ impl ConnectionManager {
         let proto_ctrl = proto.clone();
         let socket_inner = socket.clone();
         let secret = self.cluster_secret.clone();
-        let as_exit_node = self.as_exit_node.clone();
 
         // Master Dispatcher Loop
         let mut shutdown_rx1 = shutdown_tx.subscribe();
@@ -431,14 +432,16 @@ impl ConnectionManager {
                     _ = api_interval.tick() => {
                         if let Some(ref client) = api_client {
                             let ds = DeviceService::new(client);
-                            let _ = ds.heartbeat(&device_id_hb).await;
+                            let is_exit = as_exit_node_hb.load(std::sync::atomic::Ordering::SeqCst);
+                            let _ = ds.heartbeat(&device_id_hb, is_exit).await;
                         }
                     }
                     _ = hb_rx.recv() => {
                         if let Some(ref client) = api_client {
                             info!("Triggering immediate heartbeat...");
                             let ds = DeviceService::new(client);
-                            let _ = ds.heartbeat(&device_id_hb).await;
+                            let is_exit = as_exit_node_hb.load(std::sync::atomic::Ordering::SeqCst);
+                            let _ = ds.heartbeat(&device_id_hb, is_exit).await;
                         }
                     }
                     _ = proto_interval.tick() => {

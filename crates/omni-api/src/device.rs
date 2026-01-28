@@ -26,9 +26,14 @@ impl<'a> DeviceService<'a> {
         self.client.send(builder).await
     }
 
-    pub async fn heartbeat(&self, hardware_id: &str) -> Result<HeartbeatResponse> {
+    pub async fn heartbeat(
+        &self,
+        hardware_id: &str,
+        is_exit_node: bool,
+    ) -> Result<HeartbeatResponse> {
         let builder = self.client.post("/devices/heartbeat").json(&json!({
             "hardware_id": hardware_id,
+            "is_exit_node": is_exit_node,
         }));
         self.client.send(builder).await
     }
