@@ -1,6 +1,6 @@
 use crate::types::{ErrorResponse, SuccessResponse};
 use anyhow::{anyhow, Result};
-use log::{debug, error, info};
+use log::{error, info};
 use reqwest::{Client as HttpClient, RequestBuilder};
 use serde::de::DeserializeOwned;
 

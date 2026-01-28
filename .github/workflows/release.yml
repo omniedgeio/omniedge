@@ -240,7 +240,10 @@ jobs:
           
           # Build the package
           dpkg-deb --build "${PKG_DIR}"
-          mv "${PKG_DIR}.deb" "omniedge-cli_${PKG_VERSION}_${PKG_ARCH}.deb"
+          # Rename only if the output name differs from the desired name
+          if [ "${PKG_DIR}.deb" != "omniedge-cli_${PKG_VERSION}_${PKG_ARCH}.deb" ]; then
+            mv "${PKG_DIR}.deb" "omniedge-cli_${PKG_VERSION}_${PKG_ARCH}.deb"
+          fi
 
       - name: Upload DEB Artifact
         uses: actions/upload-artifact@v4
@@ -331,8 +334,10 @@ jobs:
           WantedBy=multi-user.target
           EOF
           
-          # Create spec file
+          # Create spec file (disable strip for cross-compiled binaries)
           cat > ~/rpmbuild/SPECS/omniedge-cli.spec <<EOF
+          %define __strip /bin/true
+          %define debug_package %{nil}
           Name:           ${PKG_NAME}
           Version:        ${PKG_VERSION}
           Release:        1%{?dist}
@@ -453,7 +458,7 @@ jobs:
           Exec=omniedge
           Icon=omniedge
           Comment=Peer-to-peer VPN CLI for edge computing
-          Categories=Network;VPN;
+          Categories=Network;
           Terminal=true
           EOF
           cp "${APPDIR}/omniedge-cli.desktop" "${APPDIR}/usr/share/applications/"

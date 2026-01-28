@@ -146,9 +146,9 @@ async fn run_helper_server(
                 connect_res = server_instance.connect() => {
                     if connect_res.is_ok() {
                         let server_ref = Arc::clone(&server);
-                        tokio::spawn(async move {
-                            handle_connection(server_instance, server_ref).await;
-                        });
+                        // Handle connection sequentially on Windows to avoid Send issues
+                        // with raw pointers in tun::Configuration from omninervous
+                        handle_connection(server_instance, server_ref).await;
                     }
                 }
                 _ = shutdown_rx.recv() => {
@@ -168,7 +168,6 @@ fn create_permissive_pipe(
     first: bool,
 ) -> anyhow::Result<tokio::net::windows::named_pipe::NamedPipeServer> {
     use std::os::windows::ffi::OsStrExt;
-    use std::os::windows::io::FromRawHandle;
     use std::ptr;
     use winapi::um::minwinbase::SECURITY_ATTRIBUTES;
     use winapi::um::namedpipeapi::CreateNamedPipeW;
@@ -177,7 +176,7 @@ fn create_permissive_pipe(
         FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
         PIPE_READMODE_BYTE, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT,
     };
-    use winapi::um::winnt::{PSECURITY_DESCRIPTOR, SECURITY_DESCRIPTOR};
+    use winapi::um::winnt::SECURITY_DESCRIPTOR;
 
     let name_wide: Vec<u16> = std::ffi::OsStr::new(name)
         .encode_wide()
