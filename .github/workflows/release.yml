@@ -156,12 +156,6 @@ jobs:
           - arch: arm64
             target: aarch64-unknown-linux-musl
             src_arch: arm64
-          - arch: armhf
-            target: armv7-unknown-linux-musleabihf
-            src_arch: armv7
-          - arch: riscv64
-            target: riscv64gc-unknown-linux-musl
-            src_arch: riscv64
 
     steps:
       - uses: actions/checkout@v4
