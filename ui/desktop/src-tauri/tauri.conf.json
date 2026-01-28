@@ -15,12 +15,16 @@
         "title": "OmniEdge",
         "width": 320,
         "height": 480,
+        "minWidth": 320,
+        "minHeight": 200,
+        "maxWidth": 320,
+        "maxHeight": 700,
         "decorations": false,
         "alwaysOnTop": true,
         "visible": true,
         "skipTaskbar": true,
         "shadow": true,
-        "resizable": true,
+        "resizable": false,
         "transparent": true
       }
     ],

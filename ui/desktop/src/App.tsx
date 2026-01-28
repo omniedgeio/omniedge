@@ -34,19 +34,42 @@ function App() {
   // Resize window to fit content
   const resizeToContent = useCallback(async () => {
     if (appRef.current) {
-      // Adding a small buffer for shadow/padding
-      const height = appRef.current.offsetHeight + 4;
+      const height = appRef.current.scrollHeight;
+      // Clamp height between min and max for usability
+      const minHeight = 200;
+      const maxHeight = 700;
+      const clampedHeight = Math.max(minHeight, Math.min(maxHeight, height + 4));
       const window = getCurrentWindow();
-      // Only set height if it actually changed significantly to avoid flicker
-      await window.setSize(new LogicalSize(320, height));
+      await window.setSize(new LogicalSize(320, clampedHeight));
     }
   }, []);
 
-  // Resize on content changes
+  // Use ResizeObserver for smooth content-based resizing
   useEffect(() => {
+    if (!appRef.current) return;
+    
+    const observer = new ResizeObserver(() => {
+      // Debounce resize calls to avoid flickering
+      resizeToContent();
+    });
+    
+    observer.observe(appRef.current);
+    
+    // Also trigger resize on state changes for immediate feedback
+    const timer = setTimeout(resizeToContent, 10);
+    
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+    };
+  }, [resizeToContent]);
+
+  // Trigger resize on key state changes
+  useEffect(() => {
+    // Small delay to allow DOM to update after state changes
     const timer = setTimeout(resizeToContent, 50);
     return () => clearTimeout(timer);
-  }, [isLoggedIn, networks, expandedNetworks, isLoading, isConnecting, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode, error, networkDevices, status, virtualIP]);
+  }, [isLoggedIn, networks, expandedNetworks, isLoading, isConnecting, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode, error, networkDevices, status, virtualIP, showDebug, showSetup]);
 
   useEffect(() => {
     const init = async () => {

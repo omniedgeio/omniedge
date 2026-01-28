@@ -202,7 +202,6 @@ body {
 .main-content-scroll {
     flex: 1;
     overflow-y: auto;
-    max-height: 480px;
     scrollbar-width: none;
 }
 
