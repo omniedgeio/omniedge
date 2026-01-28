@@ -167,8 +167,8 @@ impl ConnectionManager {
         }
 
         let _ = self.cleanup_adapters();
-        // Give the OS a moment to settle after deletions
-        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+        // Give the OS time to fully release WinTun resources
+        tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
 
         let client = self.api_client.as_ref().context("Not authenticated")?;
         let dev_service = DeviceService::new(client);
@@ -247,34 +247,48 @@ impl ConnectionManager {
             let if_names = ["OmniEdge"];
             let mut setup_success = false;
             let mut last_err = String::new();
+            let max_retries = 3;
 
-            for ifname in if_names {
-                debug!("Attempting TUN setup with interface name: {}", ifname);
-                let mut tun = OmniTun::new_userspace(ifname);
+            for retry in 0..max_retries {
+                if retry > 0 {
+                    info!("TUN setup retry attempt {} of {}", retry + 1, max_retries);
+                    // Run cleanup again before retry
+                    let _ = self.cleanup_adapters();
+                    tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+                }
 
-                match tun
-                    .setup(
-                        &join_resp.virtual_ip,
-                        port,
-                        &::hex::encode(self.identity.private_key_bytes()),
-                    )
-                    .await
-                {
-                    Ok(_) => {
-                        info!("TUN setup completed successfully using name: {}", ifname);
-                        setup_success = true;
-                        tun_instance = Some(tun);
-                        break;
+                for ifname in if_names {
+                    debug!("Attempting TUN setup with interface name: {}", ifname);
+                    let mut tun = OmniTun::new_userspace(ifname);
+
+                    match tun
+                        .setup(
+                            &join_resp.virtual_ip,
+                            port,
+                            &::hex::encode(self.identity.private_key_bytes()),
+                        )
+                        .await
+                    {
+                        Ok(_) => {
+                            info!("TUN setup completed successfully using name: {}", ifname);
+                            setup_success = true;
+                            tun_instance = Some(tun);
+                            break;
+                        }
+                        Err(e) => {
+                            last_err = e.to_string();
+                            warn!("TUN setup failed for name {}: {}", ifname, e);
+                        }
                     }
-                    Err(e) => {
-                        last_err = e.to_string();
-                        warn!("TUN setup failed for name {}: {}", ifname, e);
-                    }
+                }
+
+                if setup_success {
+                    break;
                 }
             }
 
             if !setup_success {
-                let err_msg = format!("Failed to create TUN device. Please ensure you are running OmniEdge as Administrator and no other VPN is conflicting. Error: {}", last_err);
+                let err_msg = format!("Failed to create TUN device after {} attempts. Please ensure you are running OmniEdge as Administrator and no other VPN is conflicting. Error: {}", max_retries, last_err);
                 error!("CRITICAL: {}", err_msg);
                 return Err(anyhow::anyhow!(err_msg));
             }
@@ -818,9 +832,32 @@ impl ConnectionManager {
         #[cfg(target_os = "windows")]
         {
             info!("Cleaning up all OmniEdge network adapters (Windows)...");
-            let ps_cmd = "Get-NetAdapter -IncludeHidden | Where-Object { $_.Name -like 'OmniEdge*' } | ForEach-Object { & netsh interface delete interface name=$_.Name }";
+
+            // Method 1: Try to disable and remove via netsh
+            let ps_cmd = "Get-NetAdapter -IncludeHidden | Where-Object { $_.Name -like 'OmniEdge*' } | ForEach-Object { Disable-NetAdapter -Name $_.Name -Confirm:$false -ErrorAction SilentlyContinue }";
             let _ = std::process::Command::new("powershell")
                 .args(["-Command", ps_cmd])
+                .output();
+
+            // Method 2: Use pnputil to remove WinTun devices
+            // Find and remove OmniEdge WinTun adapter instances
+            let pnp_find = r#"Get-PnpDevice -FriendlyName '*OmniEdge*' -ErrorAction SilentlyContinue | ForEach-Object { pnputil /remove-device $_.InstanceId 2>$null }"#;
+            let _ = std::process::Command::new("powershell")
+                .args(["-Command", pnp_find])
+                .output();
+
+            // Method 3: Reset WinTun driver state by stopping/starting
+            // This can help clear stale ring buffer registrations
+            let reset_cmd = r#"
+                $wintunService = Get-Service -Name 'WinTun' -ErrorAction SilentlyContinue;
+                if ($wintunService) {
+                    Stop-Service -Name 'WinTun' -Force -ErrorAction SilentlyContinue;
+                    Start-Sleep -Milliseconds 500;
+                    Start-Service -Name 'WinTun' -ErrorAction SilentlyContinue;
+                }
+            "#;
+            let _ = std::process::Command::new("powershell")
+                .args(["-Command", reset_cmd])
                 .output();
         }
 
