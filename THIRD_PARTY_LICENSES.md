@@ -1,5 +1,18 @@
-Prebuilt Binaries License
--------------------------
+# Third-Party Licenses
+
+This file contains license information for third-party components included in OmniEdge.
+
+---
+
+## Wintun
+
+**Component**: wintun.dll (Windows TUN driver)
+**Version**: 0.14.1
+**Location**: ui/desktop/src-tauri/resources/wintun.dll
+**Website**: https://www.wintun.net/
+**Copyright**: Copyright (c) WireGuard LLC
+
+### Prebuilt Binaries License
 
 1. DEFINITIONS. "Software" means the precise contents of the "wintun.dll"
    files that are included in the .zip file that contains this document as
@@ -82,3 +95,13 @@ Prebuilt Binaries License
    details, features, specifications, capabilities, functions, licensing
    terms, release dates, APIs, ABIs, general availability, or other
    characteristics of the Software.
+
+---
+
+## Usage Note
+
+OmniEdge uses Wintun via its Permitted API (wintun.h) for Windows TUN adapter
+functionality. The wintun.dll binary is redistributed in accordance with
+section 3(d) of the Wintun license, which permits redistribution "insofar as
+the Software is distributed alongside other software that uses the Software
+only via the Permitted API."
