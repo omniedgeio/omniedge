@@ -34,44 +34,54 @@ function App() {
   // Resize window to fit content
   const resizeToContent = useCallback(async () => {
     if (appRef.current) {
-      // Get the actual content height from the app container
-      const contentHeight = appRef.current.scrollHeight;
+      // Use offsetHeight to get the actual rendered height of content
+      const contentHeight = appRef.current.offsetHeight;
       // Clamp height between min and max for usability
       const minHeight = 200;
       const maxHeight = 700;
       const clampedHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight));
       
-      const window = getCurrentWindow();
-      // Set both the native window size - this automatically syncs the webview
-      await window.setSize(new LogicalSize(320, clampedHeight));
+      const tauriWindow = getCurrentWindow();
+      await tauriWindow.setSize(new LogicalSize(320, clampedHeight));
     }
   }, []);
 
-  // Use ResizeObserver for smooth content-based resizing
+  // Use MutationObserver to detect DOM changes (more reliable than ResizeObserver for content changes)
   useEffect(() => {
     if (!appRef.current) return;
     
     let resizeTimeout: ReturnType<typeof setTimeout>;
-    const observer = new ResizeObserver(() => {
-      // Debounce resize calls to avoid flickering during animations
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(resizeToContent, 16); // ~1 frame at 60fps
-    });
     
-    observer.observe(appRef.current);
+    const triggerResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(resizeToContent, 20);
+    };
+    
+    // ResizeObserver for size changes
+    const resizeObserver = new ResizeObserver(triggerResize);
+    resizeObserver.observe(appRef.current);
+    
+    // MutationObserver for DOM structure changes (expand/collapse adds/removes elements)
+    const mutationObserver = new MutationObserver(triggerResize);
+    mutationObserver.observe(appRef.current, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
     
     // Initial resize
     resizeToContent();
     
     return () => {
-      observer.disconnect();
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
       clearTimeout(resizeTimeout);
     };
   }, [resizeToContent]);
 
-  // Trigger resize on key state changes
+  // Trigger resize on key state changes (backup for state-driven changes)
   useEffect(() => {
-    // Small delay to allow DOM to update after state changes
     const timer = setTimeout(resizeToContent, 50);
     return () => clearTimeout(timer);
   }, [isLoggedIn, networks, expandedNetworks, isLoading, isConnecting, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode, error, networkDevices, status, virtualIP, showDebug, showSetup]);

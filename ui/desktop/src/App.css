@@ -25,11 +25,11 @@
 }
 
 html, body, #root {
-    height: 100%;
     width: 100%;
     margin: 0;
     padding: 0;
     overflow: hidden;
+    /* Don't set height - let content determine size */
 }
 
 body {
@@ -47,8 +47,7 @@ body {
 }
 
 .app {
-    width: 100%;
-    min-height: 100%;
+    width: 320px;
     background: var(--menu-bg-light);
     backdrop-filter: blur(25px) saturate(190%);
     -webkit-backdrop-filter: blur(25px) saturate(190%);
