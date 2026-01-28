@@ -18,26 +18,32 @@ OmniEdge 2.0 is a **complete ground-up rewrite** from Go/n2n to pure Rust, deliv
 
 ### Three-Mode System
 
-The CLI now supports three operational modes:
+The CLI now supports three operational modes via `--mode`:
+
+| Mode | Description | Auth Required | VPN Tunnel | Signaling Server |
+|------|-------------|---------------|------------|------------------|
+| **edge** (default) | Regular VPN client | Yes | Yes | No |
+| **nucleus** | Signaling server only | No | No | Yes |
+| **dual** | VPN client + signaling | Yes | Yes | Yes |
 
 ```bash
 # Edge mode (default) - VPN client
-omniedge join --network <uuid>
+omniedge start -n <network_id>
 
-# Nucleus mode - Run as signaling/relay server
-omniedge nucleus --port 9876
+# Nucleus mode - Standalone signaling server (no VPN, no login required)
+omniedge start --mode nucleus --secret "MySecretMin16Chars"
 
-# Dual mode - Both edge and nucleus
-omniedge dual --network <uuid> --nucleus-port 9876
+# Dual mode - VPN client + nucleus signaling server
+omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 ```
 
 ### New Features
 
 - **Exit Node Support**: Route all traffic through a peer
-  - `--as-exit-node`: Advertise this device as an exit node
-  - `--exit-node <ip>`: Use a specific peer as exit node
+  - `-x` / `--as-exit-node`: Advertise this device as an exit node
+  - `-e` / `--exit-node <ip>`: Use a specific peer as exit node
 - **Security Key Authentication**: Non-interactive login for automation
-  - `omniedge join -s <security-key> --network <uuid>`
+  - `omniedge start -s <security_key> -n <network_id>`
 - **Background Service**: Native service integration
   - Windows: Windows Service
   - Linux: systemd unit file
@@ -77,9 +83,7 @@ omniedge dual --network <uuid> --nucleus-port 9876
 - **Complete Protocol Change**: v2.0 is **not compatible** with v1.x networks
   - All devices in a network must upgrade to v2.0
 - **Configuration Format**: New TOML-based config replaces legacy format
-- **CLI Commands**: New command structure
-  - `omniedge start` → `omniedge join`
-  - `omniedge supernode` → `omniedge nucleus`
+- **Architecture**: Complete rewrite from Go/n2n to Rust/OmniNervous
 - **TUN Interface**: Interface names changed
   - Linux: `omniedge0` (was `edge0`)
   - macOS: `utun*` (unchanged)
@@ -91,7 +95,7 @@ omniedge dual --network <uuid> --nucleus-port 9876
 2. **Uninstall v1.x**: Remove old OmniEdge installation
 3. **Install v2.0**: Download and install new version
 4. **Re-authenticate**: Login with `omniedge login` or use security key
-5. **Join Network**: Use `omniedge join --network <uuid>`
+5. **Join Network**: Use `omniedge start -n <network_id>`
 
 ### Download Packages
 
@@ -147,7 +151,7 @@ omniedge dual --network <uuid> --nucleus-port 9876
 
 #### Quick Install (Linux/macOS)
 ```bash
-curl -fsSL https://omniedge.io/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/scripts/omniedge-install.sh | bash
 ```
 
 #### Package Managers
@@ -166,8 +170,9 @@ chmod +x omniedge-cli-2.0.0-x86_64.AppImage
 #### macOS
 ```bash
 # Download and extract
-tar -xzf omniedge-cli-v2.0.0-macos-aarch64.tar.gz
-sudo mv omniedge /usr/local/bin/
+curl -LO https://github.com/omniedgeio/omniedge/releases/latest/download/omniedge-cli-macos-arm64.tar.gz
+tar -xzf omniedge-cli-macos-arm64.tar.gz
+sudo mv omniedge-cli-macos-arm64 /usr/local/bin/omniedge
 
 # Or use Homebrew (coming soon)
 brew install omniedge
