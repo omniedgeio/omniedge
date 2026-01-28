@@ -20,22 +20,22 @@ jobs:
       matrix:
         include:
           - os: ubuntu-22.04
-            arch: x86_64
+            arch: x64
             target: x86_64-unknown-linux-gnu
             platform: linux
             helper_name: omni-helper-x86_64-unknown-linux-gnu
           - os: macos-latest
-            arch: aarch64
+            arch: arm64
             target: aarch64-apple-darwin
             platform: macos
             helper_name: omni-helper-aarch64-apple-darwin
           - os: macos-15-intel
-            arch: x86_64
+            arch: x64
             target: x86_64-apple-darwin
             platform: macos
             helper_name: omni-helper-x86_64-apple-darwin
           - os: windows-latest
-            arch: x86_64
+            arch: x64
             target: x86_64-pc-windows-msvc
             platform: windows
             helper_name: omni-helper-x86_64-pc-windows-msvc.exe
