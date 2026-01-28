@@ -26,6 +26,8 @@ function App() {
   const [myDeviceID, setMyDeviceID] = useState('');
   const [myAPIIP, setMyAPIIP] = useState('');
   const [showSetup, setShowSetup] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugData, setDebugData] = useState<any>(null);
   const appRef = useRef<HTMLDivElement>(null);
 
   // Resize window to fit content
@@ -129,8 +131,8 @@ function App() {
         if (me && me.virtual_ip) setMyAPIIP(me.virtual_ip);
       }
 
-      const currStatus = await invoke('get_state') as string;
-      if (currStatus.toLowerCase() === 'connected' && networks.length > 0) {
+      const currStatus = (await invoke('get_state') as string).toLowerCase();
+      if (currStatus === 'connected' && networks.length > 0) {
         // Try to match current IP to a network range if not already set
         const active = networks.find(n => vIP && vIP.startsWith(n.ip_range?.split('/')[0].split('.').slice(0, 2).join('.')));
         if (active) {
@@ -138,8 +140,11 @@ function App() {
           setConnectedNetworkID(active.id);
           setActiveNetwork(active.id);
         }
-      } else if (currStatus.toLowerCase() === 'disconnected') {
+      } else if (currStatus === 'disconnected' || currStatus === 'authenticated') {
         setConnectedNetworkID('');
+        if (!isConnecting) {
+          setActiveNetwork(null);
+        }
       }
     } catch (e) { }
   };
@@ -196,6 +201,9 @@ function App() {
     } catch (err: any) {
       console.error(`Connection failed:`, err);
       setError(err.message || err.toString());
+      // On failure, clear active network so the UI doesn't look connected
+      setActiveNetwork(null);
+      setConnectedNetworkID('');
     } finally {
       setIsConnecting(false);
     }
@@ -208,6 +216,8 @@ function App() {
       await invoke('disconnect');
       await refreshConnectionInfo();
       setVirtualIP('');
+      setActiveNetwork(null);
+      setConnectedNetworkID('');
     } catch (err) {
       console.error("Disconnect failed:", err);
     } finally {
@@ -308,11 +318,90 @@ function App() {
     await invoke('quit');
   };
 
+  const fetchDebugInfo = async () => {
+    try {
+      const data = await invoke('get_debug_info');
+      setDebugData(data);
+    } catch (e) {
+      console.error("Failed to fetch debug info", e);
+    }
+  };
+
+  const handleOpenDebug = () => {
+    fetchDebugInfo();
+    setShowDebug(true);
+  };
+
   const getStatusColor = () => {
     if (status === 'connected') return '#34c759';
     if (status === 'connecting') return '#ffcc00';
     return '#8e8e93';
   };
+
+  if (showDebug) {
+    return (
+      <div className="app" ref={appRef}>
+        <div className="app-header">
+          <div className="header-left">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src={logo} className="logo-img" alt="OmniEdge" />
+              <span className="app-name">Debug Info</span>
+            </div>
+          </div>
+          <div className="header-right">
+            <button className="secondary-btn mini" onClick={() => setShowDebug(false)}>Back</button>
+          </div>
+        </div>
+        <div className="main-content-scroll">
+          <div className="main-content-inner debug-view">
+            <div className="debug-section">
+              <div className="label-tiny">HELPER STATUS</div>
+              <div className="debug-card">
+                <div className="debug-line">
+                  <span className="debug-label">Active:</span>
+                  <span className={`debug-value ${debugData?.helper_active ? 'success' : 'error'}`}>
+                    {debugData?.helper_active ? 'YES' : 'NO'}
+                  </span>
+                </div>
+                {debugData?.helper_state && (
+                  <>
+                    <div className="debug-line">
+                      <span className="debug-label">State:</span>
+                      <span className="debug-value">{debugData.helper_state.state}</span>
+                    </div>
+                    <div className="debug-line">
+                      <span className="debug-label">VIP:</span>
+                      <span className="debug-value mono">{debugData.helper_state.virtual_ip || 'None'}</span>
+                    </div>
+                  </>
+                )}
+                {debugData?.helper_message && (
+                  <div className="debug-line-error">
+                    {debugData.helper_message}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="debug-section">
+              <div className="label-tiny">SYSTEM LOGS (LAST 50 LINES)</div>
+              <div className="log-container">
+                <pre className="log-text">
+                  {debugData?.helper_logs || 'No logs available.'}
+                </pre>
+              </div>
+              {debugData?.log_file && <div className="log-file-path truncate">{debugData.log_file}</div>}
+            </div>
+
+            <div className="debug-actions">
+              <button className="primary-login-btn" style={{ width: '100%' }} onClick={fetchDebugInfo}>Refresh</button>
+              <button className="secondary-btn" style={{ width: '100%', marginTop: '8px' }} onClick={() => invoke('open_logs')}>Open Log Folder</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app" ref={appRef}>
@@ -356,8 +445,9 @@ function App() {
           )}
 
           {error && (
-            <div className="error-banner">
+            <div className="error-banner clickable" onClick={handleOpenDebug}>
               <span className="error-text-content">{error}</span>
+              <span className="install-badge">Debug Info</span>
             </div>
           )}
 
@@ -621,6 +711,15 @@ function App() {
             <line x1="9" y1="3" x2="9" y2="21"></line>
           </svg>
           <span>Dashboard</span>
+        </div>
+        <div className="footer-divider"></div>
+        <div className="footer-item" onClick={handleOpenDebug}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <span>Debug</span>
         </div>
         <div className="footer-divider"></div>
         <div className="footer-item quit" onClick={handleQuit}>

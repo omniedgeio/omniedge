@@ -38,4 +38,5 @@ omni-tun = { path = "../../../crates/omni-tun" }
 hex = "0.4"
 log = "0.4"
 flexi_logger = "0.29"
+dotenvy = "0.15"
 

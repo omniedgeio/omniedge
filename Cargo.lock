@@ -1097,6 +1097,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dotenvy"
+version = "0.15.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
+
+[[package]]
 name = "dpi"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3210,6 +3216,7 @@ dependencies = [
  "anyhow",
  "base64 0.21.7",
  "dirs 5.0.1",
+ "dotenvy",
  "futures-util",
  "hex",
  "log",
@@ -3231,6 +3238,7 @@ name = "omni-helper"
 version = "2.0.0"
 dependencies = [
  "anyhow",
+ "dotenvy",
  "flexi_logger 0.27.4",
  "futures-util",
  "hex",
@@ -3274,6 +3282,7 @@ name = "omniedge"
 version = "2.0.0"
 dependencies = [
  "anyhow",
+ "dotenvy",
  "flexi_logger 0.29.8",
  "futures-util",
  "hex",
@@ -3303,6 +3312,7 @@ dependencies = [
  "base64 0.21.7",
  "clap",
  "dirs 5.0.1",
+ "dotenvy",
  "flexi_logger 0.27.4",
  "hex",
  "ipnetwork",

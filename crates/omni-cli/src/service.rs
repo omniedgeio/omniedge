@@ -124,7 +124,7 @@ pub async fn setup_and_start_service(
         }
 
         // Pass base_url as env var to service
-        if base_url != crate::DEFAULT_BASE_URL {
+        if base_url != omni_core::config::DEFAULT_BASE_URL {
             // Note: Standard 'sc' doesn't easily set env vars, but our main.rs will pick it up
             // if we provide it as a flag or if we had a proper installer.
             // For now, let's just log it. The user might need to set it globally.

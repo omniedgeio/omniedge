@@ -20,6 +20,7 @@ omni-proto = { path = "../omni-proto" }
 omni-tun = { path = "../omni-tun" }
 hex = "0.4"
 whoami = "1.5.0"
+dotenvy = "0.15"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7"

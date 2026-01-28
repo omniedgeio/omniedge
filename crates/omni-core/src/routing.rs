@@ -201,14 +201,7 @@ impl RoutingManager {
         // Add route to nucleus via original gateway
         Self::run_command(
             "sudo",
-            &[
-                "route",
-                "-n",
-                "add",
-                "-net",
-                nucleus_host,
-                original_gateway,
-            ],
+            &["route", "-n", "add", "-net", nucleus_host, original_gateway],
         )?;
 
         // Update default gateway

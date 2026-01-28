@@ -9,7 +9,7 @@ async fn test_device_flow_init() {
     let url = server.url();
 
     let mock = server
-        .mock("POST", "/oauth/device/code")
+        .mock("POST", "/api/v2/oauth/device/code")
         .with_status(200)
         .with_header("content-type", "application/json")
         .with_body(
@@ -30,7 +30,7 @@ async fn test_device_flow_init() {
         .create_async()
         .await;
 
-    let client = ApiClient::new(url, None);
+    let client = ApiClient::new(format!("{}/api/v2", url), None);
     let auth_service = AuthService::new(&client);
     let dr = auth_service
         .device_flow_init("client-123", "scope")
@@ -50,7 +50,7 @@ async fn test_list_all_networks() {
     let url = server.url();
 
     let mock = server
-        .mock("GET", "/virtual-networks/all/list")
+        .mock("GET", "/api/v2/virtual-networks/all/list")
         .with_status(200)
         .with_header("content-type", "application/json")
         .with_body(
@@ -71,7 +71,7 @@ async fn test_list_all_networks() {
         .create_async()
         .await;
 
-    let client = ApiClient::new(url, None);
+    let client = ApiClient::new(format!("{}/api/v2", url), None);
     let net_service = NetworkService::new(&client);
     let nets = net_service.list_all().await.unwrap();
 
@@ -87,7 +87,7 @@ async fn test_heartbeat() {
     let url = server.url();
 
     let mock = server
-        .mock("POST", "/devices/heartbeat")
+        .mock("POST", "/api/v2/devices/heartbeat")
         .with_status(200)
         .with_header("content-type", "application/json")
         .with_body(
@@ -105,7 +105,7 @@ async fn test_heartbeat() {
         .create_async()
         .await;
 
-    let client = ApiClient::new(url, None);
+    let client = ApiClient::new(format!("{}/api/v2", url), None);
     let device_service = DeviceService::new(&client);
     let hb = device_service.heartbeat("hw-123").await.unwrap();
 
@@ -121,7 +121,7 @@ async fn test_select_exit_node() {
     let mock = server
         .mock(
             "PUT",
-            "/virtual-networks/vn-1/devices/dev-1/select-exit-node",
+            "/api/v2/virtual-networks/vn-1/devices/dev-1/select-exit-node",
         )
         .with_status(200)
         .with_header("content-type", "application/json")
@@ -129,7 +129,7 @@ async fn test_select_exit_node() {
         .create_async()
         .await;
 
-    let client = ApiClient::new(url, None);
+    let client = ApiClient::new(format!("{}/api/v2", url), None);
     let net_service = NetworkService::new(&client);
     let result = net_service
         .select_exit_node("vn-1", "dev-1", Some("exit-1"))

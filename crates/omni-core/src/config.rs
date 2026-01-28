@@ -98,3 +98,24 @@ impl CliConfig {
         })
     }
 }
+
+pub const DEFAULT_BASE_URL: &str = "https://api.omniedge.io";
+pub const API_VERSION: &str = "/api/v2";
+
+pub fn get_api_base_url() -> String {
+    let url =
+        std::env::var("OMNIEDGE_API_BASE_URL").unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
+
+    let mut base = url.trim_end_matches('/').to_string();
+
+    // Repeatedly trim version suffixes to handle potential duplication in source
+    while base.ends_with("/api/v2") || base.ends_with("/api/v1") {
+        base = base
+            .trim_end_matches("/api/v2")
+            .trim_end_matches("/api/v1")
+            .to_string();
+        base = base.trim_end_matches('/').to_string();
+    }
+
+    format!("{}{}", base, API_VERSION)
+}

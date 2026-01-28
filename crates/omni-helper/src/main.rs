@@ -75,11 +75,13 @@ fn run_service() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn run_helper_server(mut shutdown_rx: tokio::sync::broadcast::Receiver<()>) -> anyhow::Result<()> {
+async fn run_helper_server(
+    mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+) -> anyhow::Result<()> {
     info!("OmniEdge Helper server starting...");
-    let server = Arc::new(HelperServer::new(
-        "https://api.omniedge.io/api/v2".to_string(),
-    ));
+    let base_url = omni_core::config::get_api_base_url();
+    info!("Using API base URL: {}", base_url);
+    let server = Arc::new(HelperServer::new(base_url));
 
     #[cfg(unix)]
     {
@@ -263,6 +265,8 @@ where
 }
 
 fn main() -> anyhow::Result<()> {
+    dotenvy::dotenv().ok();
+
     // Determine log directory. For service, we might want a system-wide path.
     #[cfg(windows)]
     let log_dir = std::env::var("PROGRAMDATA")
@@ -297,7 +301,7 @@ fn main() -> anyhow::Result<()> {
             rt.block_on(async {
                 let (tx, _rx) = tokio::sync::broadcast::channel(1);
                 let tx_stop = tx.clone();
-                
+
                 tokio::spawn(async move {
                     if let Ok(_) = tokio::signal::ctrl_c().await {
                         info!("Received Ctrl+C, shutting down helper...");

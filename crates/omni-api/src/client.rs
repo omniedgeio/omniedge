@@ -1,6 +1,6 @@
 use crate::types::{ErrorResponse, SuccessResponse};
 use anyhow::{anyhow, Result};
-use log::{error, info, warn};
+use log::{debug, error, info};
 use reqwest::{Client as HttpClient, RequestBuilder};
 use serde::de::DeserializeOwned;
 
@@ -15,7 +15,7 @@ impl ApiClient {
     pub fn new(base_url: String, token: Option<String>) -> Self {
         Self {
             client: HttpClient::new(),
-            base_url,
+            base_url: base_url.trim_end_matches('/').to_string(),
             token,
         }
     }
@@ -53,7 +53,10 @@ impl ApiClient {
                 Ok(data) => Ok(data),
                 Err(e) => {
                     let body_str = String::from_utf8_lossy(&body_bytes);
-                    error!("Failed to parse successful response from {}: {}\nBody: {}", url, e, body_str);
+                    error!(
+                        "Failed to parse successful response from {}: {}\nBody: {}",
+                        url, e, body_str
+                    );
                     Err(anyhow!(
                         "Failed to parse response (tried wrapped and unwrapped): {}\nBody: {}",
                         e,
@@ -63,11 +66,14 @@ impl ApiClient {
             }
         } else {
             let body_str = String::from_utf8_lossy(&body_bytes);
-            error!("API Error response from {}: {}\nBody: {}", url, status, body_str);
+            error!(
+                "API Error response from {}: {}\nBody: {}",
+                url, status, body_str
+            );
             let error_err: ErrorResponse =
                 serde_json::from_slice(&body_bytes).unwrap_or_else(|_| ErrorResponse {
                     code: None,
-                    message: None,
+                    message: Some(body_str.to_string()), // Fallback to raw body as message
                     errors: None,
                     error: None,
                     error_description: None,
@@ -84,15 +90,31 @@ impl ApiClient {
         }
     }
 
+    pub fn build_url(&self, path: &str) -> String {
+        format!("{}/{}", self.base_url, path.trim_start_matches('/'))
+    }
+
+    pub fn ws_url(&self, path: &str) -> String {
+        self.build_url(path)
+            .replace("http://", "ws://")
+            .replace("https://", "wss://")
+    }
+
     pub fn post(&self, path: &str) -> RequestBuilder {
-        self.client.post(format!("{}{}", self.base_url, path))
+        let url = self.build_url(path);
+        info!("API POST: {}", url);
+        self.client.post(url)
     }
 
     pub fn get(&self, path: &str) -> RequestBuilder {
-        self.client.get(format!("{}{}", self.base_url, path))
+        let url = self.build_url(path);
+        info!("API GET: {}", url);
+        self.client.get(url)
     }
 
     pub fn put(&self, path: &str) -> RequestBuilder {
-        self.client.put(format!("{}{}", self.base_url, path))
+        let url = self.build_url(path);
+        info!("API PUT: {}", url);
+        self.client.put(url)
     }
 }

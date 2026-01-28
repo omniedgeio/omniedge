@@ -24,7 +24,6 @@ use windows_service::{
 };
 
 pub const SERVICE_NAME: &str = "OmniEdge";
-pub const DEFAULT_BASE_URL: &str = "https://api.omniedge.io/api/v2";
 
 #[derive(Parser, Debug)]
 #[command(
@@ -140,9 +139,10 @@ async fn main() -> Result<()> {
         }
     }
 
+    dotenvy::dotenv().ok();
+
     log::info!("Parsing configuration...");
-    let base_url =
-        std::env::var("OMNIEDGE_BASE_URL").unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
+    let base_url = omni_core::config::get_api_base_url();
     log::info!("Using API base URL: {}", base_url);
 
     let cli = match Cli::try_parse() {
@@ -316,8 +316,8 @@ define_windows_service!(ffi_service_main, win_service_main);
 
 #[cfg(windows)]
 fn win_service_main(_arguments: Vec<std::ffi::OsString>) {
-    let base_url =
-        std::env::var("OMNIEDGE_BASE_URL").unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
+    dotenvy::dotenv().ok();
+    let base_url = omni_core::config::get_api_base_url();
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
         if let Err(e) = service_main_res(&base_url).await {

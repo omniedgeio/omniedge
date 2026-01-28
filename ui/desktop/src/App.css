@@ -778,6 +778,133 @@ body {
     font-weight: 500;
 }
 
+/* Debug View Styles */
+.debug-view {
+    padding: 14px;
+}
+
+.debug-section {
+    margin-bottom: 24px;
+}
+
+.debug-card {
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 12px;
+    padding: 14px;
+    border: 0.5px solid var(--divider);
+}
+
+@media (prefers-color-scheme: dark) {
+    .debug-card {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}
+
+.debug-line {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+
+.debug-line:last-child {
+    margin-bottom: 0;
+}
+
+.debug-label {
+    opacity: 0.5;
+    font-weight: 500;
+}
+
+.debug-value {
+    font-weight: 600;
+}
+
+.debug-value.success {
+    color: var(--status-green);
+}
+
+.debug-value.error {
+    color: var(--status-red);
+}
+
+.debug-line-error {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 0.5px solid var(--divider);
+    color: var(--status-red);
+    font-size: 11px;
+    font-family: "SF Mono", monospace;
+    line-height: 1.4;
+}
+
+.log-container {
+    background: #1e1e1e;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.log-text {
+    font-family: "SF Mono", "Menlo", monospace;
+    font-size: 10px;
+    color: #d4d4d4;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.5;
+}
+
+.log-file-path {
+    font-size: 9px;
+    opacity: 0.3;
+    margin-top: 6px;
+    font-family: "SF Mono", monospace;
+    text-align: right;
+}
+
+.debug-actions {
+    margin-top: 24px;
+    border-top: 0.5px solid var(--divider);
+    padding-top: 20px;
+}
+
+.secondary-btn.mini {
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 6px;
+}
+
+.secondary-btn {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-primary);
+    border: none;
+    padding: 10px 18px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+@media (prefers-color-scheme: dark) {
+    .secondary-btn {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary-dark);
+    }
+}
+
+.secondary-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    .secondary-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+    }
+}
+
 .truncate {
     overflow: hidden;
     text-overflow: ellipsis;

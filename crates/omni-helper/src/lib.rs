@@ -1,7 +1,8 @@
-use omni_core::ConnectionManager;
+use omni_core::{state::ConnectionState, ConnectionManager};
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HelperRequest {
@@ -31,13 +32,25 @@ pub struct HelperResponse {
 
 pub struct HelperServer {
     manager: Arc<Mutex<ConnectionManager>>,
+    state: Arc<RwLock<ConnectionState>>,
+    network_id: Arc<RwLock<Option<String>>>,
+    virtual_ip: Arc<RwLock<Option<String>>>,
+    as_exit_node: Arc<AtomicBool>,
 }
 
 impl HelperServer {
     pub fn new(base_url: String) -> Self {
         let manager = ConnectionManager::new(base_url, None);
+        let state = manager.get_state_handle();
+        let network_id = manager.get_network_id_handle();
+        let virtual_ip = manager.get_virtual_ip_handle();
+        let as_exit_node = manager.get_as_exit_node_handle();
         Self {
             manager: Arc::new(Mutex::new(manager)),
+            state,
+            network_id,
+            virtual_ip,
+            as_exit_node,
         }
     }
 
@@ -49,11 +62,19 @@ impl HelperServer {
                 data: None,
             },
             "status" => {
-                let state = self.manager.lock().await.get_state().await;
+                let state = self.state.read().await.clone();
+                let network_id = self.network_id.read().await.clone();
+                let virtual_ip = self.virtual_ip.read().await.clone();
+                // We could still lock for virtual_ip fallback if needed, but usually it's in the handle
+
                 HelperResponse {
                     success: true,
                     message: format!("{:?}", state),
-                    data: Some(serde_json::to_value(state).unwrap()),
+                    data: Some(serde_json::json!({
+                        "state": state,
+                        "network_id": network_id,
+                        "virtual_ip": virtual_ip,
+                    })),
                 }
             }
             "start_vpn" => {
@@ -109,20 +130,17 @@ impl HelperServer {
                     },
                 }
             }
-            "is_exit_node" => {
-                let manager = self.manager.lock().await;
-                HelperResponse {
-                    success: true,
-                    message: "Current exit node status".to_string(),
-                    data: Some(serde_json::to_value(manager.is_exit_node()).unwrap()),
-                }
-            }
+            "is_exit_node" => HelperResponse {
+                success: true,
+                message: "Current exit node status".to_string(),
+                data: Some(serde_json::to_value(self.as_exit_node.load(Ordering::SeqCst)).unwrap()),
+            },
             "get_virtual_ip" => {
-                let manager = self.manager.lock().await;
+                let vip = self.virtual_ip.read().await.clone().unwrap_or_default();
                 HelperResponse {
                     success: true,
                     message: "Current virtual IP".to_string(),
-                    data: Some(serde_json::to_value(manager.get_virtual_ip().await).unwrap()),
+                    data: Some(serde_json::to_value(vip).unwrap()),
                 }
             }
             "stop_vpn" => {

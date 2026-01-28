@@ -23,8 +23,8 @@ pub struct ConnectionManager {
     exit_node_ip: Option<String>,
     cluster_secret: Option<String>,
     device_id: Option<String>,
-    current_network_id: Option<String>,
-    virtual_ip: Option<String>,
+    current_network_id: Arc<RwLock<Option<String>>>,
+    virtual_ip: Arc<RwLock<Option<String>>>,
     heartbeat_tx: Option<mpsc::Sender<()>>,
     shutdown_tx: Option<broadcast::Sender<()>>,
 }
@@ -51,8 +51,8 @@ impl ConnectionManager {
             exit_node_ip: None,
             cluster_secret: None,
             device_id: None,
-            current_network_id: None,
-            virtual_ip: None,
+            current_network_id: Arc::new(RwLock::new(None)),
+            virtual_ip: Arc::new(RwLock::new(None)),
             heartbeat_tx: None,
             shutdown_tx: None,
         }
@@ -60,6 +60,35 @@ impl ConnectionManager {
 
     pub async fn get_state(&self) -> ConnectionState {
         self.state.read().await.clone()
+    }
+
+    pub fn get_state_handle(&self) -> Arc<RwLock<ConnectionState>> {
+        self.state.clone()
+    }
+
+    pub fn get_network_id_handle(&self) -> Arc<RwLock<Option<String>>> {
+        self.current_network_id.clone()
+    }
+
+    pub fn get_virtual_ip_handle(&self) -> Arc<RwLock<Option<String>>> {
+        self.virtual_ip.clone()
+    }
+
+    pub fn get_as_exit_node_handle(&self) -> Arc<AtomicBool> {
+        self.as_exit_node.clone()
+    }
+
+    pub async fn sync_state(
+        &mut self,
+        state: ConnectionState,
+        network_id: Option<String>,
+        virtual_ip: Option<String>,
+    ) {
+        self.set_state(state).await;
+        let mut nid = self.current_network_id.write().await;
+        *nid = network_id;
+        let mut vip = self.virtual_ip.write().await;
+        *vip = virtual_ip;
     }
 
     async fn set_state(&self, new_state: ConnectionState) {
@@ -109,7 +138,14 @@ impl ConnectionManager {
         let client = ApiClient::new(self.base_url.clone(), Some(token));
         self.api_client = Some(client);
 
-        self.perform_join(network_id, device_id, hardware_id).await
+        match self.perform_join(network_id, device_id, hardware_id).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                // If join fails, reset state back to Authenticated so we can try again
+                self.set_state(ConnectionState::Authenticated).await;
+                Err(e)
+            }
+        }
     }
 
     pub async fn perform_join(
@@ -118,9 +154,17 @@ impl ConnectionManager {
         device_id: &str,
         hardware_id: &str,
     ) -> Result<()> {
+        info!(
+            "Starting perform_join for network: {}, device_id: {}, hardware_id: {}",
+            network_id, device_id, hardware_id
+        );
+        info!("Using API base URL: {}", self.base_url);
         self.set_state(ConnectionState::Joining).await;
         self.device_id = Some(device_id.to_string());
-        self.current_network_id = Some(network_id.to_string());
+        {
+            let mut nid = self.current_network_id.write().await;
+            *nid = Some(network_id.to_string());
+        }
 
         let _ = self.cleanup_adapters();
         // Give the OS a moment to settle after deletions
@@ -133,7 +177,10 @@ impl ConnectionManager {
         // 0. Register/Update Device
         let os = std::env::consts::OS;
         let hostname = ::whoami::hostname();
-        info!("Registering device: {} (OS: {})", hostname, os);
+        info!(
+            "Registering/Updating device: {} (OS: {}, hardware_id: {})",
+            hostname, os, hardware_id
+        );
         let device_resp = dev_service.register(&hostname, hardware_id, os).await;
 
         let effective_device_id = if let Ok(ref resp) = device_resp {
@@ -150,19 +197,24 @@ impl ConnectionManager {
 
         // 1. Join Network
         info!(
-            "Joining virtual network: {} as device: {}",
+            "Attempting to join virtual network: {} as effective_device_id: {}",
             network_id, effective_device_id
         );
-        let join_resp = net_service
-            .join(network_id, effective_device_id)
-            .await
-            .map_err(|e| {
+        let join_resp = match net_service.join(network_id, effective_device_id).await {
+            Ok(resp) => resp,
+            Err(e) => {
                 let err_msg = format!("Join failed for network {}: {}", network_id, e);
                 error!("{}", err_msg);
-                anyhow::anyhow!(err_msg)
-            })?;
+                self.set_state(ConnectionState::Authenticated).await;
+                return Err(anyhow::anyhow!(err_msg));
+            }
+        };
 
-        debug!("Join response: {:?}", join_resp);
+        info!(
+            "Join successful. Received VIP: {}, Cluster: {}",
+            join_resp.virtual_ip, join_resp.cluster
+        );
+        debug!("Full Join response: {:?}", join_resp);
 
         self.set_state(ConnectionState::Connecting).await;
 
@@ -246,7 +298,10 @@ impl ConnectionManager {
 
         self.proto = Some(proto.clone());
         self.tun = Some(tun.clone());
-        self.virtual_ip = Some(join_resp.virtual_ip.clone());
+        {
+            let mut vip = self.virtual_ip.write().await;
+            *vip = Some(join_resp.virtual_ip.clone());
+        }
 
         // 4. Start Background Loops
         info!("Starting background loops...");
@@ -268,8 +323,7 @@ impl ConnectionManager {
         if let Some(ref exit_ip) = self.exit_node_ip {
             info!("Configuring system to use exit node: {}", exit_ip);
             let nucleus_host = &join_resp.server.host;
-            if let Err(e) = crate::routing::RoutingManager::setup_exit_node(exit_ip, nucleus_host)
-            {
+            if let Err(e) = crate::routing::RoutingManager::setup_exit_node(exit_ip, nucleus_host) {
                 error!("Failed to setup exit node routing: {}", e);
             }
         }
@@ -480,19 +534,10 @@ impl ConnectionManager {
         use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
         let ws_url = if base_url.contains("localhost") || base_url.contains("127.0.0.1") {
-            format!(
-                "ws://127.0.0.1:8080/api/v2/auth/login/session/{}",
-                session_id
-            )
+            format!("ws://127.0.0.1:8080/auth/login/session/{}", session_id)
         } else {
-            let ws_base = "https://api.omniedge.io";
-            let mut url = ws_base.replace("https://", "wss://");
-            if !url.ends_with('/') {
-                url.push('/');
-            }
-            url.push_str("auth/login/session/");
-            url.push_str(session_id);
-            url
+            let client = ApiClient::new(base_url.to_string(), None);
+            client.ws_url(&format!("/auth/login/session/{}", session_id))
         };
 
         info!(
@@ -676,11 +721,10 @@ impl ConnectionManager {
         }
 
         // Sync with backend if connected
-        if let (Some(client), Some(net_id), Some(dev_id)) = (
-            &self.api_client,
-            &self.current_network_id,
-            &self.device_id,
-        ) {
+        let current_net_id = self.current_network_id.read().await.clone();
+        if let (Some(client), Some(net_id), Some(dev_id)) =
+            (&self.api_client, &current_net_id, &self.device_id)
+        {
             let net_service = NetworkService::new(client);
             if let Err(e) = net_service.update_device(net_id, dev_id, enabled).await {
                 error!("Failed to sync exit node status to backend: {}", e);
@@ -704,7 +748,7 @@ impl ConnectionManager {
     }
 
     pub async fn get_connected_network_id(&self) -> Option<String> {
-        self.current_network_id.clone()
+        self.current_network_id.read().await.clone()
     }
 
     pub async fn get_devices(&self) -> Result<Vec<DeviceResponse>> {
@@ -715,7 +759,7 @@ impl ConnectionManager {
 
     pub async fn get_virtual_ip(&self) -> String {
         // First priority: active session IP
-        if let Some(ref ip) = self.virtual_ip {
+        if let Some(ref ip) = *self.virtual_ip.read().await {
             return ip.clone();
         }
 
@@ -746,6 +790,15 @@ impl ConnectionManager {
 
         self.proto = None;
         self.tun = None;
+
+        {
+            let mut nid = self.current_network_id.write().await;
+            *nid = None;
+        }
+        {
+            let mut vip = self.virtual_ip.write().await;
+            *vip = None;
+        }
 
         let _ = self.cleanup_adapters();
 

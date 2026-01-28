@@ -15,7 +15,7 @@ impl<'a> NetworkService<'a> {
     }
 
     pub async fn list_all(&self) -> Result<Vec<VirtualNetworkResponse>> {
-        let builder = self.client.get("/api/v2/virtual-networks/all/list");
+        let builder = self.client.get("/virtual-networks/all/list");
         match self
             .client
             .send::<crate::types::ListWrapper<Vec<VirtualNetworkResponse>>>(builder)
@@ -24,8 +24,12 @@ impl<'a> NetworkService<'a> {
             Ok(wrapper) => Ok(wrapper.data),
             Err(e) => {
                 // Fallback for cases where it might return a direct array or SuccessResponse<Vec>
-                let builder = self.client.get("/api/v2/virtual-networks/all/list");
-                match self.client.send::<Vec<VirtualNetworkResponse>>(builder).await {
+                let builder = self.client.get("/virtual-networks/all/list");
+                match self
+                    .client
+                    .send::<Vec<VirtualNetworkResponse>>(builder)
+                    .await
+                {
                     Ok(nets) => Ok(nets),
                     Err(_) => Err(e), // Return original error if both fail
                 }
@@ -38,16 +42,14 @@ impl<'a> NetworkService<'a> {
         network_id: &str,
         device_id: &str,
     ) -> Result<JoinVirtualNetworkResponse> {
-        let path = format!(
-            "/api/v2/virtual-networks/{}/devices/{}",
-            network_id, device_id
-        );
+        let path = format!("/virtual-networks/{}/devices/{}", network_id, device_id);
+        log::info!("API Join Request: {}", path);
         let builder = self.client.post(&path);
         self.client.send(builder).await
     }
 
     pub async fn get_devices(&self, network_id: &str) -> Result<Vec<VirtualNetworkDeviceResponse>> {
-        let path = format!("/api/v2/virtual-networks/{}/devices", network_id);
+        let path = format!("/virtual-networks/{}/devices", network_id);
         let builder = self.client.get(&path);
         match self
             .client
@@ -72,10 +74,7 @@ impl<'a> NetworkService<'a> {
         device_id: &str,
         is_exit_node: bool,
     ) -> Result<()> {
-        let path = format!(
-            "/api/v2/virtual-networks/{}/devices/{}",
-            network_id, device_id
-        );
+        let path = format!("/virtual-networks/{}/devices/{}", network_id, device_id);
         let builder = self.client.put(&path).json(&json!({
             "is_exit_node": is_exit_node,
         }));
@@ -90,7 +89,7 @@ impl<'a> NetworkService<'a> {
         exit_node_id: Option<&str>,
     ) -> Result<()> {
         let path = format!(
-            "/api/v2/virtual-networks/{}/devices/{}/select-exit-node",
+            "/virtual-networks/{}/devices/{}/select-exit-node",
             network_id, device_id
         );
         let builder = self.client.put(&path).json(&json!({
@@ -109,7 +108,7 @@ impl<'a> NetworkService<'a> {
         mask: &str,
         scans: &[ScanResult],
     ) -> Result<()> {
-        let path = format!("/api/v2/devices/{}/subnets", device_id);
+        let path = format!("/devices/{}/subnets", device_id);
         let builder = self.client.post(&path).json(&json!({
             "ip": ip,
             "mac_addr": mac,

@@ -1,4 +1,4 @@
-use log::info;
+use log::{error, info};
 use omni_api::types::{
     AuthResp, DeviceCodeResp, DeviceResponse, ProfileResponse, SessionResponse,
     VirtualNetworkDeviceResponse, VirtualNetworkResponse,
@@ -9,7 +9,7 @@ use tauri::{
     image::Image,
     menu::{Menu, MenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, Runtime,
+    Emitter, Manager, Runtime,
 };
 use tokio::sync::Mutex;
 
@@ -59,9 +59,12 @@ async fn call_helper(req: &HelperRequest) -> Result<HelperResponse, String> {
         }
     };
 
-    match timeout(Duration::from_secs(3), call_future).await {
+    match timeout(Duration::from_secs(10), call_future).await {
         Ok(res) => res,
-        Err(_) => Err("Helper request timed out".to_string()),
+        Err(_) => {
+            error!("Helper request timed out for command: {}", req.command);
+            Err("Helper request timed out".to_string())
+        }
     }
 }
 
@@ -542,8 +545,34 @@ async fn get_state(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<ConnectionState, String> {
-    let manager = state.manager.lock().await;
-    let curr_state = manager.get_state().await;
+    let req = HelperRequest {
+        command: "status".to_string(),
+        args: serde_json::json!({}),
+    };
+
+    let curr_state = match call_helper(&req).await {
+        Ok(resp) => {
+            if resp.success {
+                if let Some(data) = resp.data {
+                    if let Ok(st) = serde_json::from_value::<ConnectionState>(data["state"].clone())
+                    {
+                        st
+                    } else {
+                        ConnectionState::Disconnected
+                    }
+                } else {
+                    ConnectionState::Disconnected
+                }
+            } else {
+                ConnectionState::Disconnected
+            }
+        }
+        Err(_) => {
+            let manager = state.manager.lock().await;
+            manager.get_state().await
+        }
+    };
+
     update_tray_icon(&app, curr_state.clone());
     Ok(curr_state)
 }
@@ -617,17 +646,87 @@ async fn is_exit_node(state: tauri::State<'_, AppState>) -> Result<bool, String>
     }
 }
 
+#[tauri::command]
+async fn get_debug_info(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let mut info = serde_json::Map::new();
+
+    // 1. Helper Status
+    let req = HelperRequest {
+        command: "status".to_string(),
+        args: serde_json::json!({}),
+    };
+
+    if let Ok(resp) = call_helper(&req).await {
+        info.insert("helper_active".to_string(), serde_json::json!(true));
+        if let Some(data) = resp.data {
+            info.insert("helper_state".to_string(), data);
+        } else {
+            info.insert(
+                "helper_message".to_string(),
+                serde_json::json!(resp.message),
+            );
+        }
+    } else {
+        info.insert("helper_active".to_string(), serde_json::json!(false));
+    }
+
+    // 2. Local State
+    let manager = state.manager.lock().await;
+    let local_state = manager.get_state().await;
+    info.insert("local_state".to_string(), serde_json::json!(local_state));
+
+    // 3. Logs
+    #[cfg(windows)]
+    let log_dir = std::env::var("PROGRAMDATA")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir())
+        .join("OmniEdge")
+        .join("logs");
+    #[cfg(not(windows))]
+    let log_dir = std::path::PathBuf::from("/var/log/omniedge");
+
+    if let Ok(entries) = std::fs::read_dir(&log_dir) {
+        let mut log_files: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map_or(false, |ext| ext == "log"))
+            .collect();
+
+        log_files.sort_by_key(|e| e.metadata().and_then(|m| m.modified()).ok());
+
+        if let Some(latest) = log_files.last() {
+            if let Ok(content) = std::fs::read_to_string(latest.path()) {
+                let lines: Vec<&str> = content.lines().rev().take(50).collect();
+                let mut reversed = lines;
+                reversed.reverse();
+                info.insert(
+                    "helper_logs".to_string(),
+                    serde_json::json!(reversed.join("\n")),
+                );
+                info.insert(
+                    "log_file".to_string(),
+                    serde_json::json!(latest.path().display().to_string()),
+                );
+            }
+        }
+    }
+
+    Ok(serde_json::Value::Object(info))
+}
+
 async fn build_tray_menu<R: Runtime>(
     app: &tauri::AppHandle<R>,
     manager: &ConnectionManager,
 ) -> Result<Menu<R>, String> {
     let menu = Menu::new(app).map_err(|e| e.to_string())?;
 
-    let show_i = MenuItem::with_id(app, "show", "Show OmniEdge", true, None::<&str>).map_err(|e| e.to_string())?;
-    let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>).map_err(|e| e.to_string())?;
+    let show_i = MenuItem::with_id(app, "show", "Show OmniEdge", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let quit_i =
+        MenuItem::with_id(app, "quit", "Quit", true, None::<&str>).map_err(|e| e.to_string())?;
 
     // 1. App Name / Version Header
-    let header_name = MenuItem::with_id(app, "header", "OmniEdge", false, None::<&str>).map_err(|e| e.to_string())?;
+    let header_name = MenuItem::with_id(app, "header", "OmniEdge", false, None::<&str>)
+        .map_err(|e| e.to_string())?;
     menu.append(&header_name).map_err(|e| e.to_string())?;
 
     // 2. Auth Status
@@ -636,16 +735,20 @@ async fn build_tray_menu<R: Runtime>(
     } else {
         "Logged In"
     };
-    let auth_i = MenuItem::with_id(app, "auth", auth_status, true, None::<&str>).map_err(|e| e.to_string())?;
+    let auth_i = MenuItem::with_id(app, "auth", auth_status, true, None::<&str>)
+        .map_err(|e| e.to_string())?;
     menu.append(&auth_i).map_err(|e| e.to_string())?;
 
-    menu.append(&tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    menu.append(&tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
 
     // 3. Virtual Networks as Submenus
     if let Ok(networks) = manager.get_networks().await {
         if networks.is_empty() {
-             let no_net = MenuItem::with_id(app, "no_net", "No Virtual Networks", false, None::<&str>).map_err(|e| e.to_string())?;
-             menu.append(&no_net).map_err(|e| e.to_string())?;
+            let no_net =
+                MenuItem::with_id(app, "no_net", "No Virtual Networks", false, None::<&str>)
+                    .map_err(|e| e.to_string())?;
+            menu.append(&no_net).map_err(|e| e.to_string())?;
         }
 
         let connected_id = manager.get_connected_network_id().await;
@@ -658,7 +761,8 @@ async fn build_tray_menu<R: Runtime>(
                 net.name.clone()
             };
 
-            let net_submenu = Submenu::with_id(app, format!("net:{}", net.id), net_title, true).map_err(|e| e.to_string())?;
+            let net_submenu = Submenu::with_id(app, format!("net:{}", net.id), net_title, true)
+                .map_err(|e| e.to_string())?;
 
             // Submenu Item: Toggle Connection
             let toggle_id = if is_connected {
@@ -666,27 +770,47 @@ async fn build_tray_menu<R: Runtime>(
             } else {
                 format!("connect:{}", net.id)
             };
-            let toggle_text = if is_connected { "Disconnect" } else { "Connect" };
-            let toggle_i = MenuItem::with_id(app, toggle_id, toggle_text, true, None::<&str>).map_err(|e| e.to_string())?;
+            let toggle_text = if is_connected {
+                "Disconnect"
+            } else {
+                "Connect"
+            };
+            let toggle_i = MenuItem::with_id(app, toggle_id, toggle_text, true, None::<&str>)
+                .map_err(|e| e.to_string())?;
             net_submenu.append(&toggle_i).map_err(|e| e.to_string())?;
 
-            net_submenu.append(&tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+            net_submenu
+                .append(
+                    &tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?,
+                )
+                .map_err(|e| e.to_string())?;
 
             // Submenu Items: Devices
             if let Ok(devices) = manager.get_network_devices(&net.id).await {
                 if devices.is_empty() {
-                     let no_dev = MenuItem::with_id(app, "no_dev", "No other devices", false, None::<&str>).map_err(|e| e.to_string())?;
-                     net_submenu.append(&no_dev).map_err(|e| e.to_string())?;
+                    let no_dev =
+                        MenuItem::with_id(app, "no_dev", "No other devices", false, None::<&str>)
+                            .map_err(|e| e.to_string())?;
+                    net_submenu.append(&no_dev).map_err(|e| e.to_string())?;
                 } else {
                     for dev in devices {
                         let status_dot = if dev.online { "● " } else { "○ " };
                         let dev_text = format!("{}{}", status_dot, dev.name);
-                        let dev_i = MenuItem::with_id(app, format!("dev:{}", dev.id), dev_text, false, None::<&str>).map_err(|e| e.to_string())?;
+                        let dev_i = MenuItem::with_id(
+                            app,
+                            format!("dev:{}", dev.id),
+                            dev_text,
+                            false,
+                            None::<&str>,
+                        )
+                        .map_err(|e| e.to_string())?;
                         net_submenu.append(&dev_i).map_err(|e| e.to_string())?;
                     }
                 }
             } else {
-                let loading = MenuItem::with_id(app, "loading", "Loading devices...", false, None::<&str>).map_err(|e| e.to_string())?;
+                let loading =
+                    MenuItem::with_id(app, "loading", "Loading devices...", false, None::<&str>)
+                        .map_err(|e| e.to_string())?;
                 net_submenu.append(&loading).map_err(|e| e.to_string())?;
             }
 
@@ -694,10 +818,12 @@ async fn build_tray_menu<R: Runtime>(
         }
     }
 
-    menu.append(&tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    menu.append(&tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
 
     // 4. Standard Footer
-    menu.append_items(&[&show_i, &quit_i]).map_err(|e| e.to_string())?;
+    menu.append_items(&[&show_i, &quit_i])
+        .map_err(|e| e.to_string())?;
 
     Ok(menu)
 }
@@ -716,6 +842,7 @@ fn update_tray_icon<R: Runtime>(app: &tauri::AppHandle<R>, state: ConnectionStat
             }
         }
 
+        /*
         // Trigger menu refresh on state change
         let handle = app.clone();
         tauri::async_runtime::spawn(async move {
@@ -725,39 +852,57 @@ fn update_tray_icon<R: Runtime>(app: &tauri::AppHandle<R>, state: ConnectionStat
                 let _ = tray.set_menu(Some(menu));
             }
         });
+        */
     }
 }
 
 #[tauri::command]
 async fn open_logs(_app: tauri::AppHandle) -> Result<(), String> {
-    let log_dir = CliConfig::config_path()
+    let local_log_dir = CliConfig::config_path()
         .map_err(|e| e.to_string())?
         .parent()
         .ok_or("Invalid config path")?
         .join("logs");
 
-    let _ = std::fs::create_dir_all(&log_dir);
+    let _ = std::fs::create_dir_all(&local_log_dir);
+
+    #[cfg(target_os = "windows")]
+    let helper_log_dir = std::env::var("PROGRAMDATA")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir())
+        .join("OmniEdge")
+        .join("logs");
+    #[cfg(not(target_os = "windows"))]
+    let helper_log_dir = std::path::PathBuf::from("/var/log/omniedge");
+
+    let _ = std::fs::create_dir_all(&helper_log_dir);
 
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(log_dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        let _ = std::process::Command::new("explorer")
+            .arg(local_log_dir)
+            .spawn();
+        let _ = std::process::Command::new("explorer")
+            .arg(helper_log_dir)
+            .spawn();
     }
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("open")
-            .arg(log_dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        let _ = std::process::Command::new("open")
+            .arg(local_log_dir)
+            .spawn();
+        let _ = std::process::Command::new("open")
+            .arg(helper_log_dir)
+            .spawn();
     }
     #[cfg(target_os = "linux")]
     {
-        std::process::Command::new("xdg-open")
-            .arg(log_dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        let _ = std::process::Command::new("xdg-open")
+            .arg(local_log_dir)
+            .spawn();
+        let _ = std::process::Command::new("xdg-open")
+            .arg(helper_log_dir)
+            .spawn();
     }
     Ok(())
 }
@@ -768,25 +913,18 @@ fn toggle_window<R: Runtime>(app: &tauri::AppHandle<R>) {
         if is_visible {
             window.hide().unwrap();
         } else {
-            // Position near tray if possible
-            #[cfg(target_os = "windows")]
-            {
-                if let Ok(monitor) = window.current_monitor() {
-                    if let Some(monitor) = monitor {
-                        let size = window
-                            .inner_size()
-                            .unwrap_or(tauri::PhysicalSize::new(320, 480));
-                        let monitor_size = monitor.size();
-                        let monitor_pos = monitor.position();
+            // Position in center of screen
+            if let Ok(Some(monitor)) = window.current_monitor() {
+                let size = window
+                    .inner_size()
+                    .unwrap_or(tauri::PhysicalSize::new(320, 480));
+                let monitor_size = monitor.size();
+                let monitor_pos = monitor.position();
 
-                        // Default to bottom right (typical for Windows tray)
-                        let x = monitor_pos.x + monitor_size.width as i32 - size.width as i32 - 10;
-                        let y =
-                            monitor_pos.y + monitor_size.height as i32 - size.height as i32 - 50; // Above taskbar
+                let x = monitor_pos.x + (monitor_size.width as i32 - size.width as i32) / 2;
+                let y = monitor_pos.y + (monitor_size.height as i32 - size.height as i32) / 2;
 
-                        let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
-                    }
-                }
+                let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
             }
 
             window.show().unwrap();
@@ -797,7 +935,8 @@ fn toggle_window<R: Runtime>(app: &tauri::AppHandle<R>) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let base_url = "https://api.omniedge.io".to_string();
+    dotenvy::dotenv().ok();
+    let base_url = omni_core::config::get_api_base_url();
     // Initialize logging
     let log_dir = CliConfig::config_path()
         .unwrap()
@@ -840,8 +979,18 @@ pub fn run() {
                 app.set_menu(app_menu)?;
             }
 
+            let tray_menu = Menu::new(app)?;
+            let show_i = MenuItem::with_id(app, "show", "Show OmniEdge", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            tray_menu.append_items(&[
+                &show_i,
+                &tauri::menu::PredefinedMenuItem::separator(app)?,
+                &quit_i,
+            ])?;
+
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
+                .menu(&tray_menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| {
                     let id = event.id.as_ref();
@@ -862,7 +1011,8 @@ pub fn run() {
                         let handle = app.clone();
                         tauri::async_runtime::spawn(async move {
                             let state = handle.state::<AppState>();
-                            let _ = connect(handle.clone(), state, network_id, None, None, None).await;
+                            let _ =
+                                connect(handle.clone(), state, network_id, None, None, None).await;
                         });
                     } else if id.starts_with("disconnect:") {
                         let handle = app.clone();
@@ -885,18 +1035,85 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Initial menu population
-            let handle = app.handle().clone();
+            // 1. Initial menu population
+            let handle_init = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                let state = handle.state::<AppState>();
+                let _state = handle_init.state::<AppState>();
+                /*
                 let manager = state.manager.lock().await;
-                if let Ok(menu) = build_tray_menu(&handle, &manager).await {
-                    if let Some(tray) = handle.tray_by_id("main") {
+                if let Ok(menu) = build_tray_menu(&handle_init, &manager).await {
+                    if let Some(tray) = handle_init.tray_by_id("main") {
                         let _ = tray.set_menu(Some(menu));
+                    }
+                }
+                */
+            });
+
+            // 2. Background Polling for Helper State Sync
+            let handle_poll = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+                let mut last_state = ConnectionState::Disconnected;
+                let mut last_net_id: Option<String> = None;
+
+                loop {
+                    interval.tick().await;
+                    let req = HelperRequest {
+                        command: "status".to_string(),
+                        args: serde_json::json!({}),
+                    };
+
+                    if let Ok(resp) = call_helper(&req).await {
+                        if resp.success {
+                            if let Some(data) = resp.data {
+                                #[derive(serde::Deserialize)]
+                                struct HelperStatusData {
+                                    state: ConnectionState,
+                                    network_id: Option<String>,
+                                    virtual_ip: Option<String>,
+                                }
+
+                                if let Ok(status) = serde_json::from_value::<HelperStatusData>(data)
+                                {
+                                    if status.state != last_state
+                                        || status.network_id != last_net_id
+                                    {
+                                        info!("Helper state/network change detected. Syncing...");
+
+                                        // Sync local manager state
+                                        let app_state = handle_poll.state::<AppState>();
+                                        let mut manager = app_state.manager.lock().await;
+                                        manager
+                                            .sync_state(
+                                                status.state.clone(),
+                                                status.network_id.clone(),
+                                                status.virtual_ip.clone(),
+                                            )
+                                            .await;
+
+                                        update_tray_icon(&handle_poll, status.state.clone());
+
+                                        // Notify frontend of state change
+                                        let _ = handle_poll.emit(
+                                            "connection-state-changed",
+                                            serde_json::json!({
+                                                "state": status.state,
+                                                "network_id": status.network_id,
+                                                "virtual_ip": status.virtual_ip,
+                                            }),
+                                        );
+
+                                        last_state = status.state;
+                                        last_net_id = status.network_id;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             });
 
+            /*
             if let Some(window) = app.get_webview_window("main") {
                 let w = window.clone();
                 window.on_window_event(move |event| {
@@ -907,6 +1124,7 @@ pub fn run() {
                     }
                 });
             }
+            */
 
             Ok(())
         })
@@ -934,6 +1152,7 @@ pub fn run() {
             check_is_admin,
             check_helper,
             install_helper,
+            get_debug_info,
             quit
         ])
         .run(tauri::generate_context!())
