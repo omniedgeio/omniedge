@@ -122,7 +122,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: omniedge-cli-${{ matrix.platform }}-${{ matrix.arch }}
+          name: omniedge-cli-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             omniedge-cli-*.zip
             omniedge-cli-*.tar.gz
@@ -160,17 +160,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: omniedge-cli-linux-${{ matrix.src_arch }}
-
       - name: Get version
         id: version
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"  # Remove 'v' prefix
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-${{ matrix.src_arch }}
 
       - name: Extract binary
         run: |
@@ -262,7 +262,7 @@ jobs:
       - name: Upload DEB Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: omniedge-cli-deb-${{ matrix.arch }}
+          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}-deb
           path: "*.deb"
 
       - name: Upload DEB to Release
@@ -297,14 +297,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: omniedge-cli-linux-${{ matrix.src_arch }}
-
-      - name: Install RPM tools
-        run: sudo apt-get update && sudo apt-get install -y rpm
-
       - name: Get version
         id: version
         run: |
@@ -314,6 +306,14 @@ jobs:
           # Replace any dashes with underscores for RPM compatibility
           RPM_VERSION="${VERSION//-/_}"
           echo "rpm_version=$RPM_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-${{ matrix.src_arch }}
+
+      - name: Install RPM tools
+        run: sudo apt-get update && sudo apt-get install -y rpm
 
       - name: Extract binary
         run: |
@@ -398,7 +398,7 @@ jobs:
       - name: Upload RPM Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: omniedge-cli-rpm-${{ matrix.arch }}
+          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}-rpm
           path: "*.rpm"
 
       - name: Upload RPM to Release
@@ -431,17 +431,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: omniedge-cli-linux-${{ matrix.src_arch }}
-
       - name: Get version
         id: version
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"  # Remove 'v' prefix
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-${{ matrix.src_arch }}
 
       - name: Extract binary
         run: |
@@ -524,7 +524,7 @@ jobs:
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: omniedge-cli-appimage-${{ matrix.arch }}
+          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}-appimage
           path: |
             *.AppImage
             *-appdir.tar.gz
