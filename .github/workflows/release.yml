@@ -47,11 +47,6 @@ jobs:
             os: ubuntu-latest
             artifact_name: omniedge-cli-linux-riscv64
             cross: true
-          # Linux LoongArch64 (Tier 3 - experimental)
-          - target: loongarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            artifact_name: omniedge-cli-linux-loongarch64
-            cross: true
           # macOS x86_64
           - target: x86_64-apple-darwin
             os: macos-13
@@ -67,16 +62,6 @@ jobs:
             os: windows-latest
             artifact_name: omniedge-cli-windows-x64
             cross: false
-          # FreeBSD x86_64
-          - target: x86_64-unknown-freebsd
-            os: ubuntu-latest
-            artifact_name: omniedge-cli-freebsd-x64
-            cross: true
-          # FreeBSD ARM64
-          - target: aarch64-unknown-freebsd
-            os: ubuntu-latest
-            artifact_name: omniedge-cli-freebsd-arm64
-            cross: true
 
     steps:
       - uses: actions/checkout@v4
@@ -92,11 +77,11 @@ jobs:
 
       - name: Build (native)
         if: "!matrix.cross"
-        run: cargo build --release --bin omniedge --target ${{ matrix.target }}
+        run: cargo build --release -p omniedge-cli --target ${{ matrix.target }}
 
       - name: Build (cross-compile)
         if: matrix.cross
-        run: cross build --release --bin omniedge --target ${{ matrix.target }}
+        run: cross build --release -p omniedge-cli --target ${{ matrix.target }}
 
       - name: Rename and Package
         shell: bash
@@ -203,7 +188,7 @@ jobs:
           Description: OmniEdge CLI - Peer-to-peer VPN for edge computing
            A secure, peer-to-peer mesh VPN solution for connecting devices
            across networks with minimal latency and maximum security.
-          Homepage: https://omniedge.io
+          Homepage: https://connect.omniedge.io
           EOF
           
           # Remove leading spaces from control file
@@ -349,7 +334,7 @@ jobs:
           Release:        1%{?dist}
           Summary:        OmniEdge CLI - Peer-to-peer VPN for edge computing
           License:        Apache-2.0 OR MIT
-          URL:            https://omniedge.io
+          URL:            https://connect.omniedge.io
           
           %description
           A secure, peer-to-peer mesh VPN solution for connecting devices

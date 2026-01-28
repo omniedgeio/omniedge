@@ -29,15 +29,19 @@ omni-api = { path = "../../../crates/omni-api" }
 omni-helper = { path = "../../../crates/omni-helper" }
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
-winreg = "0.52.0"
 whoami = "1.5.0"
 futures-util = "0.3"
-winapi = { version = "0.3", features = ["processthreadsapi", "securitybaseapi", "winnt"] }
-libc = "0.2"
 omni-proto = { path = "../../../crates/omni-proto" }
 omni-tun = { path = "../../../crates/omni-tun" }
 hex = "0.4"
 log = "0.4"
 flexi_logger = "0.29"
 dotenvy = "0.15"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52.0"
+winapi = { version = "0.3", features = ["processthreadsapi", "securitybaseapi", "winnt"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
