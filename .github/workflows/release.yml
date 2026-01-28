@@ -47,8 +47,8 @@ jobs:
             os: ubuntu-latest
             artifact_name: omniedge-cli-linux-riscv64
             cross: true
-          # Linux LoongArch64
-          - target: loongarch64-unknown-linux-musl
+          # Linux LoongArch64 (Tier 3 - experimental)
+          - target: loongarch64-unknown-linux-gnu
             os: ubuntu-latest
             artifact_name: omniedge-cli-linux-loongarch64
             cross: true
@@ -193,7 +193,7 @@ jobs:
           chmod 755 "${PKG_DIR}/usr/bin/omniedge"
           
           # Create control file
-          cat > "${PKG_DIR}/DEBIAN/control" << EOF
+          cat > "${PKG_DIR}/DEBIAN/control" <<EOF
           Package: ${PKG_NAME}
           Version: ${PKG_VERSION}
           Section: net
@@ -206,8 +206,11 @@ jobs:
           Homepage: https://omniedge.io
           EOF
           
+          # Remove leading spaces from control file
+          sed -i 's/^          //' "${PKG_DIR}/DEBIAN/control"
+          
           # Create systemd service file
-          cat > "${PKG_DIR}/usr/lib/systemd/system/omniedge.service" << EOF
+          cat > "${PKG_DIR}/usr/lib/systemd/system/omniedge.service" <<EOF
           [Unit]
           Description=OmniEdge VPN Service
           After=network-online.target
@@ -223,22 +226,27 @@ jobs:
           WantedBy=multi-user.target
           EOF
           
+          # Remove leading spaces from service file
+          sed -i 's/^          //' "${PKG_DIR}/usr/lib/systemd/system/omniedge.service"
+          
           # Create postinst script
-          cat > "${PKG_DIR}/DEBIAN/postinst" << 'EOF'
+          cat > "${PKG_DIR}/DEBIAN/postinst" <<'EOF'
           #!/bin/bash
           set -e
           systemctl daemon-reload
           echo "OmniEdge CLI installed. Run 'omniedge login' to authenticate."
           EOF
+          sed -i 's/^          //' "${PKG_DIR}/DEBIAN/postinst"
           chmod 755 "${PKG_DIR}/DEBIAN/postinst"
           
           # Create prerm script
-          cat > "${PKG_DIR}/DEBIAN/prerm" << 'EOF'
+          cat > "${PKG_DIR}/DEBIAN/prerm" <<'EOF'
           #!/bin/bash
           set -e
           systemctl stop omniedge.service 2>/dev/null || true
           systemctl disable omniedge.service 2>/dev/null || true
           EOF
+          sed -i 's/^          //' "${PKG_DIR}/DEBIAN/prerm"
           chmod 755 "${PKG_DIR}/DEBIAN/prerm"
           
           # Build the package
@@ -318,7 +326,7 @@ jobs:
           cp ${{ matrix.artifact_name }} ~/rpmbuild/SOURCES/omniedge
           
           # Create systemd service file in SOURCES
-          cat > ~/rpmbuild/SOURCES/omniedge.service << EOF
+          cat > ~/rpmbuild/SOURCES/omniedge.service <<EOF
           [Unit]
           Description=OmniEdge VPN Service
           After=network-online.target
@@ -335,7 +343,7 @@ jobs:
           EOF
           
           # Create spec file
-          cat > ~/rpmbuild/SPECS/omniedge-cli.spec << EOF
+          cat > ~/rpmbuild/SPECS/omniedge-cli.spec <<EOF
           Name:           ${PKG_NAME}
           Version:        ${PKG_VERSION}
           Release:        1%{?dist}
@@ -449,7 +457,7 @@ jobs:
           chmod 755 "${APPDIR}/usr/bin/omniedge"
           
           # Create desktop entry
-          cat > "${APPDIR}/omniedge-cli.desktop" << EOF
+          cat > "${APPDIR}/omniedge-cli.desktop" <<EOF
           [Desktop Entry]
           Type=Application
           Name=OmniEdge CLI
@@ -462,7 +470,7 @@ jobs:
           cp "${APPDIR}/omniedge-cli.desktop" "${APPDIR}/usr/share/applications/"
           
           # Create a simple icon (SVG)
-          cat > "${APPDIR}/omniedge.svg" << 'EOF'
+          cat > "${APPDIR}/omniedge.svg" <<'EOF'
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
             <circle cx="50" cy="50" r="45" fill="#4A90D9"/>
             <text x="50" y="60" font-family="Arial" font-size="30" fill="white" text-anchor="middle">OE</text>
@@ -471,7 +479,7 @@ jobs:
           cp "${APPDIR}/omniedge.svg" "${APPDIR}/usr/share/icons/hicolor/256x256/apps/"
           
           # Create AppRun script
-          cat > "${APPDIR}/AppRun" << 'EOF'
+          cat > "${APPDIR}/AppRun" <<'EOF'
           #!/bin/bash
           SELF=$(readlink -f "$0")
           HERE=${SELF%/*}
@@ -479,6 +487,9 @@ jobs:
           exec "${HERE}/usr/bin/omniedge" "$@"
           EOF
           chmod 755 "${APPDIR}/AppRun"
+          
+          # Create .DirIcon symlink (required by AppImage)
+          ln -sf omniedge.svg "${APPDIR}/.DirIcon"
 
       - name: Build AppImage (x86_64)
         if: matrix.arch == 'x86_64'

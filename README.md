@@ -2,8 +2,13 @@
 
 > Secure P2P mesh networking for AI devices, IoT, and edge computing
 
-[![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge)](https://github.com/omniedgeio/omniedge/releases)
-[![License](https://img.shields.io/github/license/omniedgeio/omniedge)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge?style=flat-square)](https://github.com/omniedgeio/omniedge/releases)
+[![Release CLI](https://img.shields.io/github/actions/workflow/status/omniedgeio/omniedge/release.yml?label=CLI%20Build&style=flat-square)](https://github.com/omniedgeio/omniedge/actions/workflows/release.yml)
+[![Release Desktop](https://img.shields.io/github/actions/workflow/status/omniedgeio/omniedge/desktop-release.yml?label=Desktop%20Build&style=flat-square)](https://github.com/omniedgeio/omniedge/actions/workflows/desktop-release.yml)
+[![License](https://img.shields.io/github/license/omniedgeio/omniedge?style=flat-square)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
+[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows%20%7C%20freebsd-blue?style=flat-square)](#supported-platforms)
+[![Discord](https://img.shields.io/discord/1234567890?color=5865F2&label=discord&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/d4faRPYj)
 
 OmniEdge enables seamless connectivity between your devices across networks. Perfect for:
 - 🤖 **AI/ML Devices**: NVIDIA Jetson, AI edge computers
@@ -31,12 +36,68 @@ OmniEdge has transitioned from its legacy Go-based implementation (using n2n and
 
 [🌐 Website](https://connect.omniedge.io) • [📚 Docs](https://connect.omniedge.io/docs) • [💬 Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
 
+## Supported Platforms
+
+### CLI (`omniedge-cli`)
+
+| Platform | Architecture | Package Formats |
+|----------|--------------|-----------------|
+| **Linux** | x86_64 | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
+| **Linux** | ARM64 (aarch64) | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
+| **Linux** | ARMv7 | `.tar.gz`, `.deb` |
+| **Linux** | RISC-V 64 | `.tar.gz`, `.deb` |
+| **Linux** | LoongArch64 | `.tar.gz` |
+| **macOS** | x86_64 (Intel) | `.tar.gz` |
+| **macOS** | ARM64 (Apple Silicon) | `.tar.gz` |
+| **Windows** | x86_64 | `.zip` |
+| **FreeBSD** | x86_64 | `.tar.gz` |
+| **FreeBSD** | ARM64 | `.tar.gz` |
+
+### Desktop (`omniedge-desktop`)
+
+| Platform | Architecture | Package Formats |
+|----------|--------------|-----------------|
+| **Windows** | x86_64 | `.msi`, `.exe` |
+| **macOS** | x86_64 (Intel) | `.dmg` |
+| **macOS** | ARM64 (Apple Silicon) | `.dmg` |
+| **Linux** | x86_64 | `.deb`, `.AppImage` |
+
 ## Quick Install (CLI)
 
 The easiest way to install OmniEdge CLI:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/scripts/omniedge-install.sh | bash
+```
+
+### Package Manager Installation
+
+**Debian/Ubuntu (.deb):**
+```bash
+# Download the latest release
+wget https://github.com/omniedgeio/omniedge/releases/latest/download/omniedge-cli_VERSION_amd64.deb
+sudo dpkg -i omniedge-cli_*_amd64.deb
+```
+
+**Fedora/RHEL/openSUSE (.rpm):**
+```bash
+wget https://github.com/omniedgeio/omniedge/releases/latest/download/omniedge-cli-VERSION-1.x86_64.rpm
+sudo rpm -i omniedge-cli-*.x86_64.rpm
+```
+
+**AppImage (Universal Linux):**
+```bash
+wget https://github.com/omniedgeio/omniedge/releases/latest/download/omniedge-cli-VERSION-x86_64.AppImage
+chmod +x omniedge-cli-*.AppImage
+./omniedge-cli-*.AppImage
+```
+
+**macOS (Homebrew coming soon):**
+```bash
+# Download and extract
+curl -LO https://github.com/omniedgeio/omniedge/releases/latest/download/omniedge-cli-macos-arm64.tar.gz
+tar -xzf omniedge-cli-macos-arm64.tar.gz
+sudo mv omniedge-cli-macos-arm64 /usr/local/bin/omniedge
 ```
 
 ## CLI Usage
