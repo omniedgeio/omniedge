@@ -4,8 +4,8 @@ on:
   push:
     tags:
       - 'v*.*.*'
-      - 'v*.*.*-beta.*'
-      - 'v*.*.*-rc.*'
+      - 'v*.*.*-beta'
+      - 'v*.*.*-rc'
   workflow_dispatch:
 
 env:
