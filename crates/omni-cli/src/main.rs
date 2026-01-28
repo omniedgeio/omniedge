@@ -40,14 +40,14 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Start OmniEdge (Login and Join automatically). Use --daemon for background worker.
+    /// Start OmniEdge and run in background. Use -N/--nucleus to run as a signaling controller.
     Start {
         /// The virtual network ID to join
         #[arg(short = 'n', long)]
         network_id: Option<String>,
 
-        /// Run as a nucleus (signaling controller) instead of a standard edge node
-        #[arg(short = 'N', long)]
+        /// Run as a nucleus (signaling controller) for the mesh network
+        #[arg(short = 'N', long, help = "Run as a nucleus node for mesh signaling")]
         nucleus: bool,
 
         /// Act as an exit node (allow others to route traffic through this node)

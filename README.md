@@ -39,6 +39,54 @@ The easiest way to install OmniEdge CLI:
 curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/scripts/omniedge-install.sh | bash
 ```
 
+## CLI Usage
+
+After installation, OmniEdge runs as a background service on all platforms:
+
+```bash
+# Start OmniEdge (login and connect to first network)
+omniedge start
+
+# Start with a specific network
+omniedge start -n <network_id>
+
+# Run as a nucleus (signaling controller for mesh network)
+omniedge start -N
+omniedge start --nucleus
+
+# Run as an exit node (allow others to route traffic through this node)
+omniedge start -x
+omniedge start --as-exit-node
+
+# Combine options: nucleus + exit node on specific network
+omniedge start -n <network_id> -N -x
+
+# Use a specific exit node
+omniedge start -e <exit_node_ip>
+omniedge start --exit-node <exit_node_ip>
+
+# Login with security key (non-interactive)
+omniedge start -s <security_key>
+
+# Stop OmniEdge
+omniedge stop
+
+# Scan local network and upload results
+omniedge scan -c 192.168.1.0/24
+```
+
+### Background Service
+
+When you run `omniedge start`, it automatically runs in the background:
+
+| Platform    | Service Type          | Management                        |
+| ----------- | --------------------- | --------------------------------- |
+| **Windows** | Windows Service       | `sc stop OmniEdge`                |
+| **Linux**   | systemd               | `systemctl status omniedge`       |
+| **macOS**   | launchd (LaunchAgent) | `launchctl list io.omniedge.cli`  |
+
+If the OmniEdge Desktop helper service is already running, the CLI will use it instead of creating a separate service.
+
 ## Desktop Applications
 
 The new Desktop application is built with Tauri v2 and React. 
