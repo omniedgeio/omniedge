@@ -452,7 +452,7 @@ function App() {
           <div className="status-indicator-row">
             <div className="pulse-dot" style={{ backgroundColor: getStatusColor() }}></div>
             <span className="status-text">
-              {status === 'connected' ? 'Secure' : (status === 'connecting' ? 'Connecting...' : 'Disconnected')}
+              {status === 'connected' ? 'Connected' : (status === 'connecting' ? 'Connecting...' : 'Disconnected')}
             </span>
           </div>
         </div>
@@ -619,7 +619,6 @@ function App() {
                           <span className="network-name-text truncate">{net.name}</span>
                         </div>
                         <div className="item-right">
-                          {isActive && <span className="active-label">Connected</span>}
                           <div className="chevron-icon" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none' }}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="9 18 15 12 9 6"></polyline>
@@ -715,7 +714,7 @@ function App() {
                     </div>
                   </div>
 
-                  {activeNetwork ? (
+                  {activeNetwork && (
                     <div className="exit-node-selection-area">
                       <div
                         className={`exit-option-item ${!networks.find(n => n.id === activeNetwork)?.selected_exit_node_id ? 'is-selected' : ''}`}
