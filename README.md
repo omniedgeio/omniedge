@@ -50,23 +50,17 @@ omniedge start
 # Start with a specific network
 omniedge start -n <network_id>
 
-# Run as a nucleus (signaling controller for mesh network)
-omniedge start -N
-omniedge start --nucleus
+# Login with security key (non-interactive, ideal for CI/CD and automation)
+omniedge start -s <security_key>
+omniedge start -n <network_id> -s <security_key>
 
 # Run as an exit node (allow others to route traffic through this node)
 omniedge start -x
 omniedge start --as-exit-node
 
-# Combine options: nucleus + exit node on specific network
-omniedge start -n <network_id> -N -x
-
 # Use a specific exit node
 omniedge start -e <exit_node_ip>
 omniedge start --exit-node <exit_node_ip>
-
-# Login with security key (non-interactive)
-omniedge start -s <security_key>
 
 # Stop OmniEdge
 omniedge stop
@@ -74,6 +68,63 @@ omniedge stop
 # Scan local network and upload results
 omniedge scan -c 192.168.1.0/24
 ```
+
+### Operating Modes
+
+OmniEdge supports three operating modes via `--mode`:
+
+| Mode | Description | Auth Required | VPN Tunnel | Signaling Server |
+|------|-------------|---------------|------------|------------------|
+| **edge** (default) | Regular VPN client | Yes | Yes | No |
+| **nucleus** | Signaling server only | No | No | Yes |
+| **dual** | VPN client + signaling | Yes | Yes | Yes |
+
+```bash
+# EDGE MODE (default) - Regular VPN client
+omniedge start -n <network_id>
+
+# NUCLEUS MODE - Standalone signaling server (no VPN, no login required)
+# Requires --secret for cluster authentication (min 16 chars)
+omniedge start --mode nucleus --secret "MySecretMin16Chars"
+omniedge start --mode nucleus --port 51821 --secret "MySecretMin16Chars"
+
+# DUAL MODE - VPN client + nucleus signaling server
+# Acts as both an edge client AND a signaling server for other peers
+omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
+omniedge start -n <network_id> --mode dual --port 51821 --secret "MySecretMin16Chars"
+
+# Full mesh relay: dual mode + exit node
+# This node becomes a central hub for signaling AND traffic routing
+omniedge start -n <network_id> --mode dual --secret "MySecret123456789" -x
+```
+
+### Nucleus Mode
+
+In **nucleus mode**, OmniEdge runs as a standalone UDP signaling server:
+
+- **No VPN tunnel** - Does not create a network interface
+- **No authentication** - Does not require OmniEdge account login
+- **Lightweight** - Just handles peer discovery and NAT traversal signaling
+- **Cluster secret** - All clients must use the same secret to connect
+
+**Use cases:**
+- Self-hosted signaling without cloud dependency
+- Private/air-gapped networks
+- Low-latency local cluster signaling
+
+### Dual Mode
+
+In **dual mode**, OmniEdge combines both capabilities:
+
+1. **Edge Client**: Connects to the network with a virtual IP, communicates with peers
+2. **Signaling Server**: Listens on UDP port (default 51820) for peer discovery requests
+
+This allows a stable node (e.g., a server with a public IP) to act as a nucleus for other nodes in the network while also participating as a peer.
+
+**Use cases:**
+- Self-hosted mesh with full participation
+- Central hub that can also be reached directly
+- Exit node + signaling server combo
 
 ### Background Service
 

@@ -3,6 +3,9 @@ use omninervous::signaling::NucleusClient;
 use std::net::{Ipv4Addr, SocketAddr};
 use tokio::net::UdpSocket;
 
+// Re-export nucleus server components for dual mode
+pub use omninervous::signaling::{handle_nucleus_message, NucleusState};
+
 pub struct PeerInfo {
     pub vip: Ipv4Addr,
     pub endpoint: Option<SocketAddr>,

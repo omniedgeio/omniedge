@@ -3,13 +3,13 @@ use crate::state::ConnectionState;
 use anyhow::{Context, Result};
 use log::{debug, error, info, warn};
 use omni_api::{types::*, ApiClient, AuthService, DeviceService, NetworkService};
-use omni_proto::OmniProto;
+use omni_proto::{handle_nucleus_message, NucleusState, OmniProto};
 use omni_tun::OmniTun;
 use omninervous::Identity;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
 pub struct ConnectionManager {
     state: Arc<RwLock<ConnectionState>>,
@@ -19,6 +19,8 @@ pub struct ConnectionManager {
     identity: Identity,
     base_url: String,
     is_nucleus: bool,
+    nucleus_state: Option<Arc<Mutex<NucleusState>>>,
+    nucleus_port: u16,
     as_exit_node: Arc<AtomicBool>,
     exit_node_ip: Option<String>,
     cluster_secret: Option<String>,
@@ -45,6 +47,8 @@ impl ConnectionManager {
             identity,
             base_url,
             is_nucleus: false,
+            nucleus_state: None,
+            nucleus_port: 51820, // Default nucleus signaling port
             as_exit_node: Arc::new(AtomicBool::new(
                 CliConfig::load().map(|c| c.is_exit_node).unwrap_or(false),
             )),
@@ -134,6 +138,12 @@ impl ConnectionManager {
         self.is_nucleus = is_nucleus;
         self.as_exit_node.store(as_exit_node, Ordering::SeqCst);
         self.exit_node_ip = exit_node_ip;
+
+        // Initialize nucleus state if running in nucleus mode
+        if is_nucleus {
+            info!("Initializing Nucleus signaling server state...");
+            self.nucleus_state = Some(Arc::new(Mutex::new(NucleusState::new())));
+        }
 
         let client = ApiClient::new(self.base_url.clone(), Some(token));
         self.api_client = Some(client);
@@ -325,12 +335,19 @@ impl ConnectionManager {
         let (shutdown_tx, _) = broadcast::channel(1);
         self.shutdown_tx = Some(shutdown_tx.clone());
 
+        let nucleus_state = self.nucleus_state.clone();
+        let nucleus_port = self.nucleus_port;
+        let is_nucleus = self.is_nucleus;
+
         self.start_loops(
             socket,
             proto,
             tun,
             effective_device_id.to_string(),
             shutdown_tx,
+            nucleus_state,
+            nucleus_port,
+            is_nucleus,
         )
         .await;
 
@@ -355,6 +372,9 @@ impl ConnectionManager {
         tun: OmniTun,
         device_id: String,
         shutdown_tx: broadcast::Sender<()>,
+        nucleus_state: Option<Arc<Mutex<NucleusState>>>,
+        nucleus_port: u16,
+        is_nucleus: bool,
     ) {
         let (hb_tx, mut hb_rx) = mpsc::channel(1);
         self.heartbeat_tx = Some(hb_tx);
@@ -362,6 +382,81 @@ impl ConnectionManager {
         let proto_ctrl = proto.clone();
         let socket_inner = socket.clone();
         let secret = self.cluster_secret.clone();
+
+        // Nucleus Signaling Server Loop (only when running in nucleus mode)
+        if is_nucleus {
+            if let Some(nucleus_state) = nucleus_state.clone() {
+                let secret_clone = secret.clone();
+                let mut shutdown_rx_nucleus = shutdown_tx.subscribe();
+
+                // Bind nucleus signaling socket on fixed port
+                let nucleus_socket =
+                    match UdpSocket::bind(format!("0.0.0.0:{}", nucleus_port)).await {
+                        Ok(s) => {
+                            info!(
+                                "Nucleus signaling server listening on UDP port {}",
+                                nucleus_port
+                            );
+                            Arc::new(s)
+                        }
+                        Err(e) => {
+                            error!(
+                            "Failed to bind nucleus signaling port {}: {}. Nucleus mode disabled.",
+                            nucleus_port, e
+                        );
+                            // Continue without nucleus mode
+                            Arc::new(UdpSocket::bind("0.0.0.0:0").await.unwrap())
+                        }
+                    };
+
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 4096];
+                    let mut cleanup_interval =
+                        tokio::time::interval(tokio::time::Duration::from_secs(60));
+
+                    loop {
+                        tokio::select! {
+                            res = nucleus_socket.recv_from(&mut buf) => {
+                                match res {
+                                    Ok((len, src)) => {
+                                        let pkt = &buf[..len];
+                                        if pkt.is_empty() || pkt[0] < 0x11 {
+                                            continue;
+                                        }
+
+                                        // Handle nucleus signaling request
+                                        let mut state = nucleus_state.lock().await;
+                                        if let Some(response) = handle_nucleus_message(
+                                            &mut state,
+                                            pkt,
+                                            src,
+                                            secret_clone.as_deref(),
+                                        ) {
+                                            if let Err(e) = nucleus_socket.send_to(&response, src).await {
+                                                warn!("Failed to send nucleus response to {}: {}", src, e);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        error!("Nucleus socket error: {}", e);
+                                    }
+                                }
+                            }
+                            _ = cleanup_interval.tick() => {
+                                // Periodic cleanup of stale peers
+                                let mut state = nucleus_state.lock().await;
+                                state.cleanup();
+                                debug!("Nucleus state cleanup complete. {} peers registered.", state.peer_count());
+                            }
+                            _ = shutdown_rx_nucleus.recv() => {
+                                info!("Nucleus Signaling Server shutting down");
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+        }
 
         // Master Dispatcher Loop
         let mut shutdown_rx1 = shutdown_tx.subscribe();
@@ -439,7 +534,7 @@ impl ConnectionManager {
             let mut proto_interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
 
             if is_nucleus_hb {
-                info!("Running in Nucleus mode - specialized signaling active.");
+                info!("Running in DUAL MODE: Edge client + Nucleus signaling server active.");
             }
 
             loop {
@@ -805,6 +900,12 @@ impl ConnectionManager {
 
     pub fn get_base_url(&self) -> &str {
         &self.base_url
+    }
+
+    /// Configure nucleus settings for dual mode operation
+    pub fn set_nucleus_config(&mut self, port: u16, secret: Option<String>) {
+        self.nucleus_port = port;
+        self.cluster_secret = secret;
     }
 
     pub async fn disconnect(&mut self) -> Result<()> {

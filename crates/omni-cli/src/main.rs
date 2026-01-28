@@ -1,7 +1,7 @@
 extern crate hex;
 
 use anyhow::{Context, Result};
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use omni_api::{ApiClient, DeviceService, NetworkService};
 use omni_core::{CliConfig, ConnectionManager};
 
@@ -25,6 +25,18 @@ use windows_service::{
 
 pub const SERVICE_NAME: &str = "OmniEdge";
 
+/// Operating mode for OmniEdge
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+pub enum RunMode {
+    /// Edge client only - connects to a nucleus server for peer discovery
+    #[default]
+    Edge,
+    /// Nucleus server only - runs signaling server on port 51820, no VPN tunnel
+    Nucleus,
+    /// Dual mode - runs both edge client AND nucleus signaling server
+    Dual,
+}
+
 #[derive(Parser, Debug)]
 #[command(
     name = "omniedge",
@@ -40,15 +52,15 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Start OmniEdge and run in background. Use -N/--nucleus to run as a signaling controller.
+    /// Start OmniEdge and run in background
     Start {
-        /// The virtual network ID to join
+        /// Operating mode: edge (default), nucleus, or dual
+        #[arg(short = 'm', long, value_enum, default_value = "edge")]
+        mode: RunMode,
+
+        /// The virtual network ID to join (required for edge/dual modes)
         #[arg(short = 'n', long)]
         network_id: Option<String>,
-
-        /// Run as a nucleus (signaling controller) for the mesh network
-        #[arg(short = 'N', long, help = "Run as a nucleus node for mesh signaling")]
-        nucleus: bool,
 
         /// Act as an exit node (allow others to route traffic through this node)
         #[arg(short = 'x', long)]
@@ -57,6 +69,14 @@ enum Commands {
         /// Use a specific exit node IP
         #[arg(short = 'e', long = "exit-node")]
         exit_node: Option<String>,
+
+        /// UDP port for nucleus signaling server (default: 51820)
+        #[arg(short = 'p', long, default_value = "51820")]
+        port: u16,
+
+        /// Cluster secret for nucleus mode authentication (min 16 chars)
+        #[arg(long)]
+        secret: Option<String>,
 
         /// Internal flag: Run as a background daemon
         #[arg(long, hide = true)]
@@ -162,22 +182,45 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Start {
+            mode,
             network_id,
-            nucleus,
             daemon,
             as_exit_node,
             exit_node,
+            port,
+            secret,
             security_key,
         } => {
-            // Validation
-            if let Some(id) = &network_id {
-                let re = Regex::new(r"^[a-zA-Z0-9_\-]+$").unwrap();
-                if !re.is_match(id) {
-                    return Err(anyhow::anyhow!(
-                        "Invalid network_id format. Only alphanumeric, -, and _ are allowed."
-                    ));
+            // Validation based on mode
+            match mode {
+                RunMode::Edge | RunMode::Dual => {
+                    // Edge and Dual modes require network authentication
+                    if let Some(id) = &network_id {
+                        let re = Regex::new(r"^[a-zA-Z0-9_\-]+$").unwrap();
+                        if !re.is_match(id) {
+                            return Err(anyhow::anyhow!(
+                                "Invalid network_id format. Only alphanumeric, -, and _ are allowed."
+                            ));
+                        }
+                    }
+                }
+                RunMode::Nucleus => {
+                    // Nucleus-only mode requires a secret
+                    if secret.is_none() {
+                        return Err(anyhow::anyhow!(
+                            "Nucleus mode requires --secret for cluster authentication (min 16 chars)."
+                        ));
+                    }
+                    if let Some(ref s) = secret {
+                        if s.len() < 16 {
+                            return Err(anyhow::anyhow!(
+                                "Cluster secret must be at least 16 characters for security."
+                            ));
+                        }
+                    }
                 }
             }
+
             if let Some(ip) = &exit_node {
                 let re = Regex::new(r"^[0-9\.]+$").unwrap();
                 if !re.is_match(ip) {
@@ -187,12 +230,43 @@ async fn main() -> Result<()> {
                 }
             }
 
+            // Daemon mode handling
             if daemon {
-                let vn_id = network_id.context("Network ID required for daemon mode")?;
-                return service::run_worker(&base_url, &vn_id, nucleus, as_exit_node, exit_node)
-                    .await;
+                match mode {
+                    RunMode::Nucleus => {
+                        // Nucleus-only mode: just run the signaling server
+                        return service::run_nucleus_only(port, secret.as_deref().unwrap_or(""))
+                            .await;
+                    }
+                    RunMode::Edge | RunMode::Dual => {
+                        let vn_id = network_id.context("Network ID required for edge/dual mode")?;
+                        return service::run_worker(
+                            &base_url,
+                            &vn_id,
+                            mode,
+                            as_exit_node,
+                            exit_node,
+                            port,
+                            secret,
+                        )
+                        .await;
+                    }
+                }
             }
 
+            // Handle nucleus-only mode (no network/auth needed)
+            if mode == RunMode::Nucleus {
+                println!(
+                    "Starting OmniEdge Nucleus signaling server on port {}...",
+                    port
+                );
+                service::setup_and_start_nucleus_service(port, secret.as_deref().unwrap_or(""))
+                    .await?;
+                println!("Nucleus signaling server is now running in the background.");
+                return Ok(());
+            }
+
+            // Edge and Dual modes need authentication and network
             config.is_exit_node = as_exit_node;
             config.exit_node_ip = exit_node.clone();
             config.save()?;
@@ -253,13 +327,23 @@ async fn main() -> Result<()> {
             };
 
             // 4. Start Background Service
-            println!("Backgrounding OmniEdge in network {}...", vn_id);
+            let mode_str = match mode {
+                RunMode::Edge => "edge",
+                RunMode::Dual => "dual (edge + nucleus)",
+                RunMode::Nucleus => "nucleus",
+            };
+            println!(
+                "Starting OmniEdge in {} mode for network {}...",
+                mode_str, vn_id
+            );
             service::setup_and_start_service(
                 &base_url,
                 &vn_id,
-                nucleus,
+                mode,
                 as_exit_node,
                 exit_node.as_deref(),
+                port,
+                secret.as_deref(),
             )
             .await?;
             println!("OmniEdge is now running in the background.");
@@ -366,22 +450,47 @@ async fn service_main_res(base_url: &str) -> Result<()> {
 
     match cli.command {
         Commands::Start {
+            mode,
             network_id,
-            nucleus,
             daemon,
             as_exit_node,
             exit_node,
+            port,
+            secret,
             ..
-        } if daemon => {
-            let vn_id = network_id.context("Network ID required")?;
-            log::info!("Starting background worker for network {}", vn_id);
-            if let Err(e) =
-                service::run_worker(base_url, &vn_id, nucleus, as_exit_node, exit_node).await
-            {
-                log::error!("Worker failed: {}", e);
-                return Err(e);
+        } if daemon => match mode {
+            RunMode::Nucleus => {
+                log::info!("Starting nucleus-only signaling server on port {}", port);
+                if let Err(e) =
+                    service::run_nucleus_only(port, secret.as_deref().unwrap_or("")).await
+                {
+                    log::error!("Nucleus server failed: {}", e);
+                    return Err(e);
+                }
             }
-        }
+            RunMode::Edge | RunMode::Dual => {
+                let vn_id = network_id.context("Network ID required")?;
+                log::info!(
+                    "Starting background worker for network {} in {:?} mode",
+                    vn_id,
+                    mode
+                );
+                if let Err(e) = service::run_worker(
+                    base_url,
+                    &vn_id,
+                    mode,
+                    as_exit_node,
+                    exit_node,
+                    port,
+                    secret,
+                )
+                .await
+                {
+                    log::error!("Worker failed: {}", e);
+                    return Err(e);
+                }
+            }
+        },
         _ => {
             log::error!("Service started with invalid command: {:?}", cli.command);
         }

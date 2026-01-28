@@ -1,9 +1,14 @@
 use crate::utils::get_hardware_id;
+use crate::RunMode;
 use crate::SERVICE_NAME;
 use anyhow::{Context, Result};
 use log::info;
 use omni_core::{CliConfig, ConnectionManager};
+use omni_proto::{handle_nucleus_message, NucleusState};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::net::UdpSocket;
+use tokio::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct HelperRequest {
@@ -74,10 +79,16 @@ async fn start_via_helper(
     network_id: &str,
     device_id: &str,
     hardware_id: &str,
-    nucleus: bool,
+    mode: RunMode,
     as_exit_node: bool,
     exit_node_ip: Option<String>,
 ) -> Result<()> {
+    let mode_str = match mode {
+        RunMode::Edge => "edge",
+        RunMode::Nucleus => "nucleus",
+        RunMode::Dual => "dual",
+    };
+
     let req = HelperRequest {
         command: "start_vpn".to_string(),
         args: serde_json::json!({
@@ -85,7 +96,7 @@ async fn start_via_helper(
             "network_id": network_id,
             "device_id": device_id,
             "hardware_id": hardware_id,
-            "nucleus": nucleus,
+            "mode": mode_str,
             "as_exit_node": as_exit_node,
             "exit_node_ip": exit_node_ip,
         }),
@@ -99,18 +110,90 @@ async fn start_via_helper(
     }
 }
 
+/// Run nucleus-only signaling server (no VPN, no network auth)
+pub async fn run_nucleus_only(port: u16, secret: &str) -> Result<()> {
+    info!(
+        "Starting OmniEdge Nucleus-only signaling server on port {}",
+        port
+    );
+
+    let nucleus_state = Arc::new(Mutex::new(NucleusState::new()));
+    let secret = if secret.is_empty() {
+        None
+    } else {
+        Some(secret.to_string())
+    };
+
+    let socket = UdpSocket::bind(format!("0.0.0.0:{}", port)).await?;
+    info!("Nucleus signaling server listening on UDP port {}", port);
+
+    let mut buf = [0u8; 4096];
+    let mut cleanup_interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+
+    loop {
+        tokio::select! {
+            res = socket.recv_from(&mut buf) => {
+                match res {
+                    Ok((len, src)) => {
+                        let pkt = &buf[..len];
+                        if pkt.is_empty() || pkt[0] < 0x11 {
+                            continue;
+                        }
+
+                        let mut state = nucleus_state.lock().await;
+                        if let Some(response) = handle_nucleus_message(
+                            &mut state,
+                            pkt,
+                            src,
+                            secret.as_deref(),
+                        ) {
+                            if let Err(e) = socket.send_to(&response, src).await {
+                                log::warn!("Failed to send nucleus response to {}: {}", src, e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Nucleus socket error: {}", e);
+                    }
+                }
+            }
+            _ = cleanup_interval.tick() => {
+                let mut state = nucleus_state.lock().await;
+                state.cleanup();
+                log::debug!("Nucleus state cleanup complete. {} peers registered.", state.peer_count());
+            }
+            _ = tokio::signal::ctrl_c() => {
+                info!("Nucleus signaling server shutting down...");
+                break;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Run edge or dual mode worker
 pub async fn run_worker(
     base_url: &str,
     network_id: &str,
-    nucleus: bool,
+    mode: RunMode,
     as_exit_node: bool,
     exit_node: Option<String>,
+    nucleus_port: u16,
+    cluster_secret: Option<String>,
 ) -> Result<()> {
+    let mode_str = match mode {
+        RunMode::Edge => "edge",
+        RunMode::Nucleus => "nucleus-only",
+        RunMode::Dual => "dual (edge + nucleus)",
+    };
     log::info!(
-        "Starting OmniEdge background worker for network: {} (API: {})",
+        "Starting OmniEdge background worker in {} mode for network: {} (API: {})",
+        mode_str,
         network_id,
         base_url
     );
+
     let config = CliConfig::load().context("Failed to load config")?;
     let auth = config.auth_response.context("Not authenticated")?;
     let device_id = config.device_uuid.context("Device not registered")?;
@@ -122,6 +205,13 @@ pub async fn run_worker(
         .and_then(|b| b.try_into().ok());
 
     let mut manager = ConnectionManager::new(base_url.to_string(), identity_pk);
+
+    // Configure nucleus settings if in dual mode
+    if mode == RunMode::Dual {
+        manager.set_nucleus_config(nucleus_port, cluster_secret);
+    }
+
+    let is_nucleus = mode == RunMode::Dual;
     info!("Connecting with token for network: {}...", network_id);
     manager
         .connect_with_token(
@@ -129,7 +219,7 @@ pub async fn run_worker(
             network_id,
             &device_id,
             &get_hardware_id().unwrap_or_else(|_| "unknown".to_string()),
-            nucleus,
+            is_nucleus,
             as_exit_node,
             exit_node,
         )
@@ -142,12 +232,39 @@ pub async fn run_worker(
     Ok(())
 }
 
+/// Setup and start nucleus-only service
+pub async fn setup_and_start_nucleus_service(port: u16, secret: &str) -> Result<()> {
+    info!(
+        "Starting nucleus-only background service on port {}...",
+        port
+    );
+
+    #[cfg(windows)]
+    {
+        setup_windows_nucleus_service(port, secret).await?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        setup_linux_nucleus_service(port, secret)?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        setup_macos_nucleus_service(port, secret)?;
+    }
+
+    Ok(())
+}
+
 pub async fn setup_and_start_service(
     base_url: &str,
     network_id: &str,
-    nucleus: bool,
+    mode: RunMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
+    nucleus_port: u16,
+    cluster_secret: Option<&str>,
 ) -> Result<()> {
     // First, try to use existing omni-helper service if available
     if is_helper_available().await {
@@ -162,7 +279,7 @@ pub async fn setup_and_start_service(
             network_id,
             &device_id,
             &hardware_id,
-            nucleus,
+            mode,
             as_exit_node,
             exit_node.map(|s| s.to_string()),
         )
@@ -186,29 +303,98 @@ pub async fn setup_and_start_service(
 
     #[cfg(windows)]
     {
-        setup_windows_service(base_url, network_id, nucleus, as_exit_node, exit_node).await?;
+        setup_windows_service(
+            base_url,
+            network_id,
+            mode,
+            as_exit_node,
+            exit_node,
+            nucleus_port,
+            cluster_secret,
+        )
+        .await?;
     }
 
     #[cfg(target_os = "linux")]
     {
-        setup_linux_service(network_id, nucleus, as_exit_node, exit_node)?;
+        setup_linux_service(
+            network_id,
+            mode,
+            as_exit_node,
+            exit_node,
+            nucleus_port,
+            cluster_secret,
+        )?;
     }
 
     #[cfg(target_os = "macos")]
     {
-        setup_macos_service(network_id, nucleus, as_exit_node, exit_node)?;
+        setup_macos_service(
+            network_id,
+            mode,
+            as_exit_node,
+            exit_node,
+            nucleus_port,
+            cluster_secret,
+        )?;
     }
 
     Ok(())
+}
+
+fn build_mode_args(mode: RunMode, nucleus_port: u16, cluster_secret: Option<&str>) -> Vec<String> {
+    let mut args = vec![
+        "--mode".to_string(),
+        match mode {
+            RunMode::Edge => "edge".to_string(),
+            RunMode::Nucleus => "nucleus".to_string(),
+            RunMode::Dual => "dual".to_string(),
+        },
+    ];
+
+    if mode == RunMode::Dual || mode == RunMode::Nucleus {
+        args.push("--port".to_string());
+        args.push(nucleus_port.to_string());
+        if let Some(secret) = cluster_secret {
+            args.push("--secret".to_string());
+            args.push(secret.to_string());
+        }
+    }
+
+    args
+}
+
+#[cfg(windows)]
+async fn setup_windows_nucleus_service(port: u16, secret: &str) -> Result<()> {
+    use std::process::Command;
+    let exe_path = std::env::current_exe()?;
+
+    let mut args = vec![
+        "start".to_string(),
+        "--mode".to_string(),
+        "nucleus".to_string(),
+        "--port".to_string(),
+        port.to_string(),
+    ];
+    if !secret.is_empty() {
+        args.push("--secret".to_string());
+        args.push(secret.to_string());
+    }
+    args.push("--daemon".to_string());
+
+    let bin_path_val = format!("\"{}\" {}", exe_path.display(), args.join(" "));
+    setup_windows_service_common(&bin_path_val).await
 }
 
 #[cfg(windows)]
 async fn setup_windows_service(
     _base_url: &str,
     network_id: &str,
-    nucleus: bool,
+    mode: RunMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
+    nucleus_port: u16,
+    cluster_secret: Option<&str>,
 ) -> Result<()> {
     use std::process::Command;
     let exe_path = std::env::current_exe()?;
@@ -218,9 +404,9 @@ async fn setup_windows_service(
         "-n".to_string(),
         network_id.to_string(),
     ];
-    if nucleus {
-        args.push("--nucleus".to_string());
-    }
+
+    args.extend(build_mode_args(mode, nucleus_port, cluster_secret));
+
     if as_exit_node {
         args.push("--as-exit-node".to_string());
     }
@@ -231,6 +417,12 @@ async fn setup_windows_service(
     args.push("--daemon".to_string());
 
     let bin_path_val = format!("\"{}\" {}", exe_path.display(), args.join(" "));
+    setup_windows_service_common(&bin_path_val).await
+}
+
+#[cfg(windows)]
+async fn setup_windows_service_common(bin_path_val: &str) -> Result<()> {
+    use std::process::Command;
 
     let current_pid = std::process::id();
     let kill_cmd = format!(
@@ -299,20 +491,89 @@ async fn setup_windows_service(
 }
 
 #[cfg(target_os = "linux")]
+fn setup_linux_nucleus_service(port: u16, secret: &str) -> Result<()> {
+    use std::fs;
+    use std::process::Command;
+
+    let exe_path = std::env::current_exe()?;
+    let secret_flag = if secret.is_empty() {
+        "".to_string()
+    } else {
+        format!("--secret {}", secret)
+    };
+
+    let service_content = format!(
+        r#"[Unit]
+Description=OmniEdge Nucleus Signaling Server
+After=network.target
+
+[Service]
+ExecStart={} start --mode nucleus --port {} {} --daemon
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+"#,
+        exe_path.display(),
+        port,
+        secret_flag
+    );
+
+    fs::write("/tmp/omniedge.service", &service_content)?;
+
+    let _ = Command::new("sudo")
+        .args([
+            "cp",
+            "/tmp/omniedge.service",
+            "/etc/systemd/system/omniedge.service",
+        ])
+        .output();
+    let _ = Command::new("sudo")
+        .args(["systemctl", "daemon-reload"])
+        .output();
+    let _ = Command::new("sudo")
+        .args(["systemctl", "enable", "omniedge"])
+        .output();
+    let _ = Command::new("sudo")
+        .args(["systemctl", "start", "omniedge"])
+        .output();
+
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
 fn setup_linux_service(
     network_id: &str,
-    nucleus: bool,
+    mode: RunMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
+    nucleus_port: u16,
+    cluster_secret: Option<&str>,
 ) -> Result<()> {
     use std::fs;
     use std::process::Command;
 
     let exe_path = std::env::current_exe()?;
-    let n_flag = if nucleus { "--nucleus" } else { "" };
+
+    let mode_str = match mode {
+        RunMode::Edge => "edge",
+        RunMode::Nucleus => "nucleus",
+        RunMode::Dual => "dual",
+    };
+
     let as_exit_flag = if as_exit_node { "--as-exit-node" } else { "" };
     let exit_node_flag = if let Some(ip) = exit_node {
         format!("--exit-node {}", ip)
+    } else {
+        "".to_string()
+    };
+
+    let nucleus_flags = if mode == RunMode::Dual {
+        let secret_flag = cluster_secret
+            .map(|s| format!("--secret {}", s))
+            .unwrap_or_default();
+        format!("--port {} {}", nucleus_port, secret_flag)
     } else {
         "".to_string()
     };
@@ -323,7 +584,7 @@ Description=OmniEdge Service
 After=network.target
 
 [Service]
-ExecStart={} start -n {} {} {} {} --daemon
+ExecStart={} start -n {} --mode {} {} {} {} --daemon
 Restart=always
 RestartSec=5
 
@@ -332,7 +593,8 @@ WantedBy=multi-user.target
 "#,
         exe_path.display(),
         network_id,
-        n_flag,
+        mode_str,
+        nucleus_flags,
         as_exit_flag,
         exit_node_flag
     );
@@ -360,11 +622,87 @@ WantedBy=multi-user.target
 }
 
 #[cfg(target_os = "macos")]
+fn setup_macos_nucleus_service(port: u16, secret: &str) -> Result<()> {
+    use std::fs;
+    use std::process::Command;
+
+    let exe_path = std::env::current_exe()?;
+    let home_dir = dirs::home_dir().context("Failed to get home directory")?;
+    let launch_agents_dir = home_dir.join("Library/LaunchAgents");
+    let plist_path = launch_agents_dir.join("io.omniedge.cli.plist");
+
+    fs::create_dir_all(&launch_agents_dir)?;
+
+    let mut program_args = vec![
+        format!("<string>{}</string>", exe_path.display()),
+        "<string>start</string>".to_string(),
+        "<string>--mode</string>".to_string(),
+        "<string>nucleus</string>".to_string(),
+        "<string>--port</string>".to_string(),
+        format!("<string>{}</string>", port),
+    ];
+    if !secret.is_empty() {
+        program_args.push("<string>--secret</string>".to_string());
+        program_args.push(format!("<string>{}</string>", secret));
+    }
+    program_args.push("<string>--daemon</string>".to_string());
+
+    let plist_content = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>io.omniedge.cli</string>
+    <key>ProgramArguments</key>
+    <array>
+        {}
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>{}/Library/Logs/omniedge.log</string>
+    <key>StandardErrorPath</key>
+    <string>{}/Library/Logs/omniedge.error.log</string>
+</dict>
+</plist>
+"#,
+        program_args.join("\n        "),
+        home_dir.display(),
+        home_dir.display()
+    );
+
+    let _ = Command::new("launchctl")
+        .args(["unload", &plist_path.to_string_lossy()])
+        .output();
+
+    fs::write(&plist_path, plist_content)?;
+
+    let output = Command::new("launchctl")
+        .args(["load", &plist_path.to_string_lossy()])
+        .output()?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(
+            "Failed to load launchd service: {}",
+            stderr
+        ));
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
 fn setup_macos_service(
     network_id: &str,
-    nucleus: bool,
+    mode: RunMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
+    nucleus_port: u16,
+    cluster_secret: Option<&str>,
 ) -> Result<()> {
     use std::fs;
     use std::process::Command;
@@ -374,20 +712,32 @@ fn setup_macos_service(
     let launch_agents_dir = home_dir.join("Library/LaunchAgents");
     let plist_path = launch_agents_dir.join("io.omniedge.cli.plist");
 
-    // Ensure LaunchAgents directory exists
     fs::create_dir_all(&launch_agents_dir)?;
 
-    // Build program arguments
+    let mode_str = match mode {
+        RunMode::Edge => "edge",
+        RunMode::Nucleus => "nucleus",
+        RunMode::Dual => "dual",
+    };
+
     let mut program_args = vec![
         format!("<string>{}</string>", exe_path.display()),
         "<string>start</string>".to_string(),
         "<string>-n</string>".to_string(),
         format!("<string>{}</string>", network_id),
+        "<string>--mode</string>".to_string(),
+        format!("<string>{}</string>", mode_str),
     ];
 
-    if nucleus {
-        program_args.push("<string>--nucleus</string>".to_string());
+    if mode == RunMode::Dual {
+        program_args.push("<string>--port</string>".to_string());
+        program_args.push(format!("<string>{}</string>", nucleus_port));
+        if let Some(secret) = cluster_secret {
+            program_args.push("<string>--secret</string>".to_string());
+            program_args.push(format!("<string>{}</string>", secret));
+        }
     }
+
     if as_exit_node {
         program_args.push("<string>--as-exit-node</string>".to_string());
     }
@@ -424,15 +774,12 @@ fn setup_macos_service(
         home_dir.display()
     );
 
-    // Stop existing service if running
     let _ = Command::new("launchctl")
         .args(["unload", &plist_path.to_string_lossy()])
         .output();
 
-    // Write plist file
     fs::write(&plist_path, plist_content)?;
 
-    // Load and start the service
     let output = Command::new("launchctl")
         .args(["load", &plist_path.to_string_lossy()])
         .output()?;
