@@ -9,5 +9,6 @@ members = [
 ]
 resolver = "2"
 
-[patch."https://github.com/omniedgeio/OmniNervous"]
-omninervous = { path = "../OmniNervous/crates/daemon" }
+# NOTE: Uncomment for local development with OmniNervous
+# [patch."https://github.com/omniedgeio/OmniNervous"]
+# omninervous = { path = "../OmniNervous/crates/daemon" }

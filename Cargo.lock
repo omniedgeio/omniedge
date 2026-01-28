@@ -3308,7 +3308,7 @@ dependencies = [
 
 [[package]]
 name = "omni-proto"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "log",
@@ -3320,7 +3320,7 @@ dependencies = [
 
 [[package]]
 name = "omni-tun"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "log",
@@ -3390,6 +3390,7 @@ dependencies = [
 [[package]]
 name = "omninervous"
 version = "0.2.5"
+source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.2.5#1d336e385964518233f8d4c67855be42706644d3"
 dependencies = [
  "anyhow",
  "base64 0.21.7",

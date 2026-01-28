@@ -14,8 +14,6 @@ flexi_logger = "0.27"
 omni-core = { path = "../omni-core" }
 omni-api = { path = "../omni-api" }
 futures-util = "0.3"
-
-winapi = { version = "0.3", features = ["winbase", "winnt", "securitybaseapi", "handleapi", "namedpipeapi"] }
 omni-proto = { path = "../omni-proto" }
 omni-tun = { path = "../omni-tun" }
 hex = "0.4"
@@ -24,3 +22,4 @@ dotenvy = "0.15"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7"
+winapi = { version = "0.3", features = ["winbase", "winnt", "securitybaseapi", "handleapi", "namedpipeapi"] }
