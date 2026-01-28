@@ -7,14 +7,14 @@
 [![Release Desktop](https://img.shields.io/github/actions/workflow/status/omniedgeio/omniedge/desktop-release.yml?label=Desktop%20Build&style=flat-square)](https://github.com/omniedgeio/omniedge/actions/workflows/desktop-release.yml)
 [![License](https://img.shields.io/github/license/omniedgeio/omniedge?style=flat-square)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
-[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows%20%7C%20freebsd-blue?style=flat-square)](#supported-platforms)
+[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-blue?style=flat-square)](#supported-platforms)
 [![Discord](https://img.shields.io/discord/1234567890?color=5865F2&label=discord&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/d4faRPYj)
 
 OmniEdge enables seamless connectivity between your devices across networks. Perfect for:
 - 🤖 **AI/ML Devices**: NVIDIA Jetson, AI edge computers
 - 🍓 **Raspberry Pi**: All models from Pi 3 to Pi 5
 - 📡 **OpenWrt Routers**: Mesh your network infrastructure
-- 🖥️ **Servers**: Linux, macOS, FreeBSD, Windows
+- 🖥️ **Servers**: Linux, macOS, Windows
 
 ## V2 Migration & License Notice
 
@@ -32,7 +32,7 @@ OmniEdge has transitioned from its legacy Go-based implementation (using n2n and
 - [x] **Verified Stability** - Every release is automatically tested via real-world connectivity probes
 - [x] **Rust Core** - Built for performance and safety with a modular architecture
 - [x] **Real-time heartbeat** - Device online status visible in dashboard
-- [x] **Emerging architectures** - RISC-V, LoongArch, FreeBSD 14
+- [x] **Emerging architectures** - RISC-V 64, ARMv7
 
 [🌐 Website](https://connect.omniedge.io) • [📚 Docs](https://connect.omniedge.io/docs) • [💬 Discord](https://discord.gg/d4faRPYj) • [🐦 Twitter](https://twitter.com/omniedgeio)
 
@@ -43,15 +43,12 @@ OmniEdge has transitioned from its legacy Go-based implementation (using n2n and
 | Platform | Architecture | Package Formats |
 |----------|--------------|-----------------|
 | **Linux** | x86_64 | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
-| **Linux** | ARM64 (aarch64) | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
+| **Linux** | ARM64 (aarch64) | `.tar.gz`, `.deb`, `.rpm` |
 | **Linux** | ARMv7 | `.tar.gz`, `.deb` |
 | **Linux** | RISC-V 64 | `.tar.gz`, `.deb` |
-| **Linux** | LoongArch64 | `.tar.gz` |
 | **macOS** | x86_64 (Intel) | `.tar.gz` |
 | **macOS** | ARM64 (Apple Silicon) | `.tar.gz` |
 | **Windows** | x86_64 | `.zip` |
-| **FreeBSD** | x86_64 | `.tar.gz` |
-| **FreeBSD** | ARM64 | `.tar.gz` |
 
 ### Desktop (`omniedge-desktop`)
 

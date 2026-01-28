@@ -528,10 +528,9 @@ jobs:
           echo "" >> release_notes.md
           echo "| Platform | Architecture | Package |" >> release_notes.md
           echo "|----------|--------------|---------|" >> release_notes.md
-          echo "| Linux | x86_64, ARM64, ARMv7, RISC-V, LoongArch | tar.gz, .deb, .rpm, .AppImage |" >> release_notes.md
+          echo "| Linux | x86_64, ARM64, ARMv7, RISC-V 64 | tar.gz, .deb, .rpm, .AppImage |" >> release_notes.md
           echo "| macOS | x86_64, ARM64 (Apple Silicon) | tar.gz |" >> release_notes.md
           echo "| Windows | x86_64 | .zip |" >> release_notes.md
-          echo "| FreeBSD | x86_64, ARM64 | tar.gz |" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Installation" >> release_notes.md
           echo "" >> release_notes.md
