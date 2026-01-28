@@ -1,0 +1,33 @@
+# Created using winget-create
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.locale.1.6.0.schema.json
+
+PackageIdentifier: OmniEdge.OmniEdgeCLI
+PackageVersion: 2.0.0
+PackageLocale: en-US
+Publisher: OmniEdge
+PublisherUrl: https://omniedge.io
+PublisherSupportUrl: https://github.com/omniedge/omniedge/issues
+PrivacyUrl: https://omniedge.io/privacy
+Author: OmniEdge Team
+PackageName: OmniEdge CLI
+PackageUrl: https://github.com/omniedge/omniedge
+License: GPL-3.0
+LicenseUrl: https://github.com/omniedge/omniedge/blob/main/LICENSE
+Copyright: Copyright (c) 2024 OmniEdge
+ShortDescription: Peer-to-peer VPN CLI for edge computing
+Description: |-
+  OmniEdge CLI is a command-line tool for creating secure, peer-to-peer mesh VPN
+  connections. It enables devices to communicate directly across networks with
+  minimal latency and maximum security, without requiring a central server for
+  data relay.
+Tags:
+  - cli
+  - mesh
+  - network
+  - p2p
+  - peer-to-peer
+  - vpn
+  - wireguard
+ReleaseNotesUrl: https://github.com/omniedge/omniedge/releases/tag/v2.0.0
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

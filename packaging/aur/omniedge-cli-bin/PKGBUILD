@@ -1,0 +1,49 @@
+# Maintainer: OmniEdge Team <support@omniedge.io>
+pkgname=omniedge-cli-bin
+pkgver=2.0.0
+pkgrel=1
+pkgdesc="Peer-to-peer VPN CLI for edge computing"
+arch=('x86_64' 'aarch64')
+url="https://omniedge.io"
+license=('GPL3')
+provides=('omniedge-cli' 'omniedge')
+conflicts=('omniedge-cli' 'omniedge')
+depends=('glibc')
+optdepends=('systemd: for systemd service support')
+
+source_x86_64=("https://github.com/omniedge/omniedge/releases/download/v${pkgver}/omniedge-cli-${pkgver}-linux-x64.tar.gz")
+source_aarch64=("https://github.com/omniedge/omniedge/releases/download/v${pkgver}/omniedge-cli-${pkgver}-linux-arm64.tar.gz")
+
+sha256sums_x86_64=('PLACEHOLDER_SHA256_X64')
+sha256sums_aarch64=('PLACEHOLDER_SHA256_ARM64')
+
+package() {
+    cd "$srcdir"
+    
+    # Find and install the binary
+    if [[ "$CARCH" == "x86_64" ]]; then
+        install -Dm755 "omniedge-cli-${pkgver}-linux-x64" "$pkgdir/usr/bin/omniedge"
+    else
+        install -Dm755 "omniedge-cli-${pkgver}-linux-arm64" "$pkgdir/usr/bin/omniedge"
+    fi
+    
+    # Create systemd service
+    install -Dm644 /dev/stdin "$pkgdir/usr/lib/systemd/system/omniedge.service" <<EOF
+[Unit]
+Description=OmniEdge VPN Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/omniedge start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Create config directory
+    install -dm755 "$pkgdir/etc/omniedge"
+}

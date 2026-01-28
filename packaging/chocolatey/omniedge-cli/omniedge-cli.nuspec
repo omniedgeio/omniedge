@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>omniedge-cli</id>
+    <version>2.0.0</version>
+    <title>OmniEdge CLI</title>
+    <authors>OmniEdge Team</authors>
+    <owners>omniedge</owners>
+    <projectUrl>https://omniedge.io</projectUrl>
+    <projectSourceUrl>https://github.com/omniedge/omniedge</projectSourceUrl>
+    <packageSourceUrl>https://github.com/omniedge/omniedge/tree/main/packaging/chocolatey/omniedge-cli</packageSourceUrl>
+    <bugTrackerUrl>https://github.com/omniedge/omniedge/issues</bugTrackerUrl>
+    <docsUrl>https://omniedge.io/docs</docsUrl>
+    <licenseUrl>https://github.com/omniedge/omniedge/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <iconUrl>https://omniedge.io/favicon.ico</iconUrl>
+    <tags>vpn p2p peer-to-peer mesh network cli wireguard</tags>
+    <summary>Peer-to-peer VPN CLI for edge computing</summary>
+    <description><![CDATA[
+## OmniEdge CLI
+
+OmniEdge CLI is a command-line tool for creating secure, peer-to-peer mesh VPN connections.
+
+### Features
+
+- **Peer-to-peer connections**: Direct device-to-device communication
+- **Mesh networking**: Automatic network topology management
+- **Cross-platform**: Works on Windows, macOS, and Linux
+- **Secure**: Built on WireGuard protocol
+- **Easy to use**: Simple CLI commands
+
+### Usage
+
+```powershell
+# Login to your account
+omniedge login
+
+# Join a virtual network
+omniedge join
+
+# Check status
+omniedge status
+```
+
+### Documentation
+
+For more information, visit [https://omniedge.io/docs](https://omniedge.io/docs)
+]]></description>
+    <releaseNotes>https://github.com/omniedge/omniedge/releases/tag/v2.0.0</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

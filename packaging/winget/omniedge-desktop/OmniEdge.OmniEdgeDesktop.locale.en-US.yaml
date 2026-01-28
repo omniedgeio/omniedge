@@ -1,0 +1,35 @@
+# Created using winget-create
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.locale.1.6.0.schema.json
+
+PackageIdentifier: OmniEdge.OmniEdgeDesktop
+PackageVersion: 2.0.0
+PackageLocale: en-US
+Publisher: OmniEdge
+PublisherUrl: https://omniedge.io
+PublisherSupportUrl: https://github.com/omniedge/omniedge/issues
+PrivacyUrl: https://omniedge.io/privacy
+Author: OmniEdge Team
+PackageName: OmniEdge Desktop
+PackageUrl: https://github.com/omniedge/omniedge
+License: GPL-3.0
+LicenseUrl: https://github.com/omniedge/omniedge/blob/main/LICENSE
+Copyright: Copyright (c) 2024 OmniEdge
+ShortDescription: Peer-to-peer VPN desktop client for edge computing
+Description: |-
+  OmniEdge Desktop is a graphical application for creating secure, peer-to-peer
+  mesh VPN connections. It provides an easy-to-use interface for managing VPN
+  networks, connecting devices, and monitoring connection status. Built with
+  Tauri for a native experience on all platforms.
+Tags:
+  - desktop
+  - gui
+  - mesh
+  - network
+  - p2p
+  - peer-to-peer
+  - tauri
+  - vpn
+  - wireguard
+ReleaseNotesUrl: https://github.com/omniedge/omniedge/releases/tag/v2.0.0
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

@@ -1,0 +1,25 @@
+# Created using winget-create
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+
+PackageIdentifier: OmniEdge.OmniEdgeDesktop
+PackageVersion: 2.0.0
+Platform:
+  - Windows.Desktop
+MinimumOSVersion: 10.0.17763.0
+InstallerType: msi
+Scope: machine
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+InstallerSwitches:
+  Silent: /quiet /norestart
+  SilentWithProgress: /passive /norestart
+UpgradeBehavior: install
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/omniedge/omniedge/releases/download/v2.0.0/omniedge-desktop-2.0.0-windows-x64.msi
+    InstallerSha256: PLACEHOLDER_SHA256_MSI
+ProductCode: "{PLACEHOLDER-PRODUCT-CODE}"
+ManifestType: installer
+ManifestVersion: 1.6.0

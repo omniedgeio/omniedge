@@ -1,0 +1,59 @@
+# Maintainer: OmniEdge Team <support@omniedge.io>
+pkgname=omniedge-desktop-bin
+pkgver=2.0.0
+pkgrel=1
+pkgdesc="Peer-to-peer VPN desktop client for edge computing"
+arch=('x86_64')
+url="https://omniedge.io"
+license=('GPL3')
+provides=('omniedge-desktop')
+conflicts=('omniedge-desktop')
+depends=('gtk3' 'webkit2gtk' 'libayatana-appindicator')
+optdepends=('libappindicator-gtk3: legacy tray icon support')
+
+source_x86_64=("https://github.com/omniedge/omniedge/releases/download/v${pkgver}/omniedge-desktop-${pkgver}-linux-x64.AppImage")
+
+sha256sums_x86_64=('PLACEHOLDER_SHA256')
+
+options=('!strip')
+
+prepare() {
+    cd "$srcdir"
+    chmod +x "omniedge-desktop-${pkgver}-linux-x64.AppImage"
+    ./"omniedge-desktop-${pkgver}-linux-x64.AppImage" --appimage-extract
+}
+
+package() {
+    cd "$srcdir/squashfs-root"
+    
+    # Install the app files
+    install -dm755 "$pkgdir/opt/omniedge-desktop"
+    cp -r usr/* "$pkgdir/opt/omniedge-desktop/"
+    
+    # Install the main binary
+    install -Dm755 "AppRun" "$pkgdir/opt/omniedge-desktop/omniedge-desktop"
+    
+    # Create symlink in /usr/bin
+    install -dm755 "$pkgdir/usr/bin"
+    ln -s "/opt/omniedge-desktop/omniedge-desktop" "$pkgdir/usr/bin/omniedge-desktop"
+    
+    # Install desktop file
+    install -Dm644 "omniedge-desktop.desktop" "$pkgdir/usr/share/applications/omniedge-desktop.desktop"
+    
+    # Fix desktop file paths
+    sed -i 's|Exec=.*|Exec=/usr/bin/omniedge-desktop|g' "$pkgdir/usr/share/applications/omniedge-desktop.desktop"
+    sed -i 's|Icon=.*|Icon=omniedge-desktop|g' "$pkgdir/usr/share/applications/omniedge-desktop.desktop"
+    
+    # Install icons
+    for size in 16 32 64 128 256 512; do
+        if [[ -f "usr/share/icons/hicolor/${size}x${size}/apps/omniedge-desktop.png" ]]; then
+            install -Dm644 "usr/share/icons/hicolor/${size}x${size}/apps/omniedge-desktop.png" \
+                "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/omniedge-desktop.png"
+        fi
+    done
+    
+    # Install SVG icon if available
+    if [[ -f "omniedge-desktop.svg" ]]; then
+        install -Dm644 "omniedge-desktop.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/omniedge-desktop.svg"
+    fi
+}
