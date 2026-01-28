@@ -739,10 +739,25 @@ impl ConnectionManager {
         }
 
         // Sync with backend if connected
+        // IMPORTANT: Must send heartbeat FIRST to update device's is_exit_node status,
+        // then call update_device() to allow it in the network
         let current_net_id = self.current_network_id.read().await.clone();
         if let (Some(client), Some(net_id), Some(dev_id)) =
             (&self.api_client, &current_net_id, &self.device_id)
         {
+            // Step 1: Send heartbeat with new is_exit_node status and wait for it
+            let dev_service = DeviceService::new(client);
+            match dev_service.heartbeat(dev_id, enabled).await {
+                Ok(_) => {
+                    info!("Heartbeat sent with is_exit_node={}", enabled);
+                }
+                Err(e) => {
+                    error!("Failed to send heartbeat with exit node status: {}", e);
+                    // Continue anyway, the periodic heartbeat will eventually sync
+                }
+            }
+
+            // Step 2: Now update the device in the network
             let net_service = NetworkService::new(client);
             if let Err(e) = net_service.update_device(net_id, dev_id, enabled).await {
                 error!("Failed to sync exit node status to backend: {}", e);
@@ -752,12 +767,6 @@ impl ConnectionManager {
             }
         }
 
-        if let Some(tx) = &self.heartbeat_tx {
-            let tx = tx.clone();
-            tokio::spawn(async move {
-                let _ = tx.send(()).await;
-            });
-        }
         Ok(())
     }
 
