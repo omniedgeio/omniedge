@@ -262,7 +262,7 @@ async fn get_virtual_ip(state: tauri::State<'_, AppState>) -> Result<String, Str
                     .as_ref()
                     .and_then(|d| d.as_str())
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| "0.0.0.0".to_string()));
+                    .unwrap_or_default());
             }
             Err(resp.message)
         }

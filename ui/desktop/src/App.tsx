@@ -585,10 +585,10 @@ function App() {
                     <span className="card-label">This Device</span>
                     {status === 'connected' && <span className="network-badge">{networkName}</span>}
                   </div>
-                  <div className="ip-display-large clickable-ip" onClick={() => handleCopyIP(myAPIIP || virtualIP)}>
-                    {myAPIIP || virtualIP || '0.0.0.0'}
-                    <div className={`copy-hint ${copiedIP === (myAPIIP || virtualIP) ? 'copied' : ''}`}>
-                      {copiedIP === (myAPIIP || virtualIP) ? 'Copied!' : 'Click to copy'}
+                  <div className="ip-display-large clickable-ip" onClick={() => handleCopyIP(virtualIP || myAPIIP)}>
+                    {virtualIP || myAPIIP || '0.0.0.0'}
+                    <div className={`copy-hint ${copiedIP === (virtualIP || myAPIIP) ? 'copied' : ''}`}>
+                      {copiedIP === (virtualIP || myAPIIP) ? 'Copied!' : 'Click to copy'}
                     </div>
                   </div>
                 </div>
