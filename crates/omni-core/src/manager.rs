@@ -176,7 +176,8 @@ impl ConnectionManager {
 
         // 0. Register/Update Device
         let os = std::env::consts::OS;
-        let hostname = ::whoami::hostname();
+        let hostname =
+            ::whoami::fallible::hostname().unwrap_or_else(|_| "OmniEdge Device".to_string());
         info!(
             "Registering/Updating device: {} (OS: {}, hardware_id: {})",
             hostname, os, hardware_id

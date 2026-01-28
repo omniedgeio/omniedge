@@ -7,7 +7,7 @@ use omni_core::{CliConfig, ConnectionManager, ConnectionState};
 use std::sync::Arc;
 use tauri::{
     image::Image,
-    menu::{Menu, MenuItem, Submenu},
+    menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, Runtime,
 };
@@ -341,7 +341,7 @@ fn get_hardware_id() -> String {
     }
 
     // Fallback or other platforms
-    let hostname = ::whoami::hostname();
+    let hostname = ::whoami::fallible::hostname().unwrap_or_else(|_| "unknown".to_string());
     let username = ::whoami::username();
     format!("{}-{}", hostname, username)
 }
@@ -385,7 +385,8 @@ async fn connect(
     // Register device if not already registered
     if config.device_uuid.is_none() {
         // Registration is usually handled by the core/API, but let's ensure we have a name
-        let device_name = ::whoami::hostname();
+        let device_name =
+            ::whoami::fallible::hostname().unwrap_or_else(|_| "OmniEdge Device".to_string());
         config.device_name = Some(device_name);
         // device_uuid will be filled after join or we can explicitly register
     }
@@ -713,121 +714,6 @@ async fn get_debug_info(state: tauri::State<'_, AppState>) -> Result<serde_json:
     Ok(serde_json::Value::Object(info))
 }
 
-async fn build_tray_menu<R: Runtime>(
-    app: &tauri::AppHandle<R>,
-    manager: &ConnectionManager,
-) -> Result<Menu<R>, String> {
-    let menu = Menu::new(app).map_err(|e| e.to_string())?;
-
-    let show_i = MenuItem::with_id(app, "show", "Show OmniEdge", true, None::<&str>)
-        .map_err(|e| e.to_string())?;
-    let quit_i =
-        MenuItem::with_id(app, "quit", "Quit", true, None::<&str>).map_err(|e| e.to_string())?;
-
-    // 1. App Name / Version Header
-    let header_name = MenuItem::with_id(app, "header", "OmniEdge", false, None::<&str>)
-        .map_err(|e| e.to_string())?;
-    menu.append(&header_name).map_err(|e| e.to_string())?;
-
-    // 2. Auth Status
-    let auth_status = if manager.get_base_url().is_empty() {
-        "Sign In..."
-    } else {
-        "Logged In"
-    };
-    let auth_i = MenuItem::with_id(app, "auth", auth_status, true, None::<&str>)
-        .map_err(|e| e.to_string())?;
-    menu.append(&auth_i).map_err(|e| e.to_string())?;
-
-    menu.append(&tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
-
-    // 3. Virtual Networks as Submenus
-    if let Ok(networks) = manager.get_networks().await {
-        if networks.is_empty() {
-            let no_net =
-                MenuItem::with_id(app, "no_net", "No Virtual Networks", false, None::<&str>)
-                    .map_err(|e| e.to_string())?;
-            menu.append(&no_net).map_err(|e| e.to_string())?;
-        }
-
-        let connected_id = manager.get_connected_network_id().await;
-
-        for net in networks {
-            let is_connected = connected_id.as_ref() == Some(&net.id);
-            let net_title = if is_connected {
-                format!("{} (Connected)", net.name)
-            } else {
-                net.name.clone()
-            };
-
-            let net_submenu = Submenu::with_id(app, format!("net:{}", net.id), net_title, true)
-                .map_err(|e| e.to_string())?;
-
-            // Submenu Item: Toggle Connection
-            let toggle_id = if is_connected {
-                format!("disconnect:{}", net.id)
-            } else {
-                format!("connect:{}", net.id)
-            };
-            let toggle_text = if is_connected {
-                "Disconnect"
-            } else {
-                "Connect"
-            };
-            let toggle_i = MenuItem::with_id(app, toggle_id, toggle_text, true, None::<&str>)
-                .map_err(|e| e.to_string())?;
-            net_submenu.append(&toggle_i).map_err(|e| e.to_string())?;
-
-            net_submenu
-                .append(
-                    &tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?,
-                )
-                .map_err(|e| e.to_string())?;
-
-            // Submenu Items: Devices
-            if let Ok(devices) = manager.get_network_devices(&net.id).await {
-                if devices.is_empty() {
-                    let no_dev =
-                        MenuItem::with_id(app, "no_dev", "No other devices", false, None::<&str>)
-                            .map_err(|e| e.to_string())?;
-                    net_submenu.append(&no_dev).map_err(|e| e.to_string())?;
-                } else {
-                    for dev in devices {
-                        let status_dot = if dev.online { "● " } else { "○ " };
-                        let dev_text = format!("{}{}", status_dot, dev.name);
-                        let dev_i = MenuItem::with_id(
-                            app,
-                            format!("dev:{}", dev.id),
-                            dev_text,
-                            false,
-                            None::<&str>,
-                        )
-                        .map_err(|e| e.to_string())?;
-                        net_submenu.append(&dev_i).map_err(|e| e.to_string())?;
-                    }
-                }
-            } else {
-                let loading =
-                    MenuItem::with_id(app, "loading", "Loading devices...", false, None::<&str>)
-                        .map_err(|e| e.to_string())?;
-                net_submenu.append(&loading).map_err(|e| e.to_string())?;
-            }
-
-            menu.append(&net_submenu).map_err(|e| e.to_string())?;
-        }
-    }
-
-    menu.append(&tauri::menu::PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
-
-    // 4. Standard Footer
-    menu.append_items(&[&show_i, &quit_i])
-        .map_err(|e| e.to_string())?;
-
-    Ok(menu)
-}
-
 fn update_tray_icon<R: Runtime>(app: &tauri::AppHandle<R>, state: ConnectionState) {
     if let Some(tray) = app.tray_by_id("main") {
         let icon_name = match state {
@@ -966,6 +852,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_os::init())
         .manage(app_state)
         .setup(|app| {
             // macOS Native Menu

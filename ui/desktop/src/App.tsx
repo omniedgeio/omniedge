@@ -28,6 +28,7 @@ function App() {
   const [showSetup, setShowSetup] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
+  const [copiedIP, setCopiedIP] = useState<string | null>(null);
   const appRef = useRef<HTMLDivElement>(null);
 
   // Resize window to fit content
@@ -288,7 +289,8 @@ function App() {
   const handleCopyIP = (ip: string) => {
     if (!ip) return;
     navigator.clipboard.writeText(ip);
-    // Visual feedback could be added here if needed
+    setCopiedIP(ip);
+    setTimeout(() => setCopiedIP(null), 2000);
   };
 
   const handleInstallHelper = async () => {
@@ -426,6 +428,11 @@ function App() {
             <div
               className={`ios-switch header-toggle ${isLoggedIn || isWaitingForBrowser ? 'on' : ''}`}
               onClick={isLoggedIn ? handleLogout : (isWaitingForBrowser ? handleCancelBrowserLogin : handleBrowserLogin)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (isLoggedIn ? handleLogout : (isWaitingForBrowser ? handleCancelBrowserLogin : handleBrowserLogin))(); } }}
+              tabIndex={0}
+              role="switch"
+              aria-checked={isLoggedIn || isWaitingForBrowser}
+              aria-label={isLoggedIn ? 'Sign out' : 'Sign in'}
             >
               <div className="dot">
                 {(isWaitingForBrowser || isLoading) && <div className="loader-mini" style={{ borderTopColor: 'var(--accent-blue)' }}></div>}
@@ -445,9 +452,12 @@ function App() {
           )}
 
           {error && (
-            <div className="error-banner clickable" onClick={handleOpenDebug}>
+            <div className="error-banner">
               <span className="error-text-content">{error}</span>
-              <span className="install-badge">Debug Info</span>
+              <div className="error-actions">
+                <span className="error-dismiss" onClick={() => setError('')}>Dismiss</span>
+                <span className="install-badge clickable" onClick={handleOpenDebug}>Debug</span>
+              </div>
             </div>
           )}
 
@@ -541,7 +551,9 @@ function App() {
                   </div>
                   <div className="ip-display-large clickable-ip" onClick={() => handleCopyIP(myAPIIP || virtualIP)}>
                     {myAPIIP || virtualIP || '0.0.0.0'}
-                    <div className="copy-hint">Click to copy</div>
+                    <div className={`copy-hint ${copiedIP === (myAPIIP || virtualIP) ? 'copied' : ''}`}>
+                      {copiedIP === (myAPIIP || virtualIP) ? 'Copied!' : 'Click to copy'}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -590,6 +602,11 @@ function App() {
                                 e.stopPropagation();
                                 isActive ? handleDisconnect() : handleConnect(net.id);
                               }}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); isActive ? handleDisconnect() : handleConnect(net.id); } }}
+                              tabIndex={0}
+                              role="switch"
+                              aria-checked={isActive}
+                              aria-label={`VPN connection for ${net.name}`}
                             >
                               <div className="dot"></div>
                             </div>
@@ -613,7 +630,12 @@ function App() {
                                     <div className={`online-dot ${dev.online ? 'active' : ''}`}></div>
                                     <span className="dev-name truncate">{dev.name}</span>
                                   </div>
-                                  <span className="dev-ip mono clickable-ip" onClick={() => handleCopyIP(dev.virtual_ip)}>{dev.virtual_ip || '---.---.---.---'}</span>
+                                  <span 
+                                    className={`dev-ip mono clickable-ip ${copiedIP === dev.virtual_ip ? 'copied' : ''}`} 
+                                    onClick={() => handleCopyIP(dev.virtual_ip)}
+                                  >
+                                    {copiedIP === dev.virtual_ip ? 'Copied!' : (dev.virtual_ip || '---.---.---.---')}
+                                  </span>
                                 </div>
                               ))}
                               {networkDevices[net.id] && networkDevices[net.id].length === 0 && (
@@ -647,6 +669,11 @@ function App() {
                     <div
                       className={`ios-switch mini ${isBecomingExitNode ? 'on' : ''}`}
                       onClick={handleToggleIsExitNode}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleIsExitNode(e as any); } }}
+                      tabIndex={0}
+                      role="switch"
+                      aria-checked={isBecomingExitNode}
+                      aria-label="Run this device as exit node"
                     >
                       <div className="dot"></div>
                     </div>

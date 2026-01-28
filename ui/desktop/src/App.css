@@ -332,6 +332,15 @@ body {
     opacity: 0.4;
 }
 
+.copy-hint.copied {
+    opacity: 1 !important;
+    color: var(--status-green);
+}
+
+.dev-ip.clickable-ip.copied {
+    color: var(--status-green);
+}
+
 .profile-bar {
     display: flex;
     align-items: center;
@@ -913,4 +922,345 @@ body {
 
 .mono {
     font-family: "SF Mono", "Menlo", monospace;
+}
+
+/* ============================================
+   PLATFORM-SPECIFIC STYLES
+   ============================================ */
+
+/* ----- Windows Platform ----- */
+:root.platform-windows {
+    /* Windows 11 Fluent Design colors */
+    --menu-bg-light: rgba(243, 243, 243, 0.95);
+    --menu-bg-dark: rgba(32, 32, 32, 0.95);
+    --text-primary: #1a1a1a;
+    --text-primary-dark: #ffffff;
+    --text-secondary: #5d5d5d;
+    --text-secondary-dark: #9d9d9d;
+    --accent-blue: #0078d4;
+    --selection-bg: #0078d4;
+    --divider: rgba(0, 0, 0, 0.08);
+    --divider-dark: rgba(255, 255, 255, 0.08);
+    --status-green: #0f7b0f;
+    --status-red: #c42b1c;
+}
+
+.platform-windows body {
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+}
+
+.platform-windows .app {
+    /* Windows doesn't support backdrop-filter well - use solid with slight transparency */
+    background: var(--menu-bg-light);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 8px;
+    /* Windows 11 style shadow */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+    .platform-windows .app {
+        background: var(--menu-bg-dark);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    }
+}
+
+/* Windows-style toggles (more rectangular) */
+.platform-windows .ios-switch {
+    border-radius: 6px;
+}
+
+.platform-windows .ios-switch .dot {
+    border-radius: 4px;
+}
+
+/* Windows-style buttons */
+.platform-windows .primary-login-btn {
+    border-radius: 4px;
+    box-shadow: none;
+    font-weight: 600;
+}
+
+.platform-windows .primary-login-btn:hover {
+    transform: none;
+    filter: brightness(1.1);
+}
+
+.platform-windows .secondary-btn {
+    border-radius: 4px;
+}
+
+/* Windows-style cards */
+.platform-windows .this-device-card {
+    border-radius: 8px;
+    border: 1px solid var(--divider);
+}
+
+/* Windows monospace font */
+.platform-windows .mono,
+.platform-windows .ip-display-large,
+.platform-windows .dev-ip,
+.platform-windows .log-text {
+    font-family: "Cascadia Code", "Consolas", monospace;
+}
+
+/* ----- Linux Platform ----- */
+:root.platform-linux {
+    /* GNOME Adwaita / GTK4 colors */
+    --menu-bg-light: #fafafa;
+    --menu-bg-dark: #303030;
+    --text-primary: #2e3436;
+    --text-primary-dark: #eeeeec;
+    --text-secondary: #555753;
+    --text-secondary-dark: #babdb6;
+    --accent-blue: #3584e4;
+    --selection-bg: #3584e4;
+    --divider: rgba(0, 0, 0, 0.12);
+    --divider-dark: rgba(255, 255, 255, 0.12);
+    --status-green: #33d17a;
+    --status-red: #e01b24;
+}
+
+.platform-linux body {
+    font-family: "Cantarell", "Noto Sans", "Ubuntu", system-ui, sans-serif;
+    font-size: 14px;
+}
+
+.platform-linux .app {
+    /* Linux: No blur, solid background for compositor compatibility */
+    background: var(--menu-bg-light);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 12px;
+    /* Adwaita-style shadow */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+    .platform-linux .app {
+        background: var(--menu-bg-dark);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+}
+
+/* GTK-style toggles (pill shape but more compact) */
+.platform-linux .ios-switch {
+    border-radius: 14px;
+    height: 22px;
+}
+
+.platform-linux .ios-switch .dot {
+    width: 18px;
+    height: 18px;
+}
+
+/* GTK-style buttons (more rounded, flatter) */
+.platform-linux .primary-login-btn {
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    padding: 12px 24px;
+}
+
+.platform-linux .primary-login-btn:hover {
+    transform: none;
+    filter: brightness(1.05);
+}
+
+.platform-linux .secondary-btn {
+    border-radius: 8px;
+    border: 1px solid var(--divider);
+    background: transparent;
+}
+
+/* GTK-style cards */
+.platform-linux .this-device-card {
+    border-radius: 12px;
+    border: 1px solid var(--divider);
+    background: rgba(0, 0, 0, 0.02);
+}
+
+@media (prefers-color-scheme: dark) {
+    .platform-linux .this-device-card {
+        background: rgba(255, 255, 255, 0.04);
+    }
+}
+
+/* Linux monospace font */
+.platform-linux .mono,
+.platform-linux .ip-display-large,
+.platform-linux .dev-ip,
+.platform-linux .log-text {
+    font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", monospace;
+}
+
+/* Header styling for Linux - more compact */
+.platform-linux .app-header {
+    height: 48px;
+    padding: 0 12px;
+}
+
+/* ----- macOS Platform (default, already optimized) ----- */
+:root.platform-macos {
+    /* Keep existing macOS styling */
+}
+
+.platform-macos body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+
+/* macOS gets the blur effect */
+.platform-macos .app {
+    backdrop-filter: blur(25px) saturate(190%);
+    -webkit-backdrop-filter: blur(25px) saturate(190%);
+}
+
+/* ============================================
+   ACCESSIBILITY IMPROVEMENTS
+   ============================================ */
+
+/* Focus states for keyboard navigation */
+*:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+.ios-switch:focus-visible,
+.primary-login-btn:focus-visible,
+.secondary-btn:focus-visible,
+.network-menu-item:focus-visible,
+.footer-item:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+/* Make interactive elements focusable */
+.ios-switch,
+.network-menu-item,
+.footer-item,
+.exit-option-item,
+.device-row {
+    cursor: pointer;
+}
+
+/* Color-blind friendly status indicators */
+.status-orb::after,
+.online-dot::after,
+.pulse-dot::after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+/* Add patterns for status when in high-contrast mode */
+@media (prefers-contrast: more) {
+    .status-orb.active {
+        border: 2px solid var(--status-green);
+    }
+    
+    .online-dot.active {
+        border: 2px solid var(--status-green);
+    }
+    
+    .pulse-dot {
+        border: 2px solid currentColor;
+    }
+}
+
+/* ============================================
+   UX IMPROVEMENTS
+   ============================================ */
+
+/* Better hover states */
+.network-menu-item {
+    border-radius: 8px;
+    transition: background 0.15s ease;
+}
+
+.network-menu-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+    .network-menu-item:hover {
+        background: rgba(255, 255, 255, 0.06);
+    }
+}
+
+/* Clickable IP styling */
+.clickable-ip {
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.clickable-ip:hover {
+    color: var(--accent-blue);
+}
+
+/* Active/pressed states */
+.primary-login-btn:active {
+    transform: scale(0.98);
+}
+
+.ios-switch:active {
+    transform: scale(0.95);
+}
+
+/* Loading skeleton for device list */
+.loading-devices {
+    padding: 16px 0;
+    text-align: center;
+    font-size: 11px;
+    opacity: 0.5;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.3; }
+}
+
+/* Empty state styling */
+.empty-devices,
+.empty-exit-nodes {
+    padding: 16px 0;
+    text-align: center;
+    font-size: 11px;
+    opacity: 0.4;
+}
+
+/* Improved error banner with retry option */
+.error-text-content {
+    flex: 1;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.error-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.error-dismiss {
+    font-size: 10px;
+    font-weight: 600;
+    opacity: 0.7;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.error-dismiss:hover {
+    opacity: 1;
+}
+
+.install-badge.clickable {
+    cursor: pointer;
+    transition: filter 0.15s;
+}
+
+.install-badge.clickable:hover {
+    filter: brightness(1.1);
 }
