@@ -47,18 +47,18 @@ function App() {
   // Use MutationObserver to detect DOM changes (more reliable than ResizeObserver for content changes)
   useEffect(() => {
     if (!appRef.current) return;
-    
+
     let resizeTimeout: ReturnType<typeof setTimeout>;
-    
+
     const triggerResize = () => {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(resizeToContent, 20);
     };
-    
+
     // ResizeObserver for size changes
     const resizeObserver = new ResizeObserver(triggerResize);
     resizeObserver.observe(appRef.current);
-    
+
     // MutationObserver for DOM structure changes (expand/collapse adds/removes elements)
     const mutationObserver = new MutationObserver(triggerResize);
     mutationObserver.observe(appRef.current, {
@@ -67,10 +67,10 @@ function App() {
       attributes: true,
       attributeFilter: ['class', 'style']
     });
-    
+
     // Initial resize
     resizeToContent();
-    
+
     return () => {
       resizeObserver.disconnect();
       mutationObserver.disconnect();
@@ -666,8 +666,8 @@ function App() {
                                     <div className={`online-dot ${dev.online ? 'active' : ''}`}></div>
                                     <span className="dev-name truncate">{dev.name}</span>
                                   </div>
-                                  <span 
-                                    className={`dev-ip mono clickable-ip ${copiedIP === dev.virtual_ip ? 'copied' : ''}`} 
+                                  <span
+                                    className={`dev-ip mono clickable-ip ${copiedIP === dev.virtual_ip ? 'copied' : ''}`}
                                     onClick={() => handleCopyIP(dev.virtual_ip)}
                                   >
                                     {copiedIP === dev.virtual_ip ? 'Copied!' : (dev.virtual_ip || '---.---.---.---')}
@@ -754,10 +754,6 @@ function App() {
                           <div className="empty-exit-nodes">No devices configured as exit nodes</div>
                         )}
                       </div>
-                    </div>
-                  ) : (
-                    <div className="exit-node-hint">
-                      Connect to a network to route traffic through an exit node
                     </div>
                   )}
                 </div>
