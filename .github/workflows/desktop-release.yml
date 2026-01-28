@@ -94,9 +94,9 @@ jobs:
         with:
           projectPath: ui/desktop
           tagName: ${{ github.ref_name }}
-          releaseName: "OmniEdge Desktop v__VERSION__"
+          releaseName: "omniedge-desktop v__VERSION__"
           releaseBody: |
-            ## OmniEdge Desktop ${{ github.ref_name }}
+            ## omniedge-desktop ${{ github.ref_name }}
             
             ### Downloads
             
@@ -142,7 +142,7 @@ jobs:
       - name: Upload renamed artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: omniedge-desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          name: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: renamed-dist/*
           if-no-files-found: ignore
 
