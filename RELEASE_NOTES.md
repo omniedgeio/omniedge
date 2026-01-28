@@ -1,5 +1,184 @@
 # OmniEdge Release Notes
- 
+
+## v2.0.0 (2026-01-28)
+
+### Complete Rust Rewrite
+
+OmniEdge 2.0 is a **complete ground-up rewrite** from Go/n2n to pure Rust, delivering a modern, high-performance mesh VPN with significantly improved architecture.
+
+### Architecture Changes
+
+| Component | v1.x (Legacy) | v2.0 (New) |
+|-----------|---------------|------------|
+| Language | Go + C (n2n) | Pure Rust |
+| Protocol | n2n supernode/edge | OmniNervous (custom) |
+| TUN Driver | tap-windows, tuntap | omni-tun (native) |
+| Desktop | Wails v3 | Tauri v2 + React |
+| Signaling | n2n supernode | Nucleus server |
+
+### Three-Mode System
+
+The CLI now supports three operational modes:
+
+```bash
+# Edge mode (default) - VPN client
+omniedge join --network <uuid>
+
+# Nucleus mode - Run as signaling/relay server
+omniedge nucleus --port 9876
+
+# Dual mode - Both edge and nucleus
+omniedge dual --network <uuid> --nucleus-port 9876
+```
+
+### New Features
+
+- **Exit Node Support**: Route all traffic through a peer
+  - `--as-exit-node`: Advertise this device as an exit node
+  - `--exit-node <ip>`: Use a specific peer as exit node
+- **Security Key Authentication**: Non-interactive login for automation
+  - `omniedge join -s <security-key> --network <uuid>`
+- **Background Service**: Native service integration
+  - Windows: Windows Service
+  - Linux: systemd unit file
+  - macOS: launchd plist
+- **Custom User Servers**: Users can configure their own nucleus/relay servers via dashboard
+
+### Expanded Platform Support
+
+| Platform | Architectures |
+|----------|---------------|
+| Linux | x86_64, aarch64, armv7, riscv64, loongarch64 |
+| macOS | x86_64, aarch64 (Apple Silicon) |
+| Windows | x86_64 |
+| FreeBSD | x86_64, aarch64 |
+
+### New Packaging Formats
+
+| Format | Platforms |
+|--------|-----------|
+| DEB | amd64, arm64, armhf, riscv64 |
+| RPM | x86_64, aarch64 |
+| AppImage | x86_64, aarch64 |
+| DMG | macOS (x64, arm64) |
+| MSI | Windows x64 |
+| tar.gz/zip | All platforms |
+
+### Desktop Application
+
+- **Tauri v2**: Modern, lightweight desktop framework
+- **React + TypeScript**: Responsive UI
+- **System Tray**: Quick access menu with network switching
+- **Dynamic Positioning**: Window follows tray icon
+- **Cross-Platform**: Windows, macOS, Linux
+
+### Breaking Changes
+
+- **Complete Protocol Change**: v2.0 is **not compatible** with v1.x networks
+  - All devices in a network must upgrade to v2.0
+- **Configuration Format**: New TOML-based config replaces legacy format
+- **CLI Commands**: New command structure
+  - `omniedge start` → `omniedge join`
+  - `omniedge supernode` → `omniedge nucleus`
+- **TUN Interface**: Interface names changed
+  - Linux: `omniedge0` (was `edge0`)
+  - macOS: `utun*` (unchanged)
+  - Windows: `OmniEdge` (was `tap-omniedge`)
+
+### Migration Guide
+
+1. **Backup Configuration**: Export your network settings from dashboard
+2. **Uninstall v1.x**: Remove old OmniEdge installation
+3. **Install v2.0**: Download and install new version
+4. **Re-authenticate**: Login with `omniedge login` or use security key
+5. **Join Network**: Use `omniedge join --network <uuid>`
+
+### Download Packages
+
+#### CLI - Linux
+| Package | Architecture |
+|---------|--------------|
+| `omniedge-cli-v2.0.0-linux-x86_64.tar.gz` | x86_64 |
+| `omniedge-cli-v2.0.0-linux-aarch64.tar.gz` | ARM64 |
+| `omniedge-cli-v2.0.0-linux-armv7.tar.gz` | ARMv7 |
+| `omniedge-cli-v2.0.0-linux-riscv64.tar.gz` | RISC-V 64 |
+| `omniedge-cli-v2.0.0-linux-loongarch64.tar.gz` | LoongArch64 |
+
+#### CLI - DEB Packages
+| Package | Architecture |
+|---------|--------------|
+| `omniedge-cli_2.0.0_amd64.deb` | Debian/Ubuntu x64 |
+| `omniedge-cli_2.0.0_arm64.deb` | Debian/Ubuntu ARM64 |
+| `omniedge-cli_2.0.0_armhf.deb` | Debian/Ubuntu ARMv7 |
+| `omniedge-cli_2.0.0_riscv64.deb` | Debian/Ubuntu RISC-V |
+
+#### CLI - RPM Packages
+| Package | Architecture |
+|---------|--------------|
+| `omniedge-cli-2.0.0-1.x86_64.rpm` | Fedora/RHEL x64 |
+| `omniedge-cli-2.0.0-1.aarch64.rpm` | Fedora/RHEL ARM64 |
+
+#### CLI - AppImage
+| Package | Architecture |
+|---------|--------------|
+| `omniedge-cli-2.0.0-x86_64.AppImage` | Linux x64 |
+| `omniedge-cli-2.0.0-aarch64.AppImage` | Linux ARM64 |
+
+#### CLI - Other Platforms
+| Package | Platform |
+|---------|----------|
+| `omniedge-cli-v2.0.0-macos-x86_64.tar.gz` | macOS Intel |
+| `omniedge-cli-v2.0.0-macos-aarch64.tar.gz` | macOS Apple Silicon |
+| `omniedge-cli-v2.0.0-windows-x86_64.zip` | Windows x64 |
+| `omniedge-cli-v2.0.0-freebsd-x86_64.tar.gz` | FreeBSD x64 |
+| `omniedge-cli-v2.0.0-freebsd-aarch64.tar.gz` | FreeBSD ARM64 |
+
+#### Desktop Applications
+| Package | Platform |
+|---------|----------|
+| `omniedge-desktop-2.0.0-windows-x64.msi` | Windows x64 |
+| `omniedge-desktop-2.0.0-macos-x64.dmg` | macOS Intel |
+| `omniedge-desktop-2.0.0-macos-arm64.dmg` | macOS Apple Silicon |
+| `omniedge-desktop-2.0.0-linux-amd64.deb` | Linux x64 DEB |
+| `omniedge-desktop-2.0.0-linux-amd64.rpm` | Linux x64 RPM |
+| `omniedge-desktop-2.0.0-linux-amd64.AppImage` | Linux x64 AppImage |
+
+### Installation
+
+#### Quick Install (Linux/macOS)
+```bash
+curl -fsSL https://omniedge.io/install.sh | bash
+```
+
+#### Package Managers
+```bash
+# Debian/Ubuntu
+sudo dpkg -i omniedge-cli_2.0.0_amd64.deb
+
+# Fedora/RHEL
+sudo rpm -i omniedge-cli-2.0.0-1.x86_64.rpm
+
+# AppImage
+chmod +x omniedge-cli-2.0.0-x86_64.AppImage
+./omniedge-cli-2.0.0-x86_64.AppImage
+```
+
+#### macOS
+```bash
+# Download and extract
+tar -xzf omniedge-cli-v2.0.0-macos-aarch64.tar.gz
+sudo mv omniedge /usr/local/bin/
+
+# Or use Homebrew (coming soon)
+brew install omniedge
+```
+
+### Contributors
+
+Thank you to all contributors who made this major release possible!
+
+---
+
 ## v1.0.2-beta.0 (2026-01-12)
 ### 🚀 New Features & Improvements
 - **Advanced Exit Node Support**: 
