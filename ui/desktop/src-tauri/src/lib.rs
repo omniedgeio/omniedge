@@ -5,9 +5,10 @@ use omni_api::types::{
 };
 use omni_core::{CliConfig, ConnectionManager, ConnectionState};
 use std::sync::Arc;
+#[cfg(target_os = "macos")]
+use tauri::menu::{Menu, MenuItem};
 use tauri::{
     image::Image,
-    menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, Runtime,
 };
@@ -804,34 +805,107 @@ async fn resize_window(app: tauri::AppHandle, height: u32) -> Result<(), String>
         // Get current scale factor for proper sizing
         let scale_factor = window.scale_factor().unwrap_or(1.0);
 
+        // Get current window position before resizing
+        let current_pos = window
+            .outer_position()
+            .unwrap_or(tauri::PhysicalPosition::new(0, 0));
+        let old_size = window
+            .outer_size()
+            .unwrap_or(tauri::PhysicalSize::new(320, 480));
+
         // Set the window size using logical size (will be converted to physical)
         let logical_size = tauri::LogicalSize::new(320, clamped_height);
         window.set_size(logical_size).map_err(|e| e.to_string())?;
 
+        // Get the new size after resize
+        let new_size = window
+            .outer_size()
+            .unwrap_or(tauri::PhysicalSize::new(320, clamped_height));
+        let height_diff = new_size.height as i32 - old_size.height as i32;
+
+        // If window grew taller, move it up so content expands upward (tray app behavior)
+        // This keeps the bottom of the window anchored near the taskbar
+        if height_diff != 0 {
+            if let Ok(Some(monitor)) = window.current_monitor() {
+                let monitor_pos = monitor.position();
+                let padding = (12.0 * scale_factor) as i32;
+
+                // Calculate new Y position (move up by the height difference)
+                let mut new_y = current_pos.y - height_diff;
+
+                // Ensure window doesn't go above the screen top
+                if new_y < monitor_pos.y + padding {
+                    new_y = monitor_pos.y + padding;
+                }
+
+                let _ = window.set_position(tauri::PhysicalPosition::new(current_pos.x, new_y));
+            }
+        }
+
         info!(
-            "Window resized to height: {} (scale: {})",
-            clamped_height, scale_factor
+            "Window resized to height: {} (scale: {}, height_diff: {})",
+            clamped_height, scale_factor, height_diff
         );
     }
     Ok(())
 }
 
-fn toggle_window<R: Runtime>(app: &tauri::AppHandle<R>) {
+fn toggle_window<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    tray_position: Option<tauri::PhysicalPosition<f64>>,
+) {
     if let Some(window) = app.get_webview_window("main") {
         let is_visible = window.is_visible().unwrap_or(false);
         if is_visible {
             window.hide().unwrap();
         } else {
-            // Position in center of screen
+            // Position near system tray (bottom-right on Windows)
             if let Ok(Some(monitor)) = window.current_monitor() {
-                let size = window
-                    .inner_size()
+                let window_size = window
+                    .outer_size()
                     .unwrap_or(tauri::PhysicalSize::new(320, 480));
                 let monitor_size = monitor.size();
                 let monitor_pos = monitor.position();
+                let scale_factor = monitor.scale_factor();
 
-                let x = monitor_pos.x + (monitor_size.width as i32 - size.width as i32) / 2;
-                let y = monitor_pos.y + (monitor_size.height as i32 - size.height as i32) / 2;
+                // Estimate taskbar height (typically 40-48 pixels on Windows at 100% scale)
+                let taskbar_height = (48.0 * scale_factor) as i32;
+                // Padding from screen edge
+                let padding = (12.0 * scale_factor) as i32;
+
+                let (x, y) = if let Some(tray_pos) = tray_position {
+                    // Position window centered above the tray icon click position
+                    let tray_x = tray_pos.x as i32;
+                    let tray_y = tray_pos.y as i32;
+
+                    // Center horizontally on tray icon, but keep within screen bounds
+                    let mut x = tray_x - (window_size.width as i32 / 2);
+                    // Position above the tray click (above taskbar)
+                    let y = tray_y - window_size.height as i32 - padding;
+
+                    // Ensure window stays within screen bounds
+                    let screen_right = monitor_pos.x + monitor_size.width as i32;
+                    let screen_left = monitor_pos.x;
+
+                    if x + window_size.width as i32 > screen_right - padding {
+                        x = screen_right - window_size.width as i32 - padding;
+                    }
+                    if x < screen_left + padding {
+                        x = screen_left + padding;
+                    }
+
+                    (x, y.max(monitor_pos.y + padding))
+                } else {
+                    // Fallback: position at bottom-right corner above taskbar
+                    let x = monitor_pos.x + monitor_size.width as i32
+                        - window_size.width as i32
+                        - padding;
+                    let y = monitor_pos.y + monitor_size.height as i32
+                        - window_size.height as i32
+                        - taskbar_height
+                        - padding;
+                    (x, y)
+                };
 
                 let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
             }
@@ -889,58 +963,19 @@ pub fn run() {
                 app.set_menu(app_menu)?;
             }
 
-            let tray_menu = Menu::new(app)?;
-            let show_i = MenuItem::with_id(app, "show", "Show OmniEdge", true, None::<&str>)?;
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            tray_menu.append_items(&[
-                &show_i,
-                &tauri::menu::PredefinedMenuItem::separator(app)?,
-                &quit_i,
-            ])?;
-
+            // Tray icon - left click only, no right-click menu
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
-                .menu(&tray_menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| {
-                    let id = event.id.as_ref();
-                    if id == "quit" {
-                        let handle = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            let state = handle.state::<AppState>();
-                            let _ = disconnect(handle.clone(), state).await;
-                            handle.exit(0);
-                        });
-                    } else if id == "show" {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    } else if id.starts_with("connect:") {
-                        let network_id = id.strip_prefix("connect:").unwrap().to_string();
-                        let handle = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            let state = handle.state::<AppState>();
-                            let _ =
-                                connect(handle.clone(), state, network_id, None, None, None).await;
-                        });
-                    } else if id.starts_with("disconnect:") {
-                        let handle = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            let state = handle.state::<AppState>();
-                            let _ = disconnect(handle.clone(), state).await;
-                        });
-                    }
-                })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
+                        position,
                         ..
                     } = event
                     {
                         let app = tray.app_handle();
-                        toggle_window(app);
+                        toggle_window(app, Some(position));
                     }
                 })
                 .build(app)?;
@@ -1023,18 +1058,17 @@ pub fn run() {
                 }
             });
 
-            /*
+            // Hide window when it loses focus (native tray app behavior)
             if let Some(window) = app.get_webview_window("main") {
                 let w = window.clone();
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::Focused(focused) = event {
                         if !focused {
-                            w.hide().unwrap();
+                            let _ = w.hide();
                         }
                     }
                 });
             }
-            */
 
             Ok(())
         })
