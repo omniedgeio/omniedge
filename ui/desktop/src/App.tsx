@@ -34,12 +34,15 @@ function App() {
   // Resize window to fit content
   const resizeToContent = useCallback(async () => {
     if (appRef.current) {
-      const height = appRef.current.scrollHeight;
+      // Get the actual content height from the app container
+      const contentHeight = appRef.current.scrollHeight;
       // Clamp height between min and max for usability
       const minHeight = 200;
       const maxHeight = 700;
-      const clampedHeight = Math.max(minHeight, Math.min(maxHeight, height + 4));
+      const clampedHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight));
+      
       const window = getCurrentWindow();
+      // Set both the native window size - this automatically syncs the webview
       await window.setSize(new LogicalSize(320, clampedHeight));
     }
   }, []);
@@ -48,19 +51,21 @@ function App() {
   useEffect(() => {
     if (!appRef.current) return;
     
+    let resizeTimeout: ReturnType<typeof setTimeout>;
     const observer = new ResizeObserver(() => {
-      // Debounce resize calls to avoid flickering
-      resizeToContent();
+      // Debounce resize calls to avoid flickering during animations
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(resizeToContent, 16); // ~1 frame at 60fps
     });
     
     observer.observe(appRef.current);
     
-    // Also trigger resize on state changes for immediate feedback
-    const timer = setTimeout(resizeToContent, 10);
+    // Initial resize
+    resizeToContent();
     
     return () => {
       observer.disconnect();
-      clearTimeout(timer);
+      clearTimeout(resizeTimeout);
     };
   }, [resizeToContent]);
 

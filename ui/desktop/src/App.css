@@ -24,11 +24,18 @@
     cursor: default;
 }
 
+html, body, #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     background: transparent;
     color: var(--text-primary);
-    overflow: hidden;
     font-size: 13px;
     line-height: normal;
 }
@@ -40,7 +47,8 @@ body {
 }
 
 .app {
-    width: 320px;
+    width: 100%;
+    min-height: 100%;
     background: var(--menu-bg-light);
     backdrop-filter: blur(25px) saturate(190%);
     -webkit-backdrop-filter: blur(25px) saturate(190%);
