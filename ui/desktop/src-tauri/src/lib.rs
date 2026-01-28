@@ -793,6 +793,29 @@ async fn open_logs(_app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn resize_window(app: tauri::AppHandle, height: u32) -> Result<(), String> {
+    use tauri::Manager;
+
+    if let Some(window) = app.get_webview_window("main") {
+        // Clamp height between min and max
+        let clamped_height = height.max(200).min(700);
+
+        // Get current scale factor for proper sizing
+        let scale_factor = window.scale_factor().unwrap_or(1.0);
+
+        // Set the window size using logical size (will be converted to physical)
+        let logical_size = tauri::LogicalSize::new(320, clamped_height);
+        window.set_size(logical_size).map_err(|e| e.to_string())?;
+
+        info!(
+            "Window resized to height: {} (scale: {})",
+            clamped_height, scale_factor
+        );
+    }
+    Ok(())
+}
+
 fn toggle_window<R: Runtime>(app: &tauri::AppHandle<R>) {
     if let Some(window) = app.get_webview_window("main") {
         let is_visible = window.is_visible().unwrap_or(false);
@@ -1036,6 +1059,7 @@ pub fn run() {
             wait_for_session_login,
             open_browser,
             open_logs,
+            resize_window,
             check_is_admin,
             check_helper,
             install_helper,

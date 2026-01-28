@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import logo from './assets/logo.png';
 
 function App() {
@@ -36,13 +35,12 @@ function App() {
     if (appRef.current) {
       // Use offsetHeight to get the actual rendered height of content
       const contentHeight = appRef.current.offsetHeight;
-      // Clamp height between min and max for usability
-      const minHeight = 200;
-      const maxHeight = 700;
-      const clampedHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight));
-      
-      const tauriWindow = getCurrentWindow();
-      await tauriWindow.setSize(new LogicalSize(320, clampedHeight));
+      // Call Rust command to resize window (handles both native window and webview)
+      try {
+        await invoke('resize_window', { height: contentHeight });
+      } catch (e) {
+        console.error('Failed to resize window:', e);
+      }
     }
   }, []);
 
