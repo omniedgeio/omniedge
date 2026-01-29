@@ -3,11 +3,11 @@
 set -e
 
 # OmniEdge CLI Install Script
-# Usage: curl https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/scripts/omniedge-install.sh | bash
-# Manual version: curl https://raw.githubusercontent.com/omniedgeio/omniedge/refs/heads/main/scripts/omniedge-install.sh | OMNIEDGE_VERSION=v1.0.0 bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/main/scripts/omniedge-install.sh | bash
+# Manual version: curl -fsSL https://raw.githubusercontent.com/omniedgeio/omniedge/main/scripts/omniedge-install.sh | OMNIEDGE_VERSION=v2.0.0 bash
 
 REPO="omniedgeio/omniedge"
-PKG_NAME="omniedge"
+PKG_NAME="omniedge-cli"
 BIN_DIR="/usr/local/bin"
 DEFAULT_VERSION="latest"
 
@@ -24,7 +24,6 @@ setup_env() {
     fi
 }
 
-# --- get latest version from GitHub API ---
 # --- get latest version from GitHub ---
 get_latest_version() {
     # If OMNIEDGE_VERSION is set in environment, use it
@@ -62,7 +61,6 @@ download_and_verify() {
     get_latest_version
     setup_verify_arch
     verify_downloader curl || verify_downloader wget || fatal 'Cannot find curl or wget for downloading files'
-    verify_unzip unzip || fatal 'Cannot find unzip'
     setup_tmp
     download_binary
     setup_binary
@@ -70,21 +68,22 @@ download_and_verify() {
 
 output_usage(){
     echo ""
-    echo "${GREEN}✓ OmniEdge CLI installed successfully!${NC}"
+    echo "${GREEN}OmniEdge CLI installed successfully!${NC}"
     echo ""
     echo "Usage:"
     echo "  ${YELLOW}omniedge login -u your@email.com${NC}    # Login with email"
     echo "  ${YELLOW}omniedge login -s YOUR_SECRET_KEY${NC}   # Login with API key"
-    echo "  ${YELLOW}sudo omniedge join${NC}                  # Join a network"
+    echo "  ${YELLOW}sudo omniedge start -n <network_id>${NC} # Start VPN connection"
+    echo "  ${YELLOW}omniedge status${NC}                     # Check connection status"
     echo ""
-    echo "Documentation: https://connect.omniedge.io/docs"
+    echo "Documentation: https://omniedge.io/docs"
     echo ""
 }
 
 # --- create temporary directory and cleanup when done ---
 setup_tmp() {
     TMP_DIR=$(mktemp -d -t omniedge-install.XXXXXXXXXX)
-    TMP_ZIP=${TMP_DIR}/omniedge.zip
+    TMP_ARCHIVE=${TMP_DIR}/omniedge.tar.gz
     TMP_BIN=${TMP_DIR}/omniedge.bin
     cleanup() {
         code=$?
@@ -100,39 +99,34 @@ setup_tmp() {
 download_binary() {
     OS=$(uname)
     BIN_URL=""
+    # Remove 'v' prefix from VERSION for artifact naming (workflow uses version without 'v')
+    VERSION_NUM="${VERSION#v}"
     
     if [ "$OS" = "Darwin" ]; then
-        # macOS - arm64 only (Apple Silicon)
-        if [ "$ARCH" != "arm64" ]; then
-            fatal "macOS amd64 is not supported. Please use an Apple Silicon Mac (M1/M2/M3/M4)."
-        fi
-        BIN_URL="https://github.com/${REPO}/releases/download/${VERSION}/${PKG_NAME}-${VERSION}-macos-arm64.zip"
-    elif [ "$OS" = "FreeBSD" ]; then
-        BIN_URL="https://github.com/${REPO}/releases/download/${VERSION}/${PKG_NAME}-${VERSION}-freebsd-14.zip"
+        # macOS - both x64 and arm64 supported
+        BIN_URL="https://github.com/${REPO}/releases/download/${VERSION}/${PKG_NAME}-${VERSION_NUM}-macos-${SUFFIX}.tar.gz"
     else
         # Linux
-        # Determine if we need the openwrt- prefix (for mips/mipsle)
-        case $ARCH in
-            mips*|mipsle*)
-                BIN_URL="https://github.com/${REPO}/releases/download/${VERSION}/${PKG_NAME}-${VERSION}-openwrt-${SUFFIX}.zip"
-                ;;
-            *)
-                BIN_URL="https://github.com/${REPO}/releases/download/${VERSION}/${PKG_NAME}-${VERSION}-${SUFFIX}.zip"
-                ;;
-        esac
+        BIN_URL="https://github.com/${REPO}/releases/download/${VERSION}/${PKG_NAME}-${VERSION_NUM}-linux-${SUFFIX}.tar.gz"
     fi
     
     info "Downloading ${BIN_URL}"
-    download ${TMP_ZIP} ${BIN_URL}
+    download ${TMP_ARCHIVE} ${BIN_URL}
 }
 
 # --- setup permissions and move binary to system directory ---
 setup_binary() {
     info "Extracting omniedge..."
-    $UNZIP -o ${TMP_ZIP} -d ${TMP_BIN} >/dev/null 2>&1
+    mkdir -p ${TMP_BIN}
+    tar -xzf ${TMP_ARCHIVE} -C ${TMP_BIN}
     
-    # Find the omniedge binary (might be in root or subdirectory)
-    OMNIEDGE_BIN=$(find ${TMP_BIN} -name "omniedge" -type f | head -1)
+    # Find the omniedge binary (the extracted binary has a versioned name like omniedge-cli-2.0.0-linux-x64)
+    OMNIEDGE_BIN=$(find ${TMP_BIN} -type f -perm -111 | head -1)
+    
+    if [ -z "$OMNIEDGE_BIN" ]; then
+        # Try finding by name pattern
+        OMNIEDGE_BIN=$(find ${TMP_BIN} -name "omniedge-cli-*" -type f | head -1)
+    fi
     
     if [ -z "$OMNIEDGE_BIN" ]; then
         fatal "Failed to find omniedge binary in archive"
@@ -151,7 +145,7 @@ setup_verify_arch() {
     case $ARCH in
     amd64|x86_64)
         ARCH=amd64
-        SUFFIX=amd64
+        SUFFIX=x64
         ;;
     arm64|aarch64|armv8*)
         ARCH=arm64
@@ -159,26 +153,14 @@ setup_verify_arch() {
         ;;
     arm*|armv7l)
         ARCH=arm
-        SUFFIX=arm
+        SUFFIX=armv7
         ;;
     riscv64)
         ARCH=riscv64
         SUFFIX=riscv64
         ;;
-    loongarch64)
-        ARCH=loongarch64
-        SUFFIX=loongarch64
-        ;;
-    mips)
-        ARCH=mips
-        SUFFIX=mips
-        ;;
-    mipsel|mipsle)
-        ARCH=mipsle
-        SUFFIX=mipsle
-        ;;
     *)
-        fatal "Unsupported architecture: $ARCH"
+        fatal "Unsupported architecture: $ARCH. Supported: x86_64, arm64, armv7, riscv64"
         ;;
     esac
     info "Detected architecture: $ARCH"
@@ -188,13 +170,6 @@ setup_verify_arch() {
 verify_downloader() {
     [ -x "$(command -v $1)" ] || return 1
     DOWNLOADER=$1
-    return 0
-}
-
-# --- verify unzip ---
-verify_unzip() {
-    [ -x "$(command -v $1)" ] || return 1
-    UNZIP=$1
     return 0
 }
 

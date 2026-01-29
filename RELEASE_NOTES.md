@@ -10,34 +10,34 @@ OmniEdge 2.0 is a **complete ground-up rewrite** from Go/n2n to pure Rust, deliv
 
 Validated through [50-run longitudinal testing](https://github.com/omniedgeio/OmniNervous/blob/main/Capability_test/cloud_test_50_run_paper.md) using Process Capability Analysis (Cpk):
 
-| Metric | OmniEdge Tunnel | Raw Internet | Improvement |
-|--------|-----------------|--------------|-------------|
-| **Latency** | 54.69ms | 54.36ms | +0.3ms overhead |
-| **Latency Stability (Cpk)** | **2.92 (6-Sigma)** | 6.47 | Near-deterministic |
-| **Throughput** | **484.7 Mbps** | 344.1 Mbps | **+140.8%** |
-| **Jitter (StdDev)** | 0.057ms | 0.026ms | Bounded, predictable |
+| Metric                      | OmniEdge Tunnel    | Raw Internet | Improvement          |
+| --------------------------- | ------------------ | ------------ | -------------------- |
+| **Latency**                 | 54.69ms            | 54.36ms      | +0.3ms overhead      |
+| **Latency Stability (Cpk)** | **2.92 (6-Sigma)** | 6.47         | Near-deterministic   |
+| **Throughput**              | **484.7 Mbps**     | 344.1 Mbps   | **+140.8%**          |
+| **Jitter (StdDev)**         | 0.057ms            | 0.026ms      | Bounded, predictable |
 
 > **What this means**: Cpk > 2.0 indicates industrial-grade process capability. OmniEdge provides deterministic, jitter-controlled networking suitable for real-time robot control and latency-sensitive AI inference.
 
 ### Architecture Changes
 
-| Component | v1.x (Legacy) | v2.0 (New) |
-|-----------|---------------|------------|
-| Language | Go + C (n2n) | Pure Rust |
-| Protocol | n2n supernode/edge | OmniNervous (WireGuard-based) |
-| TUN Driver | tap-windows, tuntap | omni-tun (native) |
-| Desktop | Wails v3 | Tauri v2 + React |
-| Signaling | n2n supernode | Nucleus server |
+| Component  | v1.x (Legacy)       | v2.0 (New)                    |
+| ---------- | ------------------- | ----------------------------- |
+| Language   | Go + C (n2n)        | Pure Rust                     |
+| Protocol   | n2n supernode/edge  | OmniNervous (WireGuard-based) |
+| TUN Driver | tap-windows, tuntap | omni-tun (native)             |
+| Desktop    | Wails v3            | Tauri v2 + React              |
+| Signaling  | n2n supernode       | Nucleus server                |
 
 ### Three-Mode System
 
 The CLI now supports three operational modes via `--mode`:
 
-| Mode | Description | Auth Required | VPN Tunnel | Signaling Server |
-|------|-------------|---------------|------------|------------------|
-| **edge** (default) | Regular VPN client | Yes | Yes | No |
-| **nucleus** | Signaling server only | No | No | Yes |
-| **dual** | VPN client + signaling | Yes | Yes | Yes |
+| Mode               | Description            | Auth Required | VPN Tunnel | Signaling Server |
+| ------------------ | ---------------------- | ------------- | ---------- | ---------------- |
+| **edge** (default) | Regular VPN client     | Yes           | Yes        | No               |
+| **nucleus**        | Signaling server only  | No            | No         | Yes              |
+| **dual**           | VPN client + signaling | Yes           | Yes        | Yes              |
 
 ```bash
 # Edge mode (default) - VPN client
@@ -79,23 +79,23 @@ omniedge start -n <network_id> --mode dual
 
 ### Expanded Platform Support
 
-| Platform | Architectures |
-|----------|---------------|
-| Linux | x86_64, aarch64, armv7, riscv64, loongarch64 |
-| macOS | x86_64, aarch64 (Apple Silicon) |
-| Windows | x86_64 |
-| FreeBSD | x86_64, aarch64 |
+| Platform | Architectures                   |
+| -------- | ------------------------------- |
+| Linux    | x86_64, aarch64, riscv64        |
+| macOS    | x86_64, aarch64 (Apple Silicon) |
+| Windows  | x86_64                          |
+| FreeBSD  | x86_64, aarch64                 |
 
 ### New Packaging Formats
 
-| Format | Platforms |
-|--------|-----------|
-| DEB | amd64, arm64, armhf, riscv64 |
-| RPM | x86_64, aarch64 |
-| AppImage | x86_64, aarch64 |
-| DMG | macOS (x64, arm64) |
-| MSI | Windows x64 |
-| tar.gz/zip | All platforms |
+| Format     | Platforms             |
+| ---------- | --------------------- |
+| DEB        | amd64, arm64, riscv64 |
+| RPM        | x86_64, aarch64       |
+| AppImage   | x86_64, aarch64       |
+| DMG        | macOS (x64, arm64)    |
+| MSI        | Windows x64           |
+| tar.gz/zip | All platforms         |
 
 ### Desktop Application
 
@@ -127,52 +127,47 @@ omniedge start -n <network_id> --mode dual
 ### Download Packages
 
 #### CLI - Linux
-| Package | Architecture |
-|---------|--------------|
-| `omniedge-cli-v2.0.0-linux-x86_64.tar.gz` | x86_64 |
-| `omniedge-cli-v2.0.0-linux-aarch64.tar.gz` | ARM64 |
-| `omniedge-cli-v2.0.0-linux-armv7.tar.gz` | ARMv7 |
-| `omniedge-cli-v2.0.0-linux-riscv64.tar.gz` | RISC-V 64 |
-| `omniedge-cli-v2.0.0-linux-loongarch64.tar.gz` | LoongArch64 |
+| Package                                    | Architecture |
+| ------------------------------------------ | ------------ |
+| `omniedge-cli-v2.0.0-linux-x86_64.tar.gz`  | x86_64       |
+| `omniedge-cli-v2.0.0-linux-aarch64.tar.gz` | ARM64        |
+| `omniedge-cli-v2.0.0-linux-riscv64.tar.gz` | RISC-V 64    |
 
 #### CLI - DEB Packages
-| Package | Architecture |
-|---------|--------------|
-| `omniedge-cli_2.0.0_amd64.deb` | Debian/Ubuntu x64 |
-| `omniedge-cli_2.0.0_arm64.deb` | Debian/Ubuntu ARM64 |
-| `omniedge-cli_2.0.0_armhf.deb` | Debian/Ubuntu ARMv7 |
+| Package                          | Architecture         |
+| -------------------------------- | -------------------- |
+| `omniedge-cli_2.0.0_amd64.deb`   | Debian/Ubuntu x64    |
+| `omniedge-cli_2.0.0_arm64.deb`   | Debian/Ubuntu ARM64  |
 | `omniedge-cli_2.0.0_riscv64.deb` | Debian/Ubuntu RISC-V |
 
 #### CLI - RPM Packages
-| Package | Architecture |
-|---------|--------------|
-| `omniedge-cli-2.0.0-1.x86_64.rpm` | Fedora/RHEL x64 |
+| Package                            | Architecture      |
+| ---------------------------------- | ----------------- |
+| `omniedge-cli-2.0.0-1.x86_64.rpm`  | Fedora/RHEL x64   |
 | `omniedge-cli-2.0.0-1.aarch64.rpm` | Fedora/RHEL ARM64 |
 
 #### CLI - AppImage
-| Package | Architecture |
-|---------|--------------|
-| `omniedge-cli-2.0.0-x86_64.AppImage` | Linux x64 |
-| `omniedge-cli-2.0.0-aarch64.AppImage` | Linux ARM64 |
+| Package                               | Architecture |
+| ------------------------------------- | ------------ |
+| `omniedge-cli-2.0.0-x86_64.AppImage`  | Linux x64    |
+| `omniedge-cli-2.0.0-aarch64.AppImage` | Linux ARM64  |
 
 #### CLI - Other Platforms
-| Package | Platform |
-|---------|----------|
-| `omniedge-cli-v2.0.0-macos-x86_64.tar.gz` | macOS Intel |
+| Package                                    | Platform            |
+| ------------------------------------------ | ------------------- |
+| `omniedge-cli-v2.0.0-macos-x86_64.tar.gz`  | macOS Intel         |
 | `omniedge-cli-v2.0.0-macos-aarch64.tar.gz` | macOS Apple Silicon |
-| `omniedge-cli-v2.0.0-windows-x86_64.zip` | Windows x64 |
-| `omniedge-cli-v2.0.0-freebsd-x86_64.tar.gz` | FreeBSD x64 |
-| `omniedge-cli-v2.0.0-freebsd-aarch64.tar.gz` | FreeBSD ARM64 |
+| `omniedge-cli-v2.0.0-windows-x86_64.zip`   | Windows x64         |
 
 #### Desktop Applications
-| Package | Platform |
-|---------|----------|
-| `omniedge-desktop-2.0.0-windows-x64.msi` | Windows x64 |
-| `omniedge-desktop-2.0.0-macos-x64.dmg` | macOS Intel |
-| `omniedge-desktop-2.0.0-macos-arm64.dmg` | macOS Apple Silicon |
-| `omniedge-desktop-2.0.0-linux-amd64.deb` | Linux x64 DEB |
-| `omniedge-desktop-2.0.0-linux-amd64.rpm` | Linux x64 RPM |
-| `omniedge-desktop-2.0.0-linux-amd64.AppImage` | Linux x64 AppImage |
+| Package                                       | Platform            |
+| --------------------------------------------- | ------------------- |
+| `omniedge-desktop-2.0.0-windows-x64.msi`      | Windows x64         |
+| `omniedge-desktop-2.0.0-macos-x64.dmg`        | macOS Intel         |
+| `omniedge-desktop-2.0.0-macos-arm64.dmg`      | macOS Apple Silicon |
+| `omniedge-desktop-2.0.0-linux-amd64.deb`      | Linux x64 DEB       |
+| `omniedge-desktop-2.0.0-linux-amd64.rpm`      | Linux x64 RPM       |
+| `omniedge-desktop-2.0.0-linux-amd64.AppImage` | Linux x64 AppImage  |
 
 ### Installation
 
@@ -287,39 +282,39 @@ Release Notes
 ## 📦 Download Packages
 
 ### Desktop Apps
-| Package | Platform |
-|---------|----------|
-| `omniedge-desktop-1.0.0-windows-amd64.exe` | Windows (NSIS Installer) |
-| `omniedge-desktop-1.0.0-macos-arm64.dmg` | macOS (Apple Silicon) |
-| `omniedge-desktop-1.0.0-linux-amd64.deb` | Ubuntu/Debian |
-| `omniedge-desktop-1.0.0-linux-amd64.rpm` | Fedora/RHEL |
-| `omniedge-desktop-1.0.0-linux-amd64.AppImage` | Universal Linux |
-| `omniedge-desktop-1.0.0-linux-amd64.flatpak` | Flatpak |
-| `omniedge-desktop-1.0.0-linux-amd64-arch.tar.gz` | Arch Linux |
+| Package                                          | Platform                 |
+| ------------------------------------------------ | ------------------------ |
+| `omniedge-desktop-1.0.0-windows-amd64.exe`       | Windows (NSIS Installer) |
+| `omniedge-desktop-1.0.0-macos-arm64.dmg`         | macOS (Apple Silicon)    |
+| `omniedge-desktop-1.0.0-linux-amd64.deb`         | Ubuntu/Debian            |
+| `omniedge-desktop-1.0.0-linux-amd64.rpm`         | Fedora/RHEL              |
+| `omniedge-desktop-1.0.0-linux-amd64.AppImage`    | Universal Linux          |
+| `omniedge-desktop-1.0.0-linux-amd64.flatpak`     | Flatpak                  |
+| `omniedge-desktop-1.0.0-linux-amd64-arch.tar.gz` | Arch Linux               |
 
 ### CLI - Linux
-| Package | Architecture |
-|---------|--------------|
-| `omniedge-v1.0.0-amd64.zip` | x86_64 (Servers, NUCs) |
+| Package                     | Architecture            |
+| --------------------------- | ----------------------- |
+| `omniedge-v1.0.0-amd64.zip` | x86_64 (Servers, NUCs)  |
 | `omniedge-v1.0.0-arm64.zip` | ARM64 (Jetson, RPi 4/5) |
-| `omniedge-v1.0.0-arm.zip` | ARMv7 (RPi 3) |
+| `omniedge-v1.0.0-arm.zip`   | ARMv7 (RPi 3)           |
 
 ### CLI - OpenWrt
-| Package | Architecture |
-|---------|--------------|
-| `omniedge-v1.0.0-openwrt-amd64.zip` | x86_64 Routers |
-| `omniedge-v1.0.0-openwrt-arm64.zip` | ARM64 Routers |
-| `omniedge-v1.0.0-openwrt-arm.zip` | ARMv7 Routers |
-| `omniedge-v1.0.0-openwrt-mips.zip` | MIPS Routers |
+| Package                              | Architecture   |
+| ------------------------------------ | -------------- |
+| `omniedge-v1.0.0-openwrt-amd64.zip`  | x86_64 Routers |
+| `omniedge-v1.0.0-openwrt-arm64.zip`  | ARM64 Routers  |
+| `omniedge-v1.0.0-openwrt-arm.zip`    | ARMv7 Routers  |
+| `omniedge-v1.0.0-openwrt-mips.zip`   | MIPS Routers   |
 | `omniedge-v1.0.0-openwrt-mipsle.zip` | MIPSle Routers |
 
 ### CLI - Other Platforms
-| Package | Platform |
-|---------|----------|
+| Package                           | Platform                  |
+| --------------------------------- | ------------------------- |
 | `omniedge-v1.0.0-macos-arm64.zip` | macOS CLI (Apple Silicon) |
-| `omniedge-v1.0.0-freebsd-14.zip` | FreeBSD 14 |
-| `omniedge-v1.0.0-riscv64.zip` | RISC-V 64-bit |
-| `omniedge-v1.0.0-loongarch64.zip` | LoongArch 64-bit |
+| `omniedge-v1.0.0-freebsd-14.zip`  | FreeBSD 14                |
+| `omniedge-v1.0.0-riscv64.zip`     | RISC-V 64-bit             |
+| `omniedge-v1.0.0-loongarch64.zip` | LoongArch 64-bit          |
 
 ## 🔧 Breaking Changes
 

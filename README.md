@@ -34,7 +34,7 @@ Building distributed AI systems is hard. Connecting robots, edge devices, and cl
 | Latency-critical AI inference | WireGuard encryption, ~0.3ms overhead          |
 | Deterministic networking      | 6-Sigma stability (Cpk 2.92) for teleoperation |
 | Secure model transfer         | End-to-end encrypted mesh                      |
-| Heterogeneous devices         | Single binary for x86, ARM64, ARMv7, RISC-V    |
+| Heterogeneous devices         | Single binary for x86, ARM64, RISC-V           |
 | Air-gapped labs               | Self-hosted nucleus mode (no cloud dependency) |
 
 ## Performance: Industrial-Grade Stability
