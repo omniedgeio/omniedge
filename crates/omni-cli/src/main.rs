@@ -152,7 +152,7 @@ enum Commands {
         #[arg(short = 'p', long, default_value = "51820")]
         port: u16,
 
-        /// Cluster secret for nucleus mode authentication (min 16 chars)
+        /// Cluster secret for nucleus-only mode (optional, min 16 chars if provided)
         #[arg(long)]
         secret: Option<String>,
 
@@ -316,19 +316,12 @@ async fn main() -> Result<()> {
                     }
                 }
                 RunMode::Nucleus => {
-                    // Nucleus-only mode requires a secret
+                    // Nucleus-only mode: secret is optional but recommended
                     if secret.is_none() {
-                        eprintln!(
-                            "Error: Nucleus mode requires --secret for cluster authentication."
-                        );
+                        eprintln!("Warning: Running nucleus server WITHOUT authentication.");
+                        eprintln!("         Any client can connect. Use --secret for production.");
                         eprintln!();
-                        eprintln!("Example:");
-                        eprintln!("  omniedge start --mode nucleus --secret your-secret-key-here");
-                        eprintln!();
-                        eprintln!("The secret must be at least 16 characters.");
-                        std::process::exit(exit_codes::INVALID_INPUT);
-                    }
-                    if let Some(ref s) = secret {
+                    } else if let Some(ref s) = secret {
                         if s.len() < 16 {
                             eprintln!("Error: Cluster secret must be at least 16 characters for security.");
                             std::process::exit(exit_codes::INVALID_INPUT);

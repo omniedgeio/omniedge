@@ -348,7 +348,7 @@ pub async fn run_worker(
     as_exit_node: bool,
     exit_node: Option<String>,
     nucleus_port: u16,
-    cluster_secret: Option<String>,
+    _cluster_secret: Option<String>,
 ) -> Result<()> {
     let mode_str = match mode {
         RunMode::Edge => "edge",
@@ -375,8 +375,10 @@ pub async fn run_worker(
     let mut manager = ConnectionManager::new(base_url.to_string(), identity_pk);
 
     // Configure nucleus settings if in dual mode
+    // Note: In dual mode, the secret comes from the backend (join_resp.secret_key),
+    // so we pass None here - the CLI --secret is only for nucleus-only mode.
     if mode == RunMode::Dual {
-        manager.set_nucleus_config(nucleus_port, cluster_secret);
+        manager.set_nucleus_config(nucleus_port, None);
     }
 
     let is_nucleus = mode == RunMode::Dual;
