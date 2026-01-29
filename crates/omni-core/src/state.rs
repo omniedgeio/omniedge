@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum ConnectionState {
+    #[default]
     Disconnected,
     Authenticating,
     Authenticated,
@@ -12,10 +13,4 @@ pub enum ConnectionState {
     Reconnecting,
     Stopping,
     Error(String),
-}
-
-impl Default for ConnectionState {
-    fn default() -> Self {
-        ConnectionState::Disconnected
-    }
 }

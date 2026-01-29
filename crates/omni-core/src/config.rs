@@ -110,7 +110,7 @@ impl CliConfig {
     pub fn load() -> Result<Self> {
         let path = Self::config_path()?;
         if !path.exists() {
-            return Ok(Self::default_with_paths()?);
+            return Self::default_with_paths();
         }
         let content = fs::read_to_string(path)?;
         let mut config: CliConfig = serde_json::from_str(&content)?;
@@ -162,7 +162,7 @@ impl CliConfig {
         {
             // When running with sudo, use the original user's home directory
             let home = get_real_user_home()
-                .or_else(|| dirs::home_dir())
+                .or_else(dirs::home_dir)
                 .context("Could not find home directory")?;
             let mut path = home.join(".omniedge");
             let _ = fs::create_dir_all(&path);
@@ -178,7 +178,7 @@ impl CliConfig {
             .join("OmniEdge");
         #[cfg(not(target_os = "windows"))]
         let path = get_real_user_home()
-            .or_else(|| dirs::home_dir())
+            .or_else(dirs::home_dir)
             .context("Could not find home directory")?
             .join(".omniedge");
 

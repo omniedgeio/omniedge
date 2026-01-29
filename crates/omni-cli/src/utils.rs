@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use hex;
 use ipnetwork::Ipv4Network;
 use local_ip_address::local_ip;
 use mac_address::get_mac_address;

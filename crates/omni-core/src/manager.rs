@@ -124,6 +124,7 @@ impl ConnectionManager {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn connect_with_token(
         &mut self,
         token: String,
@@ -366,6 +367,7 @@ impl ConnectionManager {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_loops(
         &mut self,
         socket: Arc<UdpSocket>,
@@ -488,7 +490,7 @@ impl ConnectionManager {
                                                 .await;
                                         }
                                     }
-                                } else if first_byte >= 0x01 && first_byte <= 0x04 {
+                                } else if (0x01..=0x04).contains(&first_byte) {
                                     // WireGuard
                                     let _ = tun_ctrl.handle_packet(pkt, src, &socket_inner).await;
                                 } else {

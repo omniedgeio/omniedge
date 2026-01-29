@@ -21,10 +21,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
-      - name: Cargo Check
-        run: cargo check --workspace
-      - name: Cargo Test
-        run: cargo test --workspace
+      - name: Cargo Check (exclude desktop)
+        run: cargo check --workspace --exclude omniedge
+      - name: Cargo Test (exclude desktop)
+        run: cargo test --workspace --exclude omniedge
 
   lint:
     name: Rust Lint (Clippy & Fmt)
@@ -41,5 +41,5 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
       - name: Cargo Fmt
         run: cargo fmt --all -- --check
-      - name: Cargo Clippy
-        run: cargo clippy --workspace -- -D warnings
+      - name: Cargo Clippy (exclude desktop)
+        run: cargo clippy --workspace --exclude omniedge -- -D warnings

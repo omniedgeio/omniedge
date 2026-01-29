@@ -316,7 +316,7 @@ fn main() -> anyhow::Result<()> {
                 let tx_stop = tx.clone();
 
                 tokio::spawn(async move {
-                    if let Ok(_) = tokio::signal::ctrl_c().await {
+                    if tokio::signal::ctrl_c().await.is_ok() {
                         info!("Received Ctrl+C, shutting down helper...");
                         let _ = tx_stop.send(());
                     }
