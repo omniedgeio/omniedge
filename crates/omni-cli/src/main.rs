@@ -209,7 +209,7 @@ async fn main() -> Result<()> {
         .join("logs");
     #[cfg(not(windows))]
     let log_dir = get_real_user_home()
-        .or_else(|| dirs::home_dir())
+        .or_else(dirs::home_dir)
         .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?
         .join(".omniedge")
         .join("logs");

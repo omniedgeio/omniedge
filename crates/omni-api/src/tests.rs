@@ -107,7 +107,7 @@ async fn test_heartbeat() {
 
     let client = ApiClient::new(format!("{}/api/v2", url), None);
     let device_service = DeviceService::new(&client);
-    let hb = device_service.heartbeat("hw-123").await.unwrap();
+    let hb = device_service.heartbeat("hw-123", false).await.unwrap();
 
     assert_eq!(hb.message, "Heartbeat received");
     mock.assert_async().await;
