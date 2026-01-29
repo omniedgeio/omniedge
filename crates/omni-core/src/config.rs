@@ -58,6 +58,9 @@ pub struct CliConfig {
     pub is_exit_node: bool,
     #[serde(default)]
     pub exit_node_ip: Option<String>,
+    /// Last running mode (edge, nucleus, dual)
+    #[serde(default)]
+    pub last_run_mode: Option<String>,
 }
 
 impl CliConfig {

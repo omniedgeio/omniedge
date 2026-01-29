@@ -396,6 +396,12 @@ async fn main() -> Result<()> {
             if exit_node.is_some() {
                 config.exit_node_ip = exit_node.clone();
             }
+            // Save running mode
+            config.last_run_mode = Some(match mode {
+                RunMode::Edge => "edge".to_string(),
+                RunMode::Nucleus => "nucleus".to_string(),
+                RunMode::Dual => "dual".to_string(),
+            });
             // Use the effective exit node setting (from flag or saved config)
             let effective_as_exit_node = config.is_exit_node;
             let effective_exit_node = exit_node.clone().or_else(|| config.exit_node_ip.clone());
@@ -544,6 +550,17 @@ async fn main() -> Result<()> {
 
             if status.is_running {
                 println!("  Connection:  ● Connected");
+
+                // Show running mode
+                if let Some(ref mode) = config.last_run_mode {
+                    let mode_display = match mode.as_str() {
+                        "edge" => "Edge (VPN client)",
+                        "nucleus" => "Nucleus (signaling server)",
+                        "dual" => "Dual (VPN + signaling)",
+                        _ => mode.as_str(),
+                    };
+                    println!("  Mode:        {}", mode_display);
+                }
 
                 // Show virtual IP (prefer live data, fall back to config)
                 let virtual_ip = status
