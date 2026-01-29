@@ -5,8 +5,11 @@
 [![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge?style=flat-square)](https://github.com/omniedgeio/omniedge/releases)
 [![Release CLI](https://img.shields.io/github/actions/workflow/status/omniedgeio/omniedge/release.yml?label=CLI%20Build&style=flat-square)](https://github.com/omniedgeio/omniedge/actions/workflows/release.yml)
 [![Release Desktop](https://img.shields.io/github/actions/workflow/status/omniedgeio/omniedge/desktop-release.yml?label=Desktop%20Build&style=flat-square)](https://github.com/omniedgeio/omniedge/actions/workflows/desktop-release.yml)
+[![E2E Tests](https://img.shields.io/github/actions/workflow/status/omniedgeio/omniedge/e2e.yml?label=E2E%20Tests&style=flat-square)](https://github.com/omniedgeio/omniedge/actions/workflows/e2e.yml)
 [![License](https://img.shields.io/github/license/omniedgeio/omniedge?style=flat-square)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
+[![Tauri](https://img.shields.io/badge/tauri-v2-blue?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
+[![OmniNervous](https://img.shields.io/badge/OmniNervous-v0.2.5-green?style=flat-square)](https://github.com/omniedgeio/OmniNervous)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-blue?style=flat-square)](#supported-platforms)
 [![Discord](https://img.shields.io/discord/1234567890?color=5865F2&label=discord&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/d4faRPYj)
 
