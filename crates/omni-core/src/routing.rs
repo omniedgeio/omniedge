@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use anyhow::{anyhow, Context, Result};
 use log::info;
 use std::process::Command;

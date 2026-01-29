@@ -2,6 +2,7 @@ extern crate hex;
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
+use indicatif::{ProgressBar, ProgressStyle};
 use omni_api::{ApiClient, DeviceService, NetworkService};
 use omni_core::{CliConfig, ConnectionManager};
 
@@ -25,6 +26,16 @@ use windows_service::{
 
 pub const SERVICE_NAME: &str = "OmniEdge";
 
+/// Exit codes for CLI
+pub mod exit_codes {
+    pub const SUCCESS: i32 = 0;
+    pub const GENERAL_ERROR: i32 = 1;
+    pub const PERMISSION_DENIED: i32 = 2;
+    pub const AUTH_REQUIRED: i32 = 3;
+    pub const NETWORK_ERROR: i32 = 4;
+    pub const INVALID_INPUT: i32 = 5;
+}
+
 /// Operating mode for OmniEdge
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
 pub enum RunMode {
@@ -40,21 +51,49 @@ pub enum RunMode {
 #[derive(Parser, Debug)]
 #[command(
     name = "omniedge",
-    about = "OmniEdge CLI - Connect your devices from anywhere with zero-config Mesh VPN.",
-    long_about = "OmniEdge is a zero-config mesh VPN that connects your devices from anywhere. \n\nTypical workflow:\n1. Run 'omniedge start' to log in and connect to your first network.\n2. Use flags like -n to specify a network ID, or -x to act as an exit node.",
+    about = "OmniEdge CLI - Zero-config Mesh VPN",
+    long_about = r#"OmniEdge connects your devices securely from anywhere.
+
+GETTING STARTED:
+  omniedge start                    Login and connect to your default network
+  omniedge start -n NETWORK_ID      Connect to a specific network  
+  omniedge status                   Check connection status
+  omniedge stop                     Disconnect
+
+EXAMPLES:
+  omniedge start -n my-network
+  omniedge start -n my-network --as-exit-node
+  omniedge start --mode nucleus --port 51820 --secret mysecret123456
+  omniedge scan --cidr 192.168.1.0/24
+
+For more help: https://omniedge.io/docs/cli"#,
     version,
+    after_help = "Use 'omniedge <command> --help' for more information about a command.",
     arg_required_else_help = true
 )]
 struct Cli {
+    /// Enable verbose output (show all logs to stderr)
+    #[arg(short, long, global = true)]
+    verbose: bool,
+
     #[command(subcommand)]
     command: Commands,
 }
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Start OmniEdge and run in background
+    /// Start OmniEdge and connect to a network
+    ///
+    /// EXAMPLES:
+    ///   omniedge start                     Auto-login, connect to first network
+    ///   omniedge start -n my-network       Connect to specific network
+    ///   omniedge start -s YOUR_KEY         Login with security key (for CI/servers)
+    #[command(after_help = "TIP: Use --mode dual to also run a local signaling server.")]
     Start {
-        /// Operating mode: edge (default), nucleus, or dual
+        /// Operating mode:
+        ///   edge    - Client mode, connects to OmniEdge cloud (default)
+        ///   nucleus - Signaling server only, for self-hosted deployments  
+        ///   dual    - Both client and server (advanced)
         #[arg(short = 'm', long, value_enum, default_value = "edge")]
         mode: RunMode,
 
@@ -66,7 +105,7 @@ enum Commands {
         #[arg(short = 'x', long)]
         as_exit_node: bool,
 
-        /// Use a specific exit node IP
+        /// Use a specific exit node IP (e.g., 10.0.0.1)
         #[arg(short = 'e', long = "exit-node")]
         exit_node: Option<String>,
 
@@ -88,9 +127,14 @@ enum Commands {
     },
     /// Stop OmniEdge connection and background service
     Stop,
-    /// Scan local subnet and automatically upload results to OmniEdge
+    /// Show connection status and network information
+    Status,
+    /// Scan local subnet and upload results to OmniEdge
+    ///
+    /// EXAMPLE:
+    ///   omniedge scan --cidr 192.168.1.0/24
     Scan {
-        /// The CIDR to scan (e.g. 192.168.1.0/24)
+        /// The CIDR to scan (e.g., 192.168.1.0/24)
         #[arg(short, long)]
         cidr: String,
         /// Scan timeout in seconds
@@ -101,6 +145,23 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Parse CLI first to get verbose flag (before logger setup)
+    let cli = match Cli::try_parse() {
+        Ok(c) => c,
+        Err(e) if e.kind() == clap::error::ErrorKind::DisplayHelp => {
+            print_unified_help();
+            std::process::exit(exit_codes::SUCCESS);
+        }
+        Err(e) if e.kind() == clap::error::ErrorKind::DisplayVersion => {
+            e.exit();
+        }
+        Err(e) => {
+            eprintln!("Error: {}\n", e.kind());
+            eprintln!("Run 'omniedge --help' for usage information.");
+            std::process::exit(exit_codes::INVALID_INPUT);
+        }
+    };
+
     // Initialize unified logger for both interactive and background use
     #[cfg(windows)]
     let log_dir = dirs::data_local_dir()
@@ -114,14 +175,22 @@ async fn main() -> Result<()> {
         .join("logs");
     let _ = std::fs::create_dir_all(&log_dir);
 
-    let _logger = flexi_logger::Logger::try_with_str("info")?
+    // Set log level based on verbose flag
+    let log_level = if cli.verbose { "debug" } else { "info" };
+    let duplicate_level = if cli.verbose {
+        flexi_logger::Duplicate::All
+    } else {
+        flexi_logger::Duplicate::Warn // Only show warnings and errors to stderr by default
+    };
+
+    let _logger = flexi_logger::Logger::try_with_str(log_level)?
         .log_to_file(
             flexi_logger::FileSpec::default()
                 .directory(&log_dir)
                 .basename("omniedge")
                 .suffix("log"),
         )
-        .duplicate_to_stderr(flexi_logger::Duplicate::All)
+        .duplicate_to_stderr(duplicate_level)
         .start()?;
 
     log::info!(
@@ -134,11 +203,12 @@ async fn main() -> Result<()> {
     #[cfg(windows)]
     {
         if !is_elevated::is_elevated() {
-            println!(
-                "Error: Administrator privileges are required to manage virtual network adapters."
-            );
-            println!("Please restart your terminal (PowerShell or CMD) as an Administrator and try again.");
-            return Ok(());
+            eprintln!("Error: Administrator privileges required.");
+            eprintln!();
+            eprintln!("Please run one of the following:");
+            eprintln!("  • Right-click PowerShell/CMD → 'Run as Administrator'");
+            eprintln!("  • Or run: Start-Process powershell -Verb RunAs");
+            std::process::exit(exit_codes::PERMISSION_DENIED);
         }
     }
     log::info!("Elevation check passed.");
@@ -167,17 +237,6 @@ async fn main() -> Result<()> {
     let base_url = omni_core::config::get_api_base_url();
     log::info!("Using API base URL: {}", base_url);
 
-    let cli = match Cli::try_parse() {
-        Ok(c) => c,
-        Err(e) if e.kind() == clap::error::ErrorKind::DisplayHelp => {
-            print_unified_help();
-            std::process::exit(0);
-        }
-        Err(e) => {
-            log::error!("CLI Parse Error: {}", e);
-            e.exit();
-        }
-    };
     log::info!("CLI parsed. Loading config...");
     let mut config = CliConfig::load()?;
     log::info!("Config loaded.");
@@ -198,26 +257,40 @@ async fn main() -> Result<()> {
                 RunMode::Edge | RunMode::Dual => {
                     // Edge and Dual modes require network authentication
                     if let Some(id) = &network_id {
+                        if id.is_empty() {
+                            eprintln!("Error: Network ID cannot be empty.");
+                            std::process::exit(exit_codes::INVALID_INPUT);
+                        }
                         let re = Regex::new(r"^[a-zA-Z0-9_\-]+$").unwrap();
                         if !re.is_match(id) {
-                            return Err(anyhow::anyhow!(
-                                "Invalid network_id format. Only alphanumeric, -, and _ are allowed."
-                            ));
+                            eprintln!("Error: Invalid network ID format.");
+                            eprintln!("Network IDs can only contain letters, numbers, hyphens (-), and underscores (_).");
+                            eprintln!("No spaces or special characters allowed.");
+                            std::process::exit(exit_codes::INVALID_INPUT);
+                        }
+                        if id.len() > 64 {
+                            eprintln!("Error: Network ID is too long (max 64 characters).");
+                            std::process::exit(exit_codes::INVALID_INPUT);
                         }
                     }
                 }
                 RunMode::Nucleus => {
                     // Nucleus-only mode requires a secret
                     if secret.is_none() {
-                        return Err(anyhow::anyhow!(
-                            "Nucleus mode requires --secret for cluster authentication (min 16 chars)."
-                        ));
+                        eprintln!(
+                            "Error: Nucleus mode requires --secret for cluster authentication."
+                        );
+                        eprintln!();
+                        eprintln!("Example:");
+                        eprintln!("  omniedge start --mode nucleus --secret your-secret-key-here");
+                        eprintln!();
+                        eprintln!("The secret must be at least 16 characters.");
+                        std::process::exit(exit_codes::INVALID_INPUT);
                     }
                     if let Some(ref s) = secret {
                         if s.len() < 16 {
-                            return Err(anyhow::anyhow!(
-                                "Cluster secret must be at least 16 characters for security."
-                            ));
+                            eprintln!("Error: Cluster secret must be at least 16 characters for security.");
+                            std::process::exit(exit_codes::INVALID_INPUT);
                         }
                     }
                 }
@@ -227,10 +300,9 @@ async fn main() -> Result<()> {
                 // Validate that the exit node is a valid IPv4 address
                 use std::net::Ipv4Addr;
                 if ip.parse::<Ipv4Addr>().is_err() {
-                    return Err(anyhow::anyhow!(
-                        "Invalid exit_node format '{}'. Must be a valid IPv4 address (e.g., 10.0.0.1).",
-                        ip
-                    ));
+                    eprintln!("Error: Invalid exit node IP address '{}'.", ip);
+                    eprintln!("Expected format: 10.0.0.1 (IPv4 address)");
+                    std::process::exit(exit_codes::INVALID_INPUT);
                 }
             }
 
@@ -266,7 +338,7 @@ async fn main() -> Result<()> {
                 );
                 service::setup_and_start_nucleus_service(port, secret.as_deref().unwrap_or(""))
                     .await?;
-                println!("Nucleus signaling server is now running in the background.");
+                println!("✓ Nucleus signaling server is now running in the background.");
                 return Ok(());
             }
 
@@ -275,12 +347,23 @@ async fn main() -> Result<()> {
             config.exit_node_ip = exit_node.clone();
             config.save()?;
 
+            // Create progress spinner
+            let spinner = ProgressBar::new_spinner();
+            spinner.set_style(
+                ProgressStyle::default_spinner()
+                    .template("{spinner:.cyan} {msg}")
+                    .unwrap(),
+            );
+            spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+
             // 1. Ensure Auth
+            spinner.set_message("Authenticating...");
             let auth = if let Some(key) = security_key {
                 oauth::login_with_security_key(&base_url, &key, &mut config).await?
             } else {
                 oauth::ensure_auth(&base_url, &mut config).await?
             };
+            spinner.set_message("Authenticated ✓");
 
             let identity_pk = config
                 .identity_private_key
@@ -302,7 +385,7 @@ async fn main() -> Result<()> {
 
             // 2. Ensure Device Registration
             if config.device_uuid.is_none() {
-                println!("Registering device...");
+                spinner.set_message("Registering device...");
                 let hostname =
                     whoami::fallible::hostname().unwrap_or_else(|_| "omniedge-device".to_string());
                 let os = whoami::platform().to_string();
@@ -313,33 +396,31 @@ async fn main() -> Result<()> {
                 config.device_uuid = Some(dr.id);
                 config.device_name = Some(dr.name);
                 config.save()?;
+                spinner.set_message("Device registered ✓");
             }
 
             // 3. Get Network
+            spinner.set_message("Fetching networks...");
             let vn_id = if let Some(id) = network_id {
                 id
             } else {
                 let networks = net_service.list_all().await?;
                 if networks.is_empty() {
-                    return Err(anyhow::anyhow!(
-                        "No networks found. Please create one on the dashboard first."
-                    ));
+                    spinner.finish_and_clear();
+                    eprintln!("Error: No networks found in your account.");
+                    eprintln!();
+                    eprintln!("To create a network:");
+                    eprintln!("  1. Visit https://omniedge.io/dashboard");
+                    eprintln!("  2. Create a new virtual network");
+                    eprintln!("  3. Run 'omniedge start -n YOUR_NETWORK_ID'");
+                    std::process::exit(exit_codes::GENERAL_ERROR);
                 }
                 let first = &networks[0];
-                println!("Selecting network: {} ({})", first.name, first.id);
                 first.id.clone()
             };
 
             // 4. Start Background Service
-            let mode_str = match mode {
-                RunMode::Edge => "edge",
-                RunMode::Dual => "dual (edge + nucleus)",
-                RunMode::Nucleus => "nucleus",
-            };
-            println!(
-                "Starting OmniEdge in {} mode for network {}...",
-                mode_str, vn_id
-            );
+            spinner.set_message(format!("Connecting to network {}...", vn_id));
             service::setup_and_start_service(
                 &base_url,
                 &vn_id,
@@ -350,22 +431,130 @@ async fn main() -> Result<()> {
                 secret.as_deref(),
             )
             .await?;
-            println!("OmniEdge is now running in the background.");
+
+            spinner.finish_and_clear();
+
+            // Show success message
+            let mode_str = match mode {
+                RunMode::Edge => "edge",
+                RunMode::Dual => "dual (edge + nucleus)",
+                RunMode::Nucleus => "nucleus",
+            };
+            println!("✓ OmniEdge connected!");
+            println!();
+            println!("  Network: {}", vn_id);
+            println!("  Mode:    {}", mode_str);
+            if as_exit_node {
+                println!("  Role:    Exit node (routing traffic for peers)");
+            }
+            if let Some(ref exit_ip) = exit_node {
+                println!("  Exit:    Routing through {}", exit_ip);
+            }
+            println!();
+            println!("Run 'omniedge status' to see connection details.");
+            println!("Run 'omniedge stop' to disconnect.");
         }
         Commands::Stop => {
-            println!("Stopping OmniEdge background service...");
+            let spinner = ProgressBar::new_spinner();
+            spinner.set_style(
+                ProgressStyle::default_spinner()
+                    .template("{spinner:.cyan} {msg}")
+                    .unwrap(),
+            );
+            spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+            spinner.set_message("Stopping OmniEdge...");
+
             service::stop_and_cleanup_service(&base_url).await?;
+
+            spinner.finish_and_clear();
+            println!("✓ OmniEdge stopped.");
+        }
+        Commands::Status => {
+            let is_running = service::is_service_running().await;
+
+            println!();
+            println!("OmniEdge Status");
+            println!("───────────────");
+
+            if is_running {
+                println!("  Connection:  {} Connected", "●");
+
+                // Show last known network info from config
+                if let Some(ref network_id) = config.last_network_id {
+                    println!("  Network:     {}", network_id);
+                }
+                if let Some(ref join_info) = config.last_join_info {
+                    println!("  Virtual IP:  {}", join_info.virtual_ip);
+                }
+                if let Some(ref device_name) = config.device_name {
+                    println!("  Device:      {}", device_name);
+                }
+                if config.is_exit_node {
+                    println!("  Role:        Exit node");
+                }
+                if let Some(ref exit_ip) = config.exit_node_ip {
+                    println!("  Exit Node:   {}", exit_ip);
+                }
+            } else {
+                println!("  Connection:  ○ Disconnected");
+                println!();
+                println!("  Run 'omniedge start' to connect.");
+            }
+            println!();
+
+            // Show auth status
+            if config.auth_response.is_some() {
+                if config.is_token_expired() {
+                    println!("  Auth:        Token expired (will refresh on start)");
+                } else {
+                    println!("  Auth:        Logged in");
+                }
+            } else {
+                println!("  Auth:        Not logged in");
+            }
+
+            // Show log location
+            println!("  Logs:        {}", log_dir.display());
+            println!();
         }
         Commands::Scan { cidr, timeout } => {
-            let results = utils::run_native_scan(&cidr, timeout)?;
-            let device_net = utils::get_current_device_net_status(&cidr)?;
+            // Validate timeout
+            if timeout <= 0 {
+                eprintln!("Error: Timeout must be a positive number.");
+                std::process::exit(exit_codes::INVALID_INPUT);
+            }
+
+            println!("Scanning {}...", cidr);
+            let results = match utils::run_native_scan(&cidr, timeout) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("Error: Failed to scan network.");
+                    eprintln!("Details: {}", e);
+                    eprintln!();
+                    eprintln!("Expected CIDR format: 192.168.1.0/24");
+                    std::process::exit(exit_codes::INVALID_INPUT);
+                }
+            };
+
+            let device_net = match utils::get_current_device_net_status(&cidr) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("Warning: Could not get device network info: {}", e);
+                    utils::DeviceNet {
+                        ip: "unknown".to_string(),
+                        mac: "unknown".to_string(),
+                        mask: "unknown".to_string(),
+                    }
+                }
+            };
+
             config.scan_ip = Some(device_net.ip.clone());
             config.scan_mac = Some(device_net.mac.clone());
             config.scan_mask = Some(device_net.mask.clone());
             config.scan_results = Some(results.clone());
             config.save()?;
 
-            println!("Scan complete. Found {} hosts.", results.len());
+            println!("✓ Scan complete. Found {} hosts.", results.len());
 
             if let Some(auth) = config.auth_response.as_ref() {
                 println!("Uploading scan results to OmniEdge...");
@@ -382,16 +571,20 @@ async fn main() -> Result<()> {
                         )
                         .await
                     {
-                        Ok(_) => println!("Upload successful."),
-                        Err(e) => eprintln!("Failed to upload results: {}", e),
+                        Ok(_) => println!("✓ Upload successful."),
+                        Err(e) => {
+                            eprintln!("Warning: Failed to upload results: {}", e);
+                            eprintln!(
+                                "Results saved locally. Run 'omniedge scan' again when online."
+                            );
+                        }
                     }
                 } else {
-                    println!(
-                        "Device not registered. Please run 'omniedge start' first to register."
-                    );
+                    println!("Device not registered. Run 'omniedge start' first to register.");
                 }
             } else {
-                println!("Not logged in. Results saved locally, will be uploaded next time you run 'scan' while logged in.");
+                println!("Not logged in. Results saved locally.");
+                println!("Run 'omniedge start' to log in and upload.");
             }
         }
     }
@@ -518,7 +711,7 @@ fn print_unified_help() {
     cmd.print_long_help().unwrap();
     println!("\n=== SUBCOMMAND DETAILS ===\n");
 
-    for sub_name in ["start", "stop", "scan"] {
+    for sub_name in ["start", "stop", "status", "scan"] {
         if let Some(sub) = cmd.get_subcommands().find(|s| s.get_name() == sub_name) {
             println!("--- {} ---", sub_name.to_uppercase());
             let mut sub_cmd = sub.clone();

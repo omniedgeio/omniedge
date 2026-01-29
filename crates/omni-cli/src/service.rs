@@ -73,6 +73,54 @@ async fn is_helper_available() -> bool {
     }
 }
 
+/// Check if OmniEdge service is currently running
+pub async fn is_service_running() -> bool {
+    // First try helper
+    if is_helper_available().await {
+        let req = HelperRequest {
+            command: "status".to_string(),
+            args: serde_json::json!({}),
+        };
+        if let Ok(resp) = call_helper(&req).await {
+            if resp.success {
+                if let Some(data) = resp.data {
+                    if let Some(running) = data.get("running").and_then(|v| v.as_bool()) {
+                        return running;
+                    }
+                }
+                return true; // Helper responded successfully, assume running
+            }
+        }
+    }
+
+    // Fallback: check for running process
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        if let Ok(output) = Command::new("tasklist")
+            .args(["/FI", "IMAGENAME eq omniedge.exe", "/NH"])
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Check if there's more than just the current process
+            return stdout.matches("omniedge.exe").count() > 1;
+        }
+    }
+
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+        if let Ok(output) = Command::new("pgrep").args(["-x", "omniedge"]).output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let pids: Vec<&str> = stdout.lines().collect();
+            // Check if there's more than just the current process
+            return pids.len() > 1;
+        }
+    }
+
+    false
+}
+
 /// Start VPN through helper service
 async fn start_via_helper(
     token: &str,

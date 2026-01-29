@@ -33,6 +33,7 @@ local-ip-address = "0.5"
 regex = "1.10"
 ipnetwork = "0.20"
 is_elevated = "0.1"
+indicatif = "0.17"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7"
