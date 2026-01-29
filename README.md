@@ -10,6 +10,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![Tauri](https://img.shields.io/badge/tauri-v2-blue?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![OmniNervous](https://img.shields.io/badge/OmniNervous-v0.2.5-green?style=flat-square)](https://github.com/omniedgeio/OmniNervous)
+<br/>
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-blue?style=flat-square)](#supported-platforms)
 [![Discord](https://img.shields.io/discord/1234567890?color=5865F2&label=discord&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/d4faRPYj)
 
@@ -27,25 +28,25 @@ Building distributed AI systems is hard. Connecting robots, edge devices, and cl
 
 ## Why Researchers & Developers Choose OmniEdge
 
-| Challenge | OmniEdge Solution |
-|-----------|-------------------|
-| NAT traversal | Automatic UDP hole punching, >95% success rate |
-| Latency-critical AI inference | WireGuard encryption, ~0.3ms overhead |
-| Deterministic networking | 6-Sigma stability (Cpk 2.92) for teleoperation |
-| Secure model transfer | End-to-end encrypted mesh |
-| Heterogeneous devices | Single binary for x86, ARM64, ARMv7, RISC-V |
-| Air-gapped labs | Self-hosted nucleus mode (no cloud dependency) |
+| Challenge                     | OmniEdge Solution                              |
+| ----------------------------- | ---------------------------------------------- |
+| NAT traversal                 | Automatic UDP hole punching, >95% success rate |
+| Latency-critical AI inference | WireGuard encryption, ~0.3ms overhead          |
+| Deterministic networking      | 6-Sigma stability (Cpk 2.92) for teleoperation |
+| Secure model transfer         | End-to-end encrypted mesh                      |
+| Heterogeneous devices         | Single binary for x86, ARM64, ARMv7, RISC-V    |
+| Air-gapped labs               | Self-hosted nucleus mode (no cloud dependency) |
 
 ## Performance: Industrial-Grade Stability
 
 Validated through [50-run longitudinal testing](https://github.com/omniedgeio/OmniNervous/blob/main/Capability_test/cloud_test_50_run_paper.md) using Process Capability Analysis (Cpk):
 
-| Metric | OmniEdge Tunnel | Raw Internet | Improvement |
-|--------|-----------------|--------------|-------------|
-| **Latency** | 54.69ms | 54.36ms | +0.3ms overhead |
-| **Latency Stability (Cpk)** | **2.92 (6-Sigma)** | 6.47 | Near-deterministic |
-| **Throughput** | **484.7 Mbps** | 344.1 Mbps | **+140.8%** |
-| **Jitter (StdDev)** | 0.057ms | 0.026ms | Bounded, predictable |
+| Metric                      | OmniEdge Tunnel    | Raw Internet | Improvement          |
+| --------------------------- | ------------------ | ------------ | -------------------- |
+| **Latency**                 | 54.69ms            | 54.36ms      | +0.3ms overhead      |
+| **Latency Stability (Cpk)** | **2.92 (6-Sigma)** | 6.47         | Near-deterministic   |
+| **Throughput**              | **484.7 Mbps**     | 344.1 Mbps   | **+140.8%**          |
+| **Jitter (StdDev)**         | 0.057ms            | 0.026ms      | Bounded, predictable |
 
 > **What this means**: Cpk > 2.0 indicates industrial-grade process capability. OmniEdge provides deterministic, jitter-controlled networking suitable for real-time robot control and latency-sensitive AI inference.
 
@@ -86,32 +87,32 @@ sudo omniedge start
 
 ## Supported Hardware
 
-| Device | Architecture | Status |
-|--------|--------------|--------|
-| NVIDIA Jetson (Nano/Xavier/Orin) | ARM64 | Tested |
-| Raspberry Pi 3/4/5 | ARM64/ARMv7 | Tested |
-| Intel NUC / x86 Servers | x86_64 | Tested |
-| Apple Silicon (M1/M2/M3) | ARM64 | Tested |
-| RISC-V Boards | riscv64 | Experimental |
-| OpenWrt Routers | Various | Community |
+| Device                           | Architecture | Status       |
+| -------------------------------- | ------------ | ------------ |
+| NVIDIA Jetson (Nano/Xavier/Orin) | ARM64        | Tested       |
+| Raspberry Pi 3/4/5               | ARM64/ARMv7  | Tested       |
+| Intel NUC / x86 Servers          | x86_64       | Tested       |
+| Apple Silicon (M1/M2/M3)         | ARM64        | Tested       |
+| RISC-V Boards                    | riscv64      | Experimental |
+| OpenWrt Routers                  | Various      | Community    |
 
 ## Supported Platforms
 
 ### CLI (`omniedge-cli`)
 
-| Platform | Architecture | Package Formats |
-|----------|--------------|-----------------|
-| **Linux** | x86_64, ARM64, ARMv7, RISC-V | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
-| **macOS** | x86_64 (Intel), ARM64 (Apple Silicon) | `.tar.gz` |
-| **Windows** | x86_64 | `.zip` |
+| Platform    | Architecture                          | Package Formats                        |
+| ----------- | ------------------------------------- | -------------------------------------- |
+| **Linux**   | x86_64, ARM64, ARMv7, RISC-V          | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
+| **macOS**   | x86_64 (Intel), ARM64 (Apple Silicon) | `.tar.gz`                              |
+| **Windows** | x86_64                                | `.zip`                                 |
 
 ### Desktop (`omniedge-desktop`)
 
-| Platform | Architecture | Package Formats |
-|----------|--------------|-----------------|
-| **Windows** | x86_64 | `.msi`, `.exe` |
-| **macOS** | x86_64, ARM64 | `.dmg` |
-| **Linux** | x86_64 | `.deb`, `.AppImage` |
+| Platform    | Architecture  | Package Formats     |
+| ----------- | ------------- | ------------------- |
+| **Windows** | x86_64        | `.msi`, `.exe`      |
+| **macOS**   | x86_64, ARM64 | `.dmg`              |
+| **Linux**   | x86_64        | `.deb`, `.AppImage` |
 
 ## Architecture
 
@@ -119,32 +120,32 @@ sudo omniedge start
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Your AI Network                          │
 │                                                                 │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
-│  │ Jetson Orin  │    │  Robot Fleet │    │    Cloud     │      │
-│  │  10.147.1.1  │◄──►│  10.147.1.x  │◄──►│  10.147.1.x  │      │
-│  │  (Nucleus)   │    │   (Edges)    │    │   (Edges)    │      │
-│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘      │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
+│  │ Jetson Orin  │    │  Robot Fleet │    │    Cloud     │       │
+│  │  10.147.1.1  │◄──►│  10.147.1.x  │◄──►│  10.147.1.x  │       │
+│  │  ( Edges )   │    │   (Edges)    │    │   (Edges)    │       │
+│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘       │
 │         │                   │                   │               │
 │         └───────────────────┼───────────────────┘               │
 │                             │                                   │
-│                   ┌─────────▼─────────┐                        │
-│                   │   OmniEdge Mesh   │                        │
-│                   │    (WireGuard)    │                        │
-│                   │                   │                        │
-│                   │  - E2E Encrypted  │                        │
-│                   │  - NAT Traversal  │                        │
-│                   │  - 6σ Stability   │                        │
-│                   └───────────────────┘                        │
+│                   ┌─────────▼─────────┐                         │
+│                   │   OmniEdge Mesh   │                         │
+│                   │    (WireGuard)    │                         │
+│                   │                   │                         │
+│                   │  - E2E Encrypted  │                         │
+│                   │  - NAT Traversal  │                         │
+│                   │  - 6σ Stability   │                         │
+│                   └───────────────────┘                         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Operating Modes
 
-| Mode | Description | Use Case |
-|------|-------------|----------|
-| **edge** (default) | VPN client | Connect devices to mesh |
-| **nucleus** | Signaling server only | Self-hosted relay, no cloud |
-| **dual** | VPN + signaling | Central hub + mesh participant |
+| Mode               | Description           | Use Case                       |
+| ------------------ | --------------------- | ------------------------------ |
+| **edge** (default) | VPN client            | Connect devices to mesh        |
+| **nucleus**        | Signaling server only | Self-hosted relay, no cloud    |
+| **dual**           | VPN + signaling       | Central hub + mesh participant |
 
 ```bash
 # Edge mode - Join an existing network
@@ -201,12 +202,12 @@ omniedge start --mode dual --secret "..."                  # Hub + client
 
 OmniEdge V2 is a complete rewrite in Rust, replacing the legacy Go/n2n implementation:
 
-| Aspect | V1 (Legacy) | V2 (Current) |
-|--------|-------------|--------------|
-| Language | Go | Rust |
-| Protocol | n2n | OmniNervous (WireGuard-based) |
-| License | GPL-3.0 | Apache-2.0 / MIT |
-| Repository | [omniedge-legacy](https://github.com/omniedgeio/omniedge-legacy) | This repository |
+| Aspect     | V1 (Legacy)                                                      | V2 (Current)                  |
+| ---------- | ---------------------------------------------------------------- | ----------------------------- |
+| Language   | Go                                                               | Rust                          |
+| Protocol   | n2n                                                              | OmniNervous (WireGuard-based) |
+| License    | GPL-3.0                                                          | Apache-2.0 / MIT              |
+| Repository | [omniedge-legacy](https://github.com/omniedgeio/omniedge-legacy) | This repository               |
 
 ## Research & Citations
 
