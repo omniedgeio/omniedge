@@ -450,7 +450,19 @@ async fn main() -> Result<()> {
                 first.id.clone()
             };
 
-            // 4. Start Background Service
+            // 4. Sync exit node status to backend
+            if let Some(ref device_id) = config.device_uuid {
+                spinner.set_message("Syncing device configuration...");
+                if let Err(e) = net_service
+                    .update_device(&vn_id, device_id, as_exit_node)
+                    .await
+                {
+                    log::warn!("Failed to sync exit node status to backend: {}", e);
+                    // Continue anyway - local config is set
+                }
+            }
+
+            // 5. Start Background Service
             spinner.set_message(format!("Connecting to network {}...", vn_id));
             service::setup_and_start_service(
                 &base_url,
