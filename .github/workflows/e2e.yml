@@ -57,11 +57,12 @@ jobs:
 
       - name: Test UDP connectivity
         run: |
-          # Run a temporary container to test UDP connectivity
+          # Run a temporary container to test UDP connectivity (override entrypoint to use shell)
           docker run --rm \
             --network omniedge-e2e-net \
+            --entrypoint sh \
             omniedge-e2e-test:latest \
-            sh -c "echo 'ping' | nc -u -w 1 172.30.0.2 51821 || true"
+            -c "echo 'ping' | nc -u -w 1 172.30.0.2 51821 || true"
           
           echo "==> Nucleus logs after UDP test:"
           docker logs nucleus 2>&1 | tail -10

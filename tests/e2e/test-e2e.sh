@@ -87,11 +87,12 @@ docker run --rm \
     "$IMAGE_NAME" \
     --version > /dev/null
 
-# Use netcat to test UDP port is reachable
+# Use netcat to test UDP port is reachable (override entrypoint to use shell)
 docker run --rm \
     --network "$NETWORK_NAME" \
+    --entrypoint sh \
     "$IMAGE_NAME" \
-    sh -c "echo 'test' | nc -u -w 1 $NUCLEUS_IP $NUCLEUS_PORT" || true
+    -c "echo 'test' | nc -u -w 1 $NUCLEUS_IP $NUCLEUS_PORT" || true
 echo "    [PASS] UDP port is reachable"
 
 # Check nucleus received the packet (should show in logs)
