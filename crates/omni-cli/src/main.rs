@@ -374,8 +374,17 @@ async fn main() -> Result<()> {
             }
 
             // Edge and Dual modes need authentication and network
-            config.is_exit_node = as_exit_node;
-            config.exit_node_ip = exit_node.clone();
+            // Only update exit node settings if explicitly specified
+            // (preserve previous setting if -x not provided)
+            if as_exit_node {
+                config.is_exit_node = true;
+            }
+            if exit_node.is_some() {
+                config.exit_node_ip = exit_node.clone();
+            }
+            // Use the effective exit node setting (from flag or saved config)
+            let effective_as_exit_node = as_exit_node || config.is_exit_node;
+            let effective_exit_node = exit_node.clone().or_else(|| config.exit_node_ip.clone());
             config.save()?;
 
             // Create progress spinner
@@ -454,7 +463,7 @@ async fn main() -> Result<()> {
             if let Some(ref device_id) = config.device_uuid {
                 spinner.set_message("Syncing device configuration...");
                 if let Err(e) = net_service
-                    .update_device(&vn_id, device_id, as_exit_node)
+                    .update_device(&vn_id, device_id, effective_as_exit_node)
                     .await
                 {
                     log::warn!("Failed to sync exit node status to backend: {}", e);
@@ -468,8 +477,8 @@ async fn main() -> Result<()> {
                 &base_url,
                 &vn_id,
                 mode,
-                as_exit_node,
-                exit_node.as_deref(),
+                effective_as_exit_node,
+                effective_exit_node.as_deref(),
                 port,
                 secret.as_deref(),
             )
@@ -487,10 +496,10 @@ async fn main() -> Result<()> {
             println!();
             println!("  Network: {}", vn_id);
             println!("  Mode:    {}", mode_str);
-            if as_exit_node {
+            if effective_as_exit_node {
                 println!("  Role:    Exit node (routing traffic for peers)");
             }
-            if let Some(ref exit_ip) = exit_node {
+            if let Some(ref exit_ip) = effective_exit_node {
                 println!("  Exit:    Routing through {}", exit_ip);
             }
             println!();
