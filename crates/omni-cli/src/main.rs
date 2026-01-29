@@ -132,8 +132,12 @@ enum Commands {
         network_id: Option<String>,
 
         /// Act as an exit node (allow others to route traffic through this node)
-        #[arg(short = 'x', long)]
+        #[arg(short = 'x', long, conflicts_with = "no_exit_node")]
         as_exit_node: bool,
+
+        /// Disable exit node mode (if previously enabled)
+        #[arg(long, conflicts_with = "as_exit_node")]
+        no_exit_node: bool,
 
         /// Use a specific exit node IP (e.g., 10.0.0.1)
         #[arg(short = 'e', long = "exit-node")]
@@ -278,6 +282,7 @@ async fn main() -> Result<()> {
             network_id,
             daemon,
             as_exit_node,
+            no_exit_node,
             exit_node,
             port,
             secret,
@@ -374,16 +379,20 @@ async fn main() -> Result<()> {
             }
 
             // Edge and Dual modes need authentication and network
-            // Only update exit node settings if explicitly specified
-            // (preserve previous setting if -x not provided)
+            // Update exit node settings based on flags:
+            // -x / --as-exit-node: enable exit node
+            // --no-exit-node: disable exit node
+            // Neither: preserve previous setting
             if as_exit_node {
                 config.is_exit_node = true;
+            } else if no_exit_node {
+                config.is_exit_node = false;
             }
             if exit_node.is_some() {
                 config.exit_node_ip = exit_node.clone();
             }
             // Use the effective exit node setting (from flag or saved config)
-            let effective_as_exit_node = as_exit_node || config.is_exit_node;
+            let effective_as_exit_node = config.is_exit_node;
             let effective_exit_node = exit_node.clone().or_else(|| config.exit_node_ip.clone());
             config.save()?;
 
