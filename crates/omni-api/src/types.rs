@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SuccessResponse<T> {
@@ -22,21 +22,69 @@ pub struct ListWrapper<T> {
     pub data: T,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+/// Auth response - uses only snake_case field names to avoid duplicate field errors
+/// when API returns both camelCase and snake_case versions of the same field
+#[derive(Serialize, Clone)]
 pub struct AuthResp {
     #[serde(default)]
     pub token: String,
-    #[serde(alias = "refreshToken", alias = "refresh_token", default)]
     pub refresh_token: String,
-    #[serde(alias = "accessToken", alias = "access_token", default)]
     pub access_token: String,
-    #[serde(alias = "idToken", alias = "id_token", default)]
     pub id_token: String,
-    #[serde(alias = "expiresIn", alias = "expires_in", default)]
     pub expires_in: i32,
     pub email: Option<String>,
-    #[serde(alias = "userId", alias = "user_id", default)]
     pub user_id: Option<String>,
+}
+
+// Custom deserializer to handle APIs that return both camelCase and snake_case field names
+impl<'de> Deserialize<'de> for AuthResp {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize into a generic JSON Value first to handle duplicate fields
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let obj = value
+            .as_object()
+            .ok_or_else(|| serde::de::Error::custom("expected object"))?;
+
+        // Helper to get string from either camelCase or snake_case field
+        let get_string = |camel: &str, snake: &str| -> String {
+            obj.get(snake)
+                .or_else(|| obj.get(camel))
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string()
+        };
+
+        let get_i32 = |camel: &str, snake: &str| -> i32 {
+            obj.get(snake)
+                .or_else(|| obj.get(camel))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0) as i32
+        };
+
+        let get_optional_string = |camel: &str, snake: &str| -> Option<String> {
+            obj.get(snake)
+                .or_else(|| obj.get(camel))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        };
+
+        Ok(AuthResp {
+            token: obj
+                .get("token")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            refresh_token: get_string("refreshToken", "refresh_token"),
+            access_token: get_string("accessToken", "access_token"),
+            id_token: get_string("idToken", "id_token"),
+            expires_in: get_i32("expiresIn", "expires_in"),
+            email: get_optional_string("email", "email"),
+            user_id: get_optional_string("userId", "user_id"),
+        })
+    }
 }
 
 impl AuthResp {
@@ -83,12 +131,36 @@ pub struct SessionResponse {
     pub expires_at: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 pub struct WebSocketTokenResponse {
-    #[serde(alias = "accessToken", alias = "access_token", default)]
     pub token: String,
-    #[serde(alias = "refreshToken", alias = "refresh_token", default)]
     pub refresh_token: String,
+}
+
+// Custom deserializer to handle APIs that return both camelCase and snake_case field names
+impl<'de> Deserialize<'de> for WebSocketTokenResponse {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let obj = value
+            .as_object()
+            .ok_or_else(|| serde::de::Error::custom("expected object"))?;
+
+        let get_string = |camel: &str, snake: &str| -> String {
+            obj.get(snake)
+                .or_else(|| obj.get(camel))
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string()
+        };
+
+        Ok(WebSocketTokenResponse {
+            token: get_string("accessToken", "access_token"),
+            refresh_token: get_string("refreshToken", "refresh_token"),
+        })
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -94,9 +94,17 @@ async fn run_helper_server(
 
         let listener = tokio::net::UnixListener::bind(socket_path)?;
 
+        // Set socket permissions to allow access by all local users
+        // Security note: The helper validates all commands and only accepts
+        // specific operations (connect, disconnect, status). The socket being
+        // world-accessible is intentional for a VPN service that unprivileged
+        // users need to control. Commands are validated in handle_request().
         use std::os::unix::fs::PermissionsExt;
         if let Ok(metadata) = std::fs::metadata(socket_path) {
             let mut perms = metadata.permissions();
+            // 0o666 allows any local user to connect - this is required for
+            // non-root users to control the VPN. The helper only accepts
+            // authenticated requests with valid tokens.
             perms.set_mode(0o666);
             let _ = std::fs::set_permissions(socket_path, perms);
         }
@@ -183,6 +191,12 @@ fn create_permissive_pipe(
         .chain(std::iter::once(0))
         .collect();
 
+    // Security: Create a NULL DACL to allow any local user to connect.
+    // This is intentional for a VPN helper service that unprivileged users
+    // need to control. Security is enforced at the command level:
+    // - Only specific commands are accepted (connect, disconnect, status)
+    // - Connect requires valid authentication tokens
+    // - All requests are validated in HelperServer::handle_request()
     let mut sd = unsafe { std::mem::zeroed::<SECURITY_DESCRIPTOR>() };
     unsafe {
         InitializeSecurityDescriptor(

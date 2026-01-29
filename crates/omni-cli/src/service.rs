@@ -30,7 +30,7 @@ async fn call_helper(req: &HelperRequest) -> Result<HelperResponse> {
     #[cfg(windows)]
     {
         use tokio::net::windows::named_pipe::ClientOptions;
-        let pipe_name = r"\\.\pipe\omniedge_helper";
+        let pipe_name = r"\\.\pipe\omniedge-helper";
 
         let mut client = ClientOptions::new().open(pipe_name)?;
         let payload = serde_json::to_vec(req)?;
@@ -46,7 +46,7 @@ async fn call_helper(req: &HelperRequest) -> Result<HelperResponse> {
     #[cfg(unix)]
     {
         use tokio::net::UnixStream;
-        let socket_path = "/tmp/omniedge_helper.sock";
+        let socket_path = "/var/run/omniedge-helper.sock";
 
         let mut stream = UnixStream::connect(socket_path).await?;
         let payload = serde_json::to_vec(req)?;
@@ -366,7 +366,6 @@ fn build_mode_args(mode: RunMode, nucleus_port: u16, cluster_secret: Option<&str
 
 #[cfg(windows)]
 async fn setup_windows_nucleus_service(port: u16, secret: &str) -> Result<()> {
-    use std::process::Command;
     let exe_path = std::env::current_exe()?;
 
     let mut args = vec![
@@ -396,7 +395,6 @@ async fn setup_windows_service(
     nucleus_port: u16,
     cluster_secret: Option<&str>,
 ) -> Result<()> {
-    use std::process::Command;
     let exe_path = std::env::current_exe()?;
 
     let mut args = vec![

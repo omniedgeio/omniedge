@@ -103,13 +103,15 @@ enum Commands {
 async fn main() -> Result<()> {
     // Initialize unified logger for both interactive and background use
     #[cfg(windows)]
-    let mut log_dir = std::path::PathBuf::from("C:\\ProgramData\\OmniEdge");
+    let log_dir = dirs::data_local_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("C:\\ProgramData"))
+        .join("OmniEdge")
+        .join("logs");
     #[cfg(not(windows))]
-    let mut log_dir = dirs::home_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("/tmp/omniedge"))
-        .join(".omniedge");
-
-    log_dir.push("logs");
+    let log_dir = dirs::home_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?
+        .join(".omniedge")
+        .join("logs");
     let _ = std::fs::create_dir_all(&log_dir);
 
     let _logger = flexi_logger::Logger::try_with_str("info")?
@@ -222,10 +224,12 @@ async fn main() -> Result<()> {
             }
 
             if let Some(ip) = &exit_node {
-                let re = Regex::new(r"^[0-9\.]+$").unwrap();
-                if !re.is_match(ip) {
+                // Validate that the exit node is a valid IPv4 address
+                use std::net::Ipv4Addr;
+                if ip.parse::<Ipv4Addr>().is_err() {
                     return Err(anyhow::anyhow!(
-                        "Invalid exit_node format. Must be a valid IP address."
+                        "Invalid exit_node format '{}'. Must be a valid IPv4 address (e.g., 10.0.0.1).",
+                        ip
                     ));
                 }
             }

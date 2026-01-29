@@ -6,9 +6,14 @@ use std::path::PathBuf;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct CliConfig {
+    #[serde(default, alias = "auth_default_path")]
     pub auth_file_default_path: String,
+    #[serde(default, alias = "scan_default_path")]
     pub scan_result_default_path: String,
     pub auth_response: Option<AuthResp>,
+    /// Unix timestamp (seconds) when the token was obtained
+    #[serde(default)]
+    pub token_obtained_at: Option<i64>,
     pub device_uuid: Option<String>,
     pub device_name: Option<String>,
     pub last_join_info: Option<JoinVirtualNetworkResponse>,
@@ -30,13 +35,62 @@ pub struct CliConfig {
 }
 
 impl CliConfig {
+    /// Check if the current token is expired or about to expire (within 5 minutes)
+    pub fn is_token_expired(&self) -> bool {
+        match (&self.auth_response, self.token_obtained_at) {
+            (Some(auth), Some(obtained_at)) => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+
+                // Token expires at: obtained_at + expires_in
+                // We refresh 5 minutes (300 seconds) before expiration
+                let expires_at = obtained_at + auth.expires_in as i64;
+                let refresh_threshold = expires_at - 300;
+
+                now >= refresh_threshold
+            }
+            // No token or no timestamp - consider expired to force refresh
+            (None, _) => true,
+            (Some(_), None) => {
+                // Token exists but no timestamp - assume it might be old
+                // Don't force refresh, let it fail naturally if expired
+                false
+            }
+        }
+    }
+
+    /// Update auth response and record the current time
+    pub fn set_auth_response(&mut self, auth: AuthResp) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        self.auth_response = Some(auth);
+        self.token_obtained_at = Some(now);
+    }
+
     pub fn load() -> Result<Self> {
         let path = Self::config_path()?;
         if !path.exists() {
             return Ok(Self::default_with_paths()?);
         }
         let content = fs::read_to_string(path)?;
-        let config = serde_json::from_str(&content)?;
+        let mut config: CliConfig = serde_json::from_str(&content)?;
+
+        // Ensure paths are set (for backward compatibility with old configs)
+        if config.auth_file_default_path.is_empty() || config.scan_result_default_path.is_empty() {
+            let defaults = Self::default_with_paths()?;
+            if config.auth_file_default_path.is_empty() {
+                config.auth_file_default_path = defaults.auth_file_default_path;
+            }
+            if config.scan_result_default_path.is_empty() {
+                config.scan_result_default_path = defaults.scan_result_default_path;
+            }
+        }
+
         Ok(config)
     }
 

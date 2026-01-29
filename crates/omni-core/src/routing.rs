@@ -2,7 +2,77 @@ use anyhow::{anyhow, Context, Result};
 use log::info;
 use std::process::Command;
 
+/// Default DNS server to use when system DNS cannot be detected
+const FALLBACK_DNS: &str = "8.8.8.8";
+
 pub struct RoutingManager;
+
+impl RoutingManager {
+    /// Get the system's configured DNS server, falling back to Google DNS if detection fails
+    fn get_dns_server() -> String {
+        Self::detect_system_dns().unwrap_or_else(|| FALLBACK_DNS.to_string())
+    }
+
+    /// Attempt to detect the system's DNS server
+    fn detect_system_dns() -> Option<String> {
+        #[cfg(target_os = "linux")]
+        {
+            // Try systemd-resolve first
+            if let Ok(output) = Self::run_command("sh", &["-c", "resolvectl status 2>/dev/null | grep 'Current DNS Server' | head -1 | awk '{print $NF}'"]) {
+                let dns = output.trim();
+                if !dns.is_empty() && Self::is_valid_ip(dns) {
+                    return Some(dns.to_string());
+                }
+            }
+            // Fall back to resolv.conf
+            if let Ok(output) = Self::run_command(
+                "sh",
+                &[
+                    "-c",
+                    "grep -m1 '^nameserver' /etc/resolv.conf | awk '{print $2}'",
+                ],
+            ) {
+                let dns = output.trim();
+                if !dns.is_empty() && Self::is_valid_ip(dns) {
+                    return Some(dns.to_string());
+                }
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(output) = Self::run_command(
+                "sh",
+                &[
+                    "-c",
+                    "scutil --dns | grep 'nameserver\\[0\\]' | head -1 | awk '{print $3}'",
+                ],
+            ) {
+                let dns = output.trim();
+                if !dns.is_empty() && Self::is_valid_ip(dns) {
+                    return Some(dns.to_string());
+                }
+            }
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(output) = Self::run_command("powershell", &["-Command", "Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object { $_.ServerAddresses } | Select-Object -First 1 -ExpandProperty ServerAddresses | Select-Object -First 1"]) {
+                let dns = output.trim();
+                if !dns.is_empty() && Self::is_valid_ip(dns) {
+                    return Some(dns.to_string());
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Validate that a string is a valid IPv4 address
+    fn is_valid_ip(s: &str) -> bool {
+        s.parse::<std::net::Ipv4Addr>().is_ok()
+    }
+}
 
 impl RoutingManager {
     pub fn setup_exit_node(exit_node_ip: &str, nucleus_host: &str) -> Result<()> {
@@ -106,12 +176,16 @@ impl RoutingManager {
 
     #[cfg(target_os = "linux")]
     fn setup_dns_linux(iface: &str) -> Result<()> {
-        info!("Setting up DNS on Linux (8.8.8.8) for interface {}", iface);
+        let dns_server = Self::get_dns_server();
+        info!(
+            "Setting up DNS on Linux ({}) for interface {}",
+            dns_server, iface
+        );
 
         // Try resolvectl first (modern systemd)
         if Self::run_command("sh", &["-c", "command -v resolvectl"]).is_ok() {
             info!("Using resolvectl for DNS configuration");
-            let _ = Self::run_command("sudo", &["resolvectl", "dns", iface, "8.8.8.8"]);
+            let _ = Self::run_command("sudo", &["resolvectl", "dns", iface, &dns_server]);
             let _ = Self::run_command("sudo", &["resolvectl", "domain", iface, "~."]);
             return Ok(());
         }
@@ -129,7 +203,10 @@ impl RoutingManager {
             "sh",
             &[
                 "-c",
-                "echo \"nameserver 8.8.8.8\" | sudo tee /etc/resolv.conf",
+                &format!(
+                    "echo \"nameserver {}\" | sudo tee /etc/resolv.conf",
+                    dns_server
+                ),
             ],
         )?;
         Ok(())
@@ -218,7 +295,11 @@ impl RoutingManager {
 
     #[cfg(target_os = "macos")]
     fn setup_dns_macos(iface: &str) -> Result<()> {
-        info!("Setting up DNS on macOS (8.8.8.8) for interface {}", iface);
+        let dns_server = Self::get_dns_server();
+        info!(
+            "Setting up DNS on macOS ({}) for interface {}",
+            dns_server, iface
+        );
         // On macOS, networksetup uses service names, not interface names (en0).
         // We need to find the service associated with the interface.
         let service_out = Self::run_command("sh", &["-c", &format!("networksetup -listallhardwareports | grep -B 1 {} | head -n 1 | cut -d ' ' -f 3-", iface)])?;
@@ -234,7 +315,7 @@ impl RoutingManager {
         // 2. Set DNS
         Self::run_command(
             "sudo",
-            &["networksetup", "-setdnsservers", service, "8.8.8.8"],
+            &["networksetup", "-setdnsservers", service, &dns_server],
         )?;
         Ok(())
     }
@@ -298,13 +379,22 @@ impl RoutingManager {
 
     #[cfg(target_os = "windows")]
     fn setup_dns_windows(iface: &str) -> Result<()> {
+        let dns_server = Self::get_dns_server();
         info!(
-            "Setting up DNS on Windows (8.8.8.8) for interface {}",
-            iface
+            "Setting up DNS on Windows ({}) for interface {}",
+            dns_server, iface
         );
         let _ = Self::run_command(
             "netsh",
-            &["interface", "ip", "set", "dns", iface, "static", "8.8.8.8"],
+            &[
+                "interface",
+                "ip",
+                "set",
+                "dns",
+                iface,
+                "static",
+                &dns_server,
+            ],
         );
         Ok(())
     }
@@ -330,6 +420,8 @@ impl RoutingManager {
     fn get_primary_interface() -> Result<String> {
         #[cfg(target_os = "linux")]
         {
+            // Use 8.8.8.8 as a routing probe destination (doesn't actually connect)
+            // This determines which interface handles default internet traffic
             let out = Self::run_command(
                 "sh",
                 &["-c", "ip route get 8.8.8.8 | grep -oP 'dev \\K\\S+'"],
