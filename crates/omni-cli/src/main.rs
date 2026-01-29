@@ -551,16 +551,15 @@ async fn main() -> Result<()> {
             if status.is_running {
                 println!("  Connection:  ● Connected");
 
-                // Show running mode
-                if let Some(ref mode) = config.last_run_mode {
-                    let mode_display = match mode.as_str() {
-                        "edge" => "Edge (VPN client)",
-                        "nucleus" => "Nucleus (signaling server)",
-                        "dual" => "Dual (VPN + signaling)",
-                        _ => mode.as_str(),
-                    };
-                    println!("  Mode:        {}", mode_display);
-                }
+                // Show running mode (default to edge if not saved)
+                let mode = config.last_run_mode.as_deref().unwrap_or("edge");
+                let mode_display = match mode {
+                    "edge" => "Edge (VPN client)",
+                    "nucleus" => "Nucleus (signaling server)",
+                    "dual" => "Dual (VPN + signaling)",
+                    _ => mode,
+                };
+                println!("  Mode:        {}", mode_display);
 
                 // Show virtual IP (prefer live data, fall back to config)
                 let virtual_ip = status
