@@ -75,7 +75,7 @@ pub async fn ensure_auth(base_url: &str, config: &mut CliConfig) -> Result<AuthR
     let mut auth = loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
         match auth_service
-            .device_flow_token("omniedge-cli", &dr.device_code)
+            .device_flow_token_quiet("omniedge-cli", &dr.device_code)
             .await
         {
             Ok(mut token) => {

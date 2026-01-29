@@ -49,6 +49,20 @@ impl<'a> AuthService<'a> {
         self.client.send(builder).await
     }
 
+    /// Poll for device flow token without logging expected polling errors
+    pub async fn device_flow_token_quiet(
+        &self,
+        client_id: &str,
+        device_code: &str,
+    ) -> Result<AuthResp> {
+        let builder = self.client.post("/oauth/token").json(&json!({
+            "client_id": client_id,
+            "device_code": device_code,
+            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+        }));
+        self.client.send_quiet(builder).await
+    }
+
     pub async fn refresh_token(&self, refresh_token: &str) -> Result<AuthResp> {
         let builder = self.client.post("/oauth/token").json(&json!({
             "refresh_token": refresh_token,

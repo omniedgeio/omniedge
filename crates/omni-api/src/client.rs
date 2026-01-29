@@ -1,6 +1,6 @@
 use crate::types::{ErrorResponse, SuccessResponse};
 use anyhow::{anyhow, Result};
-use log::{error, info};
+use log::{debug, error, info};
 use reqwest::{Client as HttpClient, RequestBuilder};
 use serde::de::DeserializeOwned;
 
@@ -20,7 +20,23 @@ impl ApiClient {
         }
     }
 
+    /// Send a request, logging errors at ERROR level
     pub async fn send<T>(&self, builder: RequestBuilder) -> Result<T>
+    where
+        T: DeserializeOwned,
+    {
+        self.send_internal(builder, false).await
+    }
+
+    /// Send a request without logging errors (for polling/expected failures)
+    pub async fn send_quiet<T>(&self, builder: RequestBuilder) -> Result<T>
+    where
+        T: DeserializeOwned,
+    {
+        self.send_internal(builder, true).await
+    }
+
+    async fn send_internal<T>(&self, builder: RequestBuilder, quiet: bool) -> Result<T>
     where
         T: DeserializeOwned,
     {
@@ -39,7 +55,11 @@ impl ApiClient {
         let resp = builder.send().await?;
         let status = resp.status();
         let url = resp.url().clone();
-        info!("API Request: {} {}", url, status);
+        if quiet {
+            debug!("API Request: {} {}", url, status);
+        } else {
+            info!("API Request: {} {}", url, status);
+        }
         let body_bytes = resp.bytes().await?;
 
         if status.is_success() {
@@ -66,10 +86,17 @@ impl ApiClient {
             }
         } else {
             let body_str = String::from_utf8_lossy(&body_bytes);
-            error!(
-                "API Error response from {}: {}\nBody: {}",
-                url, status, body_str
-            );
+            if !quiet {
+                error!(
+                    "API Error response from {}: {}\nBody: {}",
+                    url, status, body_str
+                );
+            } else {
+                debug!(
+                    "API Error response from {}: {}\nBody: {}",
+                    url, status, body_str
+                );
+            }
             let error_err: ErrorResponse =
                 serde_json::from_slice(&body_bytes).unwrap_or_else(|_| ErrorResponse {
                     code: None,

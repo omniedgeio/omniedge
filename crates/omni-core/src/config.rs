@@ -4,6 +4,32 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+/// Get the real user's home directory, even when running with sudo
+#[cfg(not(target_os = "windows"))]
+fn get_real_user_home() -> Option<PathBuf> {
+    // First check SUDO_USER (set when running with sudo)
+    if let Ok(sudo_user) = std::env::var("SUDO_USER") {
+        if !sudo_user.is_empty() && sudo_user != "root" {
+            // Try to get the user's home from /etc/passwd or expand ~user
+            if let Ok(output) = std::process::Command::new("sh")
+                .args(["-c", &format!("eval echo ~{}", sudo_user)])
+                .output()
+            {
+                let home = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !home.is_empty() && home != "~" && std::path::Path::new(&home).exists() {
+                    return Some(PathBuf::from(home));
+                }
+            }
+            // Fallback: try common home paths
+            let home_path = PathBuf::from(format!("/home/{}", sudo_user));
+            if home_path.exists() {
+                return Some(home_path);
+            }
+        }
+    }
+    None
+}
+
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct CliConfig {
     #[serde(default, alias = "auth_default_path")]
@@ -125,9 +151,11 @@ impl CliConfig {
         }
         #[cfg(not(target_os = "windows"))]
         {
-            let mut path = dirs::home_dir()
-                .context("Could not find home directory")?
-                .join(".omniedge");
+            // When running with sudo, use the original user's home directory
+            let home = get_real_user_home()
+                .or_else(|| dirs::home_dir())
+                .context("Could not find home directory")?;
+            let mut path = home.join(".omniedge");
             let _ = fs::create_dir_all(&path);
             path.push("auth.json");
             Ok(path)
@@ -140,7 +168,8 @@ impl CliConfig {
             .context("Could not find local app data directory")?
             .join("OmniEdge");
         #[cfg(not(target_os = "windows"))]
-        let path = dirs::home_dir()
+        let path = get_real_user_home()
+            .or_else(|| dirs::home_dir())
             .context("Could not find home directory")?
             .join(".omniedge");
 
