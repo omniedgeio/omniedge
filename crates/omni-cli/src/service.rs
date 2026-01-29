@@ -73,9 +73,20 @@ async fn is_helper_available() -> bool {
     }
 }
 
-/// Check if OmniEdge service is currently running
-pub async fn is_service_running() -> bool {
-    // First try helper
+/// Status information for the OmniEdge service
+#[derive(Debug, Default)]
+pub struct ServiceStatus {
+    pub is_running: bool,
+    pub virtual_ip: Option<String>,
+    pub network_id: Option<String>,
+    pub interface_name: Option<String>,
+}
+
+/// Get comprehensive status of the OmniEdge service
+pub async fn get_service_status() -> ServiceStatus {
+    let mut status = ServiceStatus::default();
+
+    // First try helper for authoritative status
     if is_helper_available().await {
         let req = HelperRequest {
             command: "status".to_string(),
@@ -83,17 +94,86 @@ pub async fn is_service_running() -> bool {
         };
         if let Ok(resp) = call_helper(&req).await {
             if resp.success {
+                status.is_running = true;
                 if let Some(data) = resp.data {
-                    if let Some(running) = data.get("running").and_then(|v| v.as_bool()) {
-                        return running;
+                    if let Some(vip) = data.get("virtual_ip").and_then(|v| v.as_str()) {
+                        if !vip.is_empty() {
+                            status.virtual_ip = Some(vip.to_string());
+                        }
+                    }
+                    if let Some(net_id) = data.get("network_id").and_then(|v| v.as_str()) {
+                        if !net_id.is_empty() {
+                            status.network_id = Some(net_id.to_string());
+                        }
                     }
                 }
-                return true; // Helper responded successfully, assume running
+                // If we got status from helper, also check interface
+                if let Some(iface_info) = get_omniedge_interface() {
+                    status.interface_name = Some(iface_info.name);
+                    if status.virtual_ip.is_none() {
+                        status.virtual_ip = Some(iface_info.ip);
+                    }
+                }
+                return status;
             }
         }
     }
 
-    // Fallback: check for running process
+    // Fallback: check for running process and network interface
+    if is_process_running() {
+        status.is_running = true;
+        if let Some(iface_info) = get_omniedge_interface() {
+            status.interface_name = Some(iface_info.name);
+            status.virtual_ip = Some(iface_info.ip);
+        }
+    }
+
+    status
+}
+
+struct InterfaceInfo {
+    name: String,
+    ip: String,
+}
+
+/// Get OmniEdge network interface information
+fn get_omniedge_interface() -> Option<InterfaceInfo> {
+    use network_interface::{NetworkInterface, NetworkInterfaceConfig};
+
+    let interfaces = NetworkInterface::show().ok()?;
+
+    // Look for OmniEdge interface by name
+    #[cfg(windows)]
+    let target_names = ["OmniEdge"];
+    #[cfg(not(windows))]
+    let target_names = ["omniedge0", "utun"];
+
+    for iface in interfaces {
+        let name_lower = iface.name.to_lowercase();
+        let is_omniedge = target_names
+            .iter()
+            .any(|t| name_lower.contains(&t.to_lowercase()));
+
+        if is_omniedge {
+            for addr in &iface.addr {
+                if let std::net::IpAddr::V4(ipv4) = addr.ip() {
+                    // Skip loopback and link-local
+                    if !ipv4.is_loopback() && !ipv4.is_link_local() {
+                        return Some(InterfaceInfo {
+                            name: iface.name.clone(),
+                            ip: ipv4.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Check if omniedge process is running (excluding current process)
+fn is_process_running() -> bool {
     #[cfg(windows)]
     {
         use std::process::Command;
@@ -102,7 +182,6 @@ pub async fn is_service_running() -> bool {
             .output()
         {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            // Check if there's more than just the current process
             return stdout.matches("omniedge.exe").count() > 1;
         }
     }
@@ -113,12 +192,17 @@ pub async fn is_service_running() -> bool {
         if let Ok(output) = Command::new("pgrep").args(["-x", "omniedge"]).output() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let pids: Vec<&str> = stdout.lines().collect();
-            // Check if there's more than just the current process
             return pids.len() > 1;
         }
     }
 
     false
+}
+
+/// Check if OmniEdge service is currently running
+#[allow(dead_code)]
+pub async fn is_service_running() -> bool {
+    get_service_status().await.is_running
 }
 
 /// Start VPN through helper service

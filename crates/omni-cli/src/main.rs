@@ -470,25 +470,40 @@ async fn main() -> Result<()> {
             println!("✓ OmniEdge stopped.");
         }
         Commands::Status => {
-            let is_running = service::is_service_running().await;
+            let status = service::get_service_status().await;
 
             println!();
             println!("OmniEdge Status");
             println!("───────────────");
 
-            if is_running {
-                println!("  Connection:  {} Connected", "●");
+            if status.is_running {
+                println!("  Connection:  ● Connected");
 
-                // Show last known network info from config
-                if let Some(ref network_id) = config.last_network_id {
-                    println!("  Network:     {}", network_id);
+                // Show virtual IP (prefer live data, fall back to config)
+                let virtual_ip = status
+                    .virtual_ip
+                    .or_else(|| config.last_join_info.as_ref().map(|j| j.virtual_ip.clone()));
+                if let Some(ref vip) = virtual_ip {
+                    println!("  Virtual IP:  {}", vip);
                 }
-                if let Some(ref join_info) = config.last_join_info {
-                    println!("  Virtual IP:  {}", join_info.virtual_ip);
+
+                // Show network ID (prefer live data, fall back to config)
+                let network_id = status.network_id.or(config.last_network_id.clone());
+                if let Some(ref net_id) = network_id {
+                    println!("  Network:     {}", net_id);
                 }
+
+                // Show interface name
+                if let Some(ref iface) = status.interface_name {
+                    println!("  Interface:   {}", iface);
+                }
+
+                // Show device name from config
                 if let Some(ref device_name) = config.device_name {
                     println!("  Device:      {}", device_name);
                 }
+
+                // Show exit node info
                 if config.is_exit_node {
                     println!("  Role:        Exit node");
                 }
@@ -497,6 +512,17 @@ async fn main() -> Result<()> {
                 }
             } else {
                 println!("  Connection:  ○ Disconnected");
+
+                // Show last known info if available
+                if let Some(ref join_info) = config.last_join_info {
+                    println!();
+                    println!("  Last session:");
+                    println!("    Virtual IP: {}", join_info.virtual_ip);
+                    if let Some(ref net_id) = config.last_network_id {
+                        println!("    Network:    {}", net_id);
+                    }
+                }
+
                 println!();
                 println!("  Run 'omniedge start' to connect.");
             }
