@@ -102,37 +102,69 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           ARCH="${{ matrix.arch }}"
           PLATFORM="${{ matrix.platform }}"
+          TARGET="${{ matrix.target }}"
           
           # Create dist directory for renamed files
           mkdir -p renamed-dist
           
-          # Find and rename built artifacts (Tauri builds to workspace target/ directory)
+          # Debug: Show what was built
+          echo "==> Searching for build artifacts..."
+          find target -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null || true
+          
+          # Tauri builds to target/<target>/release/bundle/ when using --target
+          BUNDLE_DIR="target/${TARGET}/release/bundle"
+          echo "==> Looking in: ${BUNDLE_DIR}"
+          ls -la "${BUNDLE_DIR}" 2>/dev/null || echo "Bundle dir not found, checking alternatives..."
+          
+          # Find and rename built artifacts
           if [[ "$PLATFORM" == "windows" ]]; then
-            # Windows: .msi and .exe
-            find target -name "*.msi" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-windows-${ARCH}.msi \; 2>/dev/null || true
-            find target -name "*setup*.exe" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-windows-${ARCH}-setup.exe \; 2>/dev/null || true
+            # Windows: .msi in bundle/msi/, NSIS .exe in bundle/nsis/
+            if [[ -d "${BUNDLE_DIR}/msi" ]]; then
+              find "${BUNDLE_DIR}/msi" -name "*.msi" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-windows-${ARCH}.msi \;
+            fi
+            if [[ -d "${BUNDLE_DIR}/nsis" ]]; then
+              find "${BUNDLE_DIR}/nsis" -name "*.exe" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-windows-${ARCH}-setup.exe \;
+            fi
           elif [[ "$PLATFORM" == "macos" ]]; then
-            # macOS: .dmg
-            find target -name "*.dmg" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-macos-${ARCH}.dmg \; 2>/dev/null || true
+            # macOS: .dmg in bundle/dmg/
+            if [[ -d "${BUNDLE_DIR}/dmg" ]]; then
+              find "${BUNDLE_DIR}/dmg" -name "*.dmg" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-macos-${ARCH}.dmg \;
+            fi
           elif [[ "$PLATFORM" == "linux" ]]; then
-            # Linux: .deb and .AppImage
-            find target -name "*.deb" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-linux-${ARCH}.deb \; 2>/dev/null || true
-            find target -name "*.AppImage" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-linux-${ARCH}.AppImage \; 2>/dev/null || true
+            # Linux: .deb in bundle/deb/, .AppImage in bundle/appimage/
+            if [[ -d "${BUNDLE_DIR}/deb" ]]; then
+              find "${BUNDLE_DIR}/deb" -name "*.deb" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-linux-${ARCH}.deb \;
+            fi
+            if [[ -d "${BUNDLE_DIR}/appimage" ]]; then
+              find "${BUNDLE_DIR}/appimage" -name "*.AppImage" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-linux-${ARCH}.AppImage \;
+            fi
           fi
           
           # List renamed files
+          echo "==> Renamed artifacts:"
           ls -la renamed-dist/ || echo "No files renamed"
+
+      - name: Check for artifacts
+        id: check_artifacts
+        shell: bash
+        run: |
+          if [ -n "$(ls -A renamed-dist/ 2>/dev/null)" ]; then
+            echo "has_artifacts=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_artifacts=false" >> $GITHUB_OUTPUT
+            echo "::warning::No artifacts found to upload"
+          fi
 
       - name: Upload renamed artifacts
         uses: actions/upload-artifact@v4
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
         with:
           name: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: renamed-dist/*
-          if-no-files-found: ignore
 
       - name: Upload to Release (renamed)
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && steps.check_artifacts.outputs.has_artifacts == 'true'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: renamed-dist/*
