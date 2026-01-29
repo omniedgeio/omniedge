@@ -1,9 +1,10 @@
 name: "E2E Tests"
 
 on:
-  push:
-    branches: [main, dev]
-  pull_request:
+  workflow_run:
+    workflows: ["Test and Lint"]
+    types:
+      - completed
     branches: [main, dev]
   workflow_dispatch:
 
@@ -11,6 +12,8 @@ jobs:
   e2e-nucleus:
     name: Nucleus Server E2E
     runs-on: ubuntu-latest
+    # Only run if Test and Lint workflow succeeded (or if manually triggered)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v4
 
