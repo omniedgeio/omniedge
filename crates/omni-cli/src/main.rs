@@ -55,7 +55,7 @@ pub enum RunMode {
     long_about = r#"OmniEdge connects your devices securely from anywhere.
 
 GETTING STARTED:
-  omniedge start                    Login and connect to your default network
+  omniedge start                    Connect to your default network
   omniedge start -n NETWORK_ID      Connect to a specific network  
   omniedge status                   Check connection status
   omniedge stop                     Disconnect
@@ -84,10 +84,13 @@ struct Cli {
 enum Commands {
     /// Start OmniEdge and connect to a network
     ///
+    /// Authenticates if needed, then connects to the specified network
+    /// (or the first available network if none specified).
+    ///
     /// EXAMPLES:
-    ///   omniedge start                     Auto-login, connect to first network
+    ///   omniedge start                     Connect to first available network
     ///   omniedge start -n my-network       Connect to specific network
-    ///   omniedge start -s YOUR_KEY         Login with security key (for CI/servers)
+    ///   omniedge start -s YOUR_KEY         Use security key for authentication
     #[command(after_help = "TIP: Use --mode dual to also run a local signaling server.")]
     Start {
         /// Operating mode:
@@ -121,7 +124,7 @@ enum Commands {
         #[arg(long, hide = true)]
         daemon: bool,
 
-        /// Login with a security key instead of browser login
+        /// Use a security key for authentication (for CI/servers)
         #[arg(short = 's', long)]
         security_key: Option<String>,
     },

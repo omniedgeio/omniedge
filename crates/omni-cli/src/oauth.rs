@@ -57,7 +57,7 @@ pub async fn ensure_auth(base_url: &str, config: &mut CliConfig) -> Result<AuthR
         }
     }
 
-    println!("No saved login found. Starting device flow...");
+    println!("No saved credentials found. Starting device flow authentication...");
     let client = ApiClient::new(base_url.to_string(), None);
     let auth_service = AuthService::new(&client);
 
