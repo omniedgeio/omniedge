@@ -102,7 +102,7 @@ sudo mv omniedge-cli-macos-arm64 /usr/local/bin/omniedge
 After installation, OmniEdge runs as a background service on all platforms:
 
 ```bash
-# Start OmniEdge (login and connect to first network)
+# Start OmniEdge (connect to first network, login if needed)
 omniedge start
 
 # Start with a specific network
@@ -116,9 +116,15 @@ omniedge start -n <network_id> -s <security_key>
 omniedge start -x
 omniedge start --as-exit-node
 
+# Disable exit node mode (if previously enabled)
+omniedge start --no-exit-node
+
 # Use a specific exit node
 omniedge start -e <exit_node_ip>
 omniedge start --exit-node <exit_node_ip>
+
+# Check connection status
+omniedge status
 
 # Stop OmniEdge
 omniedge stop
@@ -126,6 +132,16 @@ omniedge stop
 # Scan local network and upload results
 omniedge scan -c 192.168.1.0/24
 ```
+
+### Exit Node Options
+
+| Flag | Description |
+|------|-------------|
+| `-x` / `--as-exit-node` | Enable exit node mode (allow peers to route through you) |
+| `--no-exit-node` | Disable exit node mode |
+| `-e` / `--exit-node <ip>` | Route your traffic through a specific exit node |
+
+**Note:** Exit node settings are persisted. Running `omniedge start` without flags preserves the previous setting.
 
 ### Operating Modes
 

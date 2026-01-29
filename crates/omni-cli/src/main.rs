@@ -89,8 +89,9 @@ GETTING STARTED:
 
 EXAMPLES:
   omniedge start -n my-network
-  omniedge start -n my-network --as-exit-node
-  omniedge start --mode nucleus --port 51820 --secret mysecret123456
+  omniedge start -n my-network -x            Run as exit node
+  omniedge start --no-exit-node              Disable exit node mode
+  omniedge start --mode nucleus --secret mysecret123456
   omniedge scan --cidr 192.168.1.0/24
 
 For more help: https://omniedge.io/docs/cli"#,
@@ -114,9 +115,13 @@ enum Commands {
     /// Authenticates if needed, then connects to the specified network
     /// (or the first available network if none specified).
     ///
+    /// Exit node settings are persisted - use --no-exit-node to disable.
+    ///
     /// EXAMPLES:
     ///   omniedge start                     Connect to first available network
     ///   omniedge start -n my-network       Connect to specific network
+    ///   omniedge start -x                  Enable exit node mode
+    ///   omniedge start --no-exit-node      Disable exit node mode
     ///   omniedge start -s YOUR_KEY         Use security key for authentication
     #[command(after_help = "TIP: Use --mode dual to also run a local signaling server.")]
     Start {

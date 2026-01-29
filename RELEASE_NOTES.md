@@ -41,7 +41,9 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 
 - **Exit Node Support**: Route all traffic through a peer
   - `-x` / `--as-exit-node`: Advertise this device as an exit node
+  - `--no-exit-node`: Disable exit node mode (if previously enabled)
   - `-e` / `--exit-node <ip>`: Use a specific peer as exit node
+  - Exit node settings are persisted across restarts
 - **Security Key Authentication**: Non-interactive login for automation
   - `omniedge start -s <security_key> -n <network_id>`
 - **Background Service**: Native service integration
@@ -49,6 +51,9 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
   - Linux: systemd unit file
   - macOS: launchd plist
 - **Custom User Servers**: Users can configure their own nucleus/relay servers via dashboard
+- **Status Command**: Check connection status with `omniedge status`
+  - Shows virtual IP, network, interface name, and exit node role
+  - Displays live data from network interface
 
 ### Expanded Platform Support
 
