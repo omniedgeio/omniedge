@@ -61,6 +61,12 @@ pub struct CliConfig {
     /// Last running mode (edge, nucleus, dual)
     #[serde(default)]
     pub last_run_mode: Option<String>,
+    /// Nucleus signaling port (when running in nucleus or dual mode)
+    #[serde(default)]
+    pub nucleus_port: Option<u16>,
+    /// Whether cluster secret is configured (don't store the actual secret)
+    #[serde(default)]
+    pub has_cluster_secret: bool,
 }
 
 impl CliConfig {

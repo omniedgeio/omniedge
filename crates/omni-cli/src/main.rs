@@ -373,6 +373,12 @@ async fn main() -> Result<()> {
 
             // Handle nucleus-only mode (no network/auth needed)
             if mode == RunMode::Nucleus {
+                // Save nucleus config before starting
+                config.last_run_mode = Some("nucleus".to_string());
+                config.nucleus_port = Some(port);
+                config.has_cluster_secret = secret.is_some();
+                config.save()?;
+
                 println!(
                     "Starting OmniEdge Nucleus signaling server on port {}...",
                     port
@@ -402,6 +408,15 @@ async fn main() -> Result<()> {
                 RunMode::Nucleus => "nucleus".to_string(),
                 RunMode::Dual => "dual".to_string(),
             });
+            // Save nucleus config when running in nucleus or dual mode
+            if mode == RunMode::Nucleus || mode == RunMode::Dual {
+                config.nucleus_port = Some(port);
+                config.has_cluster_secret = secret.is_some();
+            } else {
+                // Clear nucleus config when running in edge mode
+                config.nucleus_port = None;
+                config.has_cluster_secret = false;
+            }
             // Use the effective exit node setting (from flag or saved config)
             let effective_as_exit_node = config.is_exit_node;
             let effective_exit_node = exit_node.clone().or_else(|| config.exit_node_ip.clone());
@@ -542,7 +557,9 @@ async fn main() -> Result<()> {
             println!("✓ OmniEdge stopped.");
         }
         Commands::Status => {
-            let status = service::get_service_status().await;
+            let status =
+                service::get_service_status(config.last_run_mode.as_deref(), config.nucleus_port)
+                    .await;
 
             println!();
             println!("OmniEdge Status");
@@ -551,8 +568,12 @@ async fn main() -> Result<()> {
             if status.is_running {
                 println!("  Connection:  ● Connected");
 
-                // Show running mode (default to edge if not saved)
-                let mode = config.last_run_mode.as_deref().unwrap_or("edge");
+                // Show running mode from status (which was detected) or fall back to config
+                let mode = status
+                    .mode
+                    .as_deref()
+                    .or(config.last_run_mode.as_deref())
+                    .unwrap_or("edge");
                 let mode_display = match mode {
                     "edge" => "Edge (VPN client)",
                     "nucleus" => "Nucleus (signaling server)",
@@ -560,6 +581,21 @@ async fn main() -> Result<()> {
                     _ => mode,
                 };
                 println!("  Mode:        {}", mode_display);
+
+                // Show nucleus-specific info when in nucleus or dual mode
+                if mode == "nucleus" || mode == "dual" {
+                    // Prefer live port from status, fall back to config
+                    let port = status.nucleus_port.or(config.nucleus_port);
+                    if let Some(p) = port {
+                        println!("  Nucleus Port: {}", p);
+                    }
+                    let secret_status = if config.has_cluster_secret {
+                        "Configured"
+                    } else {
+                        "Not set"
+                    };
+                    println!("  Cluster Secret: {}", secret_status);
+                }
 
                 // Show virtual IP (prefer live data, fall back to config)
                 let virtual_ip = status
@@ -596,10 +632,31 @@ async fn main() -> Result<()> {
                 println!("  Connection:  ○ Disconnected");
 
                 // Show last known info if available
-                if let Some(ref join_info) = config.last_join_info {
+                if config.last_run_mode.is_some() || config.last_join_info.is_some() {
                     println!();
                     println!("  Last session:");
-                    println!("    Virtual IP: {}", join_info.virtual_ip);
+
+                    // Show last mode
+                    if let Some(ref mode) = config.last_run_mode {
+                        let mode_display = match mode.as_str() {
+                            "edge" => "Edge (VPN client)",
+                            "nucleus" => "Nucleus (signaling server)",
+                            "dual" => "Dual (VPN + signaling)",
+                            _ => mode.as_str(),
+                        };
+                        println!("    Mode:       {}", mode_display);
+
+                        // Show nucleus info if last mode was nucleus or dual
+                        if mode == "nucleus" || mode == "dual" {
+                            if let Some(port) = config.nucleus_port {
+                                println!("    Nucleus Port: {}", port);
+                            }
+                        }
+                    }
+
+                    if let Some(ref join_info) = config.last_join_info {
+                        println!("    Virtual IP: {}", join_info.virtual_ip);
+                    }
                     if let Some(ref net_id) = config.last_network_id {
                         println!("    Network:    {}", net_id);
                     }

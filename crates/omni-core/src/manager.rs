@@ -249,6 +249,7 @@ impl ConnectionManager {
         );
 
         // 2. Setup TUN
+        #[allow(unused_assignments)]
         let mut tun_instance: Option<OmniTun> = None;
         let mut port = 51820;
 

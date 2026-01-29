@@ -1,5 +1,6 @@
 use crate::utils::get_hardware_id;
 use crate::RunMode;
+#[cfg(windows)]
 use crate::SERVICE_NAME;
 use anyhow::{Context, Result};
 use log::info;
@@ -80,13 +81,55 @@ pub struct ServiceStatus {
     pub virtual_ip: Option<String>,
     pub network_id: Option<String>,
     pub interface_name: Option<String>,
+    pub mode: Option<String>,
+    pub nucleus_port: Option<u16>,
 }
 
 /// Get comprehensive status of the OmniEdge service
-pub async fn get_service_status() -> ServiceStatus {
+pub async fn get_service_status(
+    last_mode: Option<&str>,
+    nucleus_port: Option<u16>,
+) -> ServiceStatus {
     let mut status = ServiceStatus::default();
 
-    // First try helper for authoritative status
+    // Check based on last known mode
+    match last_mode {
+        Some("nucleus") => {
+            // Nucleus-only mode: check if nucleus port is in use
+            if let Some(port) = nucleus_port {
+                if is_port_in_use(port) {
+                    status.is_running = true;
+                    status.mode = Some("nucleus".to_string());
+                    status.nucleus_port = Some(port);
+                }
+            }
+        }
+        Some("dual") => {
+            // Dual mode: check both interface AND nucleus port
+            if let Some(iface_info) = get_omniedge_interface() {
+                status.is_running = true;
+                status.interface_name = Some(iface_info.name);
+                status.virtual_ip = Some(iface_info.ip);
+                status.mode = Some("dual".to_string());
+                if let Some(port) = nucleus_port {
+                    if is_port_in_use(port) {
+                        status.nucleus_port = Some(port);
+                    }
+                }
+            }
+        }
+        _ => {
+            // Edge mode (default): check interface exists with valid IP
+            if let Some(iface_info) = get_omniedge_interface() {
+                status.is_running = true;
+                status.interface_name = Some(iface_info.name);
+                status.virtual_ip = Some(iface_info.ip);
+                status.mode = Some("edge".to_string());
+            }
+        }
+    }
+
+    // Try to get additional info from helper if available
     if is_helper_available().await {
         let req = HelperRequest {
             command: "status".to_string(),
@@ -94,41 +137,33 @@ pub async fn get_service_status() -> ServiceStatus {
         };
         if let Ok(resp) = call_helper(&req).await {
             if resp.success {
-                status.is_running = true;
                 if let Some(data) = resp.data {
-                    if let Some(vip) = data.get("virtual_ip").and_then(|v| v.as_str()) {
-                        if !vip.is_empty() {
-                            status.virtual_ip = Some(vip.to_string());
-                        }
-                    }
                     if let Some(net_id) = data.get("network_id").and_then(|v| v.as_str()) {
                         if !net_id.is_empty() {
                             status.network_id = Some(net_id.to_string());
                         }
                     }
-                }
-                // If we got status from helper, also check interface
-                if let Some(iface_info) = get_omniedge_interface() {
-                    status.interface_name = Some(iface_info.name);
+                    // Use helper's virtual_ip if we don't have one from interface
                     if status.virtual_ip.is_none() {
-                        status.virtual_ip = Some(iface_info.ip);
+                        if let Some(vip) = data.get("virtual_ip").and_then(|v| v.as_str()) {
+                            if !vip.is_empty() {
+                                status.virtual_ip = Some(vip.to_string());
+                            }
+                        }
                     }
                 }
-                return status;
             }
         }
     }
 
-    // Fallback: check for running process and network interface
-    if is_process_running() {
-        status.is_running = true;
-        if let Some(iface_info) = get_omniedge_interface() {
-            status.interface_name = Some(iface_info.name);
-            status.virtual_ip = Some(iface_info.ip);
-        }
-    }
-
     status
+}
+
+/// Check if a UDP port is in use
+fn is_port_in_use(port: u16) -> bool {
+    use std::net::UdpSocket;
+    // Try to bind to the port - if it fails, the port is in use
+    UdpSocket::bind(format!("0.0.0.0:{}", port)).is_err()
 }
 
 struct InterfaceInfo {
@@ -173,6 +208,7 @@ fn get_omniedge_interface() -> Option<InterfaceInfo> {
 }
 
 /// Check if omniedge process is running (excluding current process)
+#[allow(dead_code)]
 fn is_process_running() -> bool {
     #[cfg(windows)]
     {
@@ -201,8 +237,8 @@ fn is_process_running() -> bool {
 
 /// Check if OmniEdge service is currently running
 #[allow(dead_code)]
-pub async fn is_service_running() -> bool {
-    get_service_status().await.is_running
+pub async fn is_service_running(last_mode: Option<&str>, nucleus_port: Option<u16>) -> bool {
+    get_service_status(last_mode, nucleus_port).await.is_running
 }
 
 /// Start VPN through helper service
@@ -390,7 +426,7 @@ pub async fn setup_and_start_nucleus_service(port: u16, secret: &str) -> Result<
 }
 
 pub async fn setup_and_start_service(
-    base_url: &str,
+    _base_url: &str,
     network_id: &str,
     mode: RunMode,
     as_exit_node: bool,
@@ -436,7 +472,7 @@ pub async fn setup_and_start_service(
     #[cfg(windows)]
     {
         setup_windows_service(
-            base_url,
+            _base_url,
             network_id,
             mode,
             as_exit_node,
@@ -474,6 +510,7 @@ pub async fn setup_and_start_service(
     Ok(())
 }
 
+#[cfg(windows)]
 fn build_mode_args(mode: RunMode, nucleus_port: u16, cluster_secret: Option<&str>) -> Vec<String> {
     let mut args = vec![
         "--mode".to_string(),
