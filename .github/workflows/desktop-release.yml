@@ -107,6 +107,16 @@ jobs:
             | macOS | ARM64 (Apple Silicon) | `omniedge-desktop-*-macos-arm64.dmg` |
             | Linux | x86_64 | `omniedge-desktop-*-linux-x64.deb` / `.AppImage` |
             
+            ### macOS Installation
+            
+            If you see "app is damaged" or "cannot be opened" when launching the app:
+            
+            1. Open **System Settings** (or System Preferences on older macOS)
+            2. Go to **Privacy & Security**
+            3. Scroll down to the **Security** section
+            4. You should see a message about "OmniEdge" being blocked - click **Open Anyway**
+            5. Click **Open** in the confirmation dialog
+            
             See the assets below for your platform.
           releaseDraft: true
           prerelease: ${{ contains(github.ref, '-') }}

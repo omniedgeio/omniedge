@@ -206,6 +206,16 @@ The new Desktop application is built with Tauri v2 and React.
 | **macOS**   | DMG/APP            | Universal (Silicon & Intel) |
 | **Linux**   | AppImage, DEB, RPM | x64, ARM64                  |
 
+### macOS Installation
+
+If you see "app is damaged" or "cannot be opened" when launching the app:
+
+1. Open **System Settings** (or System Preferences on older macOS)
+2. Go to **Privacy & Security**
+3. Scroll down to the **Security** section
+4. You should see a message about "OmniEdge" being blocked - click **Open Anyway**
+5. Click **Open** in the confirmation dialog
+
 ## Architecture
 
 OmniEdge is built in pure Rust for maximum efficiency and safety, leveraging the **OmniNervous** daemon for peer-to-peer connectivity.
