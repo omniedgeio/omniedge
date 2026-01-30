@@ -83,9 +83,16 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"  # Remove 'v' prefix
+          # For tag pushes, use the tag name; for workflow_dispatch, read from tauri.conf.json
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"  # Remove 'v' prefix
+          else
+            # Read version from tauri.conf.json for manual runs
+            VERSION=$(grep -o '"version": "[^"]*"' ui/desktop/src-tauri/tauri.conf.json | head -1 | cut -d'"' -f4)
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "==> Version: $VERSION"
 
       - uses: tauri-apps/tauri-action@v0
         id: tauri
