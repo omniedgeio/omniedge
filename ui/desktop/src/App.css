@@ -425,6 +425,17 @@ body {
     box-shadow: 0 0 8px rgba(52, 199, 89, 0.4);
 }
 
+.status-orb.connecting {
+    background: var(--status-yellow, #ffcc00);
+    box-shadow: 0 0 8px rgba(255, 204, 0, 0.4);
+    animation: pulse-orb 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-orb {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.9); }
+}
+
 .network-name-text {
     font-size: 14px;
     font-weight: 500;
@@ -653,6 +664,15 @@ body {
 
 .ios-switch.on {
     background: var(--status-green);
+}
+
+.ios-switch.connecting {
+    background: var(--status-yellow, #ffcc00);
+    cursor: wait;
+}
+
+.ios-switch.connecting .dot {
+    transform: translateX(8px);
 }
 
 .ios-switch .dot {

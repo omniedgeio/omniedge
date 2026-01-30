@@ -20,7 +20,7 @@ function App() {
   const [isBecomingExitNode, setIsBecomingExitNode] = useState(false);
   const [isExitNodesExpanded, setIsExitNodesExpanded] = useState(false);
   const [isWaitingForBrowser, setIsWaitingForBrowser] = useState(false);
-  const [hasPermission, setHasPermission] = useState(true);
+  const [_hasPermission, setHasPermission] = useState(true);
   const [helperInstalling, setHelperInstalling] = useState(false);
   const [myDeviceID, setMyDeviceID] = useState('');
   const [myAPIIP, setMyAPIIP] = useState('');
@@ -140,9 +140,13 @@ function App() {
       setIsLoggedIn(true);
       setIsWaitingForBrowser(false);
 
-      const currState = await invoke('get_state') as string;
-      if (currState.toLowerCase() === 'disconnected' && netsArray.length > 0) {
-        handleConnect(netsArray[0].id);
+      // Only auto-connect if helper is available
+      const helperActive = await invoke('check_helper') as boolean;
+      if (helperActive) {
+        const currState = await invoke('get_state') as string;
+        if (currState.toLowerCase() === 'disconnected' && netsArray.length > 0) {
+          handleConnect(netsArray[0].id);
+        }
       }
     } catch (err: any) {
       console.error("handleSuccessfulLogin failed:", err);
@@ -225,16 +229,36 @@ function App() {
   };
 
   const handleConnect = async (networkId: string) => {
-    if (!hasPermission) {
-      setError("Admin rights or background service required.");
+    // First check if helper is installed
+    const helperActive = await invoke('check_helper') as boolean;
+    if (!helperActive) {
+      // Helper not running - prompt user to install
+      setHasPermission(false);
+      setShowSetup(true);
+      setError("Background service is required to connect. Please install the helper service.");
       return;
     }
+    
     setIsConnecting(true);
     setError('');
-    setActiveNetwork(networkId);
+    // Don't set activeNetwork here - only set it after successful connection
     try {
       await invoke('connect', { networkId, as_exit_node: isBecomingExitNode });
-      await refreshConnectionInfo();
+      
+      // Verify connection actually succeeded by checking state
+      const currStatus = await invoke('get_state') as string;
+      if (currStatus.toLowerCase() === 'connected') {
+        setActiveNetwork(networkId);
+        setConnectedNetworkID(networkId);
+        const net = networks.find(n => n.id === networkId);
+        if (net) setNetworkName(net.name);
+        await refreshConnectionInfo();
+      } else {
+        // Connection didn't actually succeed
+        setError("Connection attempt did not succeed. Check debug info for details.");
+        setActiveNetwork(null);
+        setConnectedNetworkID('');
+      }
     } catch (err: any) {
       console.error(`Connection failed:`, err);
       setError(err.message || err.toString());
@@ -609,13 +633,16 @@ function App() {
               <div className="networks-list">
                 {networks.map(net => {
                   const isExpanded = expandedNetworks[net.id];
-                  const isActive = connectedNetworkID === net.id || activeNetwork === net.id;
+                  // Only show as active if status is 'connected' AND this is the connected network
+                  const isActive = status === 'connected' && (connectedNetworkID === net.id);
+                  // Show as connecting if we're actively trying to connect to this network
+                  const isThisConnecting = isConnecting && activeNetwork === net.id;
 
                   return (
-                    <div key={net.id} className={`network-item-wrapper ${isExpanded ? 'is-expanded' : ''} ${isActive ? 'is-active' : ''}`}>
+                    <div key={net.id} className={`network-item-wrapper ${isExpanded ? 'is-expanded' : ''} ${isActive ? 'is-active' : ''} ${isThisConnecting ? 'is-connecting' : ''}`}>
                       <div className="network-menu-item" onClick={() => toggleNetworkExpand(net.id)}>
                         <div className="item-left">
-                          <div className={`status-orb ${isActive ? 'active' : ''}`}></div>
+                          <div className={`status-orb ${isActive ? 'active' : ''} ${isThisConnecting ? 'connecting' : ''}`}></div>
                           <span className="network-name-text truncate">{net.name}</span>
                         </div>
                         <div className="item-right">
@@ -632,18 +659,21 @@ function App() {
                           <div className="control-row">
                             <span className="control-label">VPN Connection</span>
                             <div
-                              className={`ios-switch small ${isActive ? 'on' : ''}`}
+                              className={`ios-switch small ${isActive ? 'on' : ''} ${isThisConnecting ? 'connecting' : ''}`}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                if (isThisConnecting) return; // Don't allow toggle while connecting
                                 isActive ? handleDisconnect() : handleConnect(net.id);
                               }}
-                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); isActive ? handleDisconnect() : handleConnect(net.id); } }}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (!isThisConnecting) { isActive ? handleDisconnect() : handleConnect(net.id); } } }}
                               tabIndex={0}
                               role="switch"
                               aria-checked={isActive}
                               aria-label={`VPN connection for ${net.name}`}
                             >
-                              <div className="dot"></div>
+                              <div className="dot">
+                                {isThisConnecting && <div className="loader-mini" style={{ borderTopColor: 'var(--accent-blue)' }}></div>}
+                              </div>
                             </div>
                           </div>
 
