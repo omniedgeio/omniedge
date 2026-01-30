@@ -40,6 +40,51 @@ fn get_real_user_home() -> Option<std::path::PathBuf> {
     None
 }
 
+/// Check if running with elevated privileges (root on Unix, admin on Windows)
+/// If not elevated, re-exec with sudo (Unix) or show error (Windows)
+fn require_root_privileges() {
+    #[cfg(windows)]
+    {
+        if !is_elevated::is_elevated() {
+            eprintln!("Error: Administrator privileges required.");
+            eprintln!();
+            eprintln!("Please run one of the following:");
+            eprintln!("  • Right-click PowerShell/CMD → 'Run as Administrator'");
+            eprintln!("  • Or run: Start-Process powershell -Verb RunAs");
+            std::process::exit(exit_codes::PERMISSION_DENIED);
+        }
+    }
+    #[cfg(unix)]
+    {
+        if !nix::unistd::geteuid().is_root() {
+            // Re-exec with sudo - this will prompt user for password
+            reexec_with_sudo();
+        }
+    }
+}
+
+/// Re-execute the current process with sudo
+#[cfg(unix)]
+fn reexec_with_sudo() -> ! {
+    use std::os::unix::process::CommandExt;
+    
+    let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("omniedge"));
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    
+    eprintln!("Root privileges required. Requesting sudo access...");
+    
+    // Use exec to replace current process with sudo
+    let err = std::process::Command::new("sudo")
+        .arg("--")
+        .arg(&exe)
+        .args(&args)
+        .exec();
+    
+    // exec() only returns if there was an error
+    eprintln!("Failed to execute sudo: {}", err);
+    std::process::exit(exit_codes::PERMISSION_DENIED);
+}
+
 #[cfg(windows)]
 use windows_service::{
     define_windows_service,
@@ -191,6 +236,10 @@ async fn main() -> Result<()> {
             print_unified_help();
             std::process::exit(exit_codes::SUCCESS);
         }
+        Err(e) if e.kind() == clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => {
+            print_unified_help();
+            std::process::exit(exit_codes::SUCCESS);
+        }
         Err(e) if e.kind() == clap::error::ErrorKind::DisplayVersion => {
             e.exit();
         }
@@ -239,19 +288,7 @@ async fn main() -> Result<()> {
         std::env::args().collect::<Vec<_>>()
     );
 
-    log::info!("Checking Elevation...");
-    #[cfg(windows)]
-    {
-        if !is_elevated::is_elevated() {
-            eprintln!("Error: Administrator privileges required.");
-            eprintln!();
-            eprintln!("Please run one of the following:");
-            eprintln!("  • Right-click PowerShell/CMD → 'Run as Administrator'");
-            eprintln!("  • Or run: Start-Process powershell -Verb RunAs");
-            std::process::exit(exit_codes::PERMISSION_DENIED);
-        }
-    }
-    log::info!("Elevation check passed.");
+    // Root check moved to start/stop commands only
 
     // On Windows, if we are started by SCM, dispatcher will take over
     #[cfg(windows)]
@@ -293,6 +330,70 @@ async fn main() -> Result<()> {
             secret,
             security_key,
         } => {
+            // Require root/admin for TUN creation
+            require_root_privileges();
+            
+            // Check if already connected
+            let current_status = service::get_service_status(
+                config.last_run_mode.as_deref(),
+                config.nucleus_port,
+            ).await;
+            
+            if current_status.is_running {
+                // Already connected - check if user wants to change exit node settings
+                let wants_exit_node_change = as_exit_node || no_exit_node;
+                
+                if wants_exit_node_change {
+                    // User wants to toggle exit node mode while connected
+                    let new_exit_node_status = as_exit_node; // true if -x, false if --no-exit-node
+                    
+                    // Update config
+                    config.is_exit_node = new_exit_node_status;
+                    config.save()?;
+                    
+                    // Call API to update device status
+                    if let (Some(auth), Some(net_id), Some(dev_id)) = 
+                        (&config.auth_response, &config.last_network_id, &config.device_uuid) 
+                    {
+                        let client = omni_api::ApiClient::new(base_url.clone(), Some(auth.token.clone()));
+                        
+                        // Send heartbeat with new status
+                        let dev_service = omni_api::DeviceService::new(&client);
+                        if let Err(e) = dev_service.heartbeat(dev_id, new_exit_node_status).await {
+                            log::warn!("Failed to send heartbeat: {}", e);
+                        }
+                        
+                        // Update device in network
+                        let net_service = omni_api::NetworkService::new(&client);
+                        if let Err(e) = net_service.update_device(net_id, dev_id, new_exit_node_status).await {
+                            log::warn!("Failed to update device: {}", e);
+                        }
+                    }
+                    
+                    if new_exit_node_status {
+                        println!("Exit node mode enabled.");
+                        println!("This device will now allow other peers to route traffic through it.");
+                    } else {
+                        println!("Exit node mode disabled.");
+                    }
+                    std::process::exit(exit_codes::SUCCESS);
+                }
+                
+                // No exit node change requested - just show status
+                let vip = current_status.virtual_ip.as_deref().unwrap_or("unknown");
+                let iface = current_status.interface_name.as_deref().unwrap_or("unknown");
+                println!("OmniEdge is already connected.");
+                println!();
+                println!("  Virtual IP:  {}", vip);
+                println!("  Interface:   {}", iface);
+                if let Some(ref net_id) = config.last_network_id {
+                    println!("  Network:     {}", net_id);
+                }
+                println!();
+                println!("Run 'omniedge stop' first to disconnect, then start again.");
+                std::process::exit(exit_codes::SUCCESS);
+            }
+            
             // Validation based on mode
             match mode {
                 RunMode::Edge | RunMode::Dual => {
@@ -487,19 +588,9 @@ async fn main() -> Result<()> {
                 first.id.clone()
             };
 
-            // 4. Sync exit node status to backend
-            if let Some(ref device_id) = config.device_uuid {
-                spinner.set_message("Syncing device configuration...");
-                if let Err(e) = net_service
-                    .update_device(&vn_id, device_id, effective_as_exit_node)
-                    .await
-                {
-                    log::warn!("Failed to sync exit node status to backend: {}", e);
-                    // Continue anyway - local config is set
-                }
-            }
-
-            // 5. Start Background Service
+            // 4. Start Background Service
+            // Note: Exit node status will be synced after the device joins the network
+            // via the heartbeat mechanism in the background service.
             spinner.set_message(format!("Connecting to network {}...", vn_id));
             service::setup_and_start_service(
                 &base_url,
@@ -535,6 +626,9 @@ async fn main() -> Result<()> {
             println!("Run 'omniedge stop' to disconnect.");
         }
         Commands::Stop => {
+            // Require root/admin to stop daemon
+            require_root_privileges();
+            
             let spinner = ProgressBar::new_spinner();
             spinner.set_style(
                 ProgressStyle::default_spinner()

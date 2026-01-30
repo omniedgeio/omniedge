@@ -92,12 +92,15 @@ pub async fn get_service_status(
 ) -> ServiceStatus {
     let mut status = ServiceStatus::default();
 
+    // First check if omniedge daemon process is running
+    let daemon_running = is_omniedge_daemon_running();
+
     // Check based on last known mode
     match last_mode {
         Some("nucleus") => {
-            // Nucleus-only mode: check if nucleus port is in use
+            // Nucleus-only mode: check if nucleus port is in use AND daemon is running
             if let Some(port) = nucleus_port {
-                if is_port_in_use(port) {
+                if daemon_running && is_port_in_use(port) {
                     status.is_running = true;
                     status.mode = Some("nucleus".to_string());
                     status.nucleus_port = Some(port);
@@ -105,26 +108,30 @@ pub async fn get_service_status(
             }
         }
         Some("dual") => {
-            // Dual mode: check both interface AND nucleus port
-            if let Some(iface_info) = get_omniedge_interface() {
-                status.is_running = true;
-                status.interface_name = Some(iface_info.name);
-                status.virtual_ip = Some(iface_info.ip);
-                status.mode = Some("dual".to_string());
-                if let Some(port) = nucleus_port {
-                    if is_port_in_use(port) {
-                        status.nucleus_port = Some(port);
+            // Dual mode: check daemon running AND interface
+            if daemon_running {
+                if let Some(iface_info) = get_omniedge_interface() {
+                    status.is_running = true;
+                    status.interface_name = Some(iface_info.name);
+                    status.virtual_ip = Some(iface_info.ip);
+                    status.mode = Some("dual".to_string());
+                    if let Some(port) = nucleus_port {
+                        if is_port_in_use(port) {
+                            status.nucleus_port = Some(port);
+                        }
                     }
                 }
             }
         }
         _ => {
-            // Edge mode (default): check interface exists with valid IP
-            if let Some(iface_info) = get_omniedge_interface() {
-                status.is_running = true;
-                status.interface_name = Some(iface_info.name);
-                status.virtual_ip = Some(iface_info.ip);
-                status.mode = Some("edge".to_string());
+            // Edge mode (default): check daemon running AND interface exists with valid IP
+            if daemon_running {
+                if let Some(iface_info) = get_omniedge_interface() {
+                    status.is_running = true;
+                    status.interface_name = Some(iface_info.name);
+                    status.virtual_ip = Some(iface_info.ip);
+                    status.mode = Some("edge".to_string());
+                }
             }
         }
     }
@@ -172,17 +179,44 @@ struct InterfaceInfo {
 }
 
 /// Get OmniEdge network interface information
+/// On macOS, we identify the correct utun interface by matching the expected virtual IP from config
 fn get_omniedge_interface() -> Option<InterfaceInfo> {
     use network_interface::{NetworkInterface, NetworkInterfaceConfig};
 
     let interfaces = NetworkInterface::show().ok()?;
 
-    // Look for OmniEdge interface by name
+    // Try to get the expected virtual IP from config
+    let expected_vip = CliConfig::load()
+        .ok()
+        .and_then(|c| c.last_join_info)
+        .map(|j| j.virtual_ip);
+
+    // On Windows/Linux, look for interface by name
+    // On macOS, we must match by virtual IP since utun names are assigned dynamically
     #[cfg(windows)]
     let target_names = ["OmniEdge"];
-    #[cfg(not(windows))]
-    let target_names = ["omniedge0", "utun"];
+    #[cfg(target_os = "linux")]
+    let target_names = ["OmniEdge"];
 
+    // First pass: try to find interface with matching virtual IP (most accurate for macOS)
+    if let Some(ref vip) = expected_vip {
+        for iface in &interfaces {
+            for addr in &iface.addr {
+                if let std::net::IpAddr::V4(ipv4) = addr.ip() {
+                    if ipv4.to_string() == *vip {
+                        return Some(InterfaceInfo {
+                            name: iface.name.clone(),
+                            ip: ipv4.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Second pass: name-based detection (Windows/Linux only, not macOS)
+    // On macOS, we cannot reliably detect by name since all VPNs use utun*
+    #[cfg(not(target_os = "macos"))]
     for iface in interfaces {
         let name_lower = iface.name.to_lowercase();
         let is_omniedge = target_names
@@ -207,9 +241,8 @@ fn get_omniedge_interface() -> Option<InterfaceInfo> {
     None
 }
 
-/// Check if omniedge process is running (excluding current process)
-#[allow(dead_code)]
-fn is_process_running() -> bool {
+/// Check if omniedge daemon process is running (excluding current process)
+fn is_omniedge_daemon_running() -> bool {
     #[cfg(windows)]
     {
         use std::process::Command;
@@ -218,6 +251,7 @@ fn is_process_running() -> bool {
             .output()
         {
             let stdout = String::from_utf8_lossy(&output.stdout);
+            // Count running instances - if more than 1 (current process), daemon is running
             return stdout.matches("omniedge.exe").count() > 1;
         }
     }
@@ -225,10 +259,11 @@ fn is_process_running() -> bool {
     #[cfg(unix)]
     {
         use std::process::Command;
-        if let Ok(output) = Command::new("pgrep").args(["-x", "omniedge"]).output() {
+        // Use pgrep to find omniedge processes
+        if let Ok(output) = Command::new("pgrep").args(["-f", "omniedge.*--daemon"]).output() {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            let pids: Vec<&str> = stdout.lines().collect();
-            return pids.len() > 1;
+            let pids: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
+            return !pids.is_empty();
         }
     }
 
@@ -242,6 +277,8 @@ pub async fn is_service_running(last_mode: Option<&str>, nucleus_port: Option<u1
 }
 
 /// Start VPN through helper service
+/// NOTE: Currently disabled as the old helper uses incompatible n2n protocol
+#[allow(dead_code)]
 async fn start_via_helper(
     token: &str,
     network_id: &str,
@@ -383,7 +420,7 @@ pub async fn run_worker(
 
     let is_nucleus = mode == RunMode::Dual;
     info!("Connecting with token for network: {}...", network_id);
-    manager
+    let join_resp = manager
         .connect_with_token(
             auth.token,
             network_id,
@@ -394,6 +431,18 @@ pub async fn run_worker(
             exit_node,
         )
         .await?;
+
+    // Save the join info to config for status detection
+    {
+        let mut config = CliConfig::load().unwrap_or_default();
+        config.last_join_info = Some(join_resp);
+        config.last_network_id = Some(network_id.to_string());
+        if let Err(e) = config.save() {
+            log::warn!("Failed to save join info to config: {}", e);
+        } else {
+            info!("Saved join info to config for status detection");
+        }
+    }
 
     info!("Worker connected successfully. Waiting for SIGINT...");
 
@@ -436,39 +485,11 @@ pub async fn setup_and_start_service(
     nucleus_port: u16,
     cluster_secret: Option<&str>,
 ) -> Result<()> {
-    // First, try to use existing omni-helper service if available
-    if is_helper_available().await {
-        info!("Found running omni-helper service, using it for VPN connection...");
-        let config = CliConfig::load().context("Failed to load config")?;
-        let auth = config.auth_response.context("Not authenticated")?;
-        let device_id = config.device_uuid.context("Device not registered")?;
-        let hardware_id = get_hardware_id().unwrap_or_else(|_| "unknown".to_string());
-
-        match start_via_helper(
-            &auth.token,
-            network_id,
-            &device_id,
-            &hardware_id,
-            mode,
-            as_exit_node,
-            exit_node.map(|s| s.to_string()),
-        )
-        .await
-        {
-            Ok(_) => {
-                println!("VPN started via background helper service.");
-                return Ok(());
-            }
-            Err(e) => {
-                log::warn!(
-                    "Failed to start via helper: {}. Falling back to standalone service.",
-                    e
-                );
-            }
-        }
-    }
-
-    // Fall back to creating a standalone background service
+    // NOTE: The old omni-helper service uses n2n protocol which is incompatible
+    // with the new WireGuard-based CLI. Skip helper and use standalone service.
+    // TODO: Re-enable helper when omni-helper is updated to use WireGuard protocol.
+    
+    // Create standalone background service with sudo (required for TUN on macOS)
     info!("Starting standalone background service...");
 
     #[cfg(windows)]
@@ -664,6 +685,15 @@ fn setup_linux_nucleus_service(port: u16, secret: &str) -> Result<()> {
     use std::fs;
     use std::process::Command;
 
+    // Stop any existing daemon processes before setting up new service
+    if is_omniedge_daemon_running() {
+        info!("Existing OmniEdge daemon detected. Stopping it first...");
+        let _ = Command::new("pkill")
+            .args(["-f", "omniedge.*--daemon"])
+            .output();
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+
     let exe_path = std::env::current_exe()?;
     let secret_flag = if secret.is_empty() {
         "".to_string()
@@ -722,6 +752,15 @@ fn setup_linux_service(
 ) -> Result<()> {
     use std::fs;
     use std::process::Command;
+
+    // Stop any existing daemon processes before setting up new service
+    if is_omniedge_daemon_running() {
+        info!("Existing OmniEdge daemon detected. Stopping it first...");
+        let _ = Command::new("pkill")
+            .args(["-f", "omniedge.*--daemon"])
+            .output();
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
 
     let exe_path = std::env::current_exe()?;
 
@@ -795,12 +834,20 @@ fn setup_macos_nucleus_service(port: u16, secret: &str) -> Result<()> {
     use std::fs;
     use std::process::Command;
 
+    // Check if a daemon is already running and stop it first
+    if is_omniedge_daemon_running() {
+        info!("Existing OmniEdge daemon detected. Stopping it first...");
+        let _ = Command::new("pkill")
+            .args(["-f", "omniedge.*--daemon"])
+            .output();
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+
     let exe_path = std::env::current_exe()?;
     let home_dir = dirs::home_dir().context("Failed to get home directory")?;
-    let launch_agents_dir = home_dir.join("Library/LaunchAgents");
-    let plist_path = launch_agents_dir.join("io.omniedge.cli.plist");
-
-    fs::create_dir_all(&launch_agents_dir)?;
+    
+    // Use system LaunchDaemon for root privileges
+    let plist_path = std::path::PathBuf::from("/Library/LaunchDaemons/io.omniedge.daemon.plist");
 
     let mut program_args = vec![
         format!("<string>{}</string>", exe_path.display()),
@@ -822,35 +869,61 @@ fn setup_macos_nucleus_service(port: u16, secret: &str) -> Result<()> {
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>io.omniedge.cli</string>
+    <string>io.omniedge.daemon</string>
     <key>ProgramArguments</key>
     <array>
         {}
     </array>
     <key>RunAtLoad</key>
-    <true/>
+    <false/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>{}/Library/Logs/omniedge.log</string>
+    <string>/var/log/omniedge.log</string>
     <key>StandardErrorPath</key>
-    <string>{}/Library/Logs/omniedge.error.log</string>
+    <string>/var/log/omniedge.error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>{}</string>
+    </dict>
 </dict>
 </plist>
 "#,
         program_args.join("\n        "),
-        home_dir.display(),
         home_dir.display()
     );
 
-    let _ = Command::new("launchctl")
-        .args(["unload", &plist_path.to_string_lossy()])
+    // Write to temp file first
+    let temp_plist = "/tmp/io.omniedge.daemon.plist";
+    fs::write(temp_plist, &plist_content)?;
+
+    // Unload existing service if any
+    let _ = Command::new("sudo")
+        .args(["launchctl", "unload", &plist_path.to_string_lossy()])
         .output();
 
-    fs::write(&plist_path, plist_content)?;
+    // Copy plist to LaunchDaemons (requires sudo)
+    let copy_output = Command::new("sudo")
+        .args(["cp", temp_plist, &plist_path.to_string_lossy()])
+        .output()?;
 
-    let output = Command::new("launchctl")
-        .args(["load", &plist_path.to_string_lossy()])
+    if !copy_output.status.success() {
+        let stderr = String::from_utf8_lossy(&copy_output.stderr);
+        return Err(anyhow::anyhow!(
+            "Failed to install service (sudo required): {}",
+            stderr
+        ));
+    }
+
+    // Set correct ownership
+    let _ = Command::new("sudo")
+        .args(["chown", "root:wheel", &plist_path.to_string_lossy()])
+        .output();
+
+    // Load the service
+    let output = Command::new("sudo")
+        .args(["launchctl", "load", &plist_path.to_string_lossy()])
         .output()?;
 
     if !output.status.success() {
@@ -860,6 +933,9 @@ fn setup_macos_nucleus_service(port: u16, secret: &str) -> Result<()> {
             stderr
         ));
     }
+
+    // Clean up temp file
+    let _ = fs::remove_file(temp_plist);
 
     Ok(())
 }
@@ -873,15 +949,20 @@ fn setup_macos_service(
     nucleus_port: u16,
     cluster_secret: Option<&str>,
 ) -> Result<()> {
-    use std::fs;
     use std::process::Command;
 
-    let exe_path = std::env::current_exe()?;
-    let home_dir = dirs::home_dir().context("Failed to get home directory")?;
-    let launch_agents_dir = home_dir.join("Library/LaunchAgents");
-    let plist_path = launch_agents_dir.join("io.omniedge.cli.plist");
+    // Check if a daemon is already running and stop it first
+    if is_omniedge_daemon_running() {
+        info!("Existing OmniEdge daemon detected. Stopping it first...");
+        // Kill existing daemon processes
+        let _ = Command::new("pkill")
+            .args(["-f", "omniedge.*--daemon"])
+            .output();
+        // Give it a moment to clean up
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
 
-    fs::create_dir_all(&launch_agents_dir)?;
+    let exe_path = std::env::current_exe()?;
 
     let mode_str = match mode {
         RunMode::Edge => "edge",
@@ -889,79 +970,55 @@ fn setup_macos_service(
         RunMode::Dual => "dual",
     };
 
-    let mut program_args = vec![
-        format!("<string>{}</string>", exe_path.display()),
-        "<string>start</string>".to_string(),
-        "<string>-n</string>".to_string(),
-        format!("<string>{}</string>", network_id),
-        "<string>--mode</string>".to_string(),
-        format!("<string>{}</string>", mode_str),
+    // Build command arguments
+    let mut args = vec![
+        "start".to_string(),
+        "-n".to_string(),
+        network_id.to_string(),
+        "--mode".to_string(),
+        mode_str.to_string(),
     ];
 
     if mode == RunMode::Dual {
-        program_args.push("<string>--port</string>".to_string());
-        program_args.push(format!("<string>{}</string>", nucleus_port));
+        args.push("--port".to_string());
+        args.push(nucleus_port.to_string());
         if let Some(secret) = cluster_secret {
-            program_args.push("<string>--secret</string>".to_string());
-            program_args.push(format!("<string>{}</string>", secret));
+            args.push("--secret".to_string());
+            args.push(secret.to_string());
         }
     }
 
     if as_exit_node {
-        program_args.push("<string>--as-exit-node</string>".to_string());
+        args.push("--as-exit-node".to_string());
     }
     if let Some(ip) = exit_node {
-        program_args.push("<string>--exit-node</string>".to_string());
-        program_args.push(format!("<string>{}</string>", ip));
+        args.push("--exit-node".to_string());
+        args.push(ip.to_string());
     }
-    program_args.push("<string>--daemon</string>".to_string());
+    args.push("--daemon".to_string());
 
-    let plist_content = format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>io.omniedge.cli</string>
-    <key>ProgramArguments</key>
-    <array>
-        {}
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>{}/Library/Logs/omniedge.log</string>
-    <key>StandardErrorPath</key>
-    <string>{}/Library/Logs/omniedge.error.log</string>
-</dict>
-</plist>
-"#,
-        program_args.join("\n        "),
-        home_dir.display(),
-        home_dir.display()
-    );
+    info!("Starting OmniEdge daemon process: {} {:?}", exe_path.display(), args);
 
-    let _ = Command::new("launchctl")
-        .args(["unload", &plist_path.to_string_lossy()])
-        .output();
+    // Fork the daemon process to background
+    // We're already running as root (checked in main.rs), so just spawn directly
+    let child = Command::new(&exe_path)
+        .args(&args)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
 
-    fs::write(&plist_path, plist_content)?;
-
-    let output = Command::new("launchctl")
-        .args(["load", &plist_path.to_string_lossy()])
-        .output()?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!(
-            "Failed to load launchd service: {}",
-            stderr
-        ));
+    match child {
+        Ok(child) => {
+            info!("OmniEdge daemon started with PID: {}", child.id());
+            // Give the daemon a moment to start
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            Ok(())
+        }
+        Err(e) => {
+            Err(anyhow::anyhow!("Failed to start daemon process: {}", e))
+        }
     }
-
-    Ok(())
 }
 
 pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
@@ -996,12 +1053,23 @@ pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
+        
+        // Stop and remove system LaunchDaemon (new location)
+        let daemon_plist = "/Library/LaunchDaemons/io.omniedge.daemon.plist";
+        let _ = Command::new("sudo")
+            .args(["launchctl", "unload", daemon_plist])
+            .output();
+        let _ = Command::new("sudo")
+            .args(["rm", "-f", daemon_plist])
+            .output();
+        
+        // Also clean up old user LaunchAgent if it exists
         if let Some(home_dir) = dirs::home_dir() {
-            let plist_path = home_dir.join("Library/LaunchAgents/io.omniedge.cli.plist");
+            let agent_plist = home_dir.join("Library/LaunchAgents/io.omniedge.cli.plist");
             let _ = Command::new("launchctl")
-                .args(["unload", &plist_path.to_string_lossy()])
+                .args(["unload", &agent_plist.to_string_lossy()])
                 .output();
-            let _ = std::fs::remove_file(&plist_path);
+            let _ = std::fs::remove_file(&agent_plist);
         }
     }
 

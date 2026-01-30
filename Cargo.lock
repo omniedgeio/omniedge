@@ -3382,6 +3382,7 @@ dependencies = [
  "mac_address",
  "machineid-rs",
  "network-interface",
+ "nix 0.29.0",
  "omni-api",
  "omni-core",
  "omni-proto",
@@ -3398,7 +3399,6 @@ dependencies = [
 [[package]]
 name = "omninervous"
 version = "0.2.5"
-source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.2.5#1d336e385964518233f8d4c67855be42706644d3"
 dependencies = [
  "anyhow",
  "base64 0.21.7",

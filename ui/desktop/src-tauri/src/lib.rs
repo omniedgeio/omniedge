@@ -184,6 +184,12 @@ async fn install_helper(_app: tauri::AppHandle) -> Result<(), String> {
         );
 
         fs::write("/tmp/omniedge-helper.service", service_content).map_err(|e| e.to_string())?;
+        
+        // Stop existing service first to prevent duplicates
+        let _ = Command::new("sudo")
+            .args(["systemctl", "stop", "omniedge-helper"])
+            .output();
+        
         let _ = Command::new("sudo")
             .args([
                 "cp",

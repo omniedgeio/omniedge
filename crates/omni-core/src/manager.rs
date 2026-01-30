@@ -134,7 +134,7 @@ impl ConnectionManager {
         is_nucleus: bool,
         as_exit_node: bool,
         exit_node_ip: Option<String>,
-    ) -> Result<()> {
+    ) -> Result<JoinVirtualNetworkResponse> {
         self.set_state(ConnectionState::Authenticated).await;
         self.is_nucleus = is_nucleus;
         self.as_exit_node.store(as_exit_node, Ordering::SeqCst);
@@ -150,7 +150,7 @@ impl ConnectionManager {
         self.api_client = Some(client);
 
         match self.perform_join(network_id, device_id, hardware_id).await {
-            Ok(_) => Ok(()),
+            Ok(join_resp) => Ok(join_resp),
             Err(e) => {
                 // If join fails, reset state back to Authenticated so we can try again
                 self.set_state(ConnectionState::Authenticated).await;
@@ -164,7 +164,7 @@ impl ConnectionManager {
         network_id: &str,
         device_id: &str,
         hardware_id: &str,
-    ) -> Result<()> {
+    ) -> Result<JoinVirtualNetworkResponse> {
         info!(
             "Starting perform_join for network: {}, device_id: {}, hardware_id: {}",
             network_id, device_id, hardware_id
@@ -240,8 +240,8 @@ impl ConnectionManager {
         let proto = Arc::new(
             OmniProto::new(
                 &join_resp.server.host,
-                join_resp.cluster,
-                join_resp.secret_key,
+                join_resp.cluster.clone(),
+                join_resp.secret_key.clone(),
                 vip_addr,
                 0,
                 self.identity.public_key_bytes(),
@@ -308,8 +308,15 @@ impl ConnectionManager {
 
         #[cfg(not(target_os = "windows"))]
         {
+            // On macOS, TUN interfaces must be named utunN - we pass empty string
+            // to let the system assign the next available utun interface.
+            // On Linux, we can use custom names like "omniedge0"
+            #[cfg(target_os = "macos")]
+            let ifname = "";  // macOS will auto-assign utunN
+            #[cfg(target_os = "linux")]
             let ifname = "omniedge0";
-            info!("Creating Userspace TUN: {}", ifname);
+            
+            info!("Creating Userspace TUN: {}", if ifname.is_empty() { "(auto-assign)" } else { ifname });
             let mut tun = OmniTun::new_userspace(ifname);
             tun.setup(
                 &join_resp.virtual_ip,
@@ -364,7 +371,7 @@ impl ConnectionManager {
             }
         }
 
-        Ok(())
+        Ok(join_resp)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -977,10 +984,10 @@ impl ConnectionManager {
         #[cfg(target_os = "linux")]
         {
             info!("Cleaning up all OmniEdge network adapters (Linux)...");
-            // Find all omniedge[0-9]+ interfaces and delete them
+            // Find all OmniEdge interfaces and delete them
             let output = std::process::Command::new("sh")
                 .arg("-c")
-                .arg("ip link show | grep -oE 'omniedge[0-9]+'")
+                .arg("ip link show | grep -oE 'OmniEdge[0-9]*'")
                 .output();
 
             if let Ok(out) = output {
