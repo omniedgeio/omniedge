@@ -142,11 +142,12 @@ jobs:
           echo "==> Ad-hoc signing: ${APP_PATH}"
           
           # Sign all nested components first (helpers, frameworks, etc.)
-          find "$APP_PATH" -type f \( -name "*.dylib" -o -perm +111 \) | while read -r file; do
+          # Use -perm /111 (POSIX) instead of deprecated -perm +111 (old BSD)
+          find "$APP_PATH" -type f \( -name "*.dylib" -o -perm /111 \) 2>/dev/null | while read -r file; do
             if file "$file" | grep -q "Mach-O"; then
               codesign --force --sign - "$file" 2>/dev/null || true
             fi
-          done
+          done || true
           
           # Sign the main app bundle
           codesign --force --deep --sign - "$APP_PATH"
