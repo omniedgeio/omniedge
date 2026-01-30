@@ -260,7 +260,10 @@ fn is_omniedge_daemon_running() -> bool {
     {
         use std::process::Command;
         // Use pgrep to find omniedge processes
-        if let Ok(output) = Command::new("pgrep").args(["-f", "omniedge.*--daemon"]).output() {
+        if let Ok(output) = Command::new("pgrep")
+            .args(["-f", "omniedge.*--daemon"])
+            .output()
+        {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let pids: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
             return !pids.is_empty();
@@ -488,7 +491,7 @@ pub async fn setup_and_start_service(
     // NOTE: The old omni-helper service uses n2n protocol which is incompatible
     // with the new WireGuard-based CLI. Skip helper and use standalone service.
     // TODO: Re-enable helper when omni-helper is updated to use WireGuard protocol.
-    
+
     // Create standalone background service with sudo (required for TUN on macOS)
     info!("Starting standalone background service...");
 
@@ -845,7 +848,7 @@ fn setup_macos_nucleus_service(port: u16, secret: &str) -> Result<()> {
 
     let exe_path = std::env::current_exe()?;
     let home_dir = dirs::home_dir().context("Failed to get home directory")?;
-    
+
     // Use system LaunchDaemon for root privileges
     let plist_path = std::path::PathBuf::from("/Library/LaunchDaemons/io.omniedge.daemon.plist");
 
@@ -997,7 +1000,11 @@ fn setup_macos_service(
     }
     args.push("--daemon".to_string());
 
-    info!("Starting OmniEdge daemon process: {} {:?}", exe_path.display(), args);
+    info!(
+        "Starting OmniEdge daemon process: {} {:?}",
+        exe_path.display(),
+        args
+    );
 
     // Fork the daemon process to background
     // We're already running as root (checked in main.rs), so just spawn directly
@@ -1015,9 +1022,7 @@ fn setup_macos_service(
             std::thread::sleep(std::time::Duration::from_millis(500));
             Ok(())
         }
-        Err(e) => {
-            Err(anyhow::anyhow!("Failed to start daemon process: {}", e))
-        }
+        Err(e) => Err(anyhow::anyhow!("Failed to start daemon process: {}", e)),
     }
 }
 
@@ -1035,11 +1040,11 @@ pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
     #[cfg(windows)]
     {
         use std::process::Command;
-        
+
         // Stop and delete Windows service if it exists
         let _ = Command::new("sc").args(["stop", SERVICE_NAME]).output();
         let _ = Command::new("sc").args(["delete", SERVICE_NAME]).output();
-        
+
         // Kill any running omniedge daemon processes
         // This is needed if the daemon was started manually (not via Windows service)
         let kill_cmd = format!(
@@ -1049,7 +1054,7 @@ pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
         let _ = Command::new("powershell")
             .args(["-NoProfile", "-Command", &kill_cmd])
             .output();
-        
+
         // Give the process time to terminate
         std::thread::sleep(std::time::Duration::from_millis(500));
     }
@@ -1057,7 +1062,7 @@ pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
     #[cfg(target_os = "linux")]
     {
         use std::process::Command;
-        
+
         // Stop and disable systemd service if it exists
         let _ = Command::new("systemctl")
             .args(["stop", "omniedge"])
@@ -1065,13 +1070,13 @@ pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
         let _ = Command::new("systemctl")
             .args(["disable", "omniedge"])
             .output();
-        
+
         // Kill any running omniedge daemon processes
         // This is needed if the daemon was started manually (not via systemd)
         let _ = Command::new("pkill")
             .args(["-f", "omniedge.*--daemon"])
             .output();
-        
+
         // Give the process time to terminate
         std::thread::sleep(std::time::Duration::from_millis(500));
     }
@@ -1079,16 +1084,14 @@ pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
-        
+
         // Stop and remove system LaunchDaemon (new location)
         let daemon_plist = "/Library/LaunchDaemons/io.omniedge.daemon.plist";
         let _ = Command::new("launchctl")
             .args(["unload", daemon_plist])
             .output();
-        let _ = Command::new("rm")
-            .args(["-f", daemon_plist])
-            .output();
-        
+        let _ = Command::new("rm").args(["-f", daemon_plist]).output();
+
         // Also clean up old user LaunchAgent if it exists
         if let Some(home_dir) = dirs::home_dir() {
             let agent_plist = home_dir.join("Library/LaunchAgents/io.omniedge.cli.plist");
@@ -1097,13 +1100,13 @@ pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
                 .output();
             let _ = std::fs::remove_file(&agent_plist);
         }
-        
+
         // Kill any running omniedge daemon processes
         // This is needed if the daemon was started manually (not via LaunchDaemon)
         let _ = Command::new("pkill")
             .args(["-f", "omniedge.*--daemon"])
             .output();
-        
+
         // Give the process time to terminate
         std::thread::sleep(std::time::Duration::from_millis(500));
     }

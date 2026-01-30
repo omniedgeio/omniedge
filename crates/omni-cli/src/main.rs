@@ -63,24 +63,24 @@ fn require_root_privileges() {
 #[cfg(windows)]
 fn reexec_with_elevation() -> ! {
     use std::process::Command;
-    
+
     let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("omniedge.exe"));
     let args: Vec<String> = std::env::args().skip(1).collect();
     let args_str = args.join(" ");
-    
+
     eprintln!("Administrator privileges required. Requesting elevation...");
-    
+
     // Use PowerShell to launch elevated process and wait for it
     let ps_command = format!(
         "Start-Process -FilePath '{}' -ArgumentList '{}' -Verb RunAs -Wait",
         exe.display(),
-        args_str.replace("'", "''")  // Escape single quotes for PowerShell
+        args_str.replace("'", "''") // Escape single quotes for PowerShell
     );
-    
+
     let result = Command::new("powershell")
         .args(["-NoProfile", "-Command", &ps_command])
         .status();
-    
+
     match result {
         Ok(status) => {
             std::process::exit(status.code().unwrap_or(0));
@@ -99,19 +99,19 @@ fn reexec_with_elevation() -> ! {
 #[cfg(unix)]
 fn reexec_with_sudo() -> ! {
     use std::os::unix::process::CommandExt;
-    
+
     let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("omniedge"));
     let args: Vec<String> = std::env::args().skip(1).collect();
-    
+
     eprintln!("Root privileges required. Requesting sudo access...");
-    
+
     // Use exec to replace current process with sudo
     let err = std::process::Command::new("sudo")
         .arg("--")
         .arg(&exe)
         .args(&args)
         .exec();
-    
+
     // exec() only returns if there was an error
     eprintln!("Failed to execute sudo: {}", err);
     std::process::exit(exit_codes::PERMISSION_DENIED);
@@ -364,56 +364,66 @@ async fn main() -> Result<()> {
         } => {
             // Require root/admin for TUN creation
             require_root_privileges();
-            
+
             // Check if already connected
-            let current_status = service::get_service_status(
-                config.last_run_mode.as_deref(),
-                config.nucleus_port,
-            ).await;
-            
+            let current_status =
+                service::get_service_status(config.last_run_mode.as_deref(), config.nucleus_port)
+                    .await;
+
             if current_status.is_running {
                 // Already connected - check if user wants to change exit node settings
                 let wants_exit_node_change = as_exit_node || no_exit_node;
-                
+
                 if wants_exit_node_change {
                     // User wants to toggle exit node mode while connected
                     let new_exit_node_status = as_exit_node; // true if -x, false if --no-exit-node
-                    
+
                     // Update config
                     config.is_exit_node = new_exit_node_status;
                     config.save()?;
-                    
+
                     // Call API to update device status
-                    if let (Some(auth), Some(net_id), Some(dev_id)) = 
-                        (&config.auth_response, &config.last_network_id, &config.device_uuid) 
-                    {
-                        let client = omni_api::ApiClient::new(base_url.clone(), Some(auth.token.clone()));
-                        
+                    if let (Some(auth), Some(net_id), Some(dev_id)) = (
+                        &config.auth_response,
+                        &config.last_network_id,
+                        &config.device_uuid,
+                    ) {
+                        let client =
+                            omni_api::ApiClient::new(base_url.clone(), Some(auth.token.clone()));
+
                         // Send heartbeat with new status
                         let dev_service = omni_api::DeviceService::new(&client);
                         if let Err(e) = dev_service.heartbeat(dev_id, new_exit_node_status).await {
                             log::warn!("Failed to send heartbeat: {}", e);
                         }
-                        
+
                         // Update device in network
                         let net_service = omni_api::NetworkService::new(&client);
-                        if let Err(e) = net_service.update_device(net_id, dev_id, new_exit_node_status).await {
+                        if let Err(e) = net_service
+                            .update_device(net_id, dev_id, new_exit_node_status)
+                            .await
+                        {
                             log::warn!("Failed to update device: {}", e);
                         }
                     }
-                    
+
                     if new_exit_node_status {
                         println!("Exit node mode enabled.");
-                        println!("This device will now allow other peers to route traffic through it.");
+                        println!(
+                            "This device will now allow other peers to route traffic through it."
+                        );
                     } else {
                         println!("Exit node mode disabled.");
                     }
                     std::process::exit(exit_codes::SUCCESS);
                 }
-                
+
                 // No exit node change requested - just show status
                 let vip = current_status.virtual_ip.as_deref().unwrap_or("unknown");
-                let iface = current_status.interface_name.as_deref().unwrap_or("unknown");
+                let iface = current_status
+                    .interface_name
+                    .as_deref()
+                    .unwrap_or("unknown");
                 println!("OmniEdge is already connected.");
                 println!();
                 println!("  Virtual IP:  {}", vip);
@@ -425,7 +435,7 @@ async fn main() -> Result<()> {
                 println!("Run 'omniedge stop' first to disconnect, then start again.");
                 std::process::exit(exit_codes::SUCCESS);
             }
-            
+
             // Validation based on mode
             match mode {
                 RunMode::Edge | RunMode::Dual => {
@@ -660,7 +670,7 @@ async fn main() -> Result<()> {
         Commands::Stop => {
             // Require root/admin to stop daemon
             require_root_privileges();
-            
+
             let spinner = ProgressBar::new_spinner();
             spinner.set_style(
                 ProgressStyle::default_spinner()
