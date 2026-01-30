@@ -62,7 +62,6 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 | Linux | x86_64, aarch64, armv7, riscv64, loongarch64 |
 | macOS | x86_64, aarch64 (Apple Silicon) |
 | Windows | x86_64 |
-| FreeBSD | x86_64, aarch64 |
 
 ### New Packaging Formats
 
@@ -96,11 +95,9 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 
 ### Migration Guide
 
-1. **Backup Configuration**: Export your network settings from dashboard
-2. **Uninstall v1.x**: Remove old OmniEdge installation
-3. **Install v2.0**: Download and install new version
-4. **Re-authenticate**: Login with `omniedge login` or use security key
-5. **Join Network**: Use `omniedge start -n <network_id>`
+1. **Uninstall v1.x**: Remove old OmniEdge installation
+2. **Install v2.0**: Download and install new version
+3. **Re-authenticate**: Start with `omniedge start` or use security key
 
 ### Download Packages
 
@@ -109,16 +106,13 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 |---------|--------------|
 | `omniedge-cli-v2.0.0-linux-x86_64.tar.gz` | x86_64 |
 | `omniedge-cli-v2.0.0-linux-aarch64.tar.gz` | ARM64 |
-| `omniedge-cli-v2.0.0-linux-armv7.tar.gz` | ARMv7 |
 | `omniedge-cli-v2.0.0-linux-riscv64.tar.gz` | RISC-V 64 |
-| `omniedge-cli-v2.0.0-linux-loongarch64.tar.gz` | LoongArch64 |
 
 #### CLI - DEB Packages
 | Package | Architecture |
 |---------|--------------|
 | `omniedge-cli_2.0.0_amd64.deb` | Debian/Ubuntu x64 |
 | `omniedge-cli_2.0.0_arm64.deb` | Debian/Ubuntu ARM64 |
-| `omniedge-cli_2.0.0_armhf.deb` | Debian/Ubuntu ARMv7 |
 | `omniedge-cli_2.0.0_riscv64.deb` | Debian/Ubuntu RISC-V |
 
 #### CLI - RPM Packages
@@ -139,8 +133,6 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 | `omniedge-cli-v2.0.0-macos-x86_64.tar.gz` | macOS Intel |
 | `omniedge-cli-v2.0.0-macos-aarch64.tar.gz` | macOS Apple Silicon |
 | `omniedge-cli-v2.0.0-windows-x86_64.zip` | Windows x64 |
-| `omniedge-cli-v2.0.0-freebsd-x86_64.tar.gz` | FreeBSD x64 |
-| `omniedge-cli-v2.0.0-freebsd-aarch64.tar.gz` | FreeBSD ARM64 |
 
 #### Desktop Applications
 | Package | Platform |
@@ -183,6 +175,16 @@ sudo mv omniedge-cli-macos-arm64 /usr/local/bin/omniedge
 brew install omniedge
 ```
 
+### macOS desktop Installation
+
+1. Download the `.dmg` file for your Mac (ARM64 for Apple Silicon, x64 for Intel)
+2. Open the DMG and drag **OmniEdge** to **Applications**
+3. Open **OmniEdge** from Applications
+4. If you see a security warning:
+   - Open **System Settings** → **Privacy & Security**
+   - Scroll down and click **Open Anyway** next to the OmniEdge message
+   - Click **Open** in the confirmation dialog
+   - 
 ### Contributors
 
 Thank you to all contributors who made this major release possible!
