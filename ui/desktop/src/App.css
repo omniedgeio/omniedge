@@ -813,6 +813,111 @@ body {
     font-weight: 500;
 }
 
+/* Setup Debug Section */
+.setup-debug-section {
+    margin-top: 20px;
+    width: 100%;
+    border-top: 1px solid var(--divider);
+    padding-top: 16px;
+}
+
+.setup-debug-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 8px 0;
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0.6;
+}
+
+.setup-debug-header:hover {
+    opacity: 1;
+}
+
+.setup-debug-content {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+    font-size: 11px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .setup-debug-content {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}
+
+.debug-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--divider);
+    gap: 8px;
+}
+
+.debug-row:last-of-type {
+    border-bottom: none;
+}
+
+.debug-row .debug-label {
+    font-weight: 500;
+    opacity: 0.6;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.debug-row .debug-value {
+    text-align: right;
+    word-break: break-all;
+    font-family: ui-monospace, 'SF Mono', monospace;
+}
+
+.debug-row .debug-value.success {
+    color: var(--status-green);
+    font-weight: 600;
+}
+
+.debug-row .debug-value.error {
+    color: var(--status-red, #ff3b30);
+    font-weight: 600;
+}
+
+.debug-row.error {
+    color: var(--status-red, #ff3b30);
+}
+
+.debug-actions-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.mini-btn {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid var(--divider);
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.15s;
+}
+
+.mini-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+    .mini-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
+
 /* Debug View Styles */
 .debug-view {
     padding: 14px;

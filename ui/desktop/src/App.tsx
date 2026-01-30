@@ -27,6 +27,7 @@ function App() {
   const [showSetup, setShowSetup] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
+  const [helperDebugInfo, setHelperDebugInfo] = useState<{checked: boolean, active: boolean, error?: string, paths?: string[]}>({checked: false, active: false});
   const [copiedIP, setCopiedIP] = useState<string | null>(null);
   const appRef = useRef<HTMLDivElement>(null);
 
@@ -87,13 +88,30 @@ function App() {
   useEffect(() => {
     const init = async () => {
       try {
-        const helperActive = await invoke('check_helper') as boolean;
+        // Check helper status with debug info
+        let helperActive = false;
+        let helperError: string | undefined;
+        
+        try {
+          helperActive = await invoke('check_helper') as boolean;
+        } catch (err: any) {
+          helperError = err.toString();
+        }
+        
         const elevated = await invoke('check_is_admin') as boolean;
+        
+        // Update helper debug info
+        setHelperDebugInfo({
+          checked: true,
+          active: helperActive,
+          error: helperError,
+        });
 
         const canConnect = helperActive || elevated;
         setHasPermission(canConnect);
 
-        if (!canConnect) {
+        // Always show setup if helper is not running (even if elevated, we want helper for persistence)
+        if (!helperActive) {
           setShowSetup(true);
         }
 
@@ -565,17 +583,70 @@ function App() {
                   className="secondary-btn"
                   style={{ width: '100%', marginTop: '8px' }}
                   onClick={async () => {
-                    const helperActive = await invoke('check_helper') as boolean;
-                    if (helperActive) {
-                      setHasPermission(true);
-                      setShowSetup(false);
-                      setError('');
+                    setHelperDebugInfo(prev => ({...prev, checked: false}));
+                    try {
+                      const helperActive = await invoke('check_helper') as boolean;
+                      setHelperDebugInfo({checked: true, active: helperActive, error: undefined});
+                      if (helperActive) {
+                        setHasPermission(true);
+                        setShowSetup(false);
+                        setError('');
+                      }
+                    } catch (err: any) {
+                      setHelperDebugInfo({checked: true, active: false, error: err.toString()});
                     }
                   }}
                 >
                   Check Again
                 </button>
                 <div className="setup-hint" style={{ marginTop: '12px' }}>Requires a one-time Administrator elevation</div>
+                
+                {/* Debug Information Section */}
+                <div className="setup-debug-section">
+                  <div className="setup-debug-header" onClick={() => setShowDebug(!showDebug)}>
+                    <span>Debug Information</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: showDebug ? 'rotate(90deg)' : 'none', transition: '0.2s' }}>
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </div>
+                  {showDebug && (
+                    <div className="setup-debug-content">
+                      <div className="debug-row">
+                        <span className="debug-label">Helper Status:</span>
+                        <span className={`debug-value ${helperDebugInfo.active ? 'success' : 'error'}`}>
+                          {!helperDebugInfo.checked ? 'Checking...' : (helperDebugInfo.active ? 'Running' : 'Not Running')}
+                        </span>
+                      </div>
+                      <div className="debug-row">
+                        <span className="debug-label">Socket Path:</span>
+                        <span className="debug-value mono">/var/run/omniedge-helper.sock</span>
+                      </div>
+                      <div className="debug-row">
+                        <span className="debug-label">Helper Binary:</span>
+                        <span className="debug-value mono">/Library/PrivilegedHelperTools/io.omniedge.helper</span>
+                      </div>
+                      <div className="debug-row">
+                        <span className="debug-label">LaunchDaemon:</span>
+                        <span className="debug-value mono">/Library/LaunchDaemons/io.omniedge.helper.plist</span>
+                      </div>
+                      {helperDebugInfo.error && (
+                        <div className="debug-row error">
+                          <span className="debug-label">Error:</span>
+                          <span className="debug-value">{helperDebugInfo.error}</span>
+                        </div>
+                      )}
+                      <div className="debug-actions-row">
+                        <button className="mini-btn" onClick={() => invoke('open_logs')}>View Logs</button>
+                        <button className="mini-btn" onClick={async () => {
+                          const data = await invoke('get_debug_info');
+                          setDebugData(data);
+                          console.log('Debug data:', data);
+                          alert(JSON.stringify(data, null, 2));
+                        }}>Full Debug</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : !isLoggedIn ? (
