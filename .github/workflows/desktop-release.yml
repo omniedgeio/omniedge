@@ -116,8 +116,11 @@ jobs:
         shell: bash
         working-directory: ui/desktop
         env:
-          # Disable signing on macOS CI builds unless certificates are configured
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '' }}
+          # Note: Do NOT set APPLE_SIGNING_IDENTITY here - let Tauri use the
+          # signingIdentity from tauri.conf.json (which is "-" for ad-hoc signing)
+          # Setting it to empty string breaks codesign
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
         run: |
           npm run tauri -- build --target ${{ matrix.target }} --verbose
           
