@@ -996,8 +996,9 @@ impl ConnectionManager {
                     let iface = iface.trim();
                     if !iface.is_empty() {
                         debug!("Deleting linux interface: {}", iface);
-                        let _ = std::process::Command::new("sudo")
-                            .args(["ip", "link", "delete", iface])
+                        // Already running as root (require_root_privileges called before)
+                        let _ = std::process::Command::new("ip")
+                            .args(["link", "delete", iface])
                             .output();
                     }
                 }
@@ -1007,9 +1008,34 @@ impl ConnectionManager {
         #[cfg(target_os = "macos")]
         {
             info!("Cleaning up all OmniEdge network adapters (macOS)...");
-            // macOS utun interfaces are usually ephemeral, but we look for any residue if possible
-            // Most userspace implementations on macOS don't survive process death,
-            // but we can try to find utun interfaces with our specific parameters if they ghost.
+            // macOS utun interfaces are kernel-managed and automatically destroyed when
+            // the owning process terminates. However, we can try to identify and bring down
+            // any interfaces that have our expected virtual IP.
+            // 
+            // Note: On macOS, we cannot directly delete utun interfaces - they are cleaned up
+            // by the kernel when the file descriptor is closed. Killing the daemon process
+            // (done in stop_and_cleanup_service) is the proper way to clean up.
+            
+            // Try to find and bring down any utun interfaces with 100.x.x.x addresses
+            // (OmniEdge virtual network range)
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg("ifconfig | grep -B1 'inet 100\\.' | grep -E '^utun[0-9]+' | cut -d: -f1")
+                .output();
+            
+            if let Ok(out) = output {
+                let list = String::from_utf8_lossy(&out.stdout);
+                for iface in list.lines() {
+                    let iface = iface.trim();
+                    if !iface.is_empty() {
+                        debug!("Bringing down macOS interface: {}", iface);
+                        // Bring interface down - this doesn't delete it but stops traffic
+                        let _ = std::process::Command::new("ifconfig")
+                            .args([iface, "down"])
+                            .output();
+                    }
+                }
+            }
         }
 
         Ok(())

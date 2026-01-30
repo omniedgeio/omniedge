@@ -1035,19 +1035,45 @@ pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
     #[cfg(windows)]
     {
         use std::process::Command;
+        
+        // Stop and delete Windows service if it exists
         let _ = Command::new("sc").args(["stop", SERVICE_NAME]).output();
         let _ = Command::new("sc").args(["delete", SERVICE_NAME]).output();
+        
+        // Kill any running omniedge daemon processes
+        // This is needed if the daemon was started manually (not via Windows service)
+        let kill_cmd = format!(
+            "Get-Process -Name 'omniedge' -ErrorAction SilentlyContinue | Where-Object {{ $_.Id -ne {} }} | Stop-Process -Force",
+            std::process::id()
+        );
+        let _ = Command::new("powershell")
+            .args(["-NoProfile", "-Command", &kill_cmd])
+            .output();
+        
+        // Give the process time to terminate
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
 
     #[cfg(target_os = "linux")]
     {
         use std::process::Command;
-        let _ = Command::new("sudo")
-            .args(["systemctl", "stop", "omniedge"])
+        
+        // Stop and disable systemd service if it exists
+        let _ = Command::new("systemctl")
+            .args(["stop", "omniedge"])
             .output();
-        let _ = Command::new("sudo")
-            .args(["systemctl", "disable", "omniedge"])
+        let _ = Command::new("systemctl")
+            .args(["disable", "omniedge"])
             .output();
+        
+        // Kill any running omniedge daemon processes
+        // This is needed if the daemon was started manually (not via systemd)
+        let _ = Command::new("pkill")
+            .args(["-f", "omniedge.*--daemon"])
+            .output();
+        
+        // Give the process time to terminate
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
 
     #[cfg(target_os = "macos")]
@@ -1056,11 +1082,11 @@ pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
         
         // Stop and remove system LaunchDaemon (new location)
         let daemon_plist = "/Library/LaunchDaemons/io.omniedge.daemon.plist";
-        let _ = Command::new("sudo")
-            .args(["launchctl", "unload", daemon_plist])
+        let _ = Command::new("launchctl")
+            .args(["unload", daemon_plist])
             .output();
-        let _ = Command::new("sudo")
-            .args(["rm", "-f", daemon_plist])
+        let _ = Command::new("rm")
+            .args(["-f", daemon_plist])
             .output();
         
         // Also clean up old user LaunchAgent if it exists
@@ -1071,6 +1097,15 @@ pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
                 .output();
             let _ = std::fs::remove_file(&agent_plist);
         }
+        
+        // Kill any running omniedge daemon processes
+        // This is needed if the daemon was started manually (not via LaunchDaemon)
+        let _ = Command::new("pkill")
+            .args(["-f", "omniedge.*--daemon"])
+            .output();
+        
+        // Give the process time to terminate
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
 
     let config = CliConfig::load().unwrap_or_default();
