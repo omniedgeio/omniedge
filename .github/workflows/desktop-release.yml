@@ -29,7 +29,7 @@ jobs:
             target: aarch64-apple-darwin
             platform: macos
             helper_name: omni-helper-aarch64-apple-darwin
-          - os: macos-13
+          - os: macos-15-intel
             arch: x64
             target: x86_64-apple-darwin
             platform: macos
@@ -95,10 +95,6 @@ jobs:
           projectPath: ui/desktop
           includeRelease: false
           args: --target ${{ matrix.target }}
-          # Use tauri-action's built-in artifact naming and uploading
-          releaseAssetNamePattern: 'omniedge-desktop-[version]-[platform]-${{ matrix.arch }}[_setup][ext]'
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: 'omniedge-desktop-${{ matrix.platform }}-${{ matrix.arch }}-[bundle]'
 
       - name: Debug - Show artifact paths
         shell: bash
@@ -106,12 +102,87 @@ jobs:
           echo "==> Tauri artifact paths: ${{ steps.tauri.outputs.artifactPaths }}"
           echo "==> App version: ${{ steps.tauri.outputs.appVersion }}"
 
+      - name: Rename and collect artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          PLATFORM="${{ matrix.platform }}"
+          
+          mkdir -p dist
+          
+          # Parse artifactPaths (comma-separated or JSON array)
+          ARTIFACT_PATHS="${{ steps.tauri.outputs.artifactPaths }}"
+          echo "==> Raw artifact paths: $ARTIFACT_PATHS"
+          
+          # Handle both comma-separated and JSON array formats
+          if [[ "$ARTIFACT_PATHS" == "["* ]]; then
+            # JSON array format - extract paths
+            PATHS=$(echo "$ARTIFACT_PATHS" | tr -d '[]"' | tr ',' '\n')
+          else
+            # Comma-separated format
+            PATHS=$(echo "$ARTIFACT_PATHS" | tr ',' '\n')
+          fi
+          
+          for path in $PATHS; do
+            path=$(echo "$path" | xargs)  # trim whitespace
+            if [[ -z "$path" ]] || [[ ! -f "$path" ]]; then
+              continue
+            fi
+            
+            filename=$(basename "$path")
+            ext="${filename##*.}"
+            
+            case "$ext" in
+              msi)
+                newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
+                ;;
+              exe)
+                newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
+                ;;
+              dmg)
+                newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
+                ;;
+              deb)
+                newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
+                ;;
+              AppImage)
+                newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
+                ;;
+              *)
+                newname="$filename"
+                ;;
+            esac
+            
+            echo "==> Copying $path -> dist/$newname"
+            cp "$path" "dist/$newname"
+          done
+          
+          echo "==> Final artifacts:"
+          ls -la dist/
+          
+          # Check if we have any artifacts
+          if [ -n "$(ls -A dist/ 2>/dev/null)" ]; then
+            echo "has_artifacts=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_artifacts=false" >> $GITHUB_OUTPUT
+            echo "::warning::No artifacts found in dist/"
+          fi
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        if: steps.artifacts.outputs.has_artifacts == 'true'
+        with:
+          name: omniedge-desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/*
+
       - name: Upload to Release
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/') && steps.tauri.outputs.artifactPaths != ''
+        if: startsWith(github.ref, 'refs/tags/') && steps.artifacts.outputs.has_artifacts == 'true'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ steps.tauri.outputs.artifactPaths }}
+          file: dist/*
           file_glob: true
           tag: ${{ github.ref }}
           overwrite: true
