@@ -125,7 +125,8 @@ jobs:
           npm run tauri -- build --target ${{ matrix.target }} --verbose
           
           # Verify that bundles were created
-          BUNDLE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle"
+          # Note: Tauri uses the workspace root's target directory, not src-tauri/target
+          BUNDLE_DIR="../../target/${{ matrix.target }}/release/bundle"
           echo "==> Checking for bundle directory: $BUNDLE_DIR"
           if [[ -d "$BUNDLE_DIR" ]]; then
             echo "==> Bundle directory contents:"
@@ -133,8 +134,8 @@ jobs:
           else
             echo "==> ERROR: Bundle directory not found!"
             echo "==> Listing target directory structure:"
-            find src-tauri/target -type d -name bundle 2>/dev/null || echo "No bundle directories found"
-            find src-tauri/target -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null || echo "No bundle files found"
+            find ../../target -type d -name bundle 2>/dev/null || echo "No bundle directories found"
+            find ../../target -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null || echo "No bundle files found"
             exit 1
           fi
 
@@ -147,7 +148,8 @@ jobs:
           ARCH="${{ matrix.arch }}"
           PLATFORM="${{ matrix.platform }}"
           TARGET="${{ matrix.target }}"
-          BUNDLE_DIR="ui/desktop/src-tauri/target/${TARGET}/release/bundle"
+          # Tauri uses the workspace root's target directory
+          BUNDLE_DIR="target/${TARGET}/release/bundle"
           
           echo "==> Looking for artifacts in: $BUNDLE_DIR"
           echo "==> VERSION=$VERSION, PLATFORM=$PLATFORM, ARCH=$ARCH"
@@ -178,6 +180,12 @@ jobs:
           for f in "$BUNDLE_DIR"/deb/*/*.deb "$BUNDLE_DIR"/deb/*.deb; do
             cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
             echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb from $f"
+          done
+          
+          # Linux RPM
+          for f in "$BUNDLE_DIR"/rpm/*.rpm; do
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.rpm"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.rpm from $f"
           done
           
           # Linux AppImage
@@ -224,6 +232,7 @@ jobs:
             omniedge-desktop-*.msi
             omniedge-desktop-*.exe
             omniedge-desktop-*.deb
+            omniedge-desktop-*.rpm
             omniedge-desktop-*.AppImage
             omniedge-desktop-*.sha256
           if-no-files-found: warn
