@@ -87,7 +87,7 @@ jobs:
           VERSION="${VERSION#v}"  # Remove 'v' prefix
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - uses: tauri-apps/tauri-action@v1
+      - uses: tauri-apps/tauri-action@v0
         id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -95,18 +95,8 @@ jobs:
           projectPath: ui/desktop
           includeRelease: false
           args: --target ${{ matrix.target }}
-          # Use tauri-action's built-in artifact naming and uploading
-          releaseAssetNamePattern: 'omniedge-desktop-[version]-${{ matrix.platform }}-${{ matrix.arch }}[_setup][ext]'
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: 'omniedge-desktop-${{ matrix.platform }}-${{ matrix.arch }}-[bundle]'
 
-      - name: Debug - Show artifact paths
-        shell: bash
-        run: |
-          echo "==> Tauri artifact paths: ${{ steps.tauri.outputs.artifactPaths }}"
-          echo "==> App version: ${{ steps.tauri.outputs.appVersion }}"
-
-      - name: Find and collect artifacts
+      - name: Find and rename artifacts
         id: artifacts
         shell: bash
         run: |
@@ -114,131 +104,83 @@ jobs:
           ARCH="${{ matrix.arch }}"
           PLATFORM="${{ matrix.platform }}"
           TARGET="${{ matrix.target }}"
+          BUNDLE_DIR="ui/desktop/src-tauri/target/${TARGET}/release/bundle"
           
-          mkdir -p dist
+          echo "==> Looking for artifacts in: $BUNDLE_DIR"
           
-          # First try to use tauri's artifactPaths output
-          ARTIFACT_PATHS="${{ steps.tauri.outputs.artifactPaths }}"
-          echo "==> Raw artifact paths from tauri: $ARTIFACT_PATHS"
+          # List all bundle contents for debugging
+          if [[ -d "$BUNDLE_DIR" ]]; then
+            echo "==> Bundle directory contents:"
+            find "$BUNDLE_DIR" -type f 2>/dev/null || true
+          else
+            echo "==> Bundle directory not found!"
+            echo "==> Checking alternate locations..."
+            find ui/desktop/src-tauri/target -type d -name "bundle" 2>/dev/null || true
+          fi
           
-          # If artifactPaths is not empty, use it
-          if [[ -n "$ARTIFACT_PATHS" ]]; then
-            # Handle JSON array format
-            if [[ "$ARTIFACT_PATHS" == "["* ]]; then
-              PATHS=$(echo "$ARTIFACT_PATHS" | tr -d '[]"' | tr ',' '\n')
-            else
-              PATHS=$(echo "$ARTIFACT_PATHS" | tr ',' '\n')
+          # Copy and rename artifacts to root directory (like release.yml does)
+          # macOS DMG
+          for f in "$BUNDLE_DIR"/dmg/*.dmg; do
+            if [[ -f "$f" ]]; then
+              cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
+              echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
             fi
-            
-            for path in $PATHS; do
-              path=$(echo "$path" | xargs)  # trim whitespace
-              if [[ -z "$path" ]] || [[ ! -f "$path" ]]; then
-                continue
-              fi
-              
-              filename=$(basename "$path")
-              ext="${filename##*.}"
-              
-              case "$ext" in
-                msi)
-                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
-                  ;;
-                exe)
-                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
-                  ;;
-                dmg)
-                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
-                  ;;
-                deb)
-                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
-                  ;;
-                AppImage)
-                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
-                  ;;
-                *)
-                  newname="$filename"
-                  ;;
-              esac
-              
-              echo "==> Copying $path -> dist/$newname"
-              cp "$path" "dist/$newname"
-            done
-          else
-            # Fallback: manually search for artifacts in bundle directories
-            echo "==> artifactPaths is empty, searching for bundles manually..."
-            
-            BUNDLE_DIRS=(
-              "ui/desktop/src-tauri/target/${TARGET}/release/bundle"
-              "ui/desktop/src-tauri/target/release/bundle"
-            )
-            
-            for dir in "${BUNDLE_DIRS[@]}"; do
-              if [[ -d "$dir" ]]; then
-                echo "==> Found bundle directory: $dir"
-                
-                # Find and copy artifacts
-                find "$dir" -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null | while read -r path; do
-                  filename=$(basename "$path")
-                  ext="${filename##*.}"
-                  
-                  case "$ext" in
-                    msi)
-                      newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
-                      ;;
-                    dmg)
-                      newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
-                      ;;
-                    deb)
-                      newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
-                      ;;
-                    AppImage)
-                      newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
-                      ;;
-                    *)
-                      newname="$filename"
-                      ;;
-                  esac
-                  
-                  echo "==> Copying $path -> dist/$newname"
-                  cp "$path" "dist/$newname"
-                done
-                
-                # Handle NSIS .exe separately (in nsis subdirectory)
-                find "$dir" -path "*/nsis/*.exe" -type f 2>/dev/null | while read -r path; do
-                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
-                  echo "==> Copying $path -> dist/$newname"
-                  cp "$path" "dist/$newname"
-                done
-                
-                break
-              fi
-            done
-          fi
+          done
           
-          echo "==> Final artifacts:"
-          ls -la dist/
+          # Windows MSI
+          for f in "$BUNDLE_DIR"/msi/*.msi; do
+            if [[ -f "$f" ]]; then
+              cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
+              echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
+            fi
+          done
           
-          # Check if we have any artifacts
-          if [ -n "$(ls -A dist/ 2>/dev/null)" ]; then
-            echo "has_artifacts=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_artifacts=false" >> $GITHUB_OUTPUT
-            echo "::warning::No artifacts found in dist/"
-          fi
+          # Windows NSIS
+          for f in "$BUNDLE_DIR"/nsis/*.exe; do
+            if [[ -f "$f" ]]; then
+              cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
+              echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
+            fi
+          done
+          
+          # Linux DEB
+          for f in "$BUNDLE_DIR"/deb/*.deb; do
+            if [[ -f "$f" ]]; then
+              cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
+              echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
+            fi
+          done
+          
+          # Linux AppImage
+          for f in "$BUNDLE_DIR"/appimage/*.AppImage; do
+            if [[ -f "$f" ]]; then
+              cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
+              echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
+            fi
+          done
+          
+          # List final artifacts
+          echo "==> Final artifacts in root:"
+          ls -la omniedge-desktop-* 2>/dev/null || echo "No artifacts found"
 
-      - name: Upload workflow artifacts
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
-        if: steps.artifacts.outputs.has_artifacts == 'true'
         with:
-          name: omniedge-desktop-${{ matrix.platform }}-${{ matrix.arch }}
-          path: dist/*
+          name: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            omniedge-desktop-*.dmg
+            omniedge-desktop-*.msi
+            omniedge-desktop-*.exe
+            omniedge-desktop-*.deb
+            omniedge-desktop-*.AppImage
+          if-no-files-found: ignore
 
       - name: Upload to Release
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/') && steps.artifacts.outputs.has_artifacts == 'true'
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/*
+          file: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.*
           file_glob: true
           tag: ${{ github.ref }}
           overwrite: true
