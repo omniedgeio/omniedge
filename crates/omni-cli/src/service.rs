@@ -196,7 +196,7 @@ fn get_omniedge_interface() -> Option<InterfaceInfo> {
     #[cfg(windows)]
     let target_names = ["OmniEdge"];
     #[cfg(target_os = "linux")]
-    let target_names = ["OmniEdge"];
+    let target_names = ["omniedge0", "omniedge"];
 
     // First pass: try to find interface with matching virtual IP (most accurate for macOS)
     if let Some(ref vip) = expected_vip {

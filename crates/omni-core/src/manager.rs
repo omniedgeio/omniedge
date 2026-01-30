@@ -987,7 +987,7 @@ impl ConnectionManager {
             // Find all OmniEdge interfaces and delete them
             let output = std::process::Command::new("sh")
                 .arg("-c")
-                .arg("ip link show | grep -oE 'OmniEdge[0-9]*'")
+                .arg("ip link show | grep -oE 'omniedge[0-9]*'")
                 .output();
 
             if let Ok(out) = output {

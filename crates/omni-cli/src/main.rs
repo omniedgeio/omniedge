@@ -41,17 +41,13 @@ fn get_real_user_home() -> Option<std::path::PathBuf> {
 }
 
 /// Check if running with elevated privileges (root on Unix, admin on Windows)
-/// If not elevated, re-exec with sudo (Unix) or show error (Windows)
+/// If not elevated, re-exec with sudo (Unix) or elevate via UAC (Windows)
 fn require_root_privileges() {
     #[cfg(windows)]
     {
         if !is_elevated::is_elevated() {
-            eprintln!("Error: Administrator privileges required.");
-            eprintln!();
-            eprintln!("Please run one of the following:");
-            eprintln!("  • Right-click PowerShell/CMD → 'Run as Administrator'");
-            eprintln!("  • Or run: Start-Process powershell -Verb RunAs");
-            std::process::exit(exit_codes::PERMISSION_DENIED);
+            // Re-exec with elevated privileges via UAC
+            reexec_with_elevation();
         }
     }
     #[cfg(unix)]
@@ -59,6 +55,42 @@ fn require_root_privileges() {
         if !nix::unistd::geteuid().is_root() {
             // Re-exec with sudo - this will prompt user for password
             reexec_with_sudo();
+        }
+    }
+}
+
+/// Re-execute the current process with elevated privileges (Windows)
+#[cfg(windows)]
+fn reexec_with_elevation() -> ! {
+    use std::process::Command;
+    
+    let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("omniedge.exe"));
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let args_str = args.join(" ");
+    
+    eprintln!("Administrator privileges required. Requesting elevation...");
+    
+    // Use PowerShell to launch elevated process and wait for it
+    let ps_command = format!(
+        "Start-Process -FilePath '{}' -ArgumentList '{}' -Verb RunAs -Wait",
+        exe.display(),
+        args_str.replace("'", "''")  // Escape single quotes for PowerShell
+    );
+    
+    let result = Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps_command])
+        .status();
+    
+    match result {
+        Ok(status) => {
+            std::process::exit(status.code().unwrap_or(0));
+        }
+        Err(e) => {
+            eprintln!("Failed to elevate: {}", e);
+            eprintln!();
+            eprintln!("Please run manually as Administrator:");
+            eprintln!("  • Right-click PowerShell/CMD → 'Run as Administrator'");
+            std::process::exit(exit_codes::PERMISSION_DENIED);
         }
     }
 }
