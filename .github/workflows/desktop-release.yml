@@ -116,11 +116,12 @@ jobs:
         shell: bash
         working-directory: ui/desktop
         env:
-          # Note: Do NOT set APPLE_SIGNING_IDENTITY here - let Tauri use the
-          # signingIdentity from tauri.conf.json (which is "-" for ad-hoc signing)
-          # Setting it to empty string breaks codesign
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          # Explicitly unset certificate variables to force ad-hoc signing
+          # Tauri will use signingIdentity: "-" from tauri.conf.json
+          # To enable proper code signing later, remove these unsets and set valid secrets
+          APPLE_CERTIFICATE: ''
+          APPLE_CERTIFICATE_PASSWORD: ''
+          APPLE_SIGNING_IDENTITY: '-'
         run: |
           npm run tauri -- build --target ${{ matrix.target }} --verbose
           
