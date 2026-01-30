@@ -107,6 +107,7 @@ jobs:
         id: artifacts
         shell: bash
         run: |
+          set -x  # Enable debug output
           VERSION="${{ steps.version.outputs.version }}"
           ARCH="${{ matrix.arch }}"
           PLATFORM="${{ matrix.platform }}"
@@ -114,64 +115,62 @@ jobs:
           BUNDLE_DIR="ui/desktop/src-tauri/target/${TARGET}/release/bundle"
           
           echo "==> Looking for artifacts in: $BUNDLE_DIR"
+          echo "==> VERSION=$VERSION, PLATFORM=$PLATFORM, ARCH=$ARCH"
           
           # List all bundle contents for debugging
-          if [[ -d "$BUNDLE_DIR" ]]; then
-            echo "==> Bundle directory contents:"
-            find "$BUNDLE_DIR" -type f 2>/dev/null || true
-          else
-            echo "==> Bundle directory not found!"
-            echo "==> Checking alternate locations..."
-            find ui/desktop/src-tauri/target -type d -name "bundle" 2>/dev/null || true
-          fi
+          echo "==> Full target directory structure:"
+          find ui/desktop/src-tauri/target -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null || echo "No bundle files found anywhere"
           
-          # Copy and rename artifacts to root directory (like release.yml does)
+          # Copy and rename artifacts to root directory
+          # Use nullglob to handle no matches gracefully
+          shopt -s nullglob
+          
           # macOS DMG
-          for f in "$BUNDLE_DIR"/dmg/*.dmg; do
-            if [[ -f "$f" ]]; then
-              cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
-              echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
-            fi
+          for f in "$BUNDLE_DIR"/dmg/*.dmg "$BUNDLE_DIR"/macos/*.dmg; do
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg from $f"
           done
           
           # Windows MSI
           for f in "$BUNDLE_DIR"/msi/*.msi; do
-            if [[ -f "$f" ]]; then
-              cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
-              echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
-            fi
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi from $f"
           done
           
           # Windows NSIS
           for f in "$BUNDLE_DIR"/nsis/*.exe; do
-            if [[ -f "$f" ]]; then
-              cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
-              echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
-            fi
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe from $f"
           done
           
           # Linux DEB
-          for f in "$BUNDLE_DIR"/deb/*.deb; do
-            if [[ -f "$f" ]]; then
-              cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
-              echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
-            fi
+          for f in "$BUNDLE_DIR"/deb/*/*.deb "$BUNDLE_DIR"/deb/*.deb; do
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb from $f"
           done
           
           # Linux AppImage
           for f in "$BUNDLE_DIR"/appimage/*.AppImage; do
-            if [[ -f "$f" ]]; then
-              cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
-              echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
-            fi
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage from $f"
           done
+          
+          shopt -u nullglob
           
           # List final artifacts
           echo "==> Final artifacts in root:"
-          ls -la omniedge-desktop-* 2>/dev/null || echo "No artifacts found"
+          ls -la omniedge-desktop-* 2>/dev/null || echo "WARNING: No artifacts created!"
+          
+          # Set output for conditional steps
+          if ls omniedge-desktop-* 1>/dev/null 2>&1; then
+            echo "has_artifacts=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_artifacts=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
+        if: steps.artifacts.outputs.has_artifacts == 'true'
         with:
           name: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -180,11 +179,11 @@ jobs:
             omniedge-desktop-*.exe
             omniedge-desktop-*.deb
             omniedge-desktop-*.AppImage
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
       - name: Upload to Release
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && steps.artifacts.outputs.has_artifacts == 'true'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.*
