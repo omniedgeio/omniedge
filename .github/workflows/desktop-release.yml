@@ -111,7 +111,7 @@ jobs:
           BUNDLE_DIR="ui/desktop/src-tauri/target/${TARGET}/release/bundle"
           
           if [[ ! -d "$BUNDLE_DIR" ]]; then
-            BUNDLE_DIR=$(find ui/desktop/src-tauri/target -type d -name bundle -print -quit 2>/dev/null)
+            BUNDLE_DIR=$(find ui/desktop/src-tauri/target -type d -name bundle -print -quit 2>/dev/null || true)
           fi
           
           if [[ -z "$BUNDLE_DIR" ]]; then
