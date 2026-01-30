@@ -115,14 +115,13 @@ jobs:
         timeout-minutes: 30
         shell: bash
         working-directory: ui/desktop
-        env:
-          # Explicitly unset certificate variables to force ad-hoc signing
-          # Tauri will use signingIdentity: "-" from tauri.conf.json
-          # To enable proper code signing later, remove these unsets and set valid secrets
-          APPLE_CERTIFICATE: ''
-          APPLE_CERTIFICATE_PASSWORD: ''
-          APPLE_SIGNING_IDENTITY: '-'
         run: |
+          # Force ad-hoc signing by unsetting certificate environment variables
+          # GitHub Actions injects secrets, so we must unset them in the shell
+          unset APPLE_CERTIFICATE
+          unset APPLE_CERTIFICATE_PASSWORD
+          export APPLE_SIGNING_IDENTITY="-"
+          
           npm run tauri -- build --target ${{ matrix.target }} --verbose
           
           # Verify that bundles were created
