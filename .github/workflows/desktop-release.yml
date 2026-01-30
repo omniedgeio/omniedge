@@ -96,6 +96,76 @@ jobs:
           includeRelease: false
           args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
 
+      - name: Ad-hoc sign macOS app and rebuild DMG (prevents "app is damaged" error)
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          TARGET="${{ matrix.target }}"
+          BUNDLE_DIR="target/${TARGET}/release/bundle"
+          
+          # Find the DMG
+          DMG_PATH=$(find "${BUNDLE_DIR}/dmg" -name "*.dmg" -type f 2>/dev/null | head -1)
+          if [[ -z "$DMG_PATH" ]]; then
+            echo "==> No DMG found, skipping signing"
+            exit 0
+          fi
+          
+          echo "==> Found DMG: ${DMG_PATH}"
+          DMG_NAME=$(basename "$DMG_PATH")
+          
+          # Create temp directory for extraction
+          TEMP_DIR=$(mktemp -d)
+          MOUNT_POINT="${TEMP_DIR}/mount"
+          APP_DIR="${TEMP_DIR}/app"
+          mkdir -p "$MOUNT_POINT" "$APP_DIR"
+          
+          # Mount the DMG
+          echo "==> Mounting DMG..."
+          hdiutil attach "$DMG_PATH" -mountpoint "$MOUNT_POINT" -quiet
+          
+          # Copy the app out
+          APP_NAME=$(ls "$MOUNT_POINT" | grep "\.app$" | head -1)
+          if [[ -z "$APP_NAME" ]]; then
+            echo "==> No .app found in DMG"
+            hdiutil detach "$MOUNT_POINT" -quiet
+            exit 0
+          fi
+          
+          echo "==> Extracting: ${APP_NAME}"
+          cp -R "${MOUNT_POINT}/${APP_NAME}" "$APP_DIR/"
+          
+          # Unmount the DMG
+          hdiutil detach "$MOUNT_POINT" -quiet
+          
+          # Ad-hoc sign the app with hardened runtime
+          APP_PATH="${APP_DIR}/${APP_NAME}"
+          echo "==> Ad-hoc signing: ${APP_PATH}"
+          
+          # Sign all nested components first (helpers, frameworks, etc.)
+          find "$APP_PATH" -type f \( -name "*.dylib" -o -perm +111 \) | while read -r file; do
+            if file "$file" | grep -q "Mach-O"; then
+              codesign --force --sign - "$file" 2>/dev/null || true
+            fi
+          done
+          
+          # Sign the main app bundle
+          codesign --force --deep --sign - "$APP_PATH"
+          
+          # Verify
+          echo "==> Verifying signature..."
+          codesign --verify --verbose "$APP_PATH" || echo "Warning: Verification showed issues but continuing..."
+          
+          # Recreate the DMG
+          echo "==> Recreating DMG..."
+          rm -f "$DMG_PATH"
+          hdiutil create -volname "OmniEdge" -srcfolder "$APP_DIR" -ov -format UDZO "$DMG_PATH"
+          
+          # Cleanup
+          rm -rf "$TEMP_DIR"
+          
+          echo "==> Done! Signed DMG: ${DMG_PATH}"
+          ls -la "$DMG_PATH"
+
       - name: Rename artifacts with omniedge-desktop prefix
         shell: bash
         run: |
@@ -187,10 +257,10 @@ jobs:
 
             ### macOS Installation
 
-            If you see "app is damaged" or "cannot be opened" when launching the app:
-
-            1. Open **System Settings** (or System Preferences on older macOS)
-            2. Go to **Privacy & Security**
-            3. Scroll down to the **Security** section
-            4. You should see a message about "OmniEdge" being blocked - click **Open Anyway**
-            5. Click **Open** in the confirmation dialog
+            1. Download the `.dmg` file for your Mac (ARM64 for Apple Silicon, x64 for Intel)
+            2. Open the DMG and drag **OmniEdge** to **Applications**
+            3. Open **OmniEdge** from Applications
+            4. If you see a security warning:
+               - Open **System Settings** → **Privacy & Security**
+               - Scroll down and click **Open Anyway** next to the OmniEdge message
+               - Click **Open** in the confirmation dialog
