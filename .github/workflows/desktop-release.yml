@@ -97,7 +97,22 @@ jobs:
       - name: Build desktop (Tauri)
         shell: bash
         working-directory: ui/desktop
-        run: npm run tauri -- build --target ${{ matrix.target }}
+        run: |
+          npm run tauri -- build --target ${{ matrix.target }} --verbose
+          
+          # Verify that bundles were created
+          BUNDLE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle"
+          echo "==> Checking for bundle directory: $BUNDLE_DIR"
+          if [[ -d "$BUNDLE_DIR" ]]; then
+            echo "==> Bundle directory contents:"
+            ls -laR "$BUNDLE_DIR"
+          else
+            echo "==> ERROR: Bundle directory not found!"
+            echo "==> Listing target directory structure:"
+            find src-tauri/target -type d -name bundle 2>/dev/null || echo "No bundle directories found"
+            find src-tauri/target -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null || echo "No bundle files found"
+            exit 1
+          fi
 
       - name: Find and rename artifacts
         id: artifacts
@@ -110,21 +125,8 @@ jobs:
           TARGET="${{ matrix.target }}"
           BUNDLE_DIR="ui/desktop/src-tauri/target/${TARGET}/release/bundle"
           
-          if [[ ! -d "$BUNDLE_DIR" ]]; then
-            BUNDLE_DIR=$(find ui/desktop/src-tauri/target -type d -name bundle -print -quit 2>/dev/null || true)
-          fi
-          
-          if [[ -z "$BUNDLE_DIR" ]]; then
-            echo "==> No bundle directory found under ui/desktop/src-tauri/target"
-            BUNDLE_DIR="ui/desktop/src-tauri/target/${TARGET}/release/bundle"
-          fi
-          
           echo "==> Looking for artifacts in: $BUNDLE_DIR"
           echo "==> VERSION=$VERSION, PLATFORM=$PLATFORM, ARCH=$ARCH"
-          
-          # List all bundle contents for debugging
-          echo "==> Full target directory structure:"
-          find ui/desktop/src-tauri/target -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null || echo "No bundle files found anywhere"
           
           # Copy and rename artifacts to root directory
           # Use nullglob to handle no matches gracefully
