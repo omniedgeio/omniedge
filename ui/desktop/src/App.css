@@ -918,6 +918,29 @@ body {
     }
 }
 
+/* Warning Banner */
+.warning-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: rgba(255, 149, 0, 0.15);
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 8px;
+    color: #cc7700;
+    font-size: 11px;
+    font-weight: 500;
+    margin: 12px 0;
+    text-align: left;
+}
+
+@media (prefers-color-scheme: dark) {
+    .warning-banner {
+        background: rgba(255, 149, 0, 0.1);
+        color: #ffaa00;
+    }
+}
+
 /* Debug View Styles */
 .debug-view {
     padding: 14px;

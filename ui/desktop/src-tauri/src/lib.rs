@@ -419,20 +419,76 @@ async fn get_virtual_ip(state: tauri::State<'_, AppState>) -> Result<String, Str
 }
 
 #[tauri::command]
-async fn check_helper() -> bool {
-    let req = HelperRequest {
+async fn check_helper() -> Result<bool, String> {
+    // First check if helper responds to ping
+    let ping_req = HelperRequest {
         command: "ping".to_string(),
         args: serde_json::json!({}),
     };
 
     // Retry up to 3 times to allow for service startup delay
+    let mut ping_ok = false;
     for _ in 0..3 {
-        if call_helper(&req).await.is_ok() {
-            return true;
+        if call_helper(&ping_req).await.is_ok() {
+            ping_ok = true;
+            break;
         }
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
-    false
+    
+    if !ping_ok {
+        return Ok(false);
+    }
+    
+    // Now check if it's the correct (Rust v2) helper by sending version command
+    // Old Go helper won't understand this command and won't return protocol field
+    let version_req = HelperRequest {
+        command: "version".to_string(),
+        args: serde_json::json!({}),
+    };
+    
+    match call_helper(&version_req).await {
+        Ok(resp) => {
+            if resp.success {
+                if let Some(data) = resp.data {
+                    // Check for rust-v2 protocol identifier
+                    if let Some(protocol) = data.get("protocol").and_then(|p| p.as_str()) {
+                        if protocol == "rust-v2" {
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+            // Helper responded but it's not the correct version
+            info!("Helper responded but wrong version/protocol. Need to reinstall.");
+            Ok(false)
+        }
+        Err(_) => {
+            // Helper doesn't understand version command - it's the old Go helper
+            info!("Helper doesn't support version command. Old helper detected.");
+            Ok(false)
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_helper_version() -> Result<serde_json::Value, String> {
+    let req = HelperRequest {
+        command: "version".to_string(),
+        args: serde_json::json!({}),
+    };
+    
+    match call_helper(&req).await {
+        Ok(resp) => {
+            if resp.success {
+                if let Some(data) = resp.data {
+                    return Ok(data);
+                }
+            }
+            Err(resp.message)
+        }
+        Err(e) => Err(e)
+    }
 }
 
 #[tauri::command]
@@ -1250,6 +1306,7 @@ pub fn run() {
             resize_window,
             check_is_admin,
             check_helper,
+            get_helper_version,
             install_helper,
             get_debug_info,
             quit

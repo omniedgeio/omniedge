@@ -61,6 +61,14 @@ impl HelperServer {
                 message: "pong".to_string(),
                 data: None,
             },
+            "version" => HelperResponse {
+                success: true,
+                message: "omniedge-helper".to_string(),
+                data: Some(serde_json::json!({
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "protocol": "rust-v2",
+                })),
+            },
             "status" => {
                 let state = self.state.read().await.clone();
                 let network_id = self.network_id.read().await.clone();

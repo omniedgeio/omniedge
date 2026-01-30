@@ -27,7 +27,7 @@ function App() {
   const [showSetup, setShowSetup] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
-  const [helperDebugInfo, setHelperDebugInfo] = useState<{checked: boolean, active: boolean, error?: string, paths?: string[]}>({checked: false, active: false});
+  const [helperDebugInfo, setHelperDebugInfo] = useState<{checked: boolean, active: boolean, error?: string, wrongVersion?: boolean}>({checked: false, active: false});
   const [copiedIP, setCopiedIP] = useState<string | null>(null);
   const appRef = useRef<HTMLDivElement>(null);
 
@@ -91,9 +91,21 @@ function App() {
         // Check helper status with debug info
         let helperActive = false;
         let helperError: string | undefined;
+        let wrongVersion = false;
         
         try {
           helperActive = await invoke('check_helper') as boolean;
+          
+          // If check_helper returns false, try to get version to see if it's an old helper
+          if (!helperActive) {
+            try {
+              // Try to get version - if this fails with wrong format, it's the old helper
+              await invoke('get_helper_version');
+            } catch {
+              // Old helper detected - ping works but version doesn't
+              wrongVersion = true;
+            }
+          }
         } catch (err: any) {
           helperError = err.toString();
         }
@@ -105,12 +117,13 @@ function App() {
           checked: true,
           active: helperActive,
           error: helperError,
+          wrongVersion: wrongVersion,
         });
 
         const canConnect = helperActive || elevated;
         setHasPermission(canConnect);
 
-        // Always show setup if helper is not running (even if elevated, we want helper for persistence)
+        // Always show setup if helper is not running or wrong version
         if (!helperActive) {
           setShowSetup(true);
         }
@@ -549,8 +562,23 @@ function App() {
                     <path d="M12 16h.01"></path>
                   </svg>
                 </div>
-                <h2>Background Service Required</h2>
-                <p>To provide secure, non-admin VPN connectivity and background operations, OmniEdge needs to install its helper service.</p>
+                <h2>{helperDebugInfo.wrongVersion ? 'Helper Update Required' : 'Background Service Required'}</h2>
+                <p>
+                  {helperDebugInfo.wrongVersion 
+                    ? 'An older version of the helper service was detected. Please install the updated helper to ensure compatibility.'
+                    : 'To provide secure, non-admin VPN connectivity and background operations, OmniEdge needs to install its helper service.'}
+                </p>
+
+                {helperDebugInfo.wrongVersion && (
+                  <div className="warning-banner">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                      <line x1="12" y1="9" x2="12" y2="13"></line>
+                      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    <span>Old helper version detected - connections will not work until updated</span>
+                  </div>
+                )}
 
                 <div className="setup-benefits">
                   <div className="benefit-item">
@@ -614,9 +642,15 @@ function App() {
                       <div className="debug-row">
                         <span className="debug-label">Helper Status:</span>
                         <span className={`debug-value ${helperDebugInfo.active ? 'success' : 'error'}`}>
-                          {!helperDebugInfo.checked ? 'Checking...' : (helperDebugInfo.active ? 'Running' : 'Not Running')}
+                          {!helperDebugInfo.checked ? 'Checking...' : (helperDebugInfo.active ? 'Running (v2)' : (helperDebugInfo.wrongVersion ? 'Wrong Version' : 'Not Running'))}
                         </span>
                       </div>
+                      {helperDebugInfo.wrongVersion && (
+                        <div className="debug-row">
+                          <span className="debug-label">Issue:</span>
+                          <span className="debug-value error">Old Go helper detected, needs Rust v2 helper</span>
+                        </div>
+                      )}
                       <div className="debug-row">
                         <span className="debug-label">Socket Path:</span>
                         <span className="debug-value mono">/var/run/omniedge-helper.sock</span>
