@@ -500,6 +500,7 @@ fn get_hardware_id() -> String {
     format!("{}-{}", hostname, username)
 }
 
+#[allow(unused_variables)]
 fn ensure_wintun_dll(app: &tauri::AppHandle) {
     #[cfg(target_os = "windows")]
     {
