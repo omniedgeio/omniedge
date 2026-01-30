@@ -389,19 +389,46 @@ function App() {
     setError('');
     try {
       await invoke('install_helper');
-      // Re-check helper status after installation
-      const helperActive = await invoke('check_helper') as boolean;
+      
+      // Wait a moment for the service to fully start
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Re-check helper status after installation - retry a few times
+      let helperActive = false;
+      for (let i = 0; i < 5; i++) {
+        helperActive = await invoke('check_helper') as boolean;
+        if (helperActive) break;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Update debug info
+      setHelperDebugInfo({
+        checked: true,
+        active: helperActive,
+        wrongVersion: false,
+        error: helperActive ? undefined : 'Helper installed but not responding with correct version',
+      });
+      
       if (helperActive) {
         setHasPermission(true);
         setError('');
         setShowSetup(false);
+        
+        // Try auto-login if we have saved credentials
+        try {
+          const autoLoginSuccess = await invoke('try_auto_login');
+          if (autoLoginSuccess) {
+            await handleSuccessfulLogin();
+          }
+        } catch (e) {
+          console.log('Auto-login after helper install failed:', e);
+        }
       } else {
-        // Double check admin just in case
-        const elevated = await invoke('check_is_admin') as boolean;
-        setHasPermission(elevated);
+        setError('Helper was installed but is not responding correctly. Please try "Check Again" or view Debug info.');
       }
     } catch (err: any) {
       setError(`Failed to install helper: ${err.toString()}`);
+      setHelperDebugInfo(prev => ({...prev, error: err.toString()}));
     } finally {
       setHelperInstalling(false);
     }

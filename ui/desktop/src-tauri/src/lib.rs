@@ -276,14 +276,29 @@ async fn install_helper(_app: tauri::AppHandle) -> Result<(), String> {
         // Create shell script to install helper with admin privileges
         let install_script = format!(
             r#"
-            # Stop and unload existing service
+            # First, kill any running helper process
+            pkill -9 -f 'io.omniedge.helper' 2>/dev/null || true
+            killall omni-helper 2>/dev/null || true
+            
+            # Stop and unload existing service (try both old and new plist names)
+            launchctl bootout system '{}' 2>/dev/null || true
             launchctl unload '{}' 2>/dev/null || true
+            launchctl unload '/Library/LaunchDaemons/io.omniedge.mac.Omniedge.HelperTool.plist' 2>/dev/null || true
+            
+            # Wait for process to terminate
+            sleep 1
+            
+            # Force kill again if still running
+            pkill -9 -f 'io.omniedge.helper' 2>/dev/null || true
             
             # Remove old socket if exists
             rm -f '{}'
             
             # Create directory for helper
             mkdir -p /Library/PrivilegedHelperTools
+            
+            # Remove old binary first
+            rm -f '{}'
             
             # Copy helper binary
             cp '{}' '{}'
@@ -295,8 +310,8 @@ async fn install_helper(_app: tauri::AppHandle) -> Result<(), String> {
             chmod 644 '{}'
             chown root:wheel '{}'
             
-            # Load the service
-            launchctl load '{}'
+            # Load the service using modern launchctl
+            launchctl bootstrap system '{}' 2>/dev/null || launchctl load '{}'
             
             # Wait for socket to be created
             for i in 1 2 3 4 5; do
@@ -314,14 +329,16 @@ async fn install_helper(_app: tauri::AppHandle) -> Result<(), String> {
             fi
             "#,
             plist_path,
+            plist_path,
             socket_path,
+            install_path,
             helper_str, install_path,
             install_path,
             install_path,
             temp_plist, plist_path,
             plist_path,
             plist_path,
-            plist_path,
+            plist_path, plist_path,
             socket_path
         );
         
