@@ -87,7 +87,7 @@ jobs:
           VERSION="${VERSION#v}"  # Remove 'v' prefix
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v1
         id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -95,6 +95,10 @@ jobs:
           projectPath: ui/desktop
           includeRelease: false
           args: --target ${{ matrix.target }}
+          # Use tauri-action's built-in artifact naming and uploading
+          releaseAssetNamePattern: 'omniedge-desktop-[version]-${{ matrix.platform }}-${{ matrix.arch }}[_setup][ext]'
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: 'omniedge-desktop-${{ matrix.platform }}-${{ matrix.arch }}-[bundle]'
 
       - name: Debug - Show artifact paths
         shell: bash
@@ -102,62 +106,114 @@ jobs:
           echo "==> Tauri artifact paths: ${{ steps.tauri.outputs.artifactPaths }}"
           echo "==> App version: ${{ steps.tauri.outputs.appVersion }}"
 
-      - name: Rename and collect artifacts
+      - name: Find and collect artifacts
         id: artifacts
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           ARCH="${{ matrix.arch }}"
           PLATFORM="${{ matrix.platform }}"
+          TARGET="${{ matrix.target }}"
           
           mkdir -p dist
           
-          # Parse artifactPaths (comma-separated or JSON array)
+          # First try to use tauri's artifactPaths output
           ARTIFACT_PATHS="${{ steps.tauri.outputs.artifactPaths }}"
-          echo "==> Raw artifact paths: $ARTIFACT_PATHS"
+          echo "==> Raw artifact paths from tauri: $ARTIFACT_PATHS"
           
-          # Handle both comma-separated and JSON array formats
-          if [[ "$ARTIFACT_PATHS" == "["* ]]; then
-            # JSON array format - extract paths
-            PATHS=$(echo "$ARTIFACT_PATHS" | tr -d '[]"' | tr ',' '\n')
-          else
-            # Comma-separated format
-            PATHS=$(echo "$ARTIFACT_PATHS" | tr ',' '\n')
-          fi
-          
-          for path in $PATHS; do
-            path=$(echo "$path" | xargs)  # trim whitespace
-            if [[ -z "$path" ]] || [[ ! -f "$path" ]]; then
-              continue
+          # If artifactPaths is not empty, use it
+          if [[ -n "$ARTIFACT_PATHS" ]]; then
+            # Handle JSON array format
+            if [[ "$ARTIFACT_PATHS" == "["* ]]; then
+              PATHS=$(echo "$ARTIFACT_PATHS" | tr -d '[]"' | tr ',' '\n')
+            else
+              PATHS=$(echo "$ARTIFACT_PATHS" | tr ',' '\n')
             fi
             
-            filename=$(basename "$path")
-            ext="${filename##*.}"
+            for path in $PATHS; do
+              path=$(echo "$path" | xargs)  # trim whitespace
+              if [[ -z "$path" ]] || [[ ! -f "$path" ]]; then
+                continue
+              fi
+              
+              filename=$(basename "$path")
+              ext="${filename##*.}"
+              
+              case "$ext" in
+                msi)
+                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
+                  ;;
+                exe)
+                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
+                  ;;
+                dmg)
+                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
+                  ;;
+                deb)
+                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
+                  ;;
+                AppImage)
+                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
+                  ;;
+                *)
+                  newname="$filename"
+                  ;;
+              esac
+              
+              echo "==> Copying $path -> dist/$newname"
+              cp "$path" "dist/$newname"
+            done
+          else
+            # Fallback: manually search for artifacts in bundle directories
+            echo "==> artifactPaths is empty, searching for bundles manually..."
             
-            case "$ext" in
-              msi)
-                newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
-                ;;
-              exe)
-                newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
-                ;;
-              dmg)
-                newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
-                ;;
-              deb)
-                newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
-                ;;
-              AppImage)
-                newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
-                ;;
-              *)
-                newname="$filename"
-                ;;
-            esac
+            BUNDLE_DIRS=(
+              "ui/desktop/src-tauri/target/${TARGET}/release/bundle"
+              "ui/desktop/src-tauri/target/release/bundle"
+            )
             
-            echo "==> Copying $path -> dist/$newname"
-            cp "$path" "dist/$newname"
-          done
+            for dir in "${BUNDLE_DIRS[@]}"; do
+              if [[ -d "$dir" ]]; then
+                echo "==> Found bundle directory: $dir"
+                
+                # Find and copy artifacts
+                find "$dir" -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null | while read -r path; do
+                  filename=$(basename "$path")
+                  ext="${filename##*.}"
+                  
+                  case "$ext" in
+                    msi)
+                      newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
+                      ;;
+                    dmg)
+                      newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
+                      ;;
+                    deb)
+                      newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
+                      ;;
+                    AppImage)
+                      newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
+                      ;;
+                    *)
+                      newname="$filename"
+                      ;;
+                  esac
+                  
+                  echo "==> Copying $path -> dist/$newname"
+                  cp "$path" "dist/$newname"
+                done
+                
+                # Handle NSIS .exe separately (in nsis subdirectory)
+                find "$dir" -path "*/nsis/*.exe" -type f 2>/dev/null | while read -r path; do
+                  newname="omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
+                  echo "==> Copying $path -> dist/$newname"
+                  cp "$path" "dist/$newname"
+                done
+                
+                break
+              fi
+            done
+          fi
           
           echo "==> Final artifacts:"
           ls -la dist/
