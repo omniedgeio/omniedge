@@ -73,9 +73,9 @@ jobs:
         run: |
           cargo build --release -p omni-helper --target ${{ matrix.target }}
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
-            cp target/${{ matrix.target }}/release/omni-helper.exe ui/desktop/src-tauri/binaries/${{ matrix.helper_name }}
+            cp "target/${{ matrix.target }}/release/omni-helper.exe" "ui/desktop/src-tauri/binaries/${{ matrix.helper_name }}"
           else
-            cp target/${{ matrix.target }}/release/omni-helper ui/desktop/src-tauri/binaries/${{ matrix.helper_name }}
+            cp "target/${{ matrix.target }}/release/omni-helper" "ui/desktop/src-tauri/binaries/${{ matrix.helper_name }}"
           fi
           ls -la ui/desktop/src-tauri/binaries/
 
@@ -94,14 +94,10 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "==> Version: $VERSION"
 
-      - uses: tauri-apps/tauri-action@v0
-        id: tauri
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: ui/desktop
-          includeRelease: false
-          args: --target ${{ matrix.target }}
+      - name: Build desktop (Tauri)
+        shell: bash
+        working-directory: ui/desktop
+        run: npm run tauri -- build --target ${{ matrix.target }}
 
       - name: Find and rename artifacts
         id: artifacts
@@ -113,6 +109,15 @@ jobs:
           PLATFORM="${{ matrix.platform }}"
           TARGET="${{ matrix.target }}"
           BUNDLE_DIR="ui/desktop/src-tauri/target/${TARGET}/release/bundle"
+          
+          if [[ ! -d "$BUNDLE_DIR" ]]; then
+            BUNDLE_DIR=$(find ui/desktop/src-tauri/target -type d -name bundle -print -quit 2>/dev/null)
+          fi
+          
+          if [[ -z "$BUNDLE_DIR" ]]; then
+            echo "==> No bundle directory found under ui/desktop/src-tauri/target"
+            BUNDLE_DIR="ui/desktop/src-tauri/target/${TARGET}/release/bundle"
+          fi
           
           echo "==> Looking for artifacts in: $BUNDLE_DIR"
           echo "==> VERSION=$VERSION, PLATFORM=$PLATFORM, ARCH=$ARCH"
@@ -139,8 +144,8 @@ jobs:
           
           # Windows NSIS
           for f in "$BUNDLE_DIR"/nsis/*.exe; do
-            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe"
-            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}_setup.exe from $f"
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}-setup.exe"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}-setup.exe from $f"
           done
           
           # Linux DEB
@@ -186,7 +191,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/') && steps.artifacts.outputs.has_artifacts == 'true'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.*
+          file: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}*
           file_glob: true
           tag: ${{ github.ref }}
           overwrite: true
