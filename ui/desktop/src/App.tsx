@@ -260,6 +260,12 @@ function App() {
   };
 
   const handleConnect = async (networkId: string) => {
+    // Prevent multiple simultaneous connection attempts
+    if (isConnecting) {
+      console.log("Already connecting, ignoring duplicate connect request");
+      return;
+    }
+    
     // First check if helper is installed
     const helperActive = await invoke('check_helper') as boolean;
     if (!helperActive) {
@@ -271,15 +277,14 @@ function App() {
     }
     
     setIsConnecting(true);
+    setActiveNetwork(networkId); // Set immediately to prevent duplicate clicks
     setError('');
-    // Don't set activeNetwork here - only set it after successful connection
     try {
       await invoke('connect', { networkId, as_exit_node: isBecomingExitNode });
       
       // Verify connection actually succeeded by checking state
       const currStatus = await invoke('get_state') as string;
       if (currStatus.toLowerCase() === 'connected') {
-        setActiveNetwork(networkId);
         setConnectedNetworkID(networkId);
         const net = networks.find(n => n.id === networkId);
         if (net) setNetworkName(net.name);

@@ -273,96 +273,135 @@ async fn install_helper(_app: tauri::AppHandle) -> Result<(), String> {
         let temp_plist = "/tmp/io.omniedge.helper.plist";
         std::fs::write(temp_plist, &plist_content).map_err(|e| e.to_string())?;
         
-        // Create shell script to install helper with admin privileges
-        let install_script = format!(
-            r#"
-            # First, kill any running helper process
-            pkill -9 -f 'io.omniedge.helper' 2>/dev/null || true
-            killall omni-helper 2>/dev/null || true
-            
-            # Stop and unload existing service (try both old and new plist names)
-            launchctl bootout system '{}' 2>/dev/null || true
-            launchctl unload '{}' 2>/dev/null || true
-            launchctl unload '/Library/LaunchDaemons/io.omniedge.mac.Omniedge.HelperTool.plist' 2>/dev/null || true
-            
-            # Wait for process to terminate
-            sleep 1
-            
-            # Force kill again if still running
-            pkill -9 -f 'io.omniedge.helper' 2>/dev/null || true
-            
-            # Remove old socket if exists
-            rm -f '{}'
-            
-            # Create directory for helper
-            mkdir -p /Library/PrivilegedHelperTools
-            
-            # Remove old binary first
-            rm -f '{}'
-            
-            # Copy helper binary
-            cp '{}' '{}'
-            chmod 755 '{}'
-            chown root:wheel '{}'
-            
-            # Install plist
-            cp '{}' '{}'
-            chmod 644 '{}'
-            chown root:wheel '{}'
-            
-            # Load the service using modern launchctl
-            launchctl bootstrap system '{}' 2>/dev/null || launchctl load '{}'
-            
-            # Wait for socket to be created
-            for i in 1 2 3 4 5; do
-                if [ -S '{}' ]; then
-                    exit 0
-                fi
-                sleep 1
-            done
-            
-            # Check if helper is running
-            if launchctl list | grep -q io.omniedge.helper; then
-                exit 0
-            else
-                exit 1
-            fi
-            "#,
-            plist_path,
-            plist_path,
-            socket_path,
-            install_path,
-            helper_str, install_path,
-            install_path,
-            install_path,
-            temp_plist, plist_path,
-            plist_path,
-            plist_path,
-            plist_path, plist_path,
-            socket_path
+        // Create a shell script file to avoid escaping issues with osascript
+        let install_script_path = "/tmp/omniedge-install-helper.sh";
+        let install_script_content = format!(
+            r#"#!/bin/bash
+set -e
+
+# First, kill any running helper process
+pkill -9 -f io.omniedge.helper 2>/dev/null || true
+killall omni-helper 2>/dev/null || true
+
+# Stop and unload existing service (try both old and new plist names)
+launchctl bootout system {plist} 2>/dev/null || true
+launchctl unload {plist} 2>/dev/null || true
+launchctl unload /Library/LaunchDaemons/io.omniedge.mac.Omniedge.HelperTool.plist 2>/dev/null || true
+
+# Wait for process to terminate
+sleep 1
+
+# Force kill again if still running
+pkill -9 -f io.omniedge.helper 2>/dev/null || true
+
+# Remove old socket if exists
+rm -f {socket}
+
+# Create directory for helper
+mkdir -p /Library/PrivilegedHelperTools
+
+# Remove old binary first
+rm -f {install}
+
+# Copy helper binary
+cp {helper} {install}
+chmod 755 {install}
+chown root:wheel {install}
+
+# Install plist
+cp {temp_plist} {plist}
+chmod 644 {plist}
+chown root:wheel {plist}
+
+# Load the service using modern launchctl
+launchctl bootstrap system {plist} 2>/dev/null || launchctl load {plist}
+
+# Wait for socket to be created
+for i in 1 2 3 4 5; do
+    if [ -S {socket} ]; then
+        echo "Helper socket created successfully"
+        exit 0
+    fi
+    sleep 1
+done
+
+# Check if helper is running
+if launchctl list | grep -q io.omniedge.helper; then
+    echo "Helper service is running"
+    exit 0
+fi
+
+echo "Helper installed but socket not yet available"
+exit 0
+"#,
+            plist = plist_path,
+            socket = socket_path,
+            install = install_path,
+            helper = helper_str,
+            temp_plist = temp_plist,
         );
         
-        // Use osascript to run with admin privileges
+        std::fs::write(install_script_path, &install_script_content).map_err(|e| format!("Failed to write install script: {}", e))?;
+        
+        // Make script executable (not strictly needed since we call it with bash)
+        #[allow(unused)]
+        let _ = Command::new("chmod")
+            .args(["+x", install_script_path])
+            .output();
+        
+        // Log debugging info
+        eprintln!("[install_helper] Helper source path: {}", helper_str);
+        eprintln!("[install_helper] Helper exists: {}", helper_path.exists());
+        eprintln!("[install_helper] Temp plist written to: {}", temp_plist);
+        eprintln!("[install_helper] Install script written to: {}", install_script_path);
+        
+        // Use osascript to run the script with admin privileges
+        // Running a script file avoids all the escaping issues
         let apple_script = format!(
-            r#"do shell script "{}" with administrator privileges"#,
-            install_script.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ")
+            r#"do shell script "/bin/bash {}" with administrator privileges"#,
+            install_script_path
         );
+        
+        eprintln!("[install_helper] Running osascript...");
         
         let output = Command::new("osascript")
             .args(["-e", &apple_script])
             .output()
             .map_err(|e| format!("Failed to run osascript: {}", e))?;
         
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        
+        eprintln!("[install_helper] osascript exit status: {}", output.status);
+        eprintln!("[install_helper] osascript stdout: {}", stdout);
+        eprintln!("[install_helper] osascript stderr: {}", stderr);
+        
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            // Clean up script file on failure
+            let _ = std::fs::remove_file(install_script_path);
+            
             if stderr.contains("User canceled") || stderr.contains("(-128)") {
                 return Err("Installation cancelled by user.".to_string());
             }
-            return Err(format!("Failed to install helper service: {}", stderr));
+            return Err(format!("Failed to install helper service.\nExit code: {}\nstdout: {}\nstderr: {}", 
+                output.status, stdout, stderr));
         }
         
-        // Clean up temp file
+        // Clean up temp files
         let _ = std::fs::remove_file(temp_plist);
+        let _ = std::fs::remove_file(install_script_path);
+        
+        // Verify installation
+        let helper_installed = std::path::Path::new(install_path).exists();
+        let plist_installed = std::path::Path::new(plist_path).exists();
+        let socket_exists = std::path::Path::new(socket_path).exists();
+        
+        eprintln!("[install_helper] After install - helper exists: {}, plist exists: {}, socket exists: {}", 
+            helper_installed, plist_installed, socket_exists);
+        
+        if !helper_installed {
+            return Err(format!("Helper binary was not copied to {}. The install script ran but the file is missing.", install_path));
+        }
         
         Ok(())
     }

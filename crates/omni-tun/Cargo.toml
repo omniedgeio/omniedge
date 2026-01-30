@@ -5,7 +5,7 @@ edition = "2021"
 license = "Apache-2.0 OR MIT"
 
 [dependencies]
-omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "omninervous", tag = "v0.2.6" }
+omninervous = { path = "../../../OmniNervous/crates/daemon" }
 anyhow = "1.0"
 tokio = { version = "1.0", features = ["full"] }
 log = "0.4"
