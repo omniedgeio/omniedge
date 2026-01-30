@@ -14,22 +14,26 @@ pub fn get_hardware_id() -> Result<String> {
         .add_component(machineid_rs::HWIDComponent::CPUID)
         .add_component(machineid_rs::HWIDComponent::DriveSerial);
 
-    let id = builder
-        .build("omniedge")
-        .map_err(|e| anyhow!("Failed to generate machine ID: {}", e))?;
-
-    // Map the hash to a stable UUID-like format
-    if id.len() >= 32 {
-        let hex_id = &id[0..32];
-        if let Ok(bytes) = hex::decode(hex_id) {
-            if let Ok(u) = Uuid::from_slice(&bytes) {
-                let s: String = u.to_string();
-                return Ok(s);
+    match builder.build("omniedge") {
+        Ok(id) => {
+            // Map the hash to a stable UUID-like format
+            if id.len() >= 32 {
+                let hex_id = &id[0..32];
+                if let Ok(bytes) = hex::decode(hex_id) {
+                    if let Ok(u) = Uuid::from_slice(&bytes) {
+                        return Ok(u.to_string());
+                    }
+                }
             }
+            Ok(id[..std::cmp::min(id.len(), 36)].to_string())
+        }
+        Err(_) => {
+            // Fallback to hostname-username if machineid fails (consistent with Desktop)
+            let hostname = whoami::fallible::hostname().unwrap_or_else(|_| "unknown".to_string());
+            let username = whoami::username();
+            Ok(format!("{}-{}", hostname, username))
         }
     }
-
-    Ok(id[..std::cmp::min(id.len(), 36)].to_string())
 }
 
 pub fn run_native_scan(cidr: &str, _timeout_secs: i64) -> Result<Vec<omni_api::types::ScanResult>> {
