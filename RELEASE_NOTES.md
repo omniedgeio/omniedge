@@ -37,6 +37,36 @@ omniedge start --mode nucleus --secret "MySecretMin16Chars"
 omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 ```
 
+### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `omniedge start` | Connect to a network |
+| `omniedge stop` | Stop connection and background service |
+| `omniedge status` | Show connection status and network info |
+| `omniedge scan` | Scan local subnet and upload results |
+
+#### Start Command Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--mode <MODE>` | `-m` | Operating mode: `edge` (default), `nucleus`, `dual` |
+| `--network-id <ID>` | `-n` | Virtual network ID to join |
+| `--as-exit-node` | `-x` | Act as an exit node (allow traffic routing) |
+| `--no-exit-node` | | Disable exit node mode |
+| `--exit-node <IP>` | `-e` | Use a specific exit node IP |
+| `--port <PORT>` | `-p` | UDP port for nucleus server (default: 51820) |
+| `--secret <SECRET>` | | Cluster secret for nucleus mode (min 16 chars) |
+| `--security-key <KEY>` | `-s` | Security key for CI/server authentication |
+
+#### Global Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--verbose` | `-v` | Enable verbose output (show all logs to stderr) |
+| `--help` | | Show help |
+| `--version` | | Show version |
+
 ### New Features
 
 - **Exit Node Support**: Route all traffic through a peer
@@ -50,37 +80,50 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
   - Windows: Windows Service
   - Linux: systemd unit file
   - macOS: launchd plist
+- **Subnet Scanning**: Discover local network hosts
+  - `omniedge scan -c 192.168.1.0/24`
 - **Custom User Servers**: Users can configure their own nucleus/relay servers via dashboard
 - **Status Command**: Check connection status with `omniedge status`
   - Shows virtual IP, network, interface name, and exit node role
   - Displays live data from network interface
 
-### Expanded Platform Support
+### Supported Platforms
+
+#### CLI Binary Targets
 
 | Platform | Architectures |
 |----------|---------------|
-| Linux | x86_64, aarch64, armv7, riscv64, loongarch64 |
-| macOS | x86_64, aarch64 (Apple Silicon) |
+| Linux | x86_64, aarch64, armv7, riscv64 |
+| macOS | x86_64 (Intel), aarch64 (Apple Silicon) |
 | Windows | x86_64 |
 
-### New Packaging Formats
+#### Desktop Application
 
-| Format | Platforms |
-|--------|-----------|
-| DEB | amd64, arm64, armhf, riscv64 |
+| Platform | Architectures | Formats |
+|----------|---------------|---------|
+| Linux | x86_64 | .deb, .rpm, .AppImage |
+| macOS | x86_64, aarch64 | .dmg |
+| Windows | x86_64 | .msi, .exe (NSIS) |
+
+### Package Formats
+
+| Format | Architectures |
+|--------|---------------|
+| DEB | amd64, arm64 |
 | RPM | x86_64, aarch64 |
-| AppImage | x86_64, aarch64 |
-| DMG | macOS (x64, arm64) |
-| MSI | Windows x64 |
+| AppImage (CLI) | x86_64 |
+| DMG | macOS x64, arm64 |
+| MSI/NSIS | Windows x64 |
 | tar.gz/zip | All platforms |
 
 ### Desktop Application
 
 - **Tauri v2**: Modern, lightweight desktop framework
-- **React + TypeScript**: Responsive UI
+- **React 19 + TypeScript**: Responsive UI with Vite
 - **System Tray**: Quick access menu with network switching
 - **Dynamic Positioning**: Window follows tray icon
 - **Cross-Platform**: Windows, macOS, Linux
+- **Helper Binary**: Bundled `omni-helper` for privileged operations
 
 ### Breaking Changes
 
@@ -101,7 +144,7 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 
 ### Download Packages
 
-#### CLI - Linux
+#### CLI - Linux tar.gz
 | Package | Architecture |
 |---------|--------------|
 | `omniedge-cli-v2.0.0-linux-x86_64.tar.gz` | x86_64 |
@@ -113,7 +156,6 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 |---------|--------------|
 | `omniedge-cli_2.0.0_amd64.deb` | Debian/Ubuntu x64 |
 | `omniedge-cli_2.0.0_arm64.deb` | Debian/Ubuntu ARM64 |
-| `omniedge-cli_2.0.0_riscv64.deb` | Debian/Ubuntu RISC-V |
 
 #### CLI - RPM Packages
 | Package | Architecture |
@@ -125,7 +167,6 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 | Package | Architecture |
 |---------|--------------|
 | `omniedge-cli-2.0.0-x86_64.AppImage` | Linux x64 |
-| `omniedge-cli-2.0.0-aarch64.AppImage` | Linux ARM64 |
 
 #### CLI - Other Platforms
 | Package | Platform |
@@ -137,12 +178,13 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 #### Desktop Applications
 | Package | Platform |
 |---------|----------|
-| `omniedge-desktop-2.0.0-windows-x64.msi` | Windows x64 |
+| `omniedge-desktop-2.0.0-windows-x64.msi` | Windows x64 (MSI) |
+| `omniedge-desktop-2.0.0-windows-x64-setup.exe` | Windows x64 (NSIS) |
 | `omniedge-desktop-2.0.0-macos-x64.dmg` | macOS Intel |
 | `omniedge-desktop-2.0.0-macos-arm64.dmg` | macOS Apple Silicon |
-| `omniedge-desktop-2.0.0-linux-amd64.deb` | Linux x64 DEB |
-| `omniedge-desktop-2.0.0-linux-amd64.rpm` | Linux x64 RPM |
-| `omniedge-desktop-2.0.0-linux-amd64.AppImage` | Linux x64 AppImage |
+| `omniedge-desktop-2.0.0-linux-x64.deb` | Linux x64 DEB |
+| `omniedge-desktop-2.0.0-linux-x64.rpm` | Linux x64 RPM |
+| `omniedge-desktop-2.0.0-linux-x64.AppImage` | Linux x64 AppImage |
 
 ### Installation
 
@@ -164,18 +206,20 @@ chmod +x omniedge-cli-2.0.0-x86_64.AppImage
 ./omniedge-cli-2.0.0-x86_64.AppImage
 ```
 
-#### macOS
+#### macOS CLI
 ```bash
-# Download and extract
-curl -LO https://github.com/omniedgeio/omniedge/releases/latest/download/omniedge-cli-macos-arm64.tar.gz
-tar -xzf omniedge-cli-macos-arm64.tar.gz
-sudo mv omniedge-cli-macos-arm64 /usr/local/bin/omniedge
+# Download and extract (Apple Silicon)
+curl -LO https://github.com/omniedgeio/omniedge/releases/latest/download/omniedge-cli-v2.0.0-macos-aarch64.tar.gz
+tar -xzf omniedge-cli-v2.0.0-macos-aarch64.tar.gz
+sudo mv omniedge /usr/local/bin/
 
-# Or use Homebrew (coming soon)
-brew install omniedge
+# Intel Mac
+curl -LO https://github.com/omniedgeio/omniedge/releases/latest/download/omniedge-cli-v2.0.0-macos-x86_64.tar.gz
+tar -xzf omniedge-cli-v2.0.0-macos-x86_64.tar.gz
+sudo mv omniedge /usr/local/bin/
 ```
 
-### macOS desktop Installation
+### macOS Desktop Installation
 
 1. Download the `.dmg` file for your Mac (ARM64 for Apple Silicon, x64 for Intel)
 2. Open the DMG and drag **OmniEdge** to **Applications**
@@ -184,7 +228,27 @@ brew install omniedge
    - Open **System Settings** → **Privacy & Security**
    - Scroll down and click **Open Anyway** next to the OmniEdge message
    - Click **Open** in the confirmation dialog
-   - 
+
+### Windows Desktop Installation
+
+1. Download the `.msi` or `-setup.exe` installer
+2. Run the installer (may require administrator privileges)
+3. Launch OmniEdge from the Start Menu or System Tray
+
+### Linux Desktop Installation
+
+```bash
+# DEB (Debian/Ubuntu)
+sudo dpkg -i omniedge-desktop-2.0.0-linux-x64.deb
+
+# RPM (Fedora/RHEL)
+sudo rpm -i omniedge-desktop-2.0.0-linux-x64.rpm
+
+# AppImage
+chmod +x omniedge-desktop-2.0.0-linux-x64.AppImage
+./omniedge-desktop-2.0.0-linux-x64.AppImage
+```
+
 ### Contributors
 
 Thank you to all contributors who made this major release possible!
@@ -192,7 +256,7 @@ Thank you to all contributors who made this major release possible!
 ---
 
 ## v1.0.2-beta.0 (2026-01-12)
-### 🚀 New Features & Improvements
+### New Features & Improvements
 - **Advanced Exit Node Support**: 
     - **Smart CLI Flags**: The `--as-exit-node` flag now automatically implies `-r` (routing), reducing command complexity.
     - **Cloud Synchronization**: Exit node selection (`-e`) now persists across sessions and synchronizes directly with the OmniEdge dashboard.
@@ -212,20 +276,20 @@ Thank you to all contributors who made this major release possible!
 
 
 ## v1.0.1 (2026-01-09)
-### 🚀 New Features
+### New Features
 - **CLI Interactive Login**: The CLI now supports OAuth 2.0 Device Flow (`omniedge login`), allowing users to log in via browser without handling passwords directly.
 - **Desktop Session Login**: Desktop application now uses seamless browser-based session login for improved security and experience.
 
-### 🎨 Desktop UI/UX Polish
+### Desktop UI/UX Polish
 - **Refined Header**: Implemented the official OmniEdge logo and clean typography.
 - **Identity Status**: Added a visual status indicator (green dot) to the user profile chip for clear connection feedback.
 - **Active Network**: The currently connected virtual network is now clearly highlighted with a distinct background and indicator in the dashboard list.
 
-### 🐛 Bug Fixes
+### Bug Fixes
 - **Backend Stability**: Fixed a critical race condition (Error 1006) in the WebSocket service that caused login failures or "unexpected EOF" errors.
 - **Login Flow**: Improved robustness of the browser-based login mechanism.
 
-### 🔧 CI/CD Improvements
+### CI/CD Improvements
 - **macOS Build**: Release workflow now correctly targets Apple Silicon (arm64) for optimized performance on modern Macs.
 
 ---
@@ -235,7 +299,7 @@ Release Notes
 
 **Release Date:** January 8, 2026
 
-## 🎉 What's New
+## What's New
 
 ### Cross-Platform Desktop App
 - **Windows**: NSIS installer with bundled TAP driver
@@ -264,7 +328,7 @@ Release Notes
 - **OpenWrt SDK 23.05**: Stable router SDK
 - **GitHub Actions v4/v5**: Modern CI/CD
 
-## 📦 Download Packages
+## Download Packages
 
 ### Desktop Apps
 | Package | Platform |
@@ -301,7 +365,7 @@ Release Notes
 | `omniedge-v1.0.0-riscv64.zip` | RISC-V 64-bit |
 | `omniedge-v1.0.0-loongarch64.zip` | LoongArch 64-bit |
 
-## 🔧 Breaking Changes
+## Breaking Changes
 
 - **macOS**: Now uses `utun` interface (appears as `utunX` instead of `tapX`)
 - **macOS amd64**: Removed (n2n library is arch-specific, use arm64 for Apple Silicon)
@@ -309,13 +373,13 @@ Release Notes
 - **Ubuntu 18.04**: Removed (EOL)
 - **Legacy platforms**: i386, ppc64le, s390x removed
 
-## 🐛 Bug Fixes
+## Bug Fixes
 
 - Fixed device status not updating on Linux/Docker/Router platforms
 - Fixed hardware UUID mismatch in heartbeat API
 - Fixed release workflow missing parameters
 
-## 📋 Install / Upgrade
+## Install / Upgrade
 
 ### Recommended: Install Script
 
@@ -337,7 +401,7 @@ sudo mv omniedge /usr/local/bin/
 omniedge version
 ```
 
-## 🙏 Contributors
+## Contributors
 
 Thank you to all contributors who made this release possible!
 
