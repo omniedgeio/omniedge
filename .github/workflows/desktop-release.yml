@@ -107,14 +107,39 @@ jobs:
           # Create dist directory for renamed files
           mkdir -p renamed-dist
           
-          # Debug: Show what was built
-          echo "==> Searching for build artifacts..."
-          find target -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null || true
+          # Debug: Show what was built (search entire workspace)
+          echo "==> Searching for build artifacts in entire workspace..."
+          find . -type f \( -name "*.msi" -o -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null | head -20 || true
           
-          # Tauri builds to target/<target>/release/bundle/ when using --target
-          BUNDLE_DIR="target/${TARGET}/release/bundle"
-          echo "==> Looking in: ${BUNDLE_DIR}"
-          ls -la "${BUNDLE_DIR}" 2>/dev/null || echo "Bundle dir not found, checking alternatives..."
+          # Tauri builds relative to projectPath (ui/desktop), so check multiple locations
+          # Location 1: ui/desktop/src-tauri/target/<target>/release/bundle (with --target)
+          # Location 2: ui/desktop/src-tauri/target/release/bundle (without --target)
+          # Location 3: target/<target>/release/bundle (if built from root)
+          
+          BUNDLE_DIRS=(
+            "ui/desktop/src-tauri/target/${TARGET}/release/bundle"
+            "ui/desktop/src-tauri/target/release/bundle"
+            "target/${TARGET}/release/bundle"
+            "target/release/bundle"
+          )
+          
+          BUNDLE_DIR=""
+          for dir in "${BUNDLE_DIRS[@]}"; do
+            echo "==> Checking: ${dir}"
+            if [[ -d "$dir" ]]; then
+              echo "==> Found bundle directory: ${dir}"
+              ls -la "$dir" 2>/dev/null || true
+              BUNDLE_DIR="$dir"
+              break
+            fi
+          done
+          
+          if [[ -z "$BUNDLE_DIR" ]]; then
+            echo "==> ERROR: No bundle directory found!"
+            echo "==> Listing ui/desktop/src-tauri/target structure:"
+            find ui/desktop/src-tauri/target -type d -name "bundle" 2>/dev/null || echo "No bundle dirs found"
+            exit 0
+          fi
           
           # Find and rename built artifacts
           if [[ "$PLATFORM" == "windows" ]]; then
