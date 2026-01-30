@@ -8,8 +8,13 @@ on:
       - 'v*.*.*-rc'
   workflow_dispatch:
 
+concurrency:
+  group: release-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PACKAGE_NAME: omniedge-desktop
+  CARGO_TERM_COLOR: always
 
 jobs:
   publish-tauri:
@@ -29,7 +34,7 @@ jobs:
             target: aarch64-apple-darwin
             platform: macos
             helper_name: omni-helper-aarch64-apple-darwin
-          - os: macos-15-intel
+          - os: macos-13
             arch: x64
             target: x86_64-apple-darwin
             platform: macos
@@ -38,7 +43,7 @@ jobs:
             arch: x64
             target: x86_64-pc-windows-msvc
             platform: windows
-            helper_name: omni-helper-x86_64-pc-windows-msvc.exe
+            helper_name: omni-helper-x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -48,21 +53,33 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
+          cache-dependency-path: ui/desktop/package-lock.json
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            ui/desktop/src-tauri -> target
+          shared-key: ${{ matrix.target }}
+
       - name: install dependencies (ubuntu only)
-        if: matrix.os == 'ubuntu-22.04'
+        if: matrix.platform == 'linux'
+        shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
       - name: install frontend dependencies
+        shell: bash
         working-directory: ui/desktop
-        run: npm install
+        run: npm ci
 
       - name: Create binaries directory
         shell: bash
@@ -73,7 +90,7 @@ jobs:
         run: |
           cargo build --release -p omni-helper --target ${{ matrix.target }}
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
-            cp "target/${{ matrix.target }}/release/omni-helper.exe" "ui/desktop/src-tauri/binaries/${{ matrix.helper_name }}"
+            cp "target/${{ matrix.target }}/release/omni-helper.exe" "ui/desktop/src-tauri/binaries/${{ matrix.helper_name }}.exe"
           else
             cp "target/${{ matrix.target }}/release/omni-helper" "ui/desktop/src-tauri/binaries/${{ matrix.helper_name }}"
           fi
@@ -88,15 +105,19 @@ jobs:
             VERSION="${{ github.ref_name }}"
             VERSION="${VERSION#v}"  # Remove 'v' prefix
           else
-            # Read version from tauri.conf.json for manual runs
-            VERSION=$(grep -o '"version": "[^"]*"' ui/desktop/src-tauri/tauri.conf.json | head -1 | cut -d'"' -f4)
+            # Read version from tauri.conf.json for manual runs using jq
+            VERSION=$(jq -r '.version' ui/desktop/src-tauri/tauri.conf.json)
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "==> Version: $VERSION"
 
       - name: Build desktop (Tauri)
+        timeout-minutes: 30
         shell: bash
         working-directory: ui/desktop
+        env:
+          # Disable signing on macOS CI builds unless certificates are configured
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '' }}
         run: |
           npm run tauri -- build --target ${{ matrix.target }} --verbose
           
@@ -175,6 +196,21 @@ jobs:
             echo "has_artifacts=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Generate checksums
+        if: steps.artifacts.outputs.has_artifacts == 'true'
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for f in omniedge-desktop-*; do
+            if [[ "${{ matrix.platform }}" == "windows" ]]; then
+              certutil -hashfile "$f" SHA256 | grep -v "SHA256" | grep -v "CertUtil" > "$f.sha256"
+            else
+              shasum -a 256 "$f" > "$f.sha256"
+            fi
+            echo "==> Generated checksum for $f"
+          done
+          shopt -u nullglob
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         if: steps.artifacts.outputs.has_artifacts == 'true'
@@ -186,6 +222,7 @@ jobs:
             omniedge-desktop-*.exe
             omniedge-desktop-*.deb
             omniedge-desktop-*.AppImage
+            omniedge-desktop-*.sha256
           if-no-files-found: warn
 
       - name: Upload to Release
