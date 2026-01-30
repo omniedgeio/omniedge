@@ -34,7 +34,7 @@ jobs:
             target: aarch64-apple-darwin
             platform: macos
             helper_name: omni-helper-aarch64-apple-darwin
-          - os: macos-13
+          - os: macos-15-intel
             arch: x64
             target: x86_64-apple-darwin
             platform: macos
