@@ -29,7 +29,7 @@ jobs:
             target: aarch64-apple-darwin
             platform: macos
             helper_name: omni-helper-aarch64-apple-darwin
-          - os: macos-15-intel
+          - os: macos-13
             arch: x64
             target: x86_64-apple-darwin
             platform: macos
@@ -94,105 +94,24 @@ jobs:
         with:
           projectPath: ui/desktop
           includeRelease: false
-          args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+          args: --target ${{ matrix.target }}
+          # Use tauri-action's built-in artifact naming and uploading
+          releaseAssetNamePattern: 'omniedge-desktop-[version]-[platform]-${{ matrix.arch }}[_setup][ext]'
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: 'omniedge-desktop-${{ matrix.platform }}-${{ matrix.arch }}-[bundle]'
 
-      - name: Rename artifacts with omniedge-desktop prefix
+      - name: Debug - Show artifact paths
         shell: bash
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          ARCH="${{ matrix.arch }}"
-          PLATFORM="${{ matrix.platform }}"
-          TARGET="${{ matrix.target }}"
-          
-          # Create dist directory for renamed files
-          mkdir -p renamed-dist
-          
-          # Debug: Show what was built (search entire workspace)
-          echo "==> Searching for build artifacts in entire workspace..."
-          find . -type f \( -name "*.msi" -o -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null | head -20 || true
-          
-          # Tauri builds relative to projectPath (ui/desktop), so check multiple locations
-          # Location 1: ui/desktop/src-tauri/target/<target>/release/bundle (with --target)
-          # Location 2: ui/desktop/src-tauri/target/release/bundle (without --target)
-          # Location 3: target/<target>/release/bundle (if built from root)
-          
-          BUNDLE_DIRS=(
-            "ui/desktop/src-tauri/target/${TARGET}/release/bundle"
-            "ui/desktop/src-tauri/target/release/bundle"
-            "target/${TARGET}/release/bundle"
-            "target/release/bundle"
-          )
-          
-          BUNDLE_DIR=""
-          for dir in "${BUNDLE_DIRS[@]}"; do
-            echo "==> Checking: ${dir}"
-            if [[ -d "$dir" ]]; then
-              echo "==> Found bundle directory: ${dir}"
-              ls -la "$dir" 2>/dev/null || true
-              BUNDLE_DIR="$dir"
-              break
-            fi
-          done
-          
-          if [[ -z "$BUNDLE_DIR" ]]; then
-            echo "==> ERROR: No bundle directory found!"
-            echo "==> Listing ui/desktop/src-tauri/target structure:"
-            find ui/desktop/src-tauri/target -type d -name "bundle" 2>/dev/null || echo "No bundle dirs found"
-            exit 0
-          fi
-          
-          # Find and rename built artifacts
-          if [[ "$PLATFORM" == "windows" ]]; then
-            # Windows: .msi in bundle/msi/, NSIS .exe in bundle/nsis/
-            if [[ -d "${BUNDLE_DIR}/msi" ]]; then
-              find "${BUNDLE_DIR}/msi" -name "*.msi" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-windows-${ARCH}.msi \;
-            fi
-            if [[ -d "${BUNDLE_DIR}/nsis" ]]; then
-              find "${BUNDLE_DIR}/nsis" -name "*.exe" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-windows-${ARCH}-setup.exe \;
-            fi
-          elif [[ "$PLATFORM" == "macos" ]]; then
-            # macOS: .dmg in bundle/dmg/
-            if [[ -d "${BUNDLE_DIR}/dmg" ]]; then
-              find "${BUNDLE_DIR}/dmg" -name "*.dmg" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-macos-${ARCH}.dmg \;
-            fi
-          elif [[ "$PLATFORM" == "linux" ]]; then
-            # Linux: .deb in bundle/deb/, .AppImage in bundle/appimage/
-            if [[ -d "${BUNDLE_DIR}/deb" ]]; then
-              find "${BUNDLE_DIR}/deb" -name "*.deb" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-linux-${ARCH}.deb \;
-            fi
-            if [[ -d "${BUNDLE_DIR}/appimage" ]]; then
-              find "${BUNDLE_DIR}/appimage" -name "*.AppImage" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-linux-${ARCH}.AppImage \;
-            fi
-          fi
-          
-          # List renamed files
-          echo "==> Renamed artifacts:"
-          ls -la renamed-dist/ || echo "No files renamed"
+          echo "==> Tauri artifact paths: ${{ steps.tauri.outputs.artifactPaths }}"
+          echo "==> App version: ${{ steps.tauri.outputs.appVersion }}"
 
-      - name: Check for artifacts
-        id: check_artifacts
-        shell: bash
-        run: |
-          if [ -n "$(ls -A renamed-dist/ 2>/dev/null)" ]; then
-            echo "has_artifacts=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_artifacts=false" >> $GITHUB_OUTPUT
-            echo "::warning::No artifacts found to upload"
-          fi
-
-      - name: Upload renamed artifacts
-        uses: actions/upload-artifact@v4
-        if: steps.check_artifacts.outputs.has_artifacts == 'true'
-        with:
-          name: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}
-          path: renamed-dist/*
-
-      - name: Upload to Release (renamed)
+      - name: Upload to Release
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/') && steps.check_artifacts.outputs.has_artifacts == 'true'
+        if: startsWith(github.ref, 'refs/tags/') && steps.tauri.outputs.artifactPaths != ''
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: renamed-dist/*
+          file: ${{ steps.tauri.outputs.artifactPaths }}
           file_glob: true
           tag: ${{ github.ref }}
           overwrite: true
