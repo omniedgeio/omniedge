@@ -5,7 +5,9 @@ members = [
     "crates/omni-tun",
     "crates/omni-cli",
     "crates/omni-core",
-    "ui/desktop/src-tauri", "crates/omni-helper",
+    "crates/omni-plugin",
+    "crates/omni-helper",
+    "ui/desktop/src-tauri",
 ]
 resolver = "2"
 
