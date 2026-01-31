@@ -4,6 +4,158 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+// ============================================================================
+// Network Configuration for NAT Traversal (OmniNervous v0.3.0)
+// ============================================================================
+
+/// Network-level configuration for NAT traversal and connectivity
+///
+/// These settings control low-level networking features provided by OmniNervous v0.3.0:
+/// - Relay fallback for symmetric NAT
+/// - Automatic port mapping (UPnP/NAT-PMP)
+/// - Encrypted signaling
+/// - IPv6 dual-stack support
+/// - Happy Eyeballs connection racing
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NetworkConfig {
+    /// Enable relay fallback when direct P2P fails (default: true)
+    ///
+    /// When enabled, symmetric NAT scenarios will use relay servers
+    /// to ensure connectivity even when hole-punching is impossible.
+    #[serde(default = "default_true")]
+    pub relay_enabled: bool,
+
+    /// Custom relay server address (format: "host:port")
+    ///
+    /// If None, uses the Nucleus signaling server as relay.
+    /// Set this to use a dedicated relay infrastructure.
+    #[serde(default)]
+    pub relay_server: Option<String>,
+
+    /// Enable automatic port mapping via UPnP/NAT-PMP (default: true)
+    ///
+    /// Attempts to open ports on your router automatically.
+    /// Improves connectivity but may not work on all networks.
+    #[serde(default = "default_true")]
+    pub portmap_enabled: bool,
+
+    /// Enable encrypted signaling (default: true)
+    ///
+    /// Uses X25519 + XSalsa20-Poly1305 to encrypt signaling messages.
+    /// Protects against eavesdropping and message tampering.
+    #[serde(default = "default_true")]
+    pub encrypt_signaling: bool,
+
+    /// Enable IPv6 support (default: true)
+    ///
+    /// Binds dual-stack sockets for both IPv4 and IPv6.
+    /// Disable this on IPv4-only networks.
+    #[serde(default = "default_true")]
+    pub ipv6_enabled: bool,
+
+    /// Prefer IPv6 over IPv4 when latency is similar (default: true)
+    ///
+    /// When both IPv4 and IPv6 paths exist, prefer IPv6 if it's
+    /// within the preference threshold (see below).
+    #[serde(default = "default_true")]
+    pub prefer_ipv6: bool,
+
+    /// IPv6 preference threshold in milliseconds (default: 5)
+    ///
+    /// If IPv6 latency is within this many ms of IPv4, prefer IPv6.
+    /// Example: IPv4=20ms, IPv6=24ms, threshold=5 -> use IPv6
+    #[serde(default = "default_ipv6_threshold")]
+    pub ipv6_preference_threshold_ms: u32,
+
+    /// Happy Eyeballs delay in milliseconds (default: 250)
+    ///
+    /// Time to wait for IPv6 connection before starting IPv4 attempt.
+    /// Per RFC 8305, optimizes for IPv6 without delaying fallback.
+    #[serde(default = "default_happy_eyeballs_delay")]
+    pub happy_eyeballs_delay_ms: u32,
+}
+
+// Serde default value helpers
+fn default_true() -> bool {
+    true
+}
+
+fn default_ipv6_threshold() -> u32 {
+    5 // 5ms is industry proven default
+}
+
+fn default_happy_eyeballs_delay() -> u32 {
+    250 // RFC 8305 recommendation
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        Self {
+            relay_enabled: true,
+            relay_server: None,
+            portmap_enabled: true,
+            encrypt_signaling: true,
+            ipv6_enabled: true,
+            prefer_ipv6: true,
+            ipv6_preference_threshold_ms: 5,
+            happy_eyeballs_delay_ms: 250,
+        }
+    }
+}
+
+impl NetworkConfig {
+    /// Validate configuration values
+    pub fn validate(&self) -> Result<()> {
+        if self.ipv6_preference_threshold_ms > 1000 {
+            anyhow::bail!("IPv6 preference threshold must be <= 1000ms");
+        }
+
+        if self.happy_eyeballs_delay_ms > 2000 {
+            anyhow::bail!("Happy Eyeballs delay must be <= 2000ms");
+        }
+
+        if let Some(ref server) = self.relay_server {
+            if !server.contains(':') {
+                anyhow::bail!("Relay server must include port (format: host:port)");
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Get a summary of enabled features for display
+    pub fn feature_summary(&self) -> Vec<String> {
+        let mut features = Vec::new();
+
+        if self.relay_enabled {
+            features.push("Relay Fallback".to_string());
+        }
+        if self.portmap_enabled {
+            features.push("Port Mapping".to_string());
+        }
+        if self.encrypt_signaling {
+            features.push("Encrypted Signaling".to_string());
+        }
+        if self.ipv6_enabled {
+            features.push(if self.prefer_ipv6 {
+                "IPv6 (Preferred)".to_string()
+            } else {
+                "IPv6 (Available)".to_string()
+            });
+        }
+
+        if features.is_empty() {
+            features.push("Basic Mode".to_string());
+        }
+
+        features
+    }
+}
+
+// ============================================================================
+// CLI Configuration
+// ============================================================================
+
 /// Get the real user's home directory, even when running with sudo
 #[cfg(not(target_os = "windows"))]
 fn get_real_user_home() -> Option<PathBuf> {
@@ -67,6 +219,10 @@ pub struct CliConfig {
     /// Whether cluster secret is configured (don't store the actual secret)
     #[serde(default)]
     pub has_cluster_secret: bool,
+
+    /// Network configuration for NAT traversal (OmniNervous v0.3.0+)
+    #[serde(default)]
+    pub network_config: NetworkConfig,
 }
 
 impl CliConfig {
