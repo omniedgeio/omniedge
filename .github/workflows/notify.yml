@@ -11,22 +11,35 @@ on:
         description: 'Release tag (e.g., v2.0.0)'
         required: true
         type: string
+      type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - cli
+          - desktop
+          - all
 
 jobs:
   notify-cli:
     name: Notify on CLI release
     runs-on: ubuntu-latest
     if: |
-      github.event.workflow_run.name == 'Release CLI' &&
-      github.event.workflow_run.conclusion == 'success' && 
-      startsWith(github.event.workflow_run.head_branch, 'v') &&
-      !contains(github.event.workflow_run.head_branch, '-beta') &&
-      !contains(github.event.workflow_run.head_branch, '-rc')
+      (github.event_name == 'workflow_dispatch' && (inputs.type == 'cli' || inputs.type == 'all')) ||
+      (github.event.workflow_run.name == 'Release CLI' &&
+       github.event.workflow_run.conclusion == 'success' && 
+       startsWith(github.event.workflow_run.head_branch, 'v') &&
+       !contains(github.event.workflow_run.head_branch, '-beta') &&
+       !contains(github.event.workflow_run.head_branch, '-rc'))
     steps:
       - name: Get release version
         id: version
         run: |
-          TAG="${{ github.event.workflow_run.head_branch }}"
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.event.workflow_run.head_branch }}"
+          fi
           VERSION="${TAG#v}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
@@ -79,7 +92,7 @@ jobs:
     name: Notify omniedge-web-frontend
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'workflow_dispatch' && (inputs.type == 'desktop' || inputs.type == 'all')) ||
       (github.event.workflow_run.conclusion == 'success' && 
        startsWith(github.event.workflow_run.head_branch, 'v') &&
        !contains(github.event.workflow_run.head_branch, '-beta') &&
