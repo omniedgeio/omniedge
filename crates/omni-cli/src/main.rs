@@ -257,6 +257,71 @@ enum Commands {
         #[arg(short, long, default_value = "120")]
         timeout: i64,
     },
+    /// Configure network settings for NAT traversal
+    ///
+    /// Manage low-level networking options including relay, port mapping,
+    /// IPv6 preferences, and encrypted signaling.
+    ///
+    /// EXAMPLES:
+    ///   omniedge config show              Show current settings
+    ///   omniedge config relay on          Enable relay fallback
+    ///   omniedge config portmap off       Disable port mapping
+    ///   omniedge config ipv6 prefer       Enable IPv6 with preference
+    ///   omniedge config reset             Reset to defaults
+    #[command(subcommand)]
+    Config(ConfigCommands),
+}
+
+/// Network configuration subcommands
+#[derive(Subcommand, Debug)]
+enum ConfigCommands {
+    /// Show current network configuration
+    Show,
+    /// Configure relay fallback (for symmetric NAT)
+    ///
+    /// EXAMPLES:
+    ///   omniedge config relay on
+    ///   omniedge config relay off
+    ///   omniedge config relay server relay.example.com:3478
+    Relay {
+        /// Enable/disable relay or set server address
+        #[arg(value_name = "on|off|server ADDRESS")]
+        action: String,
+    },
+    /// Configure automatic port mapping (UPnP/NAT-PMP)
+    ///
+    /// EXAMPLES:
+    ///   omniedge config portmap on
+    ///   omniedge config portmap off
+    Portmap {
+        /// Enable or disable port mapping
+        #[arg(value_name = "on|off")]
+        action: String,
+    },
+    /// Configure IPv6 settings
+    ///
+    /// EXAMPLES:
+    ///   omniedge config ipv6 on           Enable IPv6
+    ///   omniedge config ipv6 off          Disable IPv6
+    ///   omniedge config ipv6 prefer       Enable and prefer IPv6
+    ///   omniedge config ipv6 no-prefer    Enable but don't prefer IPv6
+    Ipv6 {
+        /// IPv6 mode: on, off, prefer, no-prefer
+        #[arg(value_name = "on|off|prefer|no-prefer")]
+        action: String,
+    },
+    /// Configure encrypted signaling
+    ///
+    /// EXAMPLES:
+    ///   omniedge config encrypt on
+    ///   omniedge config encrypt off
+    Encrypt {
+        /// Enable or disable encrypted signaling
+        #[arg(value_name = "on|off")]
+        action: String,
+    },
+    /// Reset network configuration to defaults
+    Reset,
 }
 
 #[tokio::main]
@@ -810,6 +875,56 @@ async fn main() -> Result<()> {
             // Show log location
             println!("  Logs:        {}", log_dir.display());
             println!();
+
+            // Show network configuration (NAT traversal settings)
+            let net_config = &config.network_config;
+            println!("Network Configuration (v0.3.0)");
+            println!("──────────────────────────────");
+            println!(
+                "  Relay Fallback:     {}",
+                if net_config.relay_enabled {
+                    "Enabled"
+                } else {
+                    "Disabled"
+                }
+            );
+            if let Some(ref server) = net_config.relay_server {
+                println!("  Relay Server:       {}", server);
+            }
+            println!(
+                "  Port Mapping:       {}",
+                if net_config.portmap_enabled {
+                    "Enabled (UPnP/NAT-PMP)"
+                } else {
+                    "Disabled"
+                }
+            );
+            println!(
+                "  Encrypted Signaling: {}",
+                if net_config.encrypt_signaling {
+                    "Enabled"
+                } else {
+                    "Disabled"
+                }
+            );
+            println!(
+                "  IPv6:               {}",
+                if net_config.ipv6_enabled {
+                    if net_config.prefer_ipv6 {
+                        "Enabled (Preferred)"
+                    } else {
+                        "Enabled"
+                    }
+                } else {
+                    "Disabled"
+                }
+            );
+            println!();
+
+            // Show enabled features summary
+            let features = net_config.feature_summary();
+            println!("  Active Features: {}", features.join(", "));
+            println!();
         }
         Commands::Scan { cidr, timeout } => {
             // Validate timeout
@@ -880,6 +995,222 @@ async fn main() -> Result<()> {
                 println!("Not logged in. Results saved locally.");
                 println!("Run 'omniedge start' to log in and upload.");
             }
+        }
+        Commands::Config(config_cmd) => {
+            handle_config_command(config_cmd, &mut config)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle network configuration subcommands
+fn handle_config_command(cmd: ConfigCommands, config: &mut CliConfig) -> Result<()> {
+    use omni_core::NetworkConfig;
+
+    match cmd {
+        ConfigCommands::Show => {
+            let net_config = &config.network_config;
+            println!();
+            println!("Network Configuration");
+            println!("─────────────────────");
+            println!();
+            println!(
+                "  Relay Fallback:      {}",
+                if net_config.relay_enabled {
+                    "Enabled"
+                } else {
+                    "Disabled"
+                }
+            );
+            if let Some(ref server) = net_config.relay_server {
+                println!("  Relay Server:        {}", server);
+            } else {
+                println!("  Relay Server:        (default - use signaling server)");
+            }
+            println!();
+            println!(
+                "  Port Mapping:        {}",
+                if net_config.portmap_enabled {
+                    "Enabled (UPnP/NAT-PMP)"
+                } else {
+                    "Disabled"
+                }
+            );
+            println!();
+            println!(
+                "  Encrypted Signaling: {}",
+                if net_config.encrypt_signaling {
+                    "Enabled (X25519 + XSalsa20-Poly1305)"
+                } else {
+                    "Disabled"
+                }
+            );
+            println!();
+            println!(
+                "  IPv6:                {}",
+                if net_config.ipv6_enabled {
+                    "Enabled"
+                } else {
+                    "Disabled"
+                }
+            );
+            if net_config.ipv6_enabled {
+                println!(
+                    "  IPv6 Preference:     {}",
+                    if net_config.prefer_ipv6 {
+                        format!(
+                            "Preferred (within {}ms of IPv4)",
+                            net_config.ipv6_preference_threshold_ms
+                        )
+                    } else {
+                        "Not preferred".to_string()
+                    }
+                );
+                println!(
+                    "  Happy Eyeballs:      {}ms delay",
+                    net_config.happy_eyeballs_delay_ms
+                );
+            }
+            println!();
+
+            // Show feature summary
+            let features = net_config.feature_summary();
+            println!("  Active Features: {}", features.join(", "));
+            println!();
+        }
+        ConfigCommands::Relay { action } => {
+            let action_lower = action.to_lowercase();
+            match action_lower.as_str() {
+                "on" | "enable" | "true" | "1" => {
+                    config.network_config.relay_enabled = true;
+                    config.save()?;
+                    println!("Relay fallback enabled.");
+                    println!("Symmetric NAT scenarios will use relay servers for connectivity.");
+                }
+                "off" | "disable" | "false" | "0" => {
+                    config.network_config.relay_enabled = false;
+                    config.save()?;
+                    println!("Relay fallback disabled.");
+                    println!("Warning: Devices behind symmetric NAT may not be able to connect.");
+                }
+                "server" => {
+                    eprintln!("Error: Missing server address.");
+                    eprintln!("Usage: omniedge config relay server HOST:PORT");
+                    std::process::exit(exit_codes::INVALID_INPUT);
+                }
+                _ => {
+                    // Assume it's a server address
+                    if action.contains(':') {
+                        config.network_config.relay_server = Some(action.clone());
+                        config.network_config.relay_enabled = true;
+                        config.save()?;
+                        println!("Relay server set to: {}", action);
+                    } else {
+                        eprintln!("Error: Invalid relay action '{}'.", action);
+                        eprintln!("Usage:");
+                        eprintln!("  omniedge config relay on");
+                        eprintln!("  omniedge config relay off");
+                        eprintln!("  omniedge config relay HOST:PORT");
+                        std::process::exit(exit_codes::INVALID_INPUT);
+                    }
+                }
+            }
+        }
+        ConfigCommands::Portmap { action } => {
+            let action_lower = action.to_lowercase();
+            match action_lower.as_str() {
+                "on" | "enable" | "true" | "1" => {
+                    config.network_config.portmap_enabled = true;
+                    config.save()?;
+                    println!("Port mapping enabled.");
+                    println!("Will attempt UPnP/NAT-PMP to open ports automatically.");
+                }
+                "off" | "disable" | "false" | "0" => {
+                    config.network_config.portmap_enabled = false;
+                    config.save()?;
+                    println!("Port mapping disabled.");
+                }
+                _ => {
+                    eprintln!("Error: Invalid action '{}'. Use 'on' or 'off'.", action);
+                    std::process::exit(exit_codes::INVALID_INPUT);
+                }
+            }
+        }
+        ConfigCommands::Ipv6 { action } => {
+            let action_lower = action.to_lowercase();
+            match action_lower.as_str() {
+                "on" | "enable" | "true" | "1" => {
+                    config.network_config.ipv6_enabled = true;
+                    config.save()?;
+                    println!("IPv6 enabled.");
+                }
+                "off" | "disable" | "false" | "0" => {
+                    config.network_config.ipv6_enabled = false;
+                    config.network_config.prefer_ipv6 = false;
+                    config.save()?;
+                    println!("IPv6 disabled.");
+                }
+                "prefer" | "preferred" => {
+                    config.network_config.ipv6_enabled = true;
+                    config.network_config.prefer_ipv6 = true;
+                    config.save()?;
+                    println!("IPv6 enabled and preferred.");
+                    println!(
+                        "IPv6 will be used when latency is within {}ms of IPv4.",
+                        config.network_config.ipv6_preference_threshold_ms
+                    );
+                }
+                "no-prefer" | "noprefer" | "no-preferred" => {
+                    config.network_config.ipv6_enabled = true;
+                    config.network_config.prefer_ipv6 = false;
+                    config.save()?;
+                    println!("IPv6 enabled but not preferred.");
+                    println!("IPv4 will be used when available.");
+                }
+                _ => {
+                    eprintln!(
+                        "Error: Invalid action '{}'. Use 'on', 'off', 'prefer', or 'no-prefer'.",
+                        action
+                    );
+                    std::process::exit(exit_codes::INVALID_INPUT);
+                }
+            }
+        }
+        ConfigCommands::Encrypt { action } => {
+            let action_lower = action.to_lowercase();
+            match action_lower.as_str() {
+                "on" | "enable" | "true" | "1" => {
+                    config.network_config.encrypt_signaling = true;
+                    config.save()?;
+                    println!("Encrypted signaling enabled.");
+                    println!(
+                        "Signaling messages will be encrypted with X25519 + XSalsa20-Poly1305."
+                    );
+                }
+                "off" | "disable" | "false" | "0" => {
+                    config.network_config.encrypt_signaling = false;
+                    config.save()?;
+                    println!("Encrypted signaling disabled.");
+                    println!("Warning: Signaling messages will be sent in plaintext.");
+                }
+                _ => {
+                    eprintln!("Error: Invalid action '{}'. Use 'on' or 'off'.", action);
+                    std::process::exit(exit_codes::INVALID_INPUT);
+                }
+            }
+        }
+        ConfigCommands::Reset => {
+            config.network_config = NetworkConfig::default();
+            config.save()?;
+            println!("Network configuration reset to defaults.");
+            println!();
+            println!("Current settings:");
+            println!("  Relay Fallback:      Enabled");
+            println!("  Port Mapping:        Enabled");
+            println!("  Encrypted Signaling: Enabled");
+            println!("  IPv6:                Enabled (Preferred)");
+            println!();
         }
     }
 

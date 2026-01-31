@@ -1,4 +1,4 @@
-use crate::config::CliConfig;
+use crate::config::{CliConfig, NetworkConfig};
 use crate::state::ConnectionState;
 use anyhow::{Context, Result};
 use log::{debug, error, info, warn};
@@ -31,6 +31,8 @@ pub struct ConnectionManager {
     heartbeat_tx: Option<mpsc::Sender<()>>,
     shutdown_tx: Option<broadcast::Sender<()>>,
     task_handles: Vec<JoinHandle<()>>,
+    /// Network configuration for NAT traversal (v0.3.0+)
+    network_config: NetworkConfig,
 }
 
 impl ConnectionManager {
@@ -40,6 +42,11 @@ impl ConnectionManager {
         } else {
             Identity::generate()
         };
+
+        // Load network config from CLI config, with defaults if not available
+        let (is_exit_node, network_config) = CliConfig::load()
+            .map(|c| (c.is_exit_node, c.network_config))
+            .unwrap_or_else(|_| (false, NetworkConfig::default()));
 
         Self {
             state: Arc::new(RwLock::new(ConnectionState::Disconnected)),
@@ -51,9 +58,7 @@ impl ConnectionManager {
             is_nucleus: false,
             nucleus_state: None,
             nucleus_port: 51820, // Default nucleus signaling port
-            as_exit_node: Arc::new(AtomicBool::new(
-                CliConfig::load().map(|c| c.is_exit_node).unwrap_or(false),
-            )),
+            as_exit_node: Arc::new(AtomicBool::new(is_exit_node)),
             exit_node_ip: None,
             cluster_secret: None,
             device_id: None,
@@ -62,6 +67,7 @@ impl ConnectionManager {
             heartbeat_tx: None,
             shutdown_tx: None,
             task_handles: Vec::new(),
+            network_config,
         }
     }
 
@@ -83,6 +89,37 @@ impl ConnectionManager {
 
     pub fn get_as_exit_node_handle(&self) -> Arc<AtomicBool> {
         self.as_exit_node.clone()
+    }
+
+    /// Get the network configuration for NAT traversal
+    pub fn get_network_config(&self) -> &NetworkConfig {
+        &self.network_config
+    }
+
+    /// Get a mutable reference to the network configuration
+    pub fn get_network_config_mut(&mut self) -> &mut NetworkConfig {
+        &mut self.network_config
+    }
+
+    /// Get access to the underlying OmniProto instance (if connected)
+    pub fn get_proto(&self) -> Option<Arc<OmniProto>> {
+        self.proto.clone()
+    }
+
+    /// Update network configuration and persist to disk
+    pub fn set_network_config(&mut self, config: NetworkConfig) -> Result<()> {
+        // Validate before applying
+        config.validate()?;
+
+        self.network_config = config.clone();
+
+        // Persist to disk
+        if let Ok(mut cli_config) = CliConfig::load() {
+            cli_config.network_config = config;
+            cli_config.save()?;
+        }
+
+        Ok(())
     }
 
     pub async fn sync_state(
