@@ -55,4 +55,11 @@ impl OmniTun {
     pub async fn get_peer_stats(&self, public_key: &str) -> Option<omninervous::wg::PeerStats> {
         self.interface.get_peer_stats(public_key).await
     }
+
+    /// Shutdown the TUN interface and release resources.
+    /// This must be called before dropping OmniTun to properly release the TUN device
+    /// on macOS (where utun interfaces are tied to the file descriptor).
+    pub async fn shutdown(&self) {
+        self.interface.shutdown().await
+    }
 }

@@ -425,6 +425,17 @@ body {
     box-shadow: 0 0 8px rgba(52, 199, 89, 0.4);
 }
 
+.status-orb.connecting {
+    background: var(--status-yellow, #ffcc00);
+    box-shadow: 0 0 8px rgba(255, 204, 0, 0.4);
+    animation: pulse-orb 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-orb {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.9); }
+}
+
 .network-name-text {
     font-size: 14px;
     font-weight: 500;
@@ -655,6 +666,15 @@ body {
     background: var(--status-green);
 }
 
+.ios-switch.connecting {
+    background: var(--status-yellow, #ffcc00);
+    cursor: wait;
+}
+
+.ios-switch.connecting .dot {
+    transform: translateX(8px);
+}
+
 .ios-switch .dot {
     position: absolute;
     top: 2px;
@@ -791,6 +811,134 @@ body {
     font-size: 10px;
     opacity: 0.4;
     font-weight: 500;
+}
+
+/* Setup Debug Section */
+.setup-debug-section {
+    margin-top: 20px;
+    width: 100%;
+    border-top: 1px solid var(--divider);
+    padding-top: 16px;
+}
+
+.setup-debug-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 8px 0;
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0.6;
+}
+
+.setup-debug-header:hover {
+    opacity: 1;
+}
+
+.setup-debug-content {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+    font-size: 11px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .setup-debug-content {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}
+
+.debug-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--divider);
+    gap: 8px;
+}
+
+.debug-row:last-of-type {
+    border-bottom: none;
+}
+
+.debug-row .debug-label {
+    font-weight: 500;
+    opacity: 0.6;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.debug-row .debug-value {
+    text-align: right;
+    word-break: break-all;
+    font-family: ui-monospace, 'SF Mono', monospace;
+}
+
+.debug-row .debug-value.success {
+    color: var(--status-green);
+    font-weight: 600;
+}
+
+.debug-row .debug-value.error {
+    color: var(--status-red, #ff3b30);
+    font-weight: 600;
+}
+
+.debug-row.error {
+    color: var(--status-red, #ff3b30);
+}
+
+.debug-actions-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.mini-btn {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid var(--divider);
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.15s;
+}
+
+.mini-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+    .mini-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* Warning Banner */
+.warning-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: rgba(255, 149, 0, 0.15);
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 8px;
+    color: #cc7700;
+    font-size: 11px;
+    font-weight: 500;
+    margin: 12px 0;
+    text-align: left;
+}
+
+@media (prefers-color-scheme: dark) {
+    .warning-banner {
+        background: rgba(255, 149, 0, 0.1);
+        color: #ffaa00;
+    }
 }
 
 /* Debug View Styles */

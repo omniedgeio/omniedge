@@ -184,6 +184,12 @@ async fn install_helper(_app: tauri::AppHandle) -> Result<(), String> {
         );
 
         fs::write("/tmp/omniedge-helper.service", service_content).map_err(|e| e.to_string())?;
+
+        // Stop existing service first to prevent duplicates
+        let _ = Command::new("sudo")
+            .args(["systemctl", "stop", "omniedge-helper"])
+            .output();
+
         let _ = Command::new("sudo")
             .args([
                 "cp",
@@ -204,7 +210,209 @@ async fn install_helper(_app: tauri::AppHandle) -> Result<(), String> {
     }
     #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
-        Err("Auto-install not supported on this platform".to_string())
+        // macOS: Use osascript to prompt for admin password and install helper as LaunchDaemon
+        use std::process::Command;
+
+        let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+        let exe_dir = exe_path.parent().ok_or("Could not find exe directory")?;
+
+        // Try to find the helper binary in various locations
+        let arch = if cfg!(target_arch = "aarch64") {
+            "aarch64-apple-darwin"
+        } else {
+            "x86_64-apple-darwin"
+        };
+        let sidecar_name = format!("omni-helper-{}", arch);
+
+        let tried_paths = vec![
+            exe_dir.join("omni-helper"),
+            exe_dir.join(&sidecar_name),
+            exe_dir.join("../MacOS/omni-helper"),
+            exe_dir.join(format!("../MacOS/{}", &sidecar_name)),
+            exe_dir.join("../Resources/binaries/omni-helper"),
+            exe_dir.join(format!("../Resources/binaries/{}", &sidecar_name)),
+        ];
+
+        let helper_path = tried_paths.iter().find(|p| p.exists())
+            .ok_or_else(|| {
+                let tried_str = tried_paths.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join("\n");
+                format!(
+                    "OmniEdge Helper binary not found.\nTried:\n{}\n\nPlease reinstall the application.",
+                    tried_str
+                )
+            })?;
+
+        let helper_str = helper_path.to_str().ok_or("Invalid helper path")?;
+        let install_path = "/Library/PrivilegedHelperTools/io.omniedge.helper";
+        let plist_path = "/Library/LaunchDaemons/io.omniedge.helper.plist";
+        let socket_path = "/var/run/omniedge-helper.sock";
+
+        // Create LaunchDaemon plist content
+        let plist_content = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>io.omniedge.helper</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/var/log/omniedge-helper.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/omniedge-helper.error.log</string>
+</dict>
+</plist>"#,
+            install_path
+        );
+
+        // Write plist to temp file
+        let temp_plist = "/tmp/io.omniedge.helper.plist";
+        std::fs::write(temp_plist, &plist_content).map_err(|e| e.to_string())?;
+
+        // Create a shell script file to avoid escaping issues with osascript
+        let install_script_path = "/tmp/omniedge-install-helper.sh";
+        let install_script_content = format!(
+            r#"#!/bin/bash
+set -e
+
+# First, kill any running helper process
+pkill -9 -f io.omniedge.helper 2>/dev/null || true
+killall omni-helper 2>/dev/null || true
+
+# Stop and unload existing service (try both old and new plist names)
+launchctl bootout system {plist} 2>/dev/null || true
+launchctl unload {plist} 2>/dev/null || true
+launchctl unload /Library/LaunchDaemons/io.omniedge.mac.Omniedge.HelperTool.plist 2>/dev/null || true
+
+# Wait for process to terminate
+sleep 1
+
+# Force kill again if still running
+pkill -9 -f io.omniedge.helper 2>/dev/null || true
+
+# Remove old socket if exists
+rm -f {socket}
+
+# Create directory for helper
+mkdir -p /Library/PrivilegedHelperTools
+
+# Remove old binary first
+rm -f {install}
+
+# Copy helper binary
+cp {helper} {install}
+chmod 755 {install}
+chown root:wheel {install}
+
+# Install plist
+cp {temp_plist} {plist}
+chmod 644 {plist}
+chown root:wheel {plist}
+
+# Load the service using modern launchctl
+launchctl bootstrap system {plist} 2>/dev/null || launchctl load {plist}
+
+# Wait for socket to be created
+for i in 1 2 3 4 5; do
+    if [ -S {socket} ]; then
+        echo "Helper socket created successfully"
+        exit 0
+    fi
+    sleep 1
+done
+
+# Check if helper is running
+if launchctl list | grep -q io.omniedge.helper; then
+    echo "Helper service is running"
+    exit 0
+fi
+
+echo "Helper installed but socket not yet available"
+exit 0
+"#,
+            plist = plist_path,
+            socket = socket_path,
+            install = install_path,
+            helper = helper_str,
+            temp_plist = temp_plist,
+        );
+
+        std::fs::write(install_script_path, &install_script_content)
+            .map_err(|e| format!("Failed to write install script: {}", e))?;
+
+        // Make script executable (not strictly needed since we call it with bash)
+        #[allow(unused)]
+        let _ = Command::new("chmod")
+            .args(["+x", install_script_path])
+            .output();
+
+        // Log debugging info
+        eprintln!("[install_helper] Helper source path: {}", helper_str);
+        eprintln!("[install_helper] Helper exists: {}", helper_path.exists());
+        eprintln!("[install_helper] Temp plist written to: {}", temp_plist);
+        eprintln!(
+            "[install_helper] Install script written to: {}",
+            install_script_path
+        );
+
+        // Use osascript to run the script with admin privileges
+        // Running a script file avoids all the escaping issues
+        let apple_script = format!(
+            r#"do shell script "/bin/bash {}" with administrator privileges"#,
+            install_script_path
+        );
+
+        eprintln!("[install_helper] Running osascript...");
+
+        let output = Command::new("osascript")
+            .args(["-e", &apple_script])
+            .output()
+            .map_err(|e| format!("Failed to run osascript: {}", e))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        eprintln!("[install_helper] osascript exit status: {}", output.status);
+        eprintln!("[install_helper] osascript stdout: {}", stdout);
+        eprintln!("[install_helper] osascript stderr: {}", stderr);
+
+        if !output.status.success() {
+            // Clean up script file on failure
+            let _ = std::fs::remove_file(install_script_path);
+
+            if stderr.contains("User canceled") || stderr.contains("(-128)") {
+                return Err("Installation cancelled by user.".to_string());
+            }
+            return Err(format!(
+                "Failed to install helper service.\nExit code: {}\nstdout: {}\nstderr: {}",
+                output.status, stdout, stderr
+            ));
+        }
+
+        // Clean up temp files
+        let _ = std::fs::remove_file(temp_plist);
+        let _ = std::fs::remove_file(install_script_path);
+
+        // Verify installation
+        let helper_installed = std::path::Path::new(install_path).exists();
+        let plist_installed = std::path::Path::new(plist_path).exists();
+        let socket_exists = std::path::Path::new(socket_path).exists();
+
+        eprintln!("[install_helper] After install - helper exists: {}, plist exists: {}, socket exists: {}", 
+            helper_installed, plist_installed, socket_exists);
+
+        if !helper_installed {
+            return Err(format!("Helper binary was not copied to {}. The install script ran but the file is missing.", install_path));
+        }
+
+        Ok(())
     }
 }
 
@@ -276,20 +484,76 @@ async fn get_virtual_ip(state: tauri::State<'_, AppState>) -> Result<String, Str
 }
 
 #[tauri::command]
-async fn check_helper() -> bool {
-    let req = HelperRequest {
+async fn check_helper() -> Result<bool, String> {
+    // First check if helper responds to ping
+    let ping_req = HelperRequest {
         command: "ping".to_string(),
         args: serde_json::json!({}),
     };
 
     // Retry up to 3 times to allow for service startup delay
+    let mut ping_ok = false;
     for _ in 0..3 {
-        if call_helper(&req).await.is_ok() {
-            return true;
+        if call_helper(&ping_req).await.is_ok() {
+            ping_ok = true;
+            break;
         }
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
-    false
+
+    if !ping_ok {
+        return Ok(false);
+    }
+
+    // Now check if it's the correct (Rust v2) helper by sending version command
+    // Old Go helper won't understand this command and won't return protocol field
+    let version_req = HelperRequest {
+        command: "version".to_string(),
+        args: serde_json::json!({}),
+    };
+
+    match call_helper(&version_req).await {
+        Ok(resp) => {
+            if resp.success {
+                if let Some(data) = resp.data {
+                    // Check for rust-v2 protocol identifier
+                    if let Some(protocol) = data.get("protocol").and_then(|p| p.as_str()) {
+                        if protocol == "rust-v2" {
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+            // Helper responded but it's not the correct version
+            info!("Helper responded but wrong version/protocol. Need to reinstall.");
+            Ok(false)
+        }
+        Err(_) => {
+            // Helper doesn't understand version command - it's the old Go helper
+            info!("Helper doesn't support version command. Old helper detected.");
+            Ok(false)
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_helper_version() -> Result<serde_json::Value, String> {
+    let req = HelperRequest {
+        command: "version".to_string(),
+        args: serde_json::json!({}),
+    };
+
+    match call_helper(&req).await {
+        Ok(resp) => {
+            if resp.success {
+                if let Some(data) = resp.data {
+                    return Ok(data);
+                }
+            }
+            Err(resp.message)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 #[tauri::command]
@@ -328,25 +592,36 @@ async fn check_is_admin() -> bool {
 }
 
 fn get_hardware_id() -> String {
-    // Cross-platform machine ID helper
-    #[cfg(target_os = "windows")]
-    {
-        use winreg::enums::*;
-        use winreg::RegKey;
-        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-        if let Ok(sqm) = hklm.open_subkey("SOFTWARE\\Microsoft\\Cryptography") {
-            if let Ok(id) = sqm.get_value::<String, _>("MachineGuid") {
-                return id.replace("-", "").to_lowercase();
+    // Cross-platform machine ID using machineid_rs - same as CLI for consistency
+    use machineid_rs::{Encryption, IdBuilder};
+    use uuid::Uuid;
+
+    let mut builder = IdBuilder::new(Encryption::SHA256);
+    builder
+        .add_component(machineid_rs::HWIDComponent::SystemID)
+        .add_component(machineid_rs::HWIDComponent::CPUID)
+        .add_component(machineid_rs::HWIDComponent::DriveSerial);
+
+    if let Ok(id) = builder.build("omniedge") {
+        // Map the hash to a stable UUID-like format
+        if id.len() >= 32 {
+            let hex_id = &id[0..32];
+            if let Ok(bytes) = hex::decode(hex_id) {
+                if let Ok(u) = Uuid::from_slice(&bytes) {
+                    return u.to_string();
+                }
             }
         }
+        return id[..std::cmp::min(id.len(), 36)].to_string();
     }
 
-    // Fallback or other platforms
+    // Fallback to hostname-username if machineid fails
     let hostname = ::whoami::fallible::hostname().unwrap_or_else(|_| "unknown".to_string());
     let username = ::whoami::username();
     format!("{}-{}", hostname, username)
 }
 
+#[allow(unused_variables)]
 fn ensure_wintun_dll(app: &tauri::AppHandle) {
     #[cfg(target_os = "windows")]
     {
@@ -1096,6 +1371,7 @@ pub fn run() {
             resize_window,
             check_is_admin,
             check_helper,
+            get_helper_version,
             install_helper,
             get_debug_info,
             quit

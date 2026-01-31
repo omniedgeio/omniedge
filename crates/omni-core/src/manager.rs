@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
+use tokio::task::JoinHandle;
 
 pub struct ConnectionManager {
     state: Arc<RwLock<ConnectionState>>,
@@ -29,6 +30,7 @@ pub struct ConnectionManager {
     virtual_ip: Arc<RwLock<Option<String>>>,
     heartbeat_tx: Option<mpsc::Sender<()>>,
     shutdown_tx: Option<broadcast::Sender<()>>,
+    task_handles: Vec<JoinHandle<()>>,
 }
 
 impl ConnectionManager {
@@ -59,6 +61,7 @@ impl ConnectionManager {
             virtual_ip: Arc::new(RwLock::new(None)),
             heartbeat_tx: None,
             shutdown_tx: None,
+            task_handles: Vec::new(),
         }
     }
 
@@ -134,7 +137,13 @@ impl ConnectionManager {
         is_nucleus: bool,
         as_exit_node: bool,
         exit_node_ip: Option<String>,
-    ) -> Result<()> {
+    ) -> Result<JoinVirtualNetworkResponse> {
+        // Disconnect any existing connection first to prevent duplicate TUN interfaces
+        if self.is_connected() {
+            info!("Already connected in connect_with_token, disconnecting first...");
+            let _ = self.disconnect().await;
+        }
+
         self.set_state(ConnectionState::Authenticated).await;
         self.is_nucleus = is_nucleus;
         self.as_exit_node.store(as_exit_node, Ordering::SeqCst);
@@ -150,7 +159,7 @@ impl ConnectionManager {
         self.api_client = Some(client);
 
         match self.perform_join(network_id, device_id, hardware_id).await {
-            Ok(_) => Ok(()),
+            Ok(join_resp) => Ok(join_resp),
             Err(e) => {
                 // If join fails, reset state back to Authenticated so we can try again
                 self.set_state(ConnectionState::Authenticated).await;
@@ -164,12 +173,21 @@ impl ConnectionManager {
         network_id: &str,
         device_id: &str,
         hardware_id: &str,
-    ) -> Result<()> {
+    ) -> Result<JoinVirtualNetworkResponse> {
         info!(
             "Starting perform_join for network: {}, device_id: {}, hardware_id: {}",
             network_id, device_id, hardware_id
         );
         info!("Using API base URL: {}", self.base_url);
+
+        // If already connected, disconnect first to clean up existing TUN
+        if self.is_connected() {
+            info!("Already connected, disconnecting first to prevent duplicate TUN interfaces...");
+            let _ = self.disconnect().await;
+            // Give OS time to clean up the interface
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        }
+
         self.set_state(ConnectionState::Joining).await;
         self.device_id = Some(device_id.to_string());
         {
@@ -178,8 +196,8 @@ impl ConnectionManager {
         }
 
         let _ = self.cleanup_adapters();
-        // Give the OS time to fully release WinTun resources
-        tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+        // Give the OS time to fully release TUN resources
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
         let client = self.api_client.as_ref().context("Not authenticated")?;
         let dev_service = DeviceService::new(client);
@@ -240,8 +258,8 @@ impl ConnectionManager {
         let proto = Arc::new(
             OmniProto::new(
                 &join_resp.server.host,
-                join_resp.cluster,
-                join_resp.secret_key,
+                join_resp.cluster.clone(),
+                join_resp.secret_key.clone(),
                 vip_addr,
                 0,
                 self.identity.public_key_bytes(),
@@ -250,6 +268,16 @@ impl ConnectionManager {
         );
 
         // 2. Setup TUN
+        // First, check if an interface with this IP already exists
+        if let Some(existing_iface) = Self::find_interface_with_ip(&join_resp.virtual_ip) {
+            warn!(
+                "Interface {} already exists with IP {}. Cleaning up before creating new TUN.",
+                existing_iface, join_resp.virtual_ip
+            );
+            let _ = self.cleanup_adapters();
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        }
+
         #[allow(unused_assignments)]
         let mut tun_instance: Option<OmniTun> = None;
         let mut port = 51820;
@@ -308,8 +336,22 @@ impl ConnectionManager {
 
         #[cfg(not(target_os = "windows"))]
         {
+            // On macOS, TUN interfaces must be named utunN - we pass empty string
+            // to let the system assign the next available utun interface.
+            // On Linux, we can use custom names like "omniedge0"
+            #[cfg(target_os = "macos")]
+            let ifname = ""; // macOS will auto-assign utunN
+            #[cfg(target_os = "linux")]
             let ifname = "omniedge0";
-            info!("Creating Userspace TUN: {}", ifname);
+
+            info!(
+                "Creating Userspace TUN: {}",
+                if ifname.is_empty() {
+                    "(auto-assign)"
+                } else {
+                    ifname
+                }
+            );
             let mut tun = OmniTun::new_userspace(ifname);
             tun.setup(
                 &join_resp.virtual_ip,
@@ -364,7 +406,7 @@ impl ConnectionManager {
             }
         }
 
-        Ok(())
+        Ok(join_resp)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -385,6 +427,9 @@ impl ConnectionManager {
         let proto_ctrl = proto.clone();
         let socket_inner = socket.clone();
         let secret = self.cluster_secret.clone();
+
+        // Clear any existing task handles
+        self.task_handles.clear();
 
         // Nucleus Signaling Server Loop (only when running in nucleus mode)
         if is_nucleus {
@@ -463,7 +508,7 @@ impl ConnectionManager {
 
         // Master Dispatcher Loop
         let mut shutdown_rx1 = shutdown_tx.subscribe();
-        tokio::spawn(async move {
+        let dispatcher_handle = tokio::spawn(async move {
             let mut buf = [0u8; 4096];
             loop {
                 tokio::select! {
@@ -509,12 +554,13 @@ impl ConnectionManager {
                 }
             }
         });
+        self.task_handles.push(dispatcher_handle);
 
         // TUN Transmission Loop (TUN -> network) remains necessary for outgoing traffic
         let mut tun_tx = tun.clone();
         let socket_tx = socket.clone();
         let mut shutdown_rx2 = shutdown_tx.subscribe();
-        tokio::spawn(async move {
+        let tun_handle = tokio::spawn(async move {
             tokio::select! {
                 _ = tun_tx.start_loop(socket_tx) => {}
                 _ = shutdown_rx2.recv() => {
@@ -522,6 +568,7 @@ impl ConnectionManager {
                 }
             }
         });
+        self.task_handles.push(tun_handle);
 
         let api_client = self.api_client.as_ref().cloned();
         let proto_hb = proto.clone();
@@ -532,7 +579,7 @@ impl ConnectionManager {
 
         // Heartbeat/Poll/Role Loop
         let mut shutdown_rx3 = shutdown_tx.subscribe();
-        tokio::spawn(async move {
+        let heartbeat_handle = tokio::spawn(async move {
             let mut api_interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
             let mut proto_interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
 
@@ -567,6 +614,7 @@ impl ConnectionManager {
                 }
             }
         });
+        self.task_handles.push(heartbeat_handle);
     }
 
     pub async fn login_with_password(&mut self, email: &str, password: &str) -> Result<AuthResp> {
@@ -914,11 +962,36 @@ impl ConnectionManager {
     pub async fn disconnect(&mut self) -> Result<()> {
         self.set_state(ConnectionState::Stopping).await;
 
+        // First, send shutdown signal to all background loops
         if let Some(tx) = self.shutdown_tx.take() {
             info!("Sending shutdown signal to background loops...");
             let _ = tx.send(());
         }
 
+        // Wait for all background tasks to complete (with timeout)
+        // This ensures they drop their TUN references
+        if !self.task_handles.is_empty() {
+            info!(
+                "Waiting for {} background tasks to complete...",
+                self.task_handles.len()
+            );
+            let handles = std::mem::take(&mut self.task_handles);
+            for handle in handles {
+                // Give each task up to 2 seconds to complete
+                let _ = tokio::time::timeout(tokio::time::Duration::from_secs(2), handle).await;
+            }
+            info!("All background tasks completed or timed out");
+        }
+
+        // Shutdown the TUN properly - this closes the file descriptor
+        // and causes macOS to remove the utun interface
+        if let Some(ref tun) = self.tun {
+            info!("Shutting down TUN interface...");
+            tun.shutdown().await;
+            info!("TUN interface shutdown complete");
+        }
+
+        // Now drop the references
         self.proto = None;
         self.tun = None;
 
@@ -977,10 +1050,10 @@ impl ConnectionManager {
         #[cfg(target_os = "linux")]
         {
             info!("Cleaning up all OmniEdge network adapters (Linux)...");
-            // Find all omniedge[0-9]+ interfaces and delete them
+            // Find all OmniEdge interfaces and delete them
             let output = std::process::Command::new("sh")
                 .arg("-c")
-                .arg("ip link show | grep -oE 'omniedge[0-9]+'")
+                .arg("ip link show | grep -oE 'omniedge[0-9]*'")
                 .output();
 
             if let Ok(out) = output {
@@ -989,8 +1062,9 @@ impl ConnectionManager {
                     let iface = iface.trim();
                     if !iface.is_empty() {
                         debug!("Deleting linux interface: {}", iface);
-                        let _ = std::process::Command::new("sudo")
-                            .args(["ip", "link", "delete", iface])
+                        // Already running as root (require_root_privileges called before)
+                        let _ = std::process::Command::new("ip")
+                            .args(["link", "delete", iface])
                             .output();
                     }
                 }
@@ -1000,11 +1074,103 @@ impl ConnectionManager {
         #[cfg(target_os = "macos")]
         {
             info!("Cleaning up all OmniEdge network adapters (macOS)...");
-            // macOS utun interfaces are usually ephemeral, but we look for any residue if possible
-            // Most userspace implementations on macOS don't survive process death,
-            // but we can try to find utun interfaces with our specific parameters if they ghost.
+            // macOS utun interfaces are kernel-managed and automatically destroyed when
+            // the owning process terminates. However, we can try to identify and bring down
+            // any interfaces that have our expected virtual IP.
+            //
+            // Note: On macOS, we cannot directly delete utun interfaces - they are cleaned up
+            // by the kernel when the file descriptor is closed. Killing the daemon process
+            // (done in stop_and_cleanup_service) is the proper way to clean up.
+
+            // Try to find and bring down any utun interfaces with 100.x.x.x addresses
+            // (OmniEdge virtual network range)
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg("ifconfig | grep -B1 'inet 100\\.' | grep -E '^utun[0-9]+' | cut -d: -f1")
+                .output();
+
+            if let Ok(out) = output {
+                let list = String::from_utf8_lossy(&out.stdout);
+                for iface in list.lines() {
+                    let iface = iface.trim();
+                    if !iface.is_empty() {
+                        debug!("Bringing down macOS interface: {}", iface);
+                        // Bring interface down - this doesn't delete it but stops traffic
+                        let _ = std::process::Command::new("ifconfig")
+                            .args([iface, "down"])
+                            .output();
+                    }
+                }
+            }
         }
 
         Ok(())
+    }
+
+    /// Check if a TUN interface already exists with the given virtual IP
+    /// Returns the interface name if found, None otherwise
+    pub fn find_interface_with_ip(vip: &str) -> Option<String> {
+        #[cfg(target_os = "macos")]
+        {
+            // On macOS, check for utun interfaces with the given IP
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(format!(
+                    "ifconfig | grep -B5 'inet {}' | grep -E '^utun[0-9]+' | head -1 | cut -d: -f1",
+                    vip
+                ))
+                .output();
+
+            if let Ok(out) = output {
+                let iface = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !iface.is_empty() {
+                    info!("Found existing interface {} with IP {}", iface, vip);
+                    return Some(iface);
+                }
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            // On Linux, check for omniedge interfaces with the given IP
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(format!("ip addr show | grep -B2 'inet {}/24' | grep -E 'omniedge[0-9]*' | head -1 | awk '{{print $2}}' | tr -d ':'", vip))
+                .output();
+
+            if let Ok(out) = output {
+                let iface = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !iface.is_empty() {
+                    info!("Found existing interface {} with IP {}", iface, vip);
+                    return Some(iface);
+                }
+            }
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            // On Windows, check for OmniEdge adapters with the given IP
+            let output = std::process::Command::new("powershell")
+                .args(["-Command", &format!(
+                    "Get-NetIPAddress -IPAddress '{}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty InterfaceAlias",
+                    vip
+                )])
+                .output();
+
+            if let Ok(out) = output {
+                let iface = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !iface.is_empty() && iface.contains("OmniEdge") {
+                    info!("Found existing interface {} with IP {}", iface, vip);
+                    return Some(iface);
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Check if we're already connected (have an active TUN)
+    pub fn is_connected(&self) -> bool {
+        self.tun.is_some()
     }
 }

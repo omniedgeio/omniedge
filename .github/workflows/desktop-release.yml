@@ -8,8 +8,13 @@ on:
       - 'v*.*.*-rc'
   workflow_dispatch:
 
+concurrency:
+  group: release-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PACKAGE_NAME: omniedge-desktop
+  CARGO_TERM_COLOR: always
 
 jobs:
   publish-tauri:
@@ -38,7 +43,7 @@ jobs:
             arch: x64
             target: x86_64-pc-windows-msvc
             platform: windows
-            helper_name: omni-helper-x86_64-pc-windows-msvc.exe
+            helper_name: omni-helper-x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -48,21 +53,33 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
+          cache-dependency-path: ui/desktop/package-lock.json
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            ui/desktop/src-tauri -> target
+          shared-key: ${{ matrix.target }}
+
       - name: install dependencies (ubuntu only)
-        if: matrix.os == 'ubuntu-22.04'
+        if: matrix.platform == 'linux'
+        shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
       - name: install frontend dependencies
+        shell: bash
         working-directory: ui/desktop
-        run: npm install
+        run: npm ci
 
       - name: Create binaries directory
         shell: bash
@@ -73,9 +90,9 @@ jobs:
         run: |
           cargo build --release -p omni-helper --target ${{ matrix.target }}
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
-            cp target/${{ matrix.target }}/release/omni-helper.exe ui/desktop/src-tauri/binaries/${{ matrix.helper_name }}
+            cp "target/${{ matrix.target }}/release/omni-helper.exe" "ui/desktop/src-tauri/binaries/${{ matrix.helper_name }}.exe"
           else
-            cp target/${{ matrix.target }}/release/omni-helper ui/desktop/src-tauri/binaries/${{ matrix.helper_name }}
+            cp "target/${{ matrix.target }}/release/omni-helper" "ui/desktop/src-tauri/binaries/${{ matrix.helper_name }}"
           fi
           ls -la ui/desktop/src-tauri/binaries/
 
@@ -83,91 +100,149 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"  # Remove 'v' prefix
+          # For tag pushes, use the tag name; for workflow_dispatch, read from tauri.conf.json
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"  # Remove 'v' prefix
+          else
+            # Read version from tauri.conf.json for manual runs using jq
+            VERSION=$(jq -r '.version' ui/desktop/src-tauri/tauri.conf.json)
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "==> Version: $VERSION"
 
-      - uses: tauri-apps/tauri-action@v0
-        id: tauri
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: ui/desktop
-          includeRelease: false
-          args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+      - name: Build desktop (Tauri)
+        timeout-minutes: 30
+        shell: bash
+        working-directory: ui/desktop
+        run: |
+          # Force ad-hoc signing by unsetting certificate environment variables
+          # GitHub Actions injects secrets, so we must unset them in the shell
+          unset APPLE_CERTIFICATE
+          unset APPLE_CERTIFICATE_PASSWORD
+          export APPLE_SIGNING_IDENTITY="-"
+          
+          npm run tauri -- build --target ${{ matrix.target }} --verbose
+          
+          # Verify that bundles were created
+          # Note: Tauri uses the workspace root's target directory, not src-tauri/target
+          BUNDLE_DIR="../../target/${{ matrix.target }}/release/bundle"
+          echo "==> Checking for bundle directory: $BUNDLE_DIR"
+          if [[ -d "$BUNDLE_DIR" ]]; then
+            echo "==> Bundle directory contents:"
+            ls -laR "$BUNDLE_DIR"
+          else
+            echo "==> ERROR: Bundle directory not found!"
+            echo "==> Listing target directory structure:"
+            find ../../target -type d -name bundle 2>/dev/null || echo "No bundle directories found"
+            find ../../target -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null || echo "No bundle files found"
+            exit 1
+          fi
 
-      - name: Rename artifacts with omniedge-desktop prefix
+      - name: Find and rename artifacts
+        id: artifacts
         shell: bash
         run: |
+          set -x  # Enable debug output
           VERSION="${{ steps.version.outputs.version }}"
           ARCH="${{ matrix.arch }}"
           PLATFORM="${{ matrix.platform }}"
           TARGET="${{ matrix.target }}"
-          
-          # Create dist directory for renamed files
-          mkdir -p renamed-dist
-          
-          # Debug: Show what was built
-          echo "==> Searching for build artifacts..."
-          find target -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) 2>/dev/null || true
-          
-          # Tauri builds to target/<target>/release/bundle/ when using --target
+          # Tauri uses the workspace root's target directory
           BUNDLE_DIR="target/${TARGET}/release/bundle"
-          echo "==> Looking in: ${BUNDLE_DIR}"
-          ls -la "${BUNDLE_DIR}" 2>/dev/null || echo "Bundle dir not found, checking alternatives..."
           
-          # Find and rename built artifacts
-          if [[ "$PLATFORM" == "windows" ]]; then
-            # Windows: .msi in bundle/msi/, NSIS .exe in bundle/nsis/
-            if [[ -d "${BUNDLE_DIR}/msi" ]]; then
-              find "${BUNDLE_DIR}/msi" -name "*.msi" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-windows-${ARCH}.msi \;
-            fi
-            if [[ -d "${BUNDLE_DIR}/nsis" ]]; then
-              find "${BUNDLE_DIR}/nsis" -name "*.exe" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-windows-${ARCH}-setup.exe \;
-            fi
-          elif [[ "$PLATFORM" == "macos" ]]; then
-            # macOS: .dmg in bundle/dmg/
-            if [[ -d "${BUNDLE_DIR}/dmg" ]]; then
-              find "${BUNDLE_DIR}/dmg" -name "*.dmg" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-macos-${ARCH}.dmg \;
-            fi
-          elif [[ "$PLATFORM" == "linux" ]]; then
-            # Linux: .deb in bundle/deb/, .AppImage in bundle/appimage/
-            if [[ -d "${BUNDLE_DIR}/deb" ]]; then
-              find "${BUNDLE_DIR}/deb" -name "*.deb" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-linux-${ARCH}.deb \;
-            fi
-            if [[ -d "${BUNDLE_DIR}/appimage" ]]; then
-              find "${BUNDLE_DIR}/appimage" -name "*.AppImage" -exec cp {} renamed-dist/omniedge-desktop-${VERSION}-linux-${ARCH}.AppImage \;
-            fi
-          fi
+          echo "==> Looking for artifacts in: $BUNDLE_DIR"
+          echo "==> VERSION=$VERSION, PLATFORM=$PLATFORM, ARCH=$ARCH"
           
-          # List renamed files
-          echo "==> Renamed artifacts:"
-          ls -la renamed-dist/ || echo "No files renamed"
-
-      - name: Check for artifacts
-        id: check_artifacts
-        shell: bash
-        run: |
-          if [ -n "$(ls -A renamed-dist/ 2>/dev/null)" ]; then
+          # Copy and rename artifacts to root directory
+          # Use nullglob to handle no matches gracefully
+          shopt -s nullglob
+          
+          # macOS DMG
+          for f in "$BUNDLE_DIR"/dmg/*.dmg "$BUNDLE_DIR"/macos/*.dmg; do
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.dmg from $f"
+          done
+          
+          # Windows MSI
+          for f in "$BUNDLE_DIR"/msi/*.msi; do
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.msi from $f"
+          done
+          
+          # Windows NSIS
+          for f in "$BUNDLE_DIR"/nsis/*.exe; do
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}-setup.exe"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}-setup.exe from $f"
+          done
+          
+          # Linux DEB
+          for f in "$BUNDLE_DIR"/deb/*/*.deb "$BUNDLE_DIR"/deb/*.deb; do
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.deb from $f"
+          done
+          
+          # Linux RPM
+          for f in "$BUNDLE_DIR"/rpm/*.rpm; do
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.rpm"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.rpm from $f"
+          done
+          
+          # Linux AppImage
+          for f in "$BUNDLE_DIR"/appimage/*.AppImage; do
+            cp "$f" "omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage"
+            echo "==> Created: omniedge-desktop-${VERSION}-${PLATFORM}-${ARCH}.AppImage from $f"
+          done
+          
+          shopt -u nullglob
+          
+          # List final artifacts
+          echo "==> Final artifacts in root:"
+          ls -la omniedge-desktop-* 2>/dev/null || echo "WARNING: No artifacts created!"
+          
+          # Set output for conditional steps
+          if ls omniedge-desktop-* 1>/dev/null 2>&1; then
             echo "has_artifacts=true" >> $GITHUB_OUTPUT
           else
             echo "has_artifacts=false" >> $GITHUB_OUTPUT
-            echo "::warning::No artifacts found to upload"
           fi
 
-      - name: Upload renamed artifacts
+      - name: Generate checksums
+        if: steps.artifacts.outputs.has_artifacts == 'true'
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for f in omniedge-desktop-*; do
+            if [[ "${{ matrix.platform }}" == "windows" ]]; then
+              certutil -hashfile "$f" SHA256 | grep -v "SHA256" | grep -v "CertUtil" > "$f.sha256"
+            else
+              shasum -a 256 "$f" > "$f.sha256"
+            fi
+            echo "==> Generated checksum for $f"
+          done
+          shopt -u nullglob
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
-        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        if: steps.artifacts.outputs.has_artifacts == 'true'
         with:
           name: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}
-          path: renamed-dist/*
+          path: |
+            omniedge-desktop-*.dmg
+            omniedge-desktop-*.msi
+            omniedge-desktop-*.exe
+            omniedge-desktop-*.deb
+            omniedge-desktop-*.rpm
+            omniedge-desktop-*.AppImage
+            omniedge-desktop-*.sha256
+          if-no-files-found: warn
 
-      - name: Upload to Release (renamed)
+      - name: Upload to Release
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/') && steps.check_artifacts.outputs.has_artifacts == 'true'
+        if: startsWith(github.ref, 'refs/tags/') && steps.artifacts.outputs.has_artifacts == 'true'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: renamed-dist/*
+          file: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}*
           file_glob: true
           tag: ${{ github.ref }}
           overwrite: true
@@ -187,10 +262,10 @@ jobs:
 
             ### macOS Installation
 
-            If you see "app is damaged" or "cannot be opened" when launching the app:
-
-            1. Open **System Settings** (or System Preferences on older macOS)
-            2. Go to **Privacy & Security**
-            3. Scroll down to the **Security** section
-            4. You should see a message about "OmniEdge" being blocked - click **Open Anyway**
-            5. Click **Open** in the confirmation dialog
+            1. Download the `.dmg` file for your Mac (ARM64 for Apple Silicon, x64 for Intel)
+            2. Open the DMG and drag **OmniEdge** to **Applications**
+            3. Open **OmniEdge** from Applications
+            4. If you see a security warning:
+               - Open **System Settings** → **Privacy & Security**
+               - Scroll down and click **Open Anyway** next to the OmniEdge message
+               - Click **Open** in the confirmation dialog

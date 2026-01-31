@@ -20,13 +20,14 @@ function App() {
   const [isBecomingExitNode, setIsBecomingExitNode] = useState(false);
   const [isExitNodesExpanded, setIsExitNodesExpanded] = useState(false);
   const [isWaitingForBrowser, setIsWaitingForBrowser] = useState(false);
-  const [hasPermission, setHasPermission] = useState(true);
+  const [_hasPermission, setHasPermission] = useState(true);
   const [helperInstalling, setHelperInstalling] = useState(false);
   const [myDeviceID, setMyDeviceID] = useState('');
   const [myAPIIP, setMyAPIIP] = useState('');
   const [showSetup, setShowSetup] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
+  const [helperDebugInfo, setHelperDebugInfo] = useState<{checked: boolean, active: boolean, error?: string, wrongVersion?: boolean}>({checked: false, active: false});
   const [copiedIP, setCopiedIP] = useState<string | null>(null);
   const appRef = useRef<HTMLDivElement>(null);
 
@@ -87,13 +88,43 @@ function App() {
   useEffect(() => {
     const init = async () => {
       try {
-        const helperActive = await invoke('check_helper') as boolean;
+        // Check helper status with debug info
+        let helperActive = false;
+        let helperError: string | undefined;
+        let wrongVersion = false;
+        
+        try {
+          helperActive = await invoke('check_helper') as boolean;
+          
+          // If check_helper returns false, try to get version to see if it's an old helper
+          if (!helperActive) {
+            try {
+              // Try to get version - if this fails with wrong format, it's the old helper
+              await invoke('get_helper_version');
+            } catch {
+              // Old helper detected - ping works but version doesn't
+              wrongVersion = true;
+            }
+          }
+        } catch (err: any) {
+          helperError = err.toString();
+        }
+        
         const elevated = await invoke('check_is_admin') as boolean;
+        
+        // Update helper debug info
+        setHelperDebugInfo({
+          checked: true,
+          active: helperActive,
+          error: helperError,
+          wrongVersion: wrongVersion,
+        });
 
         const canConnect = helperActive || elevated;
         setHasPermission(canConnect);
 
-        if (!canConnect) {
+        // Always show setup if helper is not running or wrong version
+        if (!helperActive) {
           setShowSetup(true);
         }
 
@@ -140,9 +171,13 @@ function App() {
       setIsLoggedIn(true);
       setIsWaitingForBrowser(false);
 
-      const currState = await invoke('get_state') as string;
-      if (currState.toLowerCase() === 'disconnected' && netsArray.length > 0) {
-        handleConnect(netsArray[0].id);
+      // Only auto-connect if helper is available
+      const helperActive = await invoke('check_helper') as boolean;
+      if (helperActive) {
+        const currState = await invoke('get_state') as string;
+        if (currState.toLowerCase() === 'disconnected' && netsArray.length > 0) {
+          handleConnect(netsArray[0].id);
+        }
       }
     } catch (err: any) {
       console.error("handleSuccessfulLogin failed:", err);
@@ -225,16 +260,41 @@ function App() {
   };
 
   const handleConnect = async (networkId: string) => {
-    if (!hasPermission) {
-      setError("Admin rights or background service required.");
+    // Prevent multiple simultaneous connection attempts
+    if (isConnecting) {
+      console.log("Already connecting, ignoring duplicate connect request");
       return;
     }
+    
+    // First check if helper is installed
+    const helperActive = await invoke('check_helper') as boolean;
+    if (!helperActive) {
+      // Helper not running - prompt user to install
+      setHasPermission(false);
+      setShowSetup(true);
+      setError("Background service is required to connect. Please install the helper service.");
+      return;
+    }
+    
     setIsConnecting(true);
+    setActiveNetwork(networkId); // Set immediately to prevent duplicate clicks
     setError('');
-    setActiveNetwork(networkId);
     try {
       await invoke('connect', { networkId, as_exit_node: isBecomingExitNode });
-      await refreshConnectionInfo();
+      
+      // Verify connection actually succeeded by checking state
+      const currStatus = await invoke('get_state') as string;
+      if (currStatus.toLowerCase() === 'connected') {
+        setConnectedNetworkID(networkId);
+        const net = networks.find(n => n.id === networkId);
+        if (net) setNetworkName(net.name);
+        await refreshConnectionInfo();
+      } else {
+        // Connection didn't actually succeed
+        setError("Connection attempt did not succeed. Check debug info for details.");
+        setActiveNetwork(null);
+        setConnectedNetworkID('');
+      }
     } catch (err: any) {
       console.error(`Connection failed:`, err);
       setError(err.message || err.toString());
@@ -334,19 +394,46 @@ function App() {
     setError('');
     try {
       await invoke('install_helper');
-      // Re-check helper status after installation
-      const helperActive = await invoke('check_helper') as boolean;
+      
+      // Wait a moment for the service to fully start
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Re-check helper status after installation - retry a few times
+      let helperActive = false;
+      for (let i = 0; i < 5; i++) {
+        helperActive = await invoke('check_helper') as boolean;
+        if (helperActive) break;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Update debug info
+      setHelperDebugInfo({
+        checked: true,
+        active: helperActive,
+        wrongVersion: false,
+        error: helperActive ? undefined : 'Helper installed but not responding with correct version',
+      });
+      
       if (helperActive) {
         setHasPermission(true);
         setError('');
         setShowSetup(false);
+        
+        // Try auto-login if we have saved credentials
+        try {
+          const autoLoginSuccess = await invoke('try_auto_login');
+          if (autoLoginSuccess) {
+            await handleSuccessfulLogin();
+          }
+        } catch (e) {
+          console.log('Auto-login after helper install failed:', e);
+        }
       } else {
-        // Double check admin just in case
-        const elevated = await invoke('check_is_admin') as boolean;
-        setHasPermission(elevated);
+        setError('Helper was installed but is not responding correctly. Please try "Check Again" or view Debug info.');
       }
     } catch (err: any) {
       setError(`Failed to install helper: ${err.toString()}`);
+      setHelperDebugInfo(prev => ({...prev, error: err.toString()}));
     } finally {
       setHelperInstalling(false);
     }
@@ -507,8 +594,23 @@ function App() {
                     <path d="M12 16h.01"></path>
                   </svg>
                 </div>
-                <h2>Background Service Required</h2>
-                <p>To provide secure, non-admin VPN connectivity and background operations, OmniEdge needs to install its helper service.</p>
+                <h2>{helperDebugInfo.wrongVersion ? 'Helper Update Required' : 'Background Service Required'}</h2>
+                <p>
+                  {helperDebugInfo.wrongVersion 
+                    ? 'An older version of the helper service was detected. Please install the updated helper to ensure compatibility.'
+                    : 'To provide secure, non-admin VPN connectivity and background operations, OmniEdge needs to install its helper service.'}
+                </p>
+
+                {helperDebugInfo.wrongVersion && (
+                  <div className="warning-banner">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                      <line x1="12" y1="9" x2="12" y2="13"></line>
+                      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    <span>Old helper version detected - connections will not work until updated</span>
+                  </div>
+                )}
 
                 <div className="setup-benefits">
                   <div className="benefit-item">
@@ -541,17 +643,76 @@ function App() {
                   className="secondary-btn"
                   style={{ width: '100%', marginTop: '8px' }}
                   onClick={async () => {
-                    const helperActive = await invoke('check_helper') as boolean;
-                    if (helperActive) {
-                      setHasPermission(true);
-                      setShowSetup(false);
-                      setError('');
+                    setHelperDebugInfo(prev => ({...prev, checked: false}));
+                    try {
+                      const helperActive = await invoke('check_helper') as boolean;
+                      setHelperDebugInfo({checked: true, active: helperActive, error: undefined});
+                      if (helperActive) {
+                        setHasPermission(true);
+                        setShowSetup(false);
+                        setError('');
+                      }
+                    } catch (err: any) {
+                      setHelperDebugInfo({checked: true, active: false, error: err.toString()});
                     }
                   }}
                 >
                   Check Again
                 </button>
                 <div className="setup-hint" style={{ marginTop: '12px' }}>Requires a one-time Administrator elevation</div>
+                
+                {/* Debug Information Section */}
+                <div className="setup-debug-section">
+                  <div className="setup-debug-header" onClick={() => setShowDebug(!showDebug)}>
+                    <span>Debug Information</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: showDebug ? 'rotate(90deg)' : 'none', transition: '0.2s' }}>
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </div>
+                  {showDebug && (
+                    <div className="setup-debug-content">
+                      <div className="debug-row">
+                        <span className="debug-label">Helper Status:</span>
+                        <span className={`debug-value ${helperDebugInfo.active ? 'success' : 'error'}`}>
+                          {!helperDebugInfo.checked ? 'Checking...' : (helperDebugInfo.active ? 'Running (v2)' : (helperDebugInfo.wrongVersion ? 'Wrong Version' : 'Not Running'))}
+                        </span>
+                      </div>
+                      {helperDebugInfo.wrongVersion && (
+                        <div className="debug-row">
+                          <span className="debug-label">Issue:</span>
+                          <span className="debug-value error">Old Go helper detected, needs Rust v2 helper</span>
+                        </div>
+                      )}
+                      <div className="debug-row">
+                        <span className="debug-label">Socket Path:</span>
+                        <span className="debug-value mono">/var/run/omniedge-helper.sock</span>
+                      </div>
+                      <div className="debug-row">
+                        <span className="debug-label">Helper Binary:</span>
+                        <span className="debug-value mono">/Library/PrivilegedHelperTools/io.omniedge.helper</span>
+                      </div>
+                      <div className="debug-row">
+                        <span className="debug-label">LaunchDaemon:</span>
+                        <span className="debug-value mono">/Library/LaunchDaemons/io.omniedge.helper.plist</span>
+                      </div>
+                      {helperDebugInfo.error && (
+                        <div className="debug-row error">
+                          <span className="debug-label">Error:</span>
+                          <span className="debug-value">{helperDebugInfo.error}</span>
+                        </div>
+                      )}
+                      <div className="debug-actions-row">
+                        <button className="mini-btn" onClick={() => invoke('open_logs')}>View Logs</button>
+                        <button className="mini-btn" onClick={async () => {
+                          const data = await invoke('get_debug_info');
+                          setDebugData(data);
+                          console.log('Debug data:', data);
+                          alert(JSON.stringify(data, null, 2));
+                        }}>Full Debug</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : !isLoggedIn ? (
@@ -609,13 +770,16 @@ function App() {
               <div className="networks-list">
                 {networks.map(net => {
                   const isExpanded = expandedNetworks[net.id];
-                  const isActive = connectedNetworkID === net.id || activeNetwork === net.id;
+                  // Only show as active if status is 'connected' AND this is the connected network
+                  const isActive = status === 'connected' && (connectedNetworkID === net.id);
+                  // Show as connecting if we're actively trying to connect to this network
+                  const isThisConnecting = isConnecting && activeNetwork === net.id;
 
                   return (
-                    <div key={net.id} className={`network-item-wrapper ${isExpanded ? 'is-expanded' : ''} ${isActive ? 'is-active' : ''}`}>
+                    <div key={net.id} className={`network-item-wrapper ${isExpanded ? 'is-expanded' : ''} ${isActive ? 'is-active' : ''} ${isThisConnecting ? 'is-connecting' : ''}`}>
                       <div className="network-menu-item" onClick={() => toggleNetworkExpand(net.id)}>
                         <div className="item-left">
-                          <div className={`status-orb ${isActive ? 'active' : ''}`}></div>
+                          <div className={`status-orb ${isActive ? 'active' : ''} ${isThisConnecting ? 'connecting' : ''}`}></div>
                           <span className="network-name-text truncate">{net.name}</span>
                         </div>
                         <div className="item-right">
@@ -632,18 +796,21 @@ function App() {
                           <div className="control-row">
                             <span className="control-label">VPN Connection</span>
                             <div
-                              className={`ios-switch small ${isActive ? 'on' : ''}`}
+                              className={`ios-switch small ${isActive ? 'on' : ''} ${isThisConnecting ? 'connecting' : ''}`}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                if (isThisConnecting) return; // Don't allow toggle while connecting
                                 isActive ? handleDisconnect() : handleConnect(net.id);
                               }}
-                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); isActive ? handleDisconnect() : handleConnect(net.id); } }}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (!isThisConnecting) { isActive ? handleDisconnect() : handleConnect(net.id); } } }}
                               tabIndex={0}
                               role="switch"
                               aria-checked={isActive}
                               aria-label={`VPN connection for ${net.name}`}
                             >
-                              <div className="dot"></div>
+                              <div className="dot">
+                                {isThisConnecting && <div className="loader-mini" style={{ borderTopColor: 'var(--accent-blue)' }}></div>}
+                              </div>
                             </div>
                           </div>
 
