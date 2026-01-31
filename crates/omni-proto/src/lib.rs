@@ -6,6 +6,9 @@ use tokio::net::UdpSocket;
 // Re-export nucleus server components for dual mode
 pub use omninervous::signaling::{handle_nucleus_message, NucleusState};
 
+// Re-export RuntimeState for shared state management (v0.3.1)
+pub use omninervous::RuntimeState;
+
 // ============================================================================
 // NAT Traversal Types (OmniNervous v0.3.0)
 // ============================================================================
@@ -161,23 +164,67 @@ impl OmniProto {
         }
     }
 
-    // Future methods (stubs for now, will be implemented when OmniNervous exposes state)
+    // ========================================================================
+    // Runtime State Queries (v0.3.1 Integration)
+    // ========================================================================
 
-    /// Get relay statistics (stub - returns None until OmniNervous exposes this)
-    pub fn get_relay_stats(&self) -> Option<RelayStats> {
-        // TODO: Once OmniNervous adds NucleusClient::relay_stats() method
-        None
+    /// Get relay statistics from the runtime state
+    ///
+    /// Returns current relay session count, active sessions, and bytes relayed.
+    /// Returns None if relay is not active or stats haven't been updated.
+    pub async fn get_relay_stats(&self) -> Option<RelayStats> {
+        self.client.relay_stats().await
     }
 
-    /// Get port mapping status (stub - returns None until OmniNervous exposes this)
-    pub fn get_portmap_status(&self) -> Option<PortMapCapabilities> {
-        // TODO: Once OmniNervous adds NucleusClient::portmap_status() method
-        None
+    /// Get port mapping status from the runtime state
+    ///
+    /// Returns detected port mapping capabilities (NAT-PMP, UPnP, PCP support).
+    /// Returns None if port mapping is not active or status hasn't been updated.
+    pub async fn get_portmap_status(&self) -> Option<PortMapCapabilities> {
+        self.client.portmap_status().await
     }
 
-    /// Check if currently using relay for any peer (stub)
-    pub fn is_using_relay(&self) -> bool {
-        // TODO: Once OmniNervous exposes relay state
-        false
+    /// Check if relay is currently being used for any peer connection
+    pub async fn is_using_relay(&self) -> bool {
+        self.client.is_using_relay().await
+    }
+
+    /// Check if relay functionality is enabled in configuration
+    pub async fn is_relay_enabled(&self) -> bool {
+        self.client.is_relay_enabled().await
+    }
+
+    /// Check if port mapping is enabled in configuration
+    pub async fn is_portmap_enabled(&self) -> bool {
+        self.client.is_portmap_enabled().await
+    }
+
+    // ========================================================================
+    // Runtime State Updates (called by daemon/manager)
+    // ========================================================================
+
+    /// Update relay statistics (called by the connection manager)
+    pub async fn update_relay_stats(&self, stats: Option<RelayStats>) {
+        self.client.update_relay_stats(stats).await;
+    }
+
+    /// Update port mapping status (called by the connection manager)
+    pub async fn update_portmap_status(&self, status: Option<PortMapCapabilities>) {
+        self.client.update_portmap_status(status).await;
+    }
+
+    /// Update whether relay is being used (called by the connection manager)
+    pub async fn update_using_relay(&self, using: bool) {
+        self.client.update_using_relay(using).await;
+    }
+
+    /// Update whether relay is enabled (called on config change)
+    pub async fn update_relay_enabled(&self, enabled: bool) {
+        self.client.update_relay_enabled(enabled).await;
+    }
+
+    /// Update whether port mapping is enabled (called on config change)
+    pub async fn update_portmap_enabled(&self, enabled: bool) {
+        self.client.update_portmap_enabled(enabled).await;
     }
 }
