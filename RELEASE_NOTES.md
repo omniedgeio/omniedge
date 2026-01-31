@@ -1,5 +1,155 @@
 # OmniEdge Release Notes
 
+## v2.1.0 (2026-01-31)
+
+### Advanced NAT Traversal
+
+This release integrates **OmniNervous v0.3.1**, bringing enterprise-grade NAT traversal capabilities for reliable connectivity in challenging network environments.
+
+### New Features
+
+#### NAT Type Detection
+- **Automatic STUN-based Detection**: Identifies your NAT type on connection
+- **Five NAT Types Supported**:
+  | Type | Description | P2P Success Rate |
+  |------|-------------|------------------|
+  | Open | No NAT (direct connectivity) | 100% |
+  | Full Cone | Easiest NAT for P2P | 95%+ |
+  | Restricted Cone | Moderate NAT | 85%+ |
+  | Port-Restricted Cone | Strict NAT | 70%+ |
+  | Symmetric | Hardest NAT (relay required) | Relay fallback |
+
+#### Relay Fallback
+- **Automatic Relay**: When direct P2P fails (symmetric NAT), traffic routes through relay servers
+- **Zero-Knowledge Relay**: Only forwards encrypted WireGuard packets, never decrypts
+- **Configurable Relay Servers**: Use default or specify custom relay endpoints
+
+#### Port Mapping (UPnP/NAT-PMP)
+- **Automatic Port Mapping**: Requests router to open ports for better connectivity
+- **Protocol Support**: NAT-PMP (RFC 6886), PCP (RFC 6887), UPnP IGD
+- **Improves NAT Type**: Can upgrade "strict" NAT to "open" for direct P2P
+
+#### Encrypted Signaling
+- **X25519 Key Exchange**: Secure key negotiation
+- **XSalsa20-Poly1305**: Authenticated encryption for signaling messages
+- **Backward Compatible**: Works with older clients
+
+#### IPv6 Dual-Stack
+- **Native IPv6 Support**: Connect over IPv4 or IPv6
+- **Happy Eyeballs (RFC 8305)**: Races IPv4/IPv6 connections, uses fastest
+- **Preference Control**: Prefer IPv6 when latency threshold met
+
+### New CLI Commands
+
+#### `omniedge config` - Manage NAT Traversal Settings
+
+```bash
+# Show current network configuration
+omniedge config show
+
+# Relay settings
+omniedge config relay on          # Enable relay fallback
+omniedge config relay off         # Disable relay
+omniedge config relay server <url> # Set custom relay server
+
+# Port mapping
+omniedge config portmap on        # Enable UPnP/NAT-PMP
+omniedge config portmap off       # Disable port mapping
+
+# IPv6 settings
+omniedge config ipv6 on           # Enable IPv6
+omniedge config ipv6 off          # Disable IPv6
+omniedge config ipv6 prefer       # Prefer IPv6 when faster
+
+# Encrypted signaling
+omniedge config encrypt on        # Enable encrypted signaling
+omniedge config encrypt off       # Disable encryption
+
+# Reset to defaults
+omniedge config reset
+```
+
+#### Enhanced `omniedge status`
+
+Status command now shows NAT traversal information:
+
+```
+Network Configuration:
+  NAT Type:           Port-Restricted Cone (strict NAT)
+  Relay:              enabled (default server)
+  Port Mapping:       enabled (UPnP active)
+  IPv6:               enabled (prefer when <50ms faster)
+  Encrypted Signaling: enabled
+```
+
+### Technical Details
+
+#### OmniNervous Integration
+
+| Component | Version | Description |
+|-----------|---------|-------------|
+| omninervous | v0.3.1 | Core NAT traversal library |
+| NatChecker | STUN | Multi-server NAT detection |
+| RelayClient | v0.3.0 | Session-based relay with rate limiting |
+| PortMapper | v0.3.0 | NAT-PMP/UPnP/PCP support |
+| DualStackSocket | v0.3.0 | IPv4/IPv6 with Happy Eyeballs |
+
+#### Runtime State API (v0.3.1)
+
+New methods for querying NAT traversal status:
+
+```rust
+// Query relay statistics
+proto.get_relay_stats().await  // -> Option<RelayStats>
+
+// Query port mapping capabilities  
+proto.get_portmap_status().await  // -> Option<PortMapCapabilities>
+
+// Check if relay is active
+proto.is_using_relay().await  // -> bool
+
+// Check configuration state
+proto.is_relay_enabled().await  // -> bool
+proto.is_portmap_enabled().await  // -> bool
+```
+
+### Configuration
+
+Network settings are stored in `~/.omniedge/config.toml`:
+
+```toml
+[network]
+relay_enabled = true
+relay_server = ""  # Empty = use default
+portmap_enabled = true
+encrypt_signaling = true
+ipv6_enabled = true
+prefer_ipv6 = false
+ipv6_preference_threshold_ms = 50
+```
+
+### Compatibility
+
+- **OmniNervous**: Requires v0.3.1 or later
+- **Existing Networks**: Fully backward compatible with v2.0.0 networks
+- **Mixed Versions**: v2.1.0 clients work with v2.0.0 clients (NAT features just won't be used)
+
+### Bug Fixes
+
+- None in this release (feature release)
+
+### Known Limitations
+
+- Port mapping requires router support (not all routers support UPnP/NAT-PMP)
+- Relay adds latency (~10-50ms) compared to direct P2P
+- Symmetric NAT on both peers always requires relay
+
+### Contributors
+
+Thank you to all contributors who made this release possible!
+
+---
+
 ## v2.0.0 (2026-01-28)
 
 ### Complete Rust Rewrite
