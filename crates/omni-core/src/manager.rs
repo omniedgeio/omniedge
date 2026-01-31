@@ -304,6 +304,21 @@ impl ConnectionManager {
             .await?,
         );
 
+        // TODO (v0.3.1): Pass NetworkConfig to OmniNervous
+        // Once NucleusClient accepts config, uncomment:
+        //
+        // if let Some(relay_server) = &self.network_config.relay_server {
+        //     proto.set_relay_server(relay_server);
+        // }
+        // proto.set_relay_enabled(self.network_config.relay_enabled);
+        // proto.set_portmap_enabled(self.network_config.portmap_enabled);
+        // proto.set_encrypt_signaling(self.network_config.encrypt_signaling);
+        // proto.set_ipv6_enabled(self.network_config.ipv6_enabled);
+        // proto.set_ipv6_preference(
+        //     self.network_config.prefer_ipv6,
+        //     self.network_config.ipv6_preference_threshold_ms
+        // );
+
         // 2. Setup TUN
         // First, check if an interface with this IP already exists
         if let Some(existing_iface) = Self::find_interface_with_ip(&join_resp.virtual_ip) {
