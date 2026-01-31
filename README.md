@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/github/license/omniedgeio/omniedge?style=flat-square)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![Tauri](https://img.shields.io/badge/tauri-v2-blue?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
-[![OmniNervous](https://img.shields.io/badge/OmniNervous-v0.2.5-green?style=flat-square)](https://github.com/omniedgeio/OmniNervous)
+[![OmniNervous](https://img.shields.io/badge/OmniNervous-v0.3.1-green?style=flat-square)](https://github.com/omniedgeio/OmniNervous)
 <br/>
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-blue?style=flat-square)](#supported-platforms)
 [![Discord](https://img.shields.io/discord/1234567890?color=5865F2&label=discord&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/d4faRPYj)
@@ -30,7 +30,8 @@ Building distributed AI systems is hard. Connecting robots, edge devices, and cl
 
 | Challenge                     | OmniEdge Solution                              |
 | ----------------------------- | ---------------------------------------------- |
-| NAT traversal                 | Automatic UDP hole punching, >95% success rate |
+| NAT traversal                 | Automatic hole punching + relay fallback, 99%+ success |
+| Symmetric NAT                 | Zero-knowledge relay for hardest NAT types     |
 | Latency-critical AI inference | WireGuard encryption, ~0.3ms overhead          |
 | Deterministic networking      | 6-Sigma stability (Cpk 2.92) for teleoperation |
 | Secure model transfer         | End-to-end encrypted mesh                      |
@@ -134,9 +135,61 @@ sudo omniedge start
 │                   │                   │                         │
 │                   │  - E2E Encrypted  │                         │
 │                   │  - NAT Traversal  │                         │
+│                   │  - Relay Fallback │                         │
 │                   │  - 6σ Stability   │                         │
 │                   └───────────────────┘                         │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+## NAT Traversal (v2.1.0)
+
+OmniEdge automatically handles complex network environments with multi-layer NAT traversal:
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    NAT Traversal Stack                          │
+├─────────────────────────────────────────────────────────────────┤
+│  1. STUN Detection    → Identify NAT type (Open/Cone/Symmetric) │
+│  2. UDP Hole Punching → Direct P2P for compatible NAT types     │
+│  3. Port Mapping      → UPnP/NAT-PMP to open router ports       │
+│  4. Relay Fallback    → Zero-knowledge relay for symmetric NAT  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### NAT Type Compatibility
+
+| Your NAT | Peer NAT | Connection Method |
+|----------|----------|-------------------|
+| Open/Full Cone | Any | Direct P2P |
+| Restricted Cone | Open/Full/Restricted | Direct P2P |
+| Port-Restricted | Open/Full Cone | Direct P2P |
+| Symmetric | Open/Full Cone | Direct P2P (usually) |
+| Symmetric | Symmetric | **Relay** (automatic) |
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Auto NAT Detection** | STUN-based detection on connection |
+| **Relay Fallback** | Zero-knowledge relay for symmetric NAT |
+| **Port Mapping** | UPnP/NAT-PMP/PCP support |
+| **Encrypted Signaling** | X25519 + XSalsa20-Poly1305 |
+| **IPv6 Dual-Stack** | Happy Eyeballs (RFC 8305) |
+
+### Configuration
+
+```bash
+# Check your NAT type and settings
+omniedge status
+
+# Configure NAT traversal
+omniedge config show              # View current settings
+omniedge config relay on          # Enable relay fallback
+omniedge config portmap on        # Enable UPnP/NAT-PMP
+omniedge config ipv6 prefer       # Prefer IPv6 when faster
+omniedge config encrypt on        # Enable encrypted signaling
 ```
 
 ## Operating Modes
@@ -193,6 +246,15 @@ omniedge start -x                 # Run as exit node
 omniedge start -e <peer_ip>       # Use specific exit node
 omniedge start --no-exit-node     # Disable exit node
 
+# NAT traversal configuration (v2.1.0)
+omniedge config show              # Show current network settings
+omniedge config relay on|off      # Enable/disable relay fallback
+omniedge config relay server <url> # Set custom relay server
+omniedge config portmap on|off    # Enable/disable UPnP/NAT-PMP
+omniedge config ipv6 on|off|prefer # IPv6 settings
+omniedge config encrypt on|off    # Encrypted signaling
+omniedge config reset             # Reset to defaults
+
 # Advanced modes
 omniedge start --mode nucleus --port 51821 --secret "..."  # Signaling server
 omniedge start --mode dual --secret "..."                  # Hub + client
@@ -231,7 +293,11 @@ Using OmniEdge in your research? We'd love to hear about it.
 
 - **[Rust](https://www.rust-lang.org/)** - Memory safety, zero-cost abstractions
 - **[WireGuard](https://www.wireguard.com/)** - Modern, audited cryptography
-- **[OmniNervous](https://github.com/omniedgeio/OmniNervous)** - High-performance P2P daemon
+- **[OmniNervous](https://github.com/omniedgeio/OmniNervous)** - High-performance P2P daemon with NAT traversal
+  - STUN-based NAT detection
+  - Relay fallback for symmetric NAT
+  - UPnP/NAT-PMP/PCP port mapping
+  - Happy Eyeballs (RFC 8305) for IPv6
 - **[Tauri](https://tauri.app/)** - Lightweight desktop apps
 
 ## Community
