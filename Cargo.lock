@@ -3318,7 +3318,7 @@ dependencies = [
 
 [[package]]
 name = "omni-api"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "log",
@@ -3331,7 +3331,7 @@ dependencies = [
 
 [[package]]
 name = "omni-core"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -3355,7 +3355,7 @@ dependencies = [
 
 [[package]]
 name = "omni-helper"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "dotenvy",
@@ -3377,7 +3377,7 @@ dependencies = [
 
 [[package]]
 name = "omni-proto"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "log",
@@ -3389,7 +3389,7 @@ dependencies = [
 
 [[package]]
 name = "omni-tun"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "log",
@@ -3399,7 +3399,7 @@ dependencies = [
 
 [[package]]
 name = "omniedge"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "dotenvy",
@@ -3429,7 +3429,7 @@ dependencies = [
 
 [[package]]
 name = "omniedge-cli"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
