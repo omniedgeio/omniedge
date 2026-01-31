@@ -1,0 +1,114 @@
+name: "Notify Dependent Repos"
+
+on:
+  workflow_run:
+    workflows: ["Release CLI", "Release Desktop"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v2.0.0)'
+        required: true
+        type: string
+
+jobs:
+  notify-cli:
+    name: Notify on CLI release
+    runs-on: ubuntu-latest
+    if: |
+      github.event.workflow_run.name == 'Release CLI' &&
+      github.event.workflow_run.conclusion == 'success' && 
+      startsWith(github.event.workflow_run.head_branch, 'v') &&
+      !contains(github.event.workflow_run.head_branch, '-beta') &&
+      !contains(github.event.workflow_run.head_branch, '-rc')
+    steps:
+      - name: Get release version
+        id: version
+        run: |
+          TAG="${{ github.event.workflow_run.head_branch }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Trigger omniedge-docker
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: omniedgeio/omniedge-docker
+          event-type: cli-release
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
+
+      - name: Trigger omniedge-openwrt
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: omniedgeio/omniedge-openwrt
+          event-type: cli-release
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
+
+      - name: Trigger omniedge-synology
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: omniedgeio/omniedge-synology
+          event-type: cli-release
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
+
+      - name: Trigger github-action
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: omniedgeio/github-action
+          event-type: cli-release
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
+
+      - name: Summary
+        run: |
+          echo "## Triggered Dependency Updates (CLI Release)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version: **${{ steps.version.outputs.tag }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Notified repositories:" >> $GITHUB_STEP_SUMMARY
+          echo "- omniedge-docker" >> $GITHUB_STEP_SUMMARY
+          echo "- omniedge-openwrt" >> $GITHUB_STEP_SUMMARY
+          echo "- omniedge-synology" >> $GITHUB_STEP_SUMMARY
+          echo "- github-action" >> $GITHUB_STEP_SUMMARY
+
+  notify-web-frontend:
+    name: Notify omniedge-web-frontend
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.workflow_run.conclusion == 'success' && 
+       startsWith(github.event.workflow_run.head_branch, 'v') &&
+       !contains(github.event.workflow_run.head_branch, '-beta') &&
+       !contains(github.event.workflow_run.head_branch, '-rc'))
+    steps:
+      - name: Get release version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.event.workflow_run.head_branch }}"
+          fi
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Trigger omniedge-web-frontend
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: omniedgeio/omniedge-web-frontend
+          event-type: release
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
+
+      - name: Summary
+        run: |
+          echo "## Triggered Dependency Updates" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version: **${{ steps.version.outputs.tag }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Notified: omniedge-web-frontend" >> $GITHUB_STEP_SUMMARY
