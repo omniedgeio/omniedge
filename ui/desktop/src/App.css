@@ -2032,22 +2032,6 @@ body {
     }
 }
 
-.ios-switch.small {
-    width: 36px;
-    height: 20px;
-}
-
-.ios-switch.small .dot {
-    width: 16px;
-    height: 16px;
-    top: 2px;
-    left: 2px;
-}
-
-.ios-switch.small.on .dot {
-    transform: translateX(16px);
-}
-
 .data-collection-pane {
     padding: 0 14px 14px;
 }
@@ -2308,6 +2292,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    max-height: 150px;
+    overflow-y: auto;
 }
 
 .stream-item {
@@ -2389,6 +2375,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    max-height: 280px;
+    overflow-y: auto;
 }
 
 .episode-item {
