@@ -925,10 +925,15 @@ async fn wait_for_session_login(
         manager.get_base_url().to_string()
     };
 
-    // 2. Create cancellation channel and store the sender
+    // 2. Cancel any existing login session first, then create new cancellation channel
     let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
     {
         let mut cancel_guard = state.login_cancel_tx.lock().await;
+        // Cancel any previous login session
+        if let Some(old_cancel_tx) = cancel_guard.take() {
+            let _ = old_cancel_tx.send(());
+            info!("Cancelled previous login session");
+        }
         *cancel_guard = Some(cancel_tx);
     }
 
@@ -1290,6 +1295,68 @@ async fn set_window_pinned(state: tauri::State<'_, AppState>, pinned: bool) -> R
 #[tauri::command]
 async fn get_window_pinned(state: tauri::State<'_, AppState>) -> Result<bool, String> {
     Ok(state.window_pinned.load(Ordering::Relaxed))
+}
+
+/// Open the Data Collection window
+#[tauri::command]
+async fn open_data_collection_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::WebviewUrl;
+    use tauri::WebviewWindowBuilder;
+
+    // Check if window already exists
+    if let Some(window) = app.get_webview_window("data-collection") {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    // Create new window
+    let _window = WebviewWindowBuilder::new(
+        &app,
+        "data-collection",
+        WebviewUrl::App("index.html".into()),
+    )
+    .title("Data Collection - OmniEdge")
+    .inner_size(480.0, 600.0)
+    .min_inner_size(400.0, 400.0)
+    .resizable(true)
+    .decorations(false)
+    .transparent(true)
+    .shadow(true)
+    .visible(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    info!("Data Collection window opened");
+    Ok(())
+}
+
+/// Resize the Data Collection window to fit content
+#[tauri::command]
+async fn resize_data_collection_window(app: tauri::AppHandle, height: u32) -> Result<(), String> {
+    use tauri::Manager;
+
+    if let Some(window) = app.get_webview_window("data-collection") {
+        // Clamp height between min and max
+        let clamped_height = height.clamp(300, 900);
+
+        // Get current width to preserve it
+        let current_size = window
+            .inner_size()
+            .unwrap_or(tauri::PhysicalSize::new(480, 600));
+        let scale_factor = window.scale_factor().unwrap_or(1.0);
+        let current_width = (current_size.width as f64 / scale_factor) as u32;
+
+        // Set the window size using logical size
+        let logical_size = tauri::LogicalSize::new(current_width.max(400), clamped_height);
+        window.set_size(logical_size).map_err(|e| e.to_string())?;
+
+        info!(
+            "Data Collection window resized to height: {} (width: {})",
+            clamped_height, current_width
+        );
+    }
+    Ok(())
 }
 
 // ============================================================================
@@ -1754,20 +1821,54 @@ async fn init_simulation_mode(
 ) -> Result<(), String> {
     let mut sim = state.simulation.lock().await;
 
-    // Create demo streams
+    // Create demo streams with robot cameras
     let demo_streams = vec![
+        // Head cameras
         SimulatedStream {
-            stream_id: "/camera/rgb".to_string(),
+            stream_id: "/camera/forehead".to_string(),
             sample_count: 0,
             capacity: 100,
             samples_per_second: 30.0,
         },
         SimulatedStream {
-            stream_id: "/camera/depth".to_string(),
+            stream_id: "/camera/left_head".to_string(),
             sample_count: 0,
             capacity: 100,
             samples_per_second: 30.0,
         },
+        SimulatedStream {
+            stream_id: "/camera/right_head".to_string(),
+            sample_count: 0,
+            capacity: 100,
+            samples_per_second: 30.0,
+        },
+        // Hand cameras
+        SimulatedStream {
+            stream_id: "/camera/left_hand".to_string(),
+            sample_count: 0,
+            capacity: 100,
+            samples_per_second: 30.0,
+        },
+        SimulatedStream {
+            stream_id: "/camera/right_hand".to_string(),
+            sample_count: 0,
+            capacity: 100,
+            samples_per_second: 30.0,
+        },
+        // Body cameras
+        SimulatedStream {
+            stream_id: "/camera/chest".to_string(),
+            sample_count: 0,
+            capacity: 100,
+            samples_per_second: 30.0,
+        },
+        SimulatedStream {
+            stream_id: "/camera/back".to_string(),
+            sample_count: 0,
+            capacity: 100,
+            samples_per_second: 30.0,
+        },
+        // Other sensor streams
         SimulatedStream {
             stream_id: "/joint_states".to_string(),
             sample_count: 0,
@@ -2793,6 +2894,8 @@ pub fn run() {
             resize_window,
             set_window_pinned,
             get_window_pinned,
+            open_data_collection_window,
+            resize_data_collection_window,
             check_is_admin,
             check_helper,
             get_helper_version,
