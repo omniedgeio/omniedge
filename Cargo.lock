@@ -3941,6 +3941,7 @@ dependencies = [
  "log",
  "omninervous",
  "tokio",
+ "wintun",
 ]
 
 [[package]]
@@ -4012,7 +4013,6 @@ dependencies = [
 [[package]]
 name = "omninervous"
 version = "0.3.1"
-source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.3.1#1f132c5575c9989a61e7afb2ab59c1adc4667fd9"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -4040,6 +4040,7 @@ dependencies = [
  "tokio",
  "toml 0.8.2",
  "tun",
+ "wintun",
  "zeroize",
 ]
 

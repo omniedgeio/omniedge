@@ -9,3 +9,6 @@ omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "om
 anyhow = "1.0"
 tokio = { version = "1.0", features = ["full"] }
 log = "0.4"
+
+[target.'cfg(windows)'.dependencies]
+wintun = "0.3"
