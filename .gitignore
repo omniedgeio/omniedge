@@ -52,5 +52,6 @@ app.yaml
 .agents/
 .agent/
 .gemini/
+.opencode/
 
 doc
