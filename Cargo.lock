@@ -3865,7 +3865,7 @@ dependencies = [
  "omni-api",
  "omni-proto",
  "omni-tun",
- "omninervous",
+ "omninervous 0.3.1 (git+https://github.com/omniedgeio/OmniNervous?tag=v0.3.1)",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3927,7 +3927,7 @@ version = "2.2.0"
 dependencies = [
  "anyhow",
  "log",
- "omninervous",
+ "omninervous 0.3.1 (git+https://github.com/omniedgeio/OmniNervous?tag=v0.3.1)",
  "serde",
  "serde_cbor",
  "tokio",
@@ -3939,7 +3939,7 @@ version = "2.2.0"
 dependencies = [
  "anyhow",
  "log",
- "omninervous",
+ "omninervous 0.3.1 (git+https://github.com/omniedgeio/OmniNervous?tag=v0.3.2)",
  "tokio",
  "wintun",
 ]
@@ -4013,6 +4013,41 @@ dependencies = [
 [[package]]
 name = "omninervous"
 version = "0.3.1"
+source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.3.1#1f132c5575c9989a61e7afb2ab59c1adc4667fd9"
+dependencies = [
+ "anyhow",
+ "base64 0.21.7",
+ "boringtun",
+ "clap",
+ "crypto_box",
+ "dirs 5.0.1",
+ "env_logger",
+ "governor",
+ "hex",
+ "hmac",
+ "http-body-util",
+ "hyper 1.8.1",
+ "hyper-util",
+ "log",
+ "lru",
+ "rand 0.8.5",
+ "serde",
+ "serde_cbor",
+ "serde_json",
+ "sha2",
+ "shellexpand 3.1.1",
+ "snow",
+ "subtle",
+ "tokio",
+ "toml 0.8.2",
+ "tun",
+ "zeroize",
+]
+
+[[package]]
+name = "omninervous"
+version = "0.3.1"
+source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.3.2#2757bd38d6dcea02f68270023836484c31f4aff3"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
