@@ -6,7 +6,7 @@
   "description": "Example plugin that logs VPN lifecycle events",
   "homepage": "https://github.com/omniedgeio/omniedge",
   "license": "Apache-2.0",
-  "capabilities": ["EventHooks"],
+  "capabilities": ["event-hooks"],
   "min_omniedge_version": "2.0.0",
   "platforms": [],
   "config_schema": {

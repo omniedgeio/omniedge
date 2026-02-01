@@ -542,4 +542,77 @@ mod tests {
         let discovered = manager.discover_plugins().await.unwrap();
         assert!(discovered.is_empty());
     }
+
+    #[tokio::test]
+    async fn test_manager_install_plugin_from_zip() {
+        // Path to the hello-world plugin zip (relative to workspace root)
+        let zip_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("examples/plugins/hello-world/dist/hello-world-plugin.zip");
+
+        if !zip_path.exists() {
+            eprintln!("Skipping test: plugin zip not found at {:?}", zip_path);
+            return;
+        }
+
+        let dir = tempdir().unwrap();
+        let config = PluginConfig {
+            data_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+
+        let mut manager = PluginManager::new(config).unwrap();
+        manager.initialize().await.unwrap();
+
+        // Install the plugin
+        let plugin_id = manager.install_plugin(&zip_path).await;
+        assert!(
+            plugin_id.is_ok(),
+            "Failed to install plugin: {:?}",
+            plugin_id
+        );
+
+        let plugin_id = plugin_id.unwrap();
+        assert_eq!(plugin_id, "com.omniedge.hello-world");
+
+        // Verify plugin is registered
+        let entry = manager.registry().get(&plugin_id);
+        assert!(entry.is_some(), "Plugin not found in registry");
+
+        let entry = entry.unwrap();
+        assert_eq!(entry.manifest.name, "Hello World Plugin");
+        assert_eq!(entry.manifest.version, "0.1.0");
+
+        // Verify plugin files were extracted
+        let plugin_dir = dir
+            .path()
+            .join("plugins/installed/com-omniedge-hello-world");
+        assert!(
+            plugin_dir.exists(),
+            "Plugin directory not created: {:?}",
+            plugin_dir
+        );
+        assert!(
+            plugin_dir.join("manifest.json").exists(),
+            "manifest.json not found"
+        );
+        assert!(
+            plugin_dir.join("plugin.wasm").exists(),
+            "plugin.wasm not found"
+        );
+
+        // Discover should now find the plugin
+        let discovered = manager.discover_plugins().await.unwrap();
+        assert_eq!(discovered.len(), 1);
+
+        // Clean up - uninstall
+        let uninstall = manager.uninstall_plugin(&plugin_id).await;
+        assert!(uninstall.is_ok(), "Failed to uninstall: {:?}", uninstall);
+
+        // Verify uninstalled
+        assert!(manager.registry().get(&plugin_id).is_none());
+    }
 }
