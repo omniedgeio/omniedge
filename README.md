@@ -91,7 +91,7 @@ sudo omniedge start
 | Device                           | Architecture | Status       |
 | -------------------------------- | ------------ | ------------ |
 | NVIDIA Jetson (Nano/Xavier/Orin) | ARM64        | Tested       |
-| Raspberry Pi 3/4/5               | ARM64/ARMv7  | Tested       |
+| Raspberry Pi 4/5                  | ARM64        | Tested       |
 | Intel NUC / x86 Servers          | x86_64       | Tested       |
 | Apple Silicon (M1/M2/M3)         | ARM64        | Tested       |
 | RISC-V Boards                    | riscv64      | Experimental |
@@ -103,7 +103,7 @@ sudo omniedge start
 
 | Platform    | Architecture                          | Package Formats                        |
 | ----------- | ------------------------------------- | -------------------------------------- |
-| **Linux**   | x86_64, ARM64, ARMv7, RISC-V          | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
+| **Linux**   | x86_64, ARM64, RISC-V             | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
 | **macOS**   | x86_64 (Intel), ARM64 (Apple Silicon) | `.tar.gz`                              |
 | **Windows** | x86_64                                | `.zip`                                 |
 
@@ -141,7 +141,7 @@ sudo omniedge start
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Plugin System (v2.2.0)
+## Plugin System (v2.2.1)
 
 OmniEdge now supports a **WASM-based plugin system** that allows extending functionality without modifying the core application.
 

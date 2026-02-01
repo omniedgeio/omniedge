@@ -1,5 +1,26 @@
 # OmniEdge Release Notes
 
+## v2.2.1 (2026-02-01)
+
+### Desktop UI Improvements
+
+- **Data Collection Plugin**: Added "DEMO" label to Data Collection plugin in the Plugins section
+- **Native Window Decorations**: Data Collection window now uses native window decorations with standard close button
+- **Window Visibility**: Removed transparency from Data Collection window for better visibility
+
+### Build Changes
+
+- **Removed ARMv7 Support**: Dropped `armv7-unknown-linux-musleabihf` target from CLI release builds
+  - Raspberry Pi 3 and older 32-bit ARM devices are no longer supported
+  - Use ARM64 builds for Raspberry Pi 4/5 and other modern ARM devices
+
+### Compatibility
+
+- **OmniNervous**: Requires v0.3.1 or later
+- **Existing Networks**: Fully backward compatible with v2.2.0 networks
+
+---
+
 ## v2.2.0 (2026-01-31)
 
 ### WASM Plugin System
@@ -409,7 +430,7 @@ omniedge start -n <network_id> --mode dual --secret "MySecretMin16Chars"
 
 | Platform | Architectures |
 |----------|---------------|
-| Linux | x86_64, aarch64, armv7, riscv64 |
+| Linux | x86_64, aarch64, riscv64 |
 | macOS | x86_64 (Intel), aarch64 (Apple Silicon) |
 | Windows | x86_64 |
 
