@@ -46,6 +46,7 @@
 //!               └─────────────────────┘
 //! ```
 
+// Phase 0-3: Core modules
 mod buffer;
 mod camera_config;
 mod compression;
@@ -58,7 +59,20 @@ mod triggers;
 mod types;
 mod urdf;
 
-// Re-export public types
+// Phase 4: Episode packaging
+mod mcap_writer;
+mod packager;
+mod privacy;
+
+// Phase 5: Storage and upload
+mod storage;
+mod upload;
+
+// Phase 6: Plugin integration
+mod api;
+mod plugin;
+
+// Re-export public types from Phase 0-3
 pub use buffer::*;
 pub use camera_config::*;
 pub use compression::*;
@@ -71,21 +85,15 @@ pub use triggers::*;
 pub use types::*;
 pub use urdf::*;
 
-// Conditional modules (require additional dependencies)
-// These will be implemented in future phases
-// #[cfg(feature = "robotics-full")]
-// mod compression;
-// #[cfg(feature = "robotics-full")]
-// mod mcap_writer;
-// #[cfg(feature = "robotics-full")]
-// mod packager;
-// #[cfg(feature = "robotics-full")]
-// mod plugin;
-// #[cfg(feature = "robotics-full")]
-// mod privacy;
-// #[cfg(feature = "robotics-full")]
-// mod storage;
-// #[cfg(feature = "robotics-full")]
-// mod triggers;
-// #[cfg(feature = "robotics-full")]
-// mod upload;
+// Re-export public types from Phase 4
+pub use mcap_writer::*;
+pub use packager::*;
+pub use privacy::*;
+
+// Re-export public types from Phase 5
+pub use storage::*;
+pub use upload::*;
+
+// Re-export public types from Phase 6
+pub use api::*;
+pub use plugin::*;
