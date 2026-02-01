@@ -1202,6 +1202,58 @@ async fn list_plugins(state: tauri::State<'_, AppState>) -> Result<Vec<PluginInf
 }
 
 #[tauri::command]
+async fn refresh_plugins(state: tauri::State<'_, AppState>) -> Result<Vec<PluginInfoUI>, String> {
+    let manager = state.plugin_manager.lock().await;
+
+    // Re-discover plugins from disk
+    manager
+        .discover_plugins()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Return updated list
+    let plugins = manager.list_plugins();
+
+    Ok(plugins
+        .into_iter()
+        .map(|p| {
+            let plugin_type = p
+                .capabilities
+                .first()
+                .map(|c| format!("{:?}", c).to_lowercase())
+                .unwrap_or_else(|| "event".to_string());
+
+            let status = if p.error.is_some() {
+                "error".to_string()
+            } else if p.enabled {
+                "active".to_string()
+            } else {
+                "disabled".to_string()
+            };
+
+            let permissions = p
+                .capabilities
+                .iter()
+                .map(|c| format!("{:?}", c).to_lowercase())
+                .collect();
+
+            PluginInfoUI {
+                id: p.id,
+                name: p.name,
+                version: p.version,
+                author: p.author,
+                description: p.description,
+                enabled: p.enabled,
+                plugin_type,
+                status,
+                error_message: p.error,
+                permissions,
+            }
+        })
+        .collect())
+}
+
+#[tauri::command]
 async fn get_plugin_info(
     state: tauri::State<'_, AppState>,
     plugin_id: String,
@@ -1629,6 +1681,7 @@ pub fn run() {
             quit,
             // Plugin management commands
             list_plugins,
+            refresh_plugins,
             get_plugin_info,
             enable_plugin,
             disable_plugin,

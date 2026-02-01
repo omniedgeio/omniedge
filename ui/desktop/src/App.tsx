@@ -417,7 +417,8 @@ function App() {
   // Plugin management functions
   const loadPlugins = async () => {
     try {
-      const pluginList: PluginInfo[] = await invoke('list_plugins');
+      // Use refresh_plugins to re-discover plugins from disk
+      const pluginList: PluginInfo[] = await invoke('refresh_plugins');
       setPlugins(pluginList);
     } catch (err) {
       console.error('Failed to load plugins:', err);
