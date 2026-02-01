@@ -140,6 +140,29 @@ impl SampleData {
             SampleData::TeleopInput(_) => 256,
         }
     }
+
+    /// Convert to bytes for serialization
+    ///
+    /// For Binary data, returns the raw bytes directly.
+    /// For other types, serializes to JSON.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            SampleData::Binary(data) => data.clone(),
+            SampleData::JointState(js) => serde_json::to_vec(js).unwrap_or_default(),
+            SampleData::Command(cmd) => serde_json::to_vec(cmd).unwrap_or_default(),
+            SampleData::Sensor(sr) => serde_json::to_vec(sr).unwrap_or_default(),
+            SampleData::Event(ev) => serde_json::to_vec(ev).unwrap_or_default(),
+            SampleData::TeleopInput(ti) => serde_json::to_vec(ti).unwrap_or_default(),
+        }
+    }
+
+    /// Get as binary slice if this is Binary data
+    pub fn as_binary(&self) -> Option<&[u8]> {
+        match self {
+            SampleData::Binary(data) => Some(data),
+            _ => None,
+        }
+    }
 }
 
 /// Joint state observation
