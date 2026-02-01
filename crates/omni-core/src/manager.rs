@@ -168,28 +168,38 @@ impl ConnectionManager {
     }
 
     pub async fn try_auto_login(&mut self) -> Result<bool> {
-        // Skip if already authenticated or connected
-        let current_state = self.get_state().await;
-        if current_state != ConnectionState::Disconnected {
-            info!(
-                "Already authenticated (state: {:?}), skipping auto-login",
-                current_state
-            );
-            return Ok(true);
+        // Check if we have saved auth credentials
+        let config = crate::config::CliConfig::load()?;
+
+        // If already authenticated with valid API client, skip
+        if self.api_client.is_some() {
+            let current_state = self.get_state().await;
+            if current_state != ConnectionState::Disconnected {
+                info!(
+                    "Already authenticated with API client (state: {:?}), skipping auto-login",
+                    current_state
+                );
+                return Ok(true);
+            }
         }
 
         info!("Attempting auto-login...");
-        let config = crate::config::CliConfig::load()?;
         if let Some(auth) = config.auth_response.clone() {
-            // Try using the old token directly
+            // Try using the saved token
             self.api_client = Some(ApiClient::new(
                 self.base_url.clone(),
                 Some(auth.effective_token().to_string()),
             ));
             if let Ok(_profile) = self.get_profile().await {
-                self.set_state(ConnectionState::Authenticated).await;
+                // Update state if needed
+                let current_state = self.get_state().await;
+                if current_state == ConnectionState::Disconnected {
+                    self.set_state(ConnectionState::Authenticated).await;
+                }
                 Ok(true)
             } else {
+                // Token invalid, clear the client
+                self.api_client = None;
                 Ok(false)
             }
         } else {
