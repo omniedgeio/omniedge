@@ -1,4 +1,6 @@
-use log::{debug, error, info};
+#[cfg(windows)]
+use log::debug;
+use log::{error, info};
 use omni_api::types::{
     AuthResp, DeviceCodeResp, DeviceResponse, ProfileResponse, SessionResponse,
     VirtualNetworkDeviceResponse, VirtualNetworkResponse,
@@ -1321,10 +1323,9 @@ async fn open_data_collection_window(app: tauri::AppHandle) -> Result<(), String
     .min_inner_size(400.0, 400.0)
     .resizable(true)
     .decorations(true)
-    .transparent(false)
     .visible(true)
     .build()
-    .map_err(|e| e.to_string())?;
+    .map_err(|e: tauri::Error| e.to_string())?;
 
     info!("Data Collection window opened");
     Ok(())
