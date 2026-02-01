@@ -3,6 +3,20 @@ import './App.css';
 import { invoke } from "@tauri-apps/api/core";
 import logo from './assets/logo.png';
 
+// Plugin types
+interface PluginInfo {
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description: string;
+  plugin_type: string;
+  enabled: boolean;
+  status: 'active' | 'disabled' | 'error';
+  error_message?: string;
+  permissions: string[];
+}
+
 function App() {
   const [status, setStatus] = useState('disconnected');
   const [virtualIP, setVirtualIP] = useState('');
@@ -30,6 +44,16 @@ function App() {
   const [helperDebugInfo, setHelperDebugInfo] = useState<{checked: boolean, active: boolean, error?: string, wrongVersion?: boolean}>({checked: false, active: false});
   const [copiedIP, setCopiedIP] = useState<string | null>(null);
   const appRef = useRef<HTMLDivElement>(null);
+
+  // Plugin management state
+  const [isPluginsExpanded, setIsPluginsExpanded] = useState(false);
+  const [plugins, setPlugins] = useState<PluginInfo[]>([]);
+  const [expandedPluginId, setExpandedPluginId] = useState<string | null>(null);
+  const [showPluginSettings, setShowPluginSettings] = useState(false);
+  const [activePluginSettings, setActivePluginSettings] = useState<string | null>(null);
+  const [pluginConfig, setPluginConfig] = useState<Record<string, any>>({});
+  const [isPluginLoading, setIsPluginLoading] = useState(false);
+  const [pluginToRemove, setPluginToRemove] = useState<string | null>(null);
 
   // Resize window to fit content
   const resizeToContent = useCallback(async () => {
@@ -83,7 +107,7 @@ function App() {
   useEffect(() => {
     const timer = setTimeout(resizeToContent, 50);
     return () => clearTimeout(timer);
-  }, [isLoggedIn, networks, expandedNetworks, isLoading, isConnecting, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode, error, networkDevices, status, virtualIP, showDebug, showSetup]);
+  }, [isLoggedIn, networks, expandedNetworks, isLoading, isConnecting, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode, error, networkDevices, status, virtualIP, showDebug, showSetup, isPluginsExpanded, expandedPluginId, showPluginSettings, plugins]);
 
   useEffect(() => {
     const init = async () => {
@@ -389,6 +413,87 @@ function App() {
     setTimeout(() => setCopiedIP(null), 2000);
   };
 
+  // Plugin management functions
+  const loadPlugins = async () => {
+    try {
+      const pluginList: PluginInfo[] = await invoke('list_plugins');
+      setPlugins(pluginList);
+    } catch (err) {
+      console.error('Failed to load plugins:', err);
+    }
+  };
+
+  const handleTogglePlugin = async (pluginId: string, enabled: boolean) => {
+    try {
+      if (enabled) {
+        await invoke('disable_plugin', { pluginId });
+      } else {
+        await invoke('enable_plugin', { pluginId });
+      }
+      await loadPlugins();
+    } catch (err: any) {
+      console.error('Failed to toggle plugin:', err);
+      setError(`Failed to toggle plugin: ${err.message || err.toString()}`);
+    }
+  };
+
+  const handlePluginSettings = async (pluginId: string) => {
+    try {
+      const config: any = await invoke('get_plugin_config', { pluginId });
+      setPluginConfig(config || {});
+      setActivePluginSettings(pluginId);
+      setShowPluginSettings(true);
+    } catch (err) {
+      console.error('Failed to load plugin config:', err);
+    }
+  };
+
+  const handleSavePluginConfig = async () => {
+    if (!activePluginSettings) return;
+    setIsPluginLoading(true);
+    try {
+      await invoke('set_plugin_config', { 
+        pluginId: activePluginSettings, 
+        config: pluginConfig 
+      });
+      setShowPluginSettings(false);
+      setActivePluginSettings(null);
+      await loadPlugins();
+    } catch (err: any) {
+      setError(`Failed to save config: ${err.message || err.toString()}`);
+    } finally {
+      setIsPluginLoading(false);
+    }
+  };
+
+  const handleRemovePlugin = async (pluginId: string) => {
+    setIsPluginLoading(true);
+    try {
+      await invoke('uninstall_plugin', { pluginId });
+      setPluginToRemove(null);
+      setExpandedPluginId(null);
+      await loadPlugins();
+    } catch (err: any) {
+      setError(`Failed to remove plugin: ${err.message || err.toString()}`);
+    } finally {
+      setIsPluginLoading(false);
+    }
+  };
+
+  const handleInstallPlugin = async () => {
+    // Use Tauri's file dialog - we'll invoke the install directly
+    // For simplicity, we'll prompt user to drag & drop or provide path
+    // In production, you'd use tauri-plugin-dialog
+    setError('Plugin installation: Please use the command line to install plugins for now.');
+  };
+
+  // Load plugins when logged in and plugins section is expanded
+  useEffect(() => {
+    if (isLoggedIn && isPluginsExpanded && plugins.length === 0) {
+      loadPlugins();
+    }
+  }, [isLoggedIn, isPluginsExpanded]);
+
   const handleInstallHelper = async () => {
     setHelperInstalling(true);
     setError('');
@@ -522,6 +627,88 @@ function App() {
               <button className="primary-login-btn" style={{ width: '100%' }} onClick={fetchDebugInfo}>Refresh</button>
               <button className="secondary-btn" style={{ width: '100%', marginTop: '8px' }} onClick={() => invoke('open_logs')}>Open Log Folder</button>
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Plugin Settings View (full screen)
+  if (showPluginSettings && activePluginSettings) {
+    const plugin = plugins.find(p => p.id === activePluginSettings);
+    return (
+      <div className="app" ref={appRef}>
+        <div className="app-header">
+          <div className="header-left">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src={logo} className="logo-img" alt="OmniEdge" />
+              <span className="app-name">Plugin Settings</span>
+            </div>
+          </div>
+          <div className="header-right">
+            <button className="secondary-btn mini" onClick={() => { setShowPluginSettings(false); setActivePluginSettings(null); }}>Back</button>
+          </div>
+        </div>
+        <div className="main-content-scroll">
+          <div className="main-content-inner plugin-settings-view">
+            {plugin && (
+              <>
+                <div className="plugin-settings-content">
+                  <div className="plugin-config-section">
+                    <div className="plugin-config-label">{plugin.name} Configuration</div>
+                    
+                    {/* Dynamic config fields based on stored config */}
+                    {Object.keys(pluginConfig).length > 0 ? (
+                      Object.entries(pluginConfig).map(([key, value]) => (
+                        <div key={key} className="plugin-config-field">
+                          <label>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</label>
+                          {typeof value === 'boolean' ? (
+                            <div className="plugin-config-toggle-row">
+                              <span className="plugin-config-toggle-label">{key}</span>
+                              <div
+                                className={`ios-switch small ${value ? 'on' : ''}`}
+                                onClick={() => setPluginConfig(prev => ({ ...prev, [key]: !value }))}
+                                role="switch"
+                                aria-checked={value}
+                                tabIndex={0}
+                              >
+                                <div className="dot"></div>
+                              </div>
+                            </div>
+                          ) : (
+                            <input
+                              type={typeof value === 'number' ? 'number' : 'text'}
+                              className="plugin-config-input"
+                              value={value as string}
+                              onChange={(e) => setPluginConfig(prev => ({ 
+                                ...prev, 
+                                [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value 
+                              }))}
+                              placeholder={`Enter ${key}`}
+                            />
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="plugins-empty">
+                        <div className="plugins-empty-text">No configuration options</div>
+                        <div className="plugins-empty-hint">This plugin has no configurable settings</div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {Object.keys(pluginConfig).length > 0 && (
+                    <button 
+                      className="plugin-save-btn" 
+                      onClick={handleSavePluginConfig}
+                      disabled={isPluginLoading}
+                    >
+                      {isPluginLoading ? 'Saving...' : 'Save Configuration'}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -926,6 +1113,176 @@ function App() {
               )}
             </div>
           )}
+
+              {/* Plugins Section - Show only when logged in */}
+              {isLoggedIn && !showSetup && (
+                <>
+                  <div className="plugins-section-header" onClick={() => setIsPluginsExpanded(!isPluginsExpanded)}>
+                <div className="plugins-header-left">
+                  <div className="chevron-icon" style={{ transform: isPluginsExpanded ? 'rotate(90deg)' : 'none' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </div>
+                  <span className="section-title">Plugins</span>
+                  {plugins.length > 0 && (
+                    <span className={`plugin-count-badge ${plugins.filter(p => p.enabled).length === 0 ? 'inactive' : ''}`}>
+                      {plugins.filter(p => p.enabled).length}
+                    </span>
+                  )}
+                </div>
+                <div className="plugins-header-right">
+                  <button 
+                    className="plugin-add-btn" 
+                    onClick={(e) => { e.stopPropagation(); handleInstallPlugin(); }}
+                    title="Install plugin"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {isPluginsExpanded && (
+                <div className="plugins-pane">
+                  {plugins.length === 0 ? (
+                    <div className="plugins-empty">
+                      <div className="plugins-empty-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.3">
+                          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                        </svg>
+                      </div>
+                      <div className="plugins-empty-text">No plugins installed</div>
+                      <div className="plugins-empty-hint">Plugins extend OmniEdge functionality</div>
+                    </div>
+                  ) : (
+                    <div className="plugins-list">
+                      {plugins.map(plugin => {
+                        const isExpanded = expandedPluginId === plugin.id;
+                        const isRemoving = pluginToRemove === plugin.id;
+                        
+                        return (
+                          <div 
+                            key={plugin.id} 
+                            className={`plugin-item ${plugin.enabled ? 'is-enabled' : ''} ${plugin.status === 'error' ? 'has-error' : ''} ${isExpanded ? 'is-expanded' : ''}`}
+                          >
+                            <div 
+                              className="plugin-item-header" 
+                              onClick={() => setExpandedPluginId(isExpanded ? null : plugin.id)}
+                            >
+                              <div className={`plugin-status-dot ${plugin.status}`}></div>
+                              <div className="plugin-info">
+                                <div className="plugin-name">{plugin.name}</div>
+                                {plugin.status === 'error' && plugin.error_message ? (
+                                  <div className="plugin-error-text">{plugin.error_message}</div>
+                                ) : (
+                                  <div className="plugin-description">{plugin.description}</div>
+                                )}
+                              </div>
+                              <div className="plugin-item-right">
+                                <div
+                                  className={`ios-switch small ${plugin.enabled ? 'on' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTogglePlugin(plugin.id, plugin.enabled);
+                                  }}
+                                  onKeyDown={(e) => { 
+                                    if (e.key === 'Enter' || e.key === ' ') { 
+                                      e.preventDefault(); 
+                                      e.stopPropagation(); 
+                                      handleTogglePlugin(plugin.id, plugin.enabled); 
+                                    } 
+                                  }}
+                                  tabIndex={0}
+                                  role="switch"
+                                  aria-checked={plugin.enabled}
+                                  aria-label={`Enable ${plugin.name} plugin`}
+                                >
+                                  <div className="dot"></div>
+                                </div>
+                                <div className="chevron-icon" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none' }}>
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                  </svg>
+                                </div>
+                              </div>
+                            </div>
+
+                            {isExpanded && (
+                              <div className="plugin-details-panel">
+                                <div className="plugin-detail-row">
+                                  <span className="plugin-detail-label">Version</span>
+                                  <span className="plugin-detail-value">{plugin.version}</span>
+                                </div>
+                                <div className="plugin-detail-row">
+                                  <span className="plugin-detail-label">Author</span>
+                                  <span className="plugin-detail-value">{plugin.author}</span>
+                                </div>
+                                <div className="plugin-detail-row">
+                                  <span className="plugin-detail-label">Type</span>
+                                  <span className="plugin-type-tag">{plugin.plugin_type}</span>
+                                </div>
+                                {plugin.permissions.length > 0 && (
+                                  <div className="plugin-detail-row">
+                                    <span className="plugin-detail-label">Permissions</span>
+                                    <div className="plugin-permissions">
+                                      {plugin.permissions.map(perm => (
+                                        <span key={perm} className="permission-tag">{perm}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {!isRemoving ? (
+                                  <div className="plugin-actions">
+                                    <button 
+                                      className="plugin-action-btn settings" 
+                                      onClick={() => handlePluginSettings(plugin.id)}
+                                    >
+                                      Settings
+                                    </button>
+                                    <button 
+                                      className="plugin-action-btn remove" 
+                                      onClick={() => setPluginToRemove(plugin.id)}
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="plugin-remove-confirm">
+                                    <div className="plugin-remove-confirm-text">
+                                      Are you sure you want to remove this plugin?
+                                    </div>
+                                    <div className="plugin-remove-confirm-actions">
+                                      <button 
+                                        className="plugin-remove-confirm-btn cancel" 
+                                        onClick={() => setPluginToRemove(null)}
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button 
+                                        className="plugin-remove-confirm-btn confirm" 
+                                        onClick={() => handleRemovePlugin(plugin.id)}
+                                        disabled={isPluginLoading}
+                                      >
+                                        {isPluginLoading ? 'Removing...' : 'Remove'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+                </>
+              )}
         </div>
       </div>
 
