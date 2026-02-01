@@ -107,6 +107,12 @@ impl PluginManager {
             discovered.push(id);
         }
 
+        // Re-apply saved state (enabled/disabled, config) after discovery
+        // This ensures plugins discovered from disk get their saved state applied
+        if let Err(e) = self.registry.load_state() {
+            log::warn!("Failed to load registry state: {}", e);
+        }
+
         info!("Discovered {} plugins", discovered.len());
         Ok(discovered)
     }

@@ -1377,6 +1377,9 @@ async fn handle_plugin_command(cmd: PluginCommands) -> Result<()> {
             }
         }
         PluginCommands::Uninstall { plugin_id } => {
+            // Discover first to ensure registry is populated
+            let _ = plugin_manager.discover_plugins().await;
+
             println!("Uninstalling plugin {}...", plugin_id);
 
             match plugin_manager.uninstall_plugin(&plugin_id).await {
@@ -1390,6 +1393,9 @@ async fn handle_plugin_command(cmd: PluginCommands) -> Result<()> {
             }
         }
         PluginCommands::Enable { plugin_id } => {
+            // Discover first to ensure registry is populated
+            let _ = plugin_manager.discover_plugins().await;
+
             println!("Enabling plugin {}...", plugin_id);
 
             match plugin_manager.enable_plugin(&plugin_id).await {
@@ -1403,6 +1409,9 @@ async fn handle_plugin_command(cmd: PluginCommands) -> Result<()> {
             }
         }
         PluginCommands::Disable { plugin_id } => {
+            // Discover first to ensure registry is populated
+            let _ = plugin_manager.discover_plugins().await;
+
             println!("Disabling plugin {}...", plugin_id);
 
             match plugin_manager.disable_plugin(&plugin_id).await {
@@ -1471,6 +1480,9 @@ async fn handle_plugin_command(cmd: PluginCommands) -> Result<()> {
             }
         }
         PluginCommands::Reload { plugin_id } => {
+            // Discover first to ensure registry is populated
+            let _ = plugin_manager.discover_plugins().await;
+
             println!("Reloading plugin {}...", plugin_id);
 
             // Disable then enable
