@@ -245,6 +245,14 @@ fn create_permissive_pipe(
     }
 }
 
+/// Maximum buffer size for request/response messages (16KB).
+/// This should be sufficient for all helper commands.
+const MAX_MESSAGE_SIZE: usize = 16 * 1024;
+
+/// Read timeout for client connections (30 seconds).
+/// Prevents blocking if a client connects but never sends data.
+const READ_TIMEOUT_SECS: u64 = 30;
+
 /// Handle a single request on a connection and return.
 ///
 /// On Windows, this design allows the pipe server to quickly create new pipe
@@ -252,46 +260,104 @@ fn create_permissive_pipe(
 /// each request, so single-request handling is sufficient and avoids the
 /// "All pipe instances are busy" error that occurs when handle_connection
 /// blocks in a loop.
+///
+/// Security note: This function only handles message parsing and response.
+/// Command authorization is enforced in `HelperServer::handle_request()`.
 async fn handle_connection<S>(mut socket: S, server: Arc<HelperServer>)
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    let mut buf = [0; 4096];
+    use tokio::time::{timeout, Duration};
 
-    // Read a single request
-    let n = match socket.read(&mut buf).await {
-        Ok(0) => return, // Client closed connection
-        Ok(n) => n,
-        Err(e) => {
+    let mut buf = [0u8; MAX_MESSAGE_SIZE];
+
+    // Read a single request with timeout to prevent indefinite blocking
+    let read_result = timeout(
+        Duration::from_secs(READ_TIMEOUT_SECS),
+        socket.read(&mut buf),
+    )
+    .await;
+
+    let n = match read_result {
+        Ok(Ok(0)) => return, // Client closed connection
+        Ok(Ok(n)) => n,
+        Ok(Err(e)) => {
             error!("Read error: {}", e);
+            return;
+        }
+        Err(_) => {
+            error!(
+                "Read timeout after {}s - client did not send data",
+                READ_TIMEOUT_SECS
+            );
             return;
         }
     };
 
+    // Check if buffer might have been too small (message truncated)
+    if n == MAX_MESSAGE_SIZE {
+        error!(
+            "Request may be truncated (received max buffer size {})",
+            MAX_MESSAGE_SIZE
+        );
+        let _ = send_error_response(&mut socket, "Request too large").await;
+        return;
+    }
+
     let req: HelperRequest = match serde_json::from_slice(&buf[..n]) {
         Ok(r) => r,
         Err(e) => {
-            error!("Unmarshal error: {}", e);
-            // Send error response
-            let error_resp = omni_helper::HelperResponse {
-                success: false,
-                message: format!("Invalid request: {}", e),
-                data: None,
-            };
-            let _ = socket
-                .write_all(&serde_json::to_vec(&error_resp).unwrap())
-                .await;
+            // Log detailed error but send generic message to client
+            error!("JSON parse error: {} (received {} bytes)", e, n);
+            let _ = send_error_response(&mut socket, "Invalid request format").await;
             return;
         }
     };
 
     let resp = server.handle_request(req).await;
-    let resp_bytes = serde_json::to_vec(&resp).unwrap();
+
+    // Serialize response with fallback for unlikely serialization errors
+    let resp_bytes = match serde_json::to_vec(&resp) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            error!("Response serialization error: {}", e);
+            b"{\"success\":false,\"message\":\"Internal error\",\"data\":null}".to_vec()
+        }
+    };
+
     if let Err(e) = socket.write_all(&resp_bytes).await {
         error!("Write error: {}", e);
     }
     // Connection closes after response - client must reconnect for next request
+}
+
+/// Send an error response to the client.
+/// Uses a pre-formatted JSON string to avoid serialization in error paths.
+async fn send_error_response<S>(socket: &mut S, message: &str) -> Result<(), std::io::Error>
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    use tokio::io::AsyncWriteExt;
+
+    // Escape message for JSON (basic escaping for quotes and backslashes)
+    let escaped_message: String = message
+        .chars()
+        .flat_map(|c| match c {
+            '"' => vec!['\\', '"'],
+            '\\' => vec!['\\', '\\'],
+            '\n' => vec!['\\', 'n'],
+            '\r' => vec!['\\', 'r'],
+            _ => vec![c],
+        })
+        .collect();
+
+    let error_json = format!(
+        r#"{{"success":false,"message":"{}","data":null}}"#,
+        escaped_message
+    );
+
+    socket.write_all(error_json.as_bytes()).await
 }
 
 fn main() -> anyhow::Result<()> {
