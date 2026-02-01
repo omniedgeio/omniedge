@@ -1,0 +1,248 @@
+// OmniEdge Plugin System - Plugin Interfaces
+// Interfaces that plugins implement
+
+package omniedge:plugin@1.0.0;
+
+use types.{
+    capability,
+    state-change-event,
+    peer-info,
+    network-event,
+    connection-stats,
+    policy-context,
+    policy-decision,
+    auth-method,
+    auth-request,
+    auth-response,
+    traffic-class,
+    packet-info,
+    triage-action,
+    actuator-sample,
+    health-report,
+    compliance-mode,
+    compliance-result,
+    plugin-error,
+};
+
+/// Plugin manifest information
+record plugin-manifest {
+    id: string,
+    name: string,
+    version: string,
+    author: string,
+    description: string,
+    capabilities: list<capability>,
+}
+
+/// Base plugin interface - all plugins must implement this
+interface base-plugin {
+    /// Return the plugin manifest
+    manifest: func() -> plugin-manifest;
+    
+    /// Called when the plugin is loaded
+    on-load: func() -> result<_, plugin-error>;
+    
+    /// Called when the plugin is about to be unloaded
+    on-unload: func() -> result<_, plugin-error>;
+}
+
+/// Event plugin interface - react to VPN lifecycle events
+interface event-plugin {
+    /// Called when connection state changes
+    on-state-change: func(event: state-change-event);
+    
+    /// Called when a new peer is discovered
+    on-peer-discovered: func(peer: peer-info);
+    
+    /// Called when a peer disconnects
+    on-peer-disconnected: func(peer: peer-info);
+    
+    /// Called on network join/leave
+    on-network-change: func(event: network-event);
+    
+    /// Called periodically with connection statistics
+    on-stats-update: func(stats: connection-stats);
+}
+
+/// Authentication plugin interface
+interface auth-plugin {
+    /// Returns supported authentication methods
+    supported-methods: func() -> list<auth-method>;
+    
+    /// Initiate authentication flow
+    authenticate: func(req: auth-request) -> auth-response;
+    
+    /// Refresh expired tokens
+    refresh-token: func(token: string) -> auth-response;
+}
+
+/// Policy plugin interface
+interface policy-plugin {
+    /// Select which network to join
+    select-network: func(ctx: policy-context) -> option<string>;
+    
+    /// Select exit node for traffic routing
+    select-exit-node: func(ctx: policy-context) -> option<string>;
+    
+    /// Validate if connection is allowed
+    validate-connection: func(ctx: policy-context) -> policy-decision;
+    
+    /// Called when policy context changes
+    on-context-change: func(ctx: policy-context);
+}
+
+/// QoS plugin interface
+interface qos-plugin {
+    /// Classify a packet and return its priority class
+    classify-packet: func(packet: packet-info) -> traffic-class;
+}
+
+/// Trigger definition for data triage
+record trigger-definition {
+    name: string,
+    trigger-type: string,
+    conditions: string,
+}
+
+/// Trigger event
+record trigger-event {
+    trigger-name: string,
+    timestamp: u64,
+    context: string,
+}
+
+/// Buffer configuration
+record buffer-config {
+    max-size-bytes: u64,
+    max-duration-seconds: u32,
+    sources: list<string>,
+}
+
+/// Data triage plugin interface
+interface data-triage-plugin {
+    /// Configure the ring buffer
+    configure-buffer: func(config: buffer-config) -> result<_, plugin-error>;
+    
+    /// Register triggers
+    register-triggers: func() -> list<trigger-definition>;
+    
+    /// Called when a trigger fires
+    on-trigger: func(trigger: trigger-event) -> triage-action;
+}
+
+/// PdM configuration
+record pdm-config {
+    actuator-ids: list<string>,
+    sampling-frequency-hz: u32,
+    report-interval-seconds: u32,
+    anomaly-sensitivity: f32,
+}
+
+/// PdM plugin interface
+interface pdm-plugin {
+    /// Configure monitoring
+    configure-monitoring: func(config: pdm-config) -> result<_, plugin-error>;
+    
+    /// Process actuator sample
+    on-actuator-sample: func(sample: actuator-sample);
+    
+    /// Compute health report
+    compute-health-report: func() -> health-report;
+}
+
+/// Data packet for compliance checking
+record data-packet {
+    source: string,
+    data-type: string,
+    data: list<u8>,
+    metadata: string,
+}
+
+/// Compliance plugin interface
+interface compliance-plugin {
+    /// Check if data is compliant
+    check-compliance: func(data: data-packet) -> compliance-result;
+    
+    /// Get current compliance mode
+    get-compliance-mode: func() -> compliance-mode;
+}
+
+// ============================================================================
+// World definitions - combinations of imports and exports
+// ============================================================================
+
+/// World for event plugins
+world event-plugin-world {
+    import omniedge:host/logging;
+    import omniedge:host/config;
+    import omniedge:host/kv-store;
+    import omniedge:host/time;
+    
+    export base-plugin;
+    export event-plugin;
+}
+
+/// World for authentication plugins
+world auth-plugin-world {
+    import omniedge:host/logging;
+    import omniedge:host/config;
+    import omniedge:host/kv-store;
+    import omniedge:host/time;
+    import omniedge:host/http;
+    
+    export base-plugin;
+    export auth-plugin;
+}
+
+/// World for policy plugins
+world policy-plugin-world {
+    import omniedge:host/logging;
+    import omniedge:host/config;
+    import omniedge:host/kv-store;
+    import omniedge:host/time;
+    import omniedge:host/vpn-state;
+    
+    export base-plugin;
+    export policy-plugin;
+}
+
+/// World for QoS plugins
+world qos-plugin-world {
+    import omniedge:host/logging;
+    import omniedge:host/config;
+    
+    export base-plugin;
+    export qos-plugin;
+}
+
+/// World for data triage plugins
+world data-triage-plugin-world {
+    import omniedge:host/logging;
+    import omniedge:host/config;
+    import omniedge:host/kv-store;
+    import omniedge:host/time;
+    
+    export base-plugin;
+    export data-triage-plugin;
+}
+
+/// World for PdM plugins
+world pdm-plugin-world {
+    import omniedge:host/logging;
+    import omniedge:host/config;
+    import omniedge:host/kv-store;
+    import omniedge:host/time;
+    
+    export base-plugin;
+    export pdm-plugin;
+}
+
+/// World for compliance plugins
+world compliance-plugin-world {
+    import omniedge:host/logging;
+    import omniedge:host/config;
+    import omniedge:host/kv-store;
+    
+    export base-plugin;
+    export compliance-plugin;
+}

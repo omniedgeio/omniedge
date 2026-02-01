@@ -1,0 +1,136 @@
+// OmniEdge Plugin System - Host Functions
+// Functions provided by the host to plugins
+
+package omniedge:host@1.0.0;
+
+/// Logging functions available to plugins
+interface logging {
+    /// Log a trace-level message
+    log-trace: func(message: string);
+    
+    /// Log a debug-level message
+    log-debug: func(message: string);
+    
+    /// Log an info-level message
+    log-info: func(message: string);
+    
+    /// Log a warn-level message
+    log-warn: func(message: string);
+    
+    /// Log an error-level message
+    log-error: func(message: string);
+}
+
+/// Configuration access for plugins
+interface config {
+    /// Get a string configuration value
+    get-string: func(key: string) -> option<string>;
+    
+    /// Get an integer configuration value
+    get-int: func(key: string) -> option<s64>;
+    
+    /// Get a float configuration value
+    get-float: func(key: string) -> option<f64>;
+    
+    /// Get a boolean configuration value
+    get-bool: func(key: string) -> option<bool>;
+    
+    /// List all configuration keys
+    keys: func() -> list<string>;
+}
+
+/// Key-value store for plugin state persistence
+interface kv-store {
+    /// Set a value in the store
+    set: func(key: string, value: list<u8>) -> result<_, string>;
+    
+    /// Get a value from the store
+    get: func(key: string) -> option<list<u8>>;
+    
+    /// Delete a value from the store
+    delete: func(key: string) -> bool;
+    
+    /// List all keys in the store
+    keys: func() -> list<string>;
+    
+    /// Clear all values
+    clear: func() -> result<_, string>;
+}
+
+/// Time functions
+interface time {
+    /// Get current timestamp in milliseconds since Unix epoch
+    now-ms: func() -> u64;
+    
+    /// Get current timestamp in nanoseconds since Unix epoch
+    now-ns: func() -> u64;
+}
+
+/// Random number generation
+interface random {
+    /// Generate a random UUID v4
+    uuid: func() -> string;
+    
+    /// Generate random bytes
+    bytes: func(count: u32) -> list<u8>;
+}
+
+/// HTTP client (restricted to allowlisted hosts)
+interface http {
+    /// HTTP request configuration
+    record http-request {
+        method: http-method,
+        url: string,
+        headers: list<tuple<string, string>>,
+        body: option<list<u8>>,
+        timeout-ms: option<u32>,
+    }
+    
+    /// HTTP methods
+    enum http-method {
+        get,
+        post,
+        put,
+        patch,
+        delete,
+    }
+    
+    /// HTTP response
+    record http-response {
+        status: u16,
+        headers: list<tuple<string, string>>,
+        body: list<u8>,
+    }
+    
+    /// Check if a URL is allowed
+    is-allowed: func(url: string) -> bool;
+    
+    /// Send an HTTP request (async, returns request ID)
+    send: func(request: http-request) -> result<string, string>;
+}
+
+/// VPN state queries
+interface vpn-state {
+    use omniedge:plugin/types.{
+        connection-state,
+        peer-info,
+        network-info,
+        device-info,
+        connection-stats,
+    };
+    
+    /// Get current connection state
+    get-state: func() -> connection-state;
+    
+    /// Get connected peers
+    get-peers: func() -> list<peer-info>;
+    
+    /// Get available networks
+    get-networks: func() -> list<network-info>;
+    
+    /// Get current device info
+    get-device-info: func() -> option<device-info>;
+    
+    /// Get connection statistics
+    get-stats: func() -> connection-stats;
+}
