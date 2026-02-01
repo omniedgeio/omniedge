@@ -58,6 +58,10 @@ pub mod types;
 #[cfg(feature = "widgets")]
 pub mod widget;
 
+// Robotics-specific plugins (requires robotics feature)
+#[cfg(feature = "robotics")]
+pub mod robotics;
+
 // Re-export main types
 pub use error::{PluginError, PluginResult};
 pub use manager::PluginManager;
