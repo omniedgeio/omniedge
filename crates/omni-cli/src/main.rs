@@ -5,6 +5,7 @@ use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use omni_api::{ApiClient, DeviceService, NetworkService};
 use omni_core::{CliConfig, ConnectionManager};
+use omni_plugin::{PluginConfig, PluginManager};
 
 mod oauth;
 mod service;
@@ -270,6 +271,20 @@ enum Commands {
     ///   omniedge config reset             Reset to defaults
     #[command(subcommand)]
     Config(ConfigCommands),
+    /// Manage plugins
+    ///
+    /// Install, enable, disable, and manage OmniEdge plugins.
+    /// Plugins extend OmniEdge functionality through secure WASM sandboxes.
+    ///
+    /// EXAMPLES:
+    ///   omniedge plugin list                    List installed plugins
+    ///   omniedge plugin install ./my-plugin.zip Install a plugin
+    ///   omniedge plugin enable my-plugin        Enable a plugin
+    ///   omniedge plugin disable my-plugin       Disable a plugin
+    ///   omniedge plugin info my-plugin          Show plugin details
+    ///   omniedge plugin uninstall my-plugin     Remove a plugin
+    #[command(subcommand)]
+    Plugin(PluginCommands),
 }
 
 /// Network configuration subcommands
@@ -322,6 +337,63 @@ enum ConfigCommands {
     },
     /// Reset network configuration to defaults
     Reset,
+}
+
+/// Plugin management subcommands
+#[derive(Subcommand, Debug)]
+enum PluginCommands {
+    /// List all installed plugins
+    List,
+    /// Install a plugin from a ZIP file
+    ///
+    /// EXAMPLE:
+    ///   omniedge plugin install ./my-plugin.zip
+    Install {
+        /// Path to the plugin ZIP file
+        path: String,
+    },
+    /// Uninstall a plugin
+    ///
+    /// EXAMPLE:
+    ///   omniedge plugin uninstall my-plugin
+    Uninstall {
+        /// Plugin ID to uninstall
+        plugin_id: String,
+    },
+    /// Enable a plugin
+    ///
+    /// EXAMPLE:
+    ///   omniedge plugin enable my-plugin
+    Enable {
+        /// Plugin ID to enable
+        plugin_id: String,
+    },
+    /// Disable a plugin
+    ///
+    /// EXAMPLE:
+    ///   omniedge plugin disable my-plugin
+    Disable {
+        /// Plugin ID to disable
+        plugin_id: String,
+    },
+    /// Show detailed information about a plugin
+    ///
+    /// EXAMPLE:
+    ///   omniedge plugin info my-plugin
+    Info {
+        /// Plugin ID to show info for
+        plugin_id: String,
+    },
+    /// Reload a plugin (disable and re-enable)
+    ///
+    /// EXAMPLE:
+    ///   omniedge plugin reload my-plugin
+    Reload {
+        /// Plugin ID to reload
+        plugin_id: String,
+    },
+    /// Discover plugins in the plugins directory
+    Discover,
 }
 
 #[tokio::main]
@@ -999,6 +1071,9 @@ async fn main() -> Result<()> {
         Commands::Config(config_cmd) => {
             handle_config_command(config_cmd, &mut config)?;
         }
+        Commands::Plugin(plugin_cmd) => {
+            handle_plugin_command(plugin_cmd).await?;
+        }
     }
 
     Ok(())
@@ -1210,6 +1285,232 @@ fn handle_config_command(cmd: ConfigCommands, config: &mut CliConfig) -> Result<
             println!("  Port Mapping:        Enabled");
             println!("  Encrypted Signaling: Enabled");
             println!("  IPv6:                Enabled (Preferred)");
+            println!();
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle plugin management subcommands
+async fn handle_plugin_command(cmd: PluginCommands) -> Result<()> {
+    use omni_plugin::registry::PluginState;
+
+    // Initialize plugin manager
+    let plugin_config = PluginConfig::default();
+    let mut plugin_manager =
+        PluginManager::new(plugin_config).context("Failed to create plugin manager")?;
+
+    // Initialize the plugin manager (discovers plugins, etc.)
+    if let Err(e) = plugin_manager.initialize().await {
+        log::warn!("Plugin manager initialization warning: {}", e);
+        // Continue anyway - some operations may still work
+    }
+
+    match cmd {
+        PluginCommands::List => {
+            // Discover plugins first
+            if let Err(e) = plugin_manager.discover_plugins().await {
+                log::warn!("Plugin discovery warning: {}", e);
+            }
+
+            let plugins = plugin_manager.list_plugins();
+
+            println!();
+            println!("Installed Plugins");
+            println!("─────────────────");
+
+            if plugins.is_empty() {
+                println!("  No plugins installed.");
+                println!();
+                println!("  Install a plugin with: omniedge plugin install <path.zip>");
+            } else {
+                println!();
+                for plugin in &plugins {
+                    let status = if plugin.enabled { "●" } else { "○" };
+                    let status_text = if plugin.enabled {
+                        "enabled"
+                    } else {
+                        "disabled"
+                    };
+                    println!(
+                        "  {} {} v{} ({})",
+                        status, plugin.id, plugin.version, status_text
+                    );
+                    if !plugin.description.is_empty() {
+                        println!("    {}", plugin.description);
+                    }
+                }
+            }
+            println!();
+        }
+        PluginCommands::Install { path } => {
+            println!("Installing plugin from {}...", path);
+
+            let path = std::path::Path::new(&path);
+            if !path.exists() {
+                eprintln!("Error: File not found: {}", path.display());
+                std::process::exit(exit_codes::INVALID_INPUT);
+            }
+
+            match plugin_manager.install_plugin(path).await {
+                Ok(plugin_id) => {
+                    println!("✓ Plugin installed successfully!");
+                    println!();
+                    println!("  ID: {}", plugin_id);
+
+                    // Get full plugin info
+                    if let Some(info) = plugin_manager.get_plugin_info(&plugin_id) {
+                        println!("  Name:    {}", info.name);
+                        println!("  Version: {}", info.version);
+                        if !info.author.is_empty() {
+                            println!("  Author:  {}", info.author);
+                        }
+                    }
+                    println!();
+                    println!("  Enable with: omniedge plugin enable {}", plugin_id);
+                }
+                Err(e) => {
+                    eprintln!("Error: Failed to install plugin: {}", e);
+                    std::process::exit(exit_codes::GENERAL_ERROR);
+                }
+            }
+        }
+        PluginCommands::Uninstall { plugin_id } => {
+            println!("Uninstalling plugin {}...", plugin_id);
+
+            match plugin_manager.uninstall_plugin(&plugin_id).await {
+                Ok(()) => {
+                    println!("✓ Plugin '{}' uninstalled successfully.", plugin_id);
+                }
+                Err(e) => {
+                    eprintln!("Error: Failed to uninstall plugin: {}", e);
+                    std::process::exit(exit_codes::GENERAL_ERROR);
+                }
+            }
+        }
+        PluginCommands::Enable { plugin_id } => {
+            println!("Enabling plugin {}...", plugin_id);
+
+            match plugin_manager.enable_plugin(&plugin_id).await {
+                Ok(()) => {
+                    println!("✓ Plugin '{}' enabled.", plugin_id);
+                }
+                Err(e) => {
+                    eprintln!("Error: Failed to enable plugin: {}", e);
+                    std::process::exit(exit_codes::GENERAL_ERROR);
+                }
+            }
+        }
+        PluginCommands::Disable { plugin_id } => {
+            println!("Disabling plugin {}...", plugin_id);
+
+            match plugin_manager.disable_plugin(&plugin_id).await {
+                Ok(()) => {
+                    println!("✓ Plugin '{}' disabled.", plugin_id);
+                }
+                Err(e) => {
+                    eprintln!("Error: Failed to disable plugin: {}", e);
+                    std::process::exit(exit_codes::GENERAL_ERROR);
+                }
+            }
+        }
+        PluginCommands::Info { plugin_id } => {
+            // Discover first to ensure registry is populated
+            let _ = plugin_manager.discover_plugins().await;
+
+            match plugin_manager.get_plugin_info(&plugin_id) {
+                Some(plugin) => {
+                    println!();
+                    println!("Plugin: {}", plugin.name);
+                    println!("────────────────────────────────");
+                    println!("  ID:          {}", plugin.id);
+                    println!("  Version:     {}", plugin.version);
+                    if !plugin.author.is_empty() {
+                        println!("  Author:      {}", plugin.author);
+                    }
+                    if !plugin.description.is_empty() {
+                        println!("  Description: {}", plugin.description);
+                    }
+                    println!(
+                        "  Enabled:     {}",
+                        if plugin.enabled { "Yes" } else { "No" }
+                    );
+
+                    let state_str = match plugin.state {
+                        PluginState::Discovered => "Discovered",
+                        PluginState::Loading => "Loading",
+                        PluginState::Loaded => "Loaded",
+                        PluginState::Running => "Running",
+                        PluginState::Stopped => "Stopped",
+                        PluginState::Error => "Error",
+                        PluginState::Disabled => "Disabled",
+                    };
+                    println!("  State:       {}", state_str);
+
+                    if let Some(ref err) = plugin.error {
+                        println!("  Error:       {}", err);
+                    }
+
+                    // Show capabilities
+                    if !plugin.capabilities.is_empty() {
+                        println!();
+                        println!("  Capabilities:");
+                        for cap in &plugin.capabilities {
+                            println!("    - {:?}", cap);
+                        }
+                    }
+                    println!();
+                }
+                None => {
+                    eprintln!("Error: Plugin '{}' not found.", plugin_id);
+                    eprintln!();
+                    eprintln!("Run 'omniedge plugin list' to see installed plugins.");
+                    std::process::exit(exit_codes::INVALID_INPUT);
+                }
+            }
+        }
+        PluginCommands::Reload { plugin_id } => {
+            println!("Reloading plugin {}...", plugin_id);
+
+            // Disable then enable
+            if let Err(e) = plugin_manager.disable_plugin(&plugin_id).await {
+                log::warn!("Disable during reload: {}", e);
+            }
+
+            match plugin_manager.enable_plugin(&plugin_id).await {
+                Ok(()) => {
+                    println!("✓ Plugin '{}' reloaded.", plugin_id);
+                }
+                Err(e) => {
+                    eprintln!("Error: Failed to reload plugin: {}", e);
+                    std::process::exit(exit_codes::GENERAL_ERROR);
+                }
+            }
+        }
+        PluginCommands::Discover => {
+            println!("Discovering plugins...");
+
+            match plugin_manager.discover_plugins().await {
+                Ok(plugin_ids) => {
+                    println!("✓ Found {} plugin(s).", plugin_ids.len());
+
+                    if !plugin_ids.is_empty() {
+                        println!();
+                        for id in &plugin_ids {
+                            if let Some(info) = plugin_manager.get_plugin_info(id) {
+                                println!("  - {} v{}", info.id, info.version);
+                            } else {
+                                println!("  - {}", id);
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: Failed to discover plugins: {}", e);
+                    std::process::exit(exit_codes::GENERAL_ERROR);
+                }
+            }
             println!();
         }
     }
