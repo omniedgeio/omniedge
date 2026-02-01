@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 
 // Robot Data Collection types
 interface DataCollectionStatus {
@@ -326,26 +325,13 @@ function DataCollection() {
     }
   };
 
-  const handleClose = async () => {
-    const win = getCurrentWindow();
-    await win.close();
-  };
-
   return (
     <div className="data-collection-window" ref={windowRef}>
-      {/* Window Header */}
-      <div className="dc-window-header" data-tauri-drag-region>
-        <div className="dc-header-left">
-          <span className="dc-title">Data Collection</span>
-          {simulationMode && <span className="sim-badge">SIM</span>}
-          {dataCollectionStatus?.recording && <span className="recording-badge">REC</span>}
-        </div>
-        <button className="dc-close-btn" onClick={handleClose}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
+      {/* Status Header */}
+      <div className="dc-status-header">
+        <span className="dc-title">Data Collection</span>
+        {simulationMode && <span className="sim-badge">SIM</span>}
+        {dataCollectionStatus?.recording && <span className="recording-badge">REC</span>}
       </div>
 
       {/* Content */}

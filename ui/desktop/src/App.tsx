@@ -1240,7 +1240,10 @@ function App() {
                               <div className="plugin-item-header">
                                 <div className={`plugin-status-dot ${dataCollectionEnabled ? 'active' : 'disabled'}`}></div>
                                 <div className="plugin-info">
-                                  <div className="plugin-name">Data Collection</div>
+                                  <div className="plugin-name">
+                                    Data Collection
+                                    <span className="demo-badge">DEMO</span>
+                                  </div>
                                   <div className="plugin-description">Collect and manage robot training data</div>
                                 </div>
                                 <div className="plugin-item-right">

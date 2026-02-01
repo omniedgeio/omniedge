@@ -2087,6 +2087,18 @@ body {
     margin-left: 6px;
 }
 
+.demo-badge {
+    background: #ff9500;
+    color: white;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 .simulation-toggle-row {
     display: flex;
     align-items: center;
