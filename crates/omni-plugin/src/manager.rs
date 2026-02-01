@@ -18,6 +18,7 @@ use tracing::{debug, info, warn};
 use wasmtime::Store;
 
 /// A running plugin instance
+#[allow(dead_code)]
 struct RunningPlugin {
     /// Plugin instance
     instance: PluginInstance,
