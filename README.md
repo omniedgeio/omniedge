@@ -170,6 +170,16 @@ OmniEdge now supports a **WASM-based plugin system** that allows extending funct
 ### Installing Plugins
 
 ```bash
+# Via CLI (v2.2.0)
+omniedge plugin list                    # List installed plugins
+omniedge plugin install ./plugin.zip    # Install from ZIP file
+omniedge plugin uninstall <plugin-id>   # Remove a plugin
+omniedge plugin enable <plugin-id>      # Enable a plugin
+omniedge plugin disable <plugin-id>     # Disable a plugin
+omniedge plugin info <plugin-id>        # Show plugin details
+omniedge plugin reload <plugin-id>      # Reload a plugin
+omniedge plugin discover                # Discover plugins in directory
+
 # Via Desktop UI
 # Settings > Plugins > Install Plugin > Select .zip file
 
@@ -314,6 +324,16 @@ omniedge config portmap on|off    # Enable/disable UPnP/NAT-PMP
 omniedge config ipv6 on|off|prefer # IPv6 settings
 omniedge config encrypt on|off    # Encrypted signaling
 omniedge config reset             # Reset to defaults
+
+# Plugin management (v2.2.0)
+omniedge plugin list              # List installed plugins
+omniedge plugin install <path>    # Install plugin from ZIP
+omniedge plugin uninstall <id>    # Remove a plugin
+omniedge plugin enable <id>       # Enable a plugin
+omniedge plugin disable <id>      # Disable a plugin
+omniedge plugin info <id>         # Show plugin details
+omniedge plugin reload <id>       # Reload a plugin
+omniedge plugin discover          # Discover plugins in directory
 
 # Advanced modes
 omniedge start --mode nucleus --port 51821 --secret "..."  # Signaling server

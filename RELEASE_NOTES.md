@@ -42,6 +42,45 @@ Plugins can subscribe to the following events:
 - **File Picker**: Install plugins from `.zip` archives via file dialog
 - **Plugin Discovery**: Automatic detection of installed plugins on startup
 
+#### CLI Plugin Commands (New)
+
+The CLI now has full plugin management support, bringing feature parity with the desktop app:
+
+```bash
+# List all installed plugins
+omniedge plugin list
+
+# Install a plugin from ZIP file
+omniedge plugin install ./my-plugin.zip
+
+# Uninstall a plugin
+omniedge plugin uninstall com.example.my-plugin
+
+# Enable/disable plugins
+omniedge plugin enable com.example.my-plugin
+omniedge plugin disable com.example.my-plugin
+
+# Show plugin details
+omniedge plugin info com.example.my-plugin
+
+# Reload a plugin (apply config changes)
+omniedge plugin reload com.example.my-plugin
+
+# Discover plugins in the plugins directory
+omniedge plugin discover
+```
+
+| Command | Description |
+|---------|-------------|
+| `omniedge plugin list` | List all installed plugins with status |
+| `omniedge plugin install <path>` | Install plugin from ZIP archive |
+| `omniedge plugin uninstall <id>` | Remove a plugin completely |
+| `omniedge plugin enable <id>` | Enable a disabled plugin |
+| `omniedge plugin disable <id>` | Disable a plugin |
+| `omniedge plugin info <id>` | Show detailed plugin information |
+| `omniedge plugin reload <id>` | Reload a plugin |
+| `omniedge plugin discover` | Scan plugins directory for new plugins |
+
 ### Helper Service Improvements
 
 #### Security Hardening
@@ -105,6 +144,7 @@ Plugins can subscribe to the following events:
 | File | Description |
 |------|-------------|
 | `crates/omni-plugin/` | New plugin system crate |
+| `crates/omni-cli/src/main.rs` | CLI now includes plugin subcommands |
 | `examples/plugins/hello-world/` | Example plugin with full source |
 | `scripts/test-helper.ps1` | Windows helper service test script |
 
