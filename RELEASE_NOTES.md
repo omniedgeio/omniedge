@@ -1,5 +1,131 @@
 # OmniEdge Release Notes
 
+## v2.2.0 (2026-01-31)
+
+### WASM Plugin System
+
+This release introduces a **WebAssembly-based plugin system** that allows extending OmniEdge functionality through secure, sandboxed plugins.
+
+### New Features
+
+#### Plugin Runtime
+- **WASM Component Model**: Plugins are compiled to WebAssembly components using the WASI Preview 2 standard
+- **Secure Sandboxing**: Each plugin runs in an isolated sandbox with no direct system access
+- **Capability-Based Security**: Plugins declare required capabilities in their manifest; users approve permissions on install
+
+#### Supported Capabilities
+
+| Capability | Description | Security Level |
+|------------|-------------|----------------|
+| `network-status` | Read VPN connection state | Low |
+| `peer-info` | Access peer list and connection info | Low |
+| `event-hooks` | Subscribe to VPN lifecycle events | Low |
+| `logging` | Write to application logs | Low |
+| `key-value-store` | Persist plugin-specific data | Medium |
+| `notifications` | Display system notifications | Medium |
+| `http-client` | Make outbound HTTP requests | High |
+
+#### Event Hooks
+
+Plugins can subscribe to the following events:
+
+| Event | Description |
+|-------|-------------|
+| `on_state_change` | VPN connection state changed |
+| `on_peer_discovered` | New peer joined the network |
+| `on_peer_disconnected` | Peer left the network |
+| `on_network_change` | Switched to different virtual network |
+| `on_stats_update` | Periodic statistics update |
+
+#### Desktop UI Integration
+- **Plugin Management UI**: Install, enable, disable, and uninstall plugins from Settings
+- **File Picker**: Install plugins from `.zip` archives via file dialog
+- **Plugin Discovery**: Automatic detection of installed plugins on startup
+
+### Helper Service Improvements
+
+#### Security Hardening
+- **Increased Buffer Size**: Request/response buffer increased from 4KB to 16KB for larger messages
+- **Read Timeout**: Added 30-second timeout to prevent indefinite blocking from misbehaving clients
+- **Truncation Detection**: Requests exceeding buffer size are detected and rejected gracefully
+- **Safe Serialization**: Removed `unwrap()` calls; uses fallback JSON on serialization errors
+- **Generic Error Messages**: Detailed errors logged server-side; clients receive generic messages
+
+#### Concurrency Fix
+- **Single-Request Model**: Each pipe connection handles one request and closes, preventing "All pipe instances are busy" errors on Windows
+- **Test Script**: Added `scripts/test-helper.ps1` for validating helper service functionality
+
+### Technical Details
+
+#### Plugin Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   Desktop App                        │
+│  ┌───────────────────────────────────────────────┐  │
+│  │              Plugin Manager                    │  │
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐       │  │
+│  │  │ Plugin  │  │ Plugin  │  │ Plugin  │  ...  │  │
+│  │  │  WASM   │  │  WASM   │  │  WASM   │       │  │
+│  │  └────┬────┘  └────┬────┘  └────┬────┘       │  │
+│  │       │            │            │             │  │
+│  │  ┌────▼────────────▼────────────▼────┐       │  │
+│  │  │         Wasmtime Runtime          │       │  │
+│  │  │    (Secure WASM Sandbox)          │       │  │
+│  │  └───────────────────────────────────┘       │  │
+│  └───────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
+```
+
+#### Plugin Manifest Format
+
+```json
+{
+  "id": "example-plugin",
+  "name": "Example Plugin",
+  "version": "1.0.0",
+  "description": "An example plugin",
+  "author": "Your Name",
+  "capabilities": ["network-status", "event-hooks", "logging"],
+  "entry_point": "plugin.wasm"
+}
+```
+
+#### New Crate: `omni-plugin`
+
+| Component | Description |
+|-----------|-------------|
+| `PluginManager` | Manages plugin lifecycle (install, load, unload) |
+| `PluginRuntime` | Wasmtime-based WASM execution environment |
+| `PluginPackage` | Handles plugin ZIP archives and manifests |
+| `PluginManifest` | Strongly-typed manifest parsing and validation |
+
+### New Files
+
+| File | Description |
+|------|-------------|
+| `crates/omni-plugin/` | New plugin system crate |
+| `examples/plugins/hello-world/` | Example plugin with full source |
+| `scripts/test-helper.ps1` | Windows helper service test script |
+
+### Bug Fixes
+
+- **Windows Named Pipe Concurrency**: Fixed "All pipe instances are busy" error when desktop app makes concurrent helper requests
+- **Plugin Manifest Format**: Fixed capability format (now uses kebab-case: `event-hooks` instead of `EventHooks`)
+
+### Compatibility
+
+- **OmniNervous**: Requires v0.3.1 or later
+- **Wasmtime**: v18.0 (WASI Preview 2 support)
+- **Existing Networks**: Fully backward compatible with v2.1.0 networks
+- **Plugins**: New feature, requires v2.2.0 desktop app
+
+### Contributors
+
+Thank you to all contributors who made this release possible!
+
+---
+
 ## v2.1.0 (2026-01-31)
 
 ### Advanced NAT Traversal

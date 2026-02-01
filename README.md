@@ -141,6 +141,66 @@ sudo omniedge start
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## Plugin System (v2.2.0)
+
+OmniEdge now supports a **WASM-based plugin system** that allows extending functionality without modifying the core application.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **WASM Sandboxing** | Plugins run in secure WebAssembly sandboxes |
+| **Event Hooks** | React to VPN state changes, peer events, network changes |
+| **Capability-Based Security** | Fine-grained permissions per plugin |
+| **Hot Reload** | Install, enable, disable plugins without restart |
+| **Cross-Platform** | Single plugin binary works on all platforms |
+
+### Plugin Capabilities
+
+| Capability | Description |
+|------------|-------------|
+| `network-status` | Read VPN connection state |
+| `peer-info` | Access peer list and status |
+| `event-hooks` | Subscribe to VPN events |
+| `http-client` | Make outbound HTTP requests |
+| `key-value-store` | Persist plugin data |
+| `notifications` | Show system notifications |
+| `logging` | Write to application logs |
+
+### Installing Plugins
+
+```bash
+# Via Desktop UI
+# Settings > Plugins > Install Plugin > Select .zip file
+
+# Plugin directory
+# Windows: %APPDATA%\OmniEdge\plugins\
+# macOS:   ~/Library/Application Support/OmniEdge/plugins/
+# Linux:   ~/.local/share/omniedge/plugins/
+```
+
+### Creating Plugins
+
+See [examples/plugins/hello-world](examples/plugins/hello-world) for a complete example.
+
+```rust
+// Minimal plugin structure
+wit_bindgen::generate!({
+    world: "omniedge-plugin",
+    exports: {
+        world: MyPlugin,
+    },
+});
+
+struct MyPlugin;
+
+impl Guest for MyPlugin {
+    fn on_load() -> Result<(), String> {
+        Ok(())
+    }
+}
+```
+
 ## NAT Traversal (v2.1.0)
 
 OmniEdge automatically handles complex network environments with multi-layer NAT traversal:
