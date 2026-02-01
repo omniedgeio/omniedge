@@ -49,3 +49,8 @@ winapi = { version = "0.3", features = ["processthreadsapi", "securitybaseapi", 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
+[features]
+default = ["robotics"]
+# Enable robotics data collection UI (Linux-focused)
+robotics = ["omni-plugin/robotics"]
+

@@ -649,9 +649,19 @@ impl DataCollectionPlugin {
         self.storage_manager.as_ref()
     }
 
+    /// Get mutable storage manager
+    pub fn storage_manager_mut(&mut self) -> Option<&mut StorageManager> {
+        self.storage_manager.as_mut()
+    }
+
     /// Get upload manager
     pub fn upload_manager(&self) -> Option<&UploadManager> {
         self.upload_manager.as_ref()
+    }
+
+    /// Get mutable upload manager
+    pub fn upload_manager_mut(&mut self) -> Option<&mut UploadManager> {
+        self.upload_manager.as_mut()
     }
 
     /// Get statistics
