@@ -139,9 +139,8 @@ async fn run_helper_server(
 
         let mut first = true;
         loop {
-            let server_instance = create_permissive_pipe(pipe_name, first);
-
-            let server_instance = match server_instance {
+            // Create a pipe instance for this iteration
+            let server_instance = match create_permissive_pipe(pipe_name, first) {
                 Ok(s) => s,
                 Err(e) => {
                     error!("CreateNamedPipe error: {}", e);
@@ -149,13 +148,16 @@ async fn run_helper_server(
                     continue;
                 }
             };
+            first = false;
 
             tokio::select! {
                 connect_res = server_instance.connect() => {
                     if connect_res.is_ok() {
                         let server_ref = Arc::clone(&server);
                         // Handle connection sequentially on Windows to avoid Send issues
-                        // with raw pointers in tun::Configuration from omninervous
+                        // with raw pointers in tun::Configuration from omninervous.
+                        // Single-request handling ensures the server quickly returns to
+                        // create new pipe instances for other clients.
                         handle_connection(server_instance, server_ref).await;
                     }
                 }
@@ -164,7 +166,6 @@ async fn run_helper_server(
                     break;
                 }
             }
-            first = false;
         }
     }
     Ok(())
@@ -244,37 +245,53 @@ fn create_permissive_pipe(
     }
 }
 
+/// Handle a single request on a connection and return.
+///
+/// On Windows, this design allows the pipe server to quickly create new pipe
+/// instances for other clients. The desktop app creates a new connection for
+/// each request, so single-request handling is sufficient and avoids the
+/// "All pipe instances are busy" error that occurs when handle_connection
+/// blocks in a loop.
 async fn handle_connection<S>(mut socket: S, server: Arc<HelperServer>)
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let mut buf = [0; 4096];
-    loop {
-        let n = match socket.read(&mut buf).await {
-            Ok(0) => return,
-            Ok(n) => n,
-            Err(e) => {
-                error!("Read error: {}", e);
-                return;
-            }
-        };
 
-        let req: HelperRequest = match serde_json::from_slice(&buf[..n]) {
-            Ok(r) => r,
-            Err(e) => {
-                error!("Unmarshal error: {}", e);
-                continue;
-            }
-        };
-
-        let resp = server.handle_request(req).await;
-        let resp_bytes = serde_json::to_vec(&resp).unwrap();
-        if let Err(e) = socket.write_all(&resp_bytes).await {
-            error!("Write error: {}", e);
+    // Read a single request
+    let n = match socket.read(&mut buf).await {
+        Ok(0) => return, // Client closed connection
+        Ok(n) => n,
+        Err(e) => {
+            error!("Read error: {}", e);
             return;
         }
+    };
+
+    let req: HelperRequest = match serde_json::from_slice(&buf[..n]) {
+        Ok(r) => r,
+        Err(e) => {
+            error!("Unmarshal error: {}", e);
+            // Send error response
+            let error_resp = omni_helper::HelperResponse {
+                success: false,
+                message: format!("Invalid request: {}", e),
+                data: None,
+            };
+            let _ = socket
+                .write_all(&serde_json::to_vec(&error_resp).unwrap())
+                .await;
+            return;
+        }
+    };
+
+    let resp = server.handle_request(req).await;
+    let resp_bytes = serde_json::to_vec(&resp).unwrap();
+    if let Err(e) = socket.write_all(&resp_bytes).await {
+        error!("Write error: {}", e);
     }
+    // Connection closes after response - client must reconnect for next request
 }
 
 fn main() -> anyhow::Result<()> {

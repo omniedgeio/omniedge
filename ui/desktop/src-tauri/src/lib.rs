@@ -50,15 +50,26 @@ async fn call_helper(req: &HelperRequest) -> Result<HelperResponse, String> {
         #[cfg(windows)]
         {
             let pipe_name = r"\\.\pipe\omniedge-helper";
-            let mut client = ClientOptions::new()
-                .open(pipe_name)
-                .map_err(|e| e.to_string())?;
-            client
-                .write_all(&req_bytes)
-                .await
-                .map_err(|e| e.to_string())?;
-            let n = client.read(&mut buf).await.map_err(|e| e.to_string())?;
-            serde_json::from_slice(&buf[..n]).map_err(|e| e.to_string())
+            let mut client = ClientOptions::new().open(pipe_name).map_err(|e| {
+                error!("Failed to open pipe {}: {}", pipe_name, e);
+                e.to_string()
+            })?;
+            client.write_all(&req_bytes).await.map_err(|e| {
+                error!("Failed to write to pipe: {}", e);
+                e.to_string()
+            })?;
+            let n = client.read(&mut buf).await.map_err(|e| {
+                error!("Failed to read from pipe: {}", e);
+                e.to_string()
+            })?;
+            serde_json::from_slice(&buf[..n]).map_err(|e| {
+                error!(
+                    "Failed to parse response: {} (raw: {:?})",
+                    e,
+                    String::from_utf8_lossy(&buf[..n])
+                );
+                e.to_string()
+            })
         }
     };
 
