@@ -3956,6 +3956,7 @@ dependencies = [
  "omni-api",
  "omni-core",
  "omni-helper",
+ "omni-plugin",
  "omni-proto",
  "omni-tun",
  "serde",

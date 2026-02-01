@@ -4,6 +4,7 @@ use omni_api::types::{
     VirtualNetworkDeviceResponse, VirtualNetworkResponse,
 };
 use omni_core::{CliConfig, ConnectionManager, ConnectionState};
+use omni_plugin::{PluginConfig, PluginManager};
 use std::sync::Arc;
 #[cfg(target_os = "macos")]
 use tauri::menu::{Menu, MenuItem};
@@ -24,6 +25,7 @@ use omni_helper::{HelperRequest, HelperResponse, StartArgs};
 
 struct AppState {
     manager: Arc<Mutex<ConnectionManager>>,
+    plugin_manager: Arc<Mutex<PluginManager>>,
 }
 
 async fn call_helper(req: &HelperRequest) -> Result<HelperResponse, String> {
@@ -1125,6 +1127,213 @@ async fn resize_window(app: tauri::AppHandle, height: u32) -> Result<(), String>
     Ok(())
 }
 
+// ============================================================================
+// Plugin Management Commands
+// ============================================================================
+
+/// Plugin info for frontend (simplified from omni_plugin::PluginInfo)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PluginInfoUI {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub author: String,
+    pub description: String,
+    pub plugin_type: String,
+    pub enabled: bool,
+    pub status: String, // "active", "disabled", "error"
+    pub error_message: Option<String>,
+    pub permissions: Vec<String>,
+}
+
+#[tauri::command]
+async fn list_plugins(state: tauri::State<'_, AppState>) -> Result<Vec<PluginInfoUI>, String> {
+    let manager = state.plugin_manager.lock().await;
+    let plugins = manager.list_plugins();
+
+    Ok(plugins
+        .into_iter()
+        .map(|p| {
+            let plugin_type = p
+                .capabilities
+                .first()
+                .map(|c| format!("{:?}", c).to_lowercase())
+                .unwrap_or_else(|| "event".to_string());
+
+            let status = if p.error.is_some() {
+                "error".to_string()
+            } else if p.enabled {
+                "active".to_string()
+            } else {
+                "disabled".to_string()
+            };
+
+            let permissions = p
+                .capabilities
+                .iter()
+                .map(|c| format!("{:?}", c).to_lowercase())
+                .collect();
+
+            PluginInfoUI {
+                id: p.id,
+                name: p.name,
+                version: p.version,
+                author: p.author,
+                description: p.description,
+                plugin_type,
+                enabled: p.enabled,
+                status,
+                error_message: p.error,
+                permissions,
+            }
+        })
+        .collect())
+}
+
+#[tauri::command]
+async fn get_plugin_info(
+    state: tauri::State<'_, AppState>,
+    plugin_id: String,
+) -> Result<PluginInfoUI, String> {
+    let manager = state.plugin_manager.lock().await;
+    let p = manager
+        .get_plugin_info(&plugin_id)
+        .ok_or_else(|| format!("Plugin '{}' not found", plugin_id))?;
+
+    let plugin_type = p
+        .capabilities
+        .first()
+        .map(|c| format!("{:?}", c).to_lowercase())
+        .unwrap_or_else(|| "event".to_string());
+
+    let status = if p.error.is_some() {
+        "error".to_string()
+    } else if p.enabled {
+        "active".to_string()
+    } else {
+        "disabled".to_string()
+    };
+
+    let permissions = p
+        .capabilities
+        .iter()
+        .map(|c| format!("{:?}", c).to_lowercase())
+        .collect();
+
+    Ok(PluginInfoUI {
+        id: p.id,
+        name: p.name,
+        version: p.version,
+        author: p.author,
+        description: p.description,
+        plugin_type,
+        enabled: p.enabled,
+        status,
+        error_message: p.error,
+        permissions,
+    })
+}
+
+#[tauri::command]
+async fn enable_plugin(state: tauri::State<'_, AppState>, plugin_id: String) -> Result<(), String> {
+    let manager = state.plugin_manager.lock().await;
+    manager
+        .enable_plugin(&plugin_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn disable_plugin(
+    state: tauri::State<'_, AppState>,
+    plugin_id: String,
+) -> Result<(), String> {
+    let manager = state.plugin_manager.lock().await;
+    manager
+        .disable_plugin(&plugin_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn install_plugin_from_file(
+    state: tauri::State<'_, AppState>,
+    path: String,
+) -> Result<PluginInfoUI, String> {
+    let manager = state.plugin_manager.lock().await;
+    let plugin_id = manager
+        .install_plugin(std::path::Path::new(&path))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    drop(manager);
+
+    // Fetch and return the new plugin info
+    get_plugin_info(state, plugin_id).await
+}
+
+#[tauri::command]
+async fn uninstall_plugin(
+    state: tauri::State<'_, AppState>,
+    plugin_id: String,
+) -> Result<(), String> {
+    let manager = state.plugin_manager.lock().await;
+    manager
+        .uninstall_plugin(&plugin_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_plugin_config(
+    state: tauri::State<'_, AppState>,
+    plugin_id: String,
+) -> Result<serde_json::Value, String> {
+    let manager = state.plugin_manager.lock().await;
+    let entry = manager
+        .registry()
+        .get(&plugin_id)
+        .ok_or_else(|| format!("Plugin '{}' not found", plugin_id))?;
+
+    Ok(serde_json::to_value(&entry.config).unwrap_or(serde_json::json!({})))
+}
+
+#[tauri::command]
+async fn set_plugin_config(
+    state: tauri::State<'_, AppState>,
+    plugin_id: String,
+    config: serde_json::Value,
+) -> Result<(), String> {
+    let manager = state.plugin_manager.lock().await;
+
+    // Convert Value to HashMap
+    let config_map: std::collections::HashMap<String, serde_json::Value> =
+        serde_json::from_value(config).map_err(|e| e.to_string())?;
+
+    manager
+        .update_config(&plugin_id, config_map)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn reload_plugin(state: tauri::State<'_, AppState>, plugin_id: String) -> Result<(), String> {
+    let manager = state.plugin_manager.lock().await;
+
+    // Unload then load
+    let _ = manager.unload_plugin(&plugin_id).await;
+    manager
+        .load_plugin(&plugin_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn discover_plugins(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
+    let manager = state.plugin_manager.lock().await;
+    manager.discover_plugins().await.map_err(|e| e.to_string())
+}
+
 fn toggle_window<R: Runtime>(
     app: &tauri::AppHandle<R>,
     tray_position: Option<tauri::PhysicalPosition<f64>>,
@@ -1218,8 +1427,21 @@ pub fn run() {
     info!("OmniEdge Desktop starting (Log dir: {})", log_dir.display());
 
     let manager = ConnectionManager::new(base_url, None);
+
+    // Initialize plugin manager
+    let plugin_config = PluginConfig::default();
+    let plugin_manager = match PluginManager::new(plugin_config) {
+        Ok(pm) => pm,
+        Err(e) => {
+            error!("Failed to initialize plugin manager: {}", e);
+            // Create a fallback with minimal config
+            PluginManager::with_defaults().expect("Failed to create default plugin manager")
+        }
+    };
+
     let app_state = AppState {
         manager: Arc::new(Mutex::new(manager)),
+        plugin_manager: Arc::new(Mutex::new(plugin_manager)),
     };
 
     tauri::Builder::default()
@@ -1258,7 +1480,25 @@ pub fn run() {
             // 1. Initial menu population
             let handle_init = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                let _state = handle_init.state::<AppState>();
+                let state = handle_init.state::<AppState>();
+
+                // Initialize plugin manager
+                {
+                    let mut plugin_manager = state.plugin_manager.lock().await;
+                    if let Err(e) = plugin_manager.initialize().await {
+                        error!("Failed to initialize plugin manager: {}", e);
+                    } else {
+                        // Discover and load plugins
+                        if let Err(e) = plugin_manager.discover_plugins().await {
+                            error!("Failed to discover plugins: {}", e);
+                        }
+                        if let Err(e) = plugin_manager.load_all().await {
+                            error!("Failed to load plugins: {}", e);
+                        }
+                        info!("Plugin system initialized");
+                    }
+                }
+
                 /*
                 let manager = state.manager.lock().await;
                 if let Ok(menu) = build_tray_menu(&handle_init, &manager).await {
@@ -1374,7 +1614,18 @@ pub fn run() {
             get_helper_version,
             install_helper,
             get_debug_info,
-            quit
+            quit,
+            // Plugin management commands
+            list_plugins,
+            get_plugin_info,
+            enable_plugin,
+            disable_plugin,
+            install_plugin_from_file,
+            uninstall_plugin,
+            get_plugin_config,
+            set_plugin_config,
+            reload_plugin,
+            discover_plugins
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -27,6 +27,7 @@ serde_json = "1"
 omni-core = { path = "../../../crates/omni-core" }
 omni-api = { path = "../../../crates/omni-api" }
 omni-helper = { path = "../../../crates/omni-helper" }
+omni-plugin = { path = "../../../crates/omni-plugin" }
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
 whoami = "1.5.0"

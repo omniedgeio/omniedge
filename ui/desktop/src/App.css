@@ -1418,3 +1418,489 @@ body {
 .install-badge.clickable:hover {
     filter: brightness(1.1);
 }
+
+/* ============================================
+   PLUGIN MANAGEMENT STYLES
+   ============================================ */
+
+/* Plugin Section Header */
+.plugins-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 18px 8px;
+    cursor: pointer;
+}
+
+.plugins-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.plugin-count-badge {
+    background: var(--accent-blue);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 18px;
+    text-align: center;
+}
+
+.plugin-count-badge.inactive {
+    background: var(--divider);
+    color: var(--text-secondary);
+}
+
+.plugins-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.plugin-add-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: rgba(0, 122, 255, 0.1);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.2s;
+    color: var(--accent-blue);
+}
+
+.plugin-add-btn:hover {
+    background: rgba(0, 122, 255, 0.2);
+}
+
+.plugin-add-btn:active {
+    transform: scale(0.95);
+}
+
+/* Plugin List Container */
+.plugins-pane {
+    padding: 0 14px 14px;
+    animation: reveal 0.25s ease-out;
+}
+
+.plugins-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Plugin Item Card */
+.plugin-item {
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.3);
+    border: 0.5px solid var(--divider);
+    overflow: hidden;
+    transition: 0.2s;
+}
+
+@media (prefers-color-scheme: dark) {
+    .plugin-item {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}
+
+.plugin-item.is-enabled {
+    background: rgba(52, 199, 89, 0.05);
+    border-color: rgba(52, 199, 89, 0.2);
+}
+
+.plugin-item.has-error {
+    background: rgba(255, 59, 48, 0.05);
+    border-color: rgba(255, 59, 48, 0.2);
+}
+
+.plugin-item.is-expanded {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Plugin Item Header Row */
+.plugin-item-header {
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    gap: 10px;
+}
+
+.plugin-item-header:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+@media (prefers-color-scheme: dark) {
+    .plugin-item-header:hover {
+        background: rgba(255, 255, 255, 0.03);
+    }
+}
+
+.plugin-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.plugin-status-dot.active {
+    background: var(--status-green);
+    box-shadow: 0 0 6px rgba(52, 199, 89, 0.4);
+}
+
+.plugin-status-dot.disabled {
+    background: var(--divider);
+}
+
+.plugin-status-dot.error {
+    background: var(--status-red);
+    box-shadow: 0 0 6px rgba(255, 59, 48, 0.4);
+}
+
+.plugin-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.plugin-name {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.plugin-description {
+    font-size: 11px;
+    opacity: 0.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.plugin-error-text {
+    font-size: 11px;
+    color: var(--status-red);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.plugin-item-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* Smaller toggle for plugins */
+.ios-switch.small {
+    width: 32px;
+    height: 18px;
+    border-radius: 9px;
+}
+
+.ios-switch.small .dot {
+    width: 14px;
+    height: 14px;
+}
+
+.ios-switch.small.on .dot {
+    transform: translateX(14px);
+}
+
+/* Plugin Details Panel */
+.plugin-details-panel {
+    padding: 10px 12px 12px;
+    border-top: 0.5px solid var(--divider);
+    animation: reveal 0.2s ease-out;
+}
+
+.plugin-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 4px 0;
+}
+
+.plugin-detail-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    opacity: 0.4;
+    flex-shrink: 0;
+}
+
+.plugin-detail-value {
+    font-size: 11px;
+    text-align: right;
+    max-width: 180px;
+    word-break: break-word;
+}
+
+.plugin-permissions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: flex-end;
+}
+
+.permission-tag {
+    background: rgba(0, 122, 255, 0.1);
+    color: var(--accent-blue);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+}
+
+.plugin-type-tag {
+    background: rgba(128, 128, 128, 0.1);
+    color: var(--text-secondary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+/* Plugin Action Buttons */
+.plugin-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.plugin-action-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.plugin-action-btn.settings {
+    background: var(--accent-blue);
+    color: white;
+}
+
+.plugin-action-btn.settings:hover {
+    filter: brightness(1.1);
+}
+
+.plugin-action-btn.remove {
+    background: rgba(255, 59, 48, 0.1);
+    color: var(--status-red);
+}
+
+.plugin-action-btn.remove:hover {
+    background: rgba(255, 59, 48, 0.2);
+}
+
+/* Plugin Settings View (Full Screen) */
+.plugin-settings-view {
+    animation: fadeIn 0.2s ease-out;
+}
+
+.plugin-settings-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border-bottom: 0.5px solid var(--divider);
+}
+
+.plugin-settings-back {
+    opacity: 0.5;
+    cursor: pointer;
+    transition: 0.2s;
+    display: flex;
+    align-items: center;
+}
+
+.plugin-settings-back:hover {
+    opacity: 1;
+}
+
+.plugin-settings-title {
+    font-size: 13px;
+    font-weight: 600;
+    flex: 1;
+}
+
+.plugin-settings-content {
+    padding: 14px;
+}
+
+.plugin-config-section {
+    margin-bottom: 16px;
+}
+
+.plugin-config-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    opacity: 0.4;
+    margin-bottom: 10px;
+}
+
+.plugin-config-field {
+    margin-bottom: 14px;
+}
+
+.plugin-config-field label {
+    display: block;
+    font-size: 11px;
+    margin-bottom: 6px;
+    opacity: 0.7;
+}
+
+.plugin-config-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 0.5px solid var(--divider);
+    border-radius: 8px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.5);
+    transition: 0.2s;
+    font-family: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+    .plugin-config-input {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary-dark);
+    }
+}
+
+.plugin-config-input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+.plugin-config-input::placeholder {
+    opacity: 0.4;
+}
+
+.plugin-config-toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 0.5px solid var(--divider);
+}
+
+.plugin-config-toggle-row:last-child {
+    border-bottom: none;
+}
+
+.plugin-config-toggle-label {
+    font-size: 12px;
+}
+
+.plugin-save-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent-blue);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+    margin-top: 20px;
+}
+
+.plugin-save-btn:hover {
+    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+}
+
+.plugin-save-btn:active {
+    transform: scale(0.98);
+}
+
+.plugin-save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Empty State */
+.plugins-empty {
+    padding: 24px 16px;
+    text-align: center;
+}
+
+.plugins-empty-icon {
+    margin-bottom: 12px;
+    opacity: 0.3;
+}
+
+.plugins-empty-text {
+    font-size: 12px;
+    opacity: 0.5;
+    margin-bottom: 4px;
+}
+
+.plugins-empty-hint {
+    font-size: 10px;
+    opacity: 0.3;
+}
+
+/* Plugin Loading State */
+.plugin-loading {
+    padding: 20px;
+    text-align: center;
+    font-size: 11px;
+    opacity: 0.5;
+    animation: pulse 1.5s infinite;
+}
+
+/* Remove Confirmation */
+.plugin-remove-confirm {
+    background: rgba(255, 59, 48, 0.05);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 10px;
+}
+
+.plugin-remove-confirm-text {
+    font-size: 11px;
+    margin-bottom: 10px;
+    color: var(--status-red);
+}
+
+.plugin-remove-confirm-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.plugin-remove-confirm-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+
+.plugin-remove-confirm-btn.cancel {
+    background: var(--divider);
+    color: var(--text-primary);
+}
+
+.plugin-remove-confirm-btn.confirm {
+    background: var(--status-red);
+    color: white;
+}
