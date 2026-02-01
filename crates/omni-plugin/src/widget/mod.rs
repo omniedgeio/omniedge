@@ -4,12 +4,11 @@
 //! Widgets run in isolated iframes with controlled communication.
 
 use crate::error::{PluginError, PluginResult};
-use crate::manifest::PluginManifest;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Widget placement in the UI
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -199,6 +198,7 @@ pub struct WidgetRegistry {
     /// Registered widgets by full ID
     widgets: Arc<RwLock<HashMap<String, RegisteredWidget>>>,
     /// Widgets directory
+    #[allow(dead_code)]
     widgets_dir: PathBuf,
 }
 
@@ -221,7 +221,7 @@ impl WidgetRegistry {
         let mut widgets = self
             .widgets
             .write()
-            .map_err(|e| PluginError::Internal(anyhow::anyhow!("Lock poisoned: {}", e)))?;
+            .map_err(|e| PluginError::Internal(format!("Lock poisoned: {}", e)))?;
 
         for manifest in widget_manifests {
             let widget = RegisteredWidget::new(plugin_id, manifest, bundle_path.to_path_buf());
@@ -247,7 +247,7 @@ impl WidgetRegistry {
         let mut widgets = self
             .widgets
             .write()
-            .map_err(|e| PluginError::Internal(anyhow::anyhow!("Lock poisoned: {}", e)))?;
+            .map_err(|e| PluginError::Internal(format!("Lock poisoned: {}", e)))?;
 
         widgets.retain(|_, w| w.plugin_id != plugin_id);
 
@@ -299,7 +299,7 @@ impl WidgetRegistry {
         let mut widgets = self
             .widgets
             .write()
-            .map_err(|e| PluginError::Internal(anyhow::anyhow!("Lock poisoned: {}", e)))?;
+            .map_err(|e| PluginError::Internal(format!("Lock poisoned: {}", e)))?;
 
         match widgets.get_mut(full_id) {
             Some(widget) => {
@@ -315,7 +315,7 @@ impl WidgetRegistry {
         let mut widgets = self
             .widgets
             .write()
-            .map_err(|e| PluginError::Internal(anyhow::anyhow!("Lock poisoned: {}", e)))?;
+            .map_err(|e| PluginError::Internal(format!("Lock poisoned: {}", e)))?;
 
         match widgets.get_mut(full_id) {
             Some(widget) => {

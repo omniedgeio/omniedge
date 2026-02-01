@@ -82,19 +82,17 @@ async fn call_helper(req: &HelperRequest) -> Result<HelperResponse, String> {
                     Err(e) => {
                         last_err = e.to_string();
                         // Check if it's a "pipe busy" error (ERROR_PIPE_BUSY = 231)
-                        if e.raw_os_error() == Some(231) {
-                            if retry < MAX_RETRIES - 1 {
-                                // Exponential backoff: 100ms, 200ms, 400ms, 800ms
-                                let backoff = INITIAL_BACKOFF_MS * (1 << retry);
-                                debug!(
-                                    "Pipe busy, retrying in {}ms (attempt {}/{})",
-                                    backoff,
-                                    retry + 1,
-                                    MAX_RETRIES
-                                );
-                                tokio::time::sleep(Duration::from_millis(backoff)).await;
-                                continue;
-                            }
+                        if e.raw_os_error() == Some(231) && retry < MAX_RETRIES - 1 {
+                            // Exponential backoff: 100ms, 200ms, 400ms, 800ms
+                            let backoff = INITIAL_BACKOFF_MS * (1 << retry);
+                            debug!(
+                                "Pipe busy, retrying in {}ms (attempt {}/{})",
+                                backoff,
+                                retry + 1,
+                                MAX_RETRIES
+                            );
+                            tokio::time::sleep(Duration::from_millis(backoff)).await;
+                            continue;
                         }
                         // For non-busy errors or max retries reached, log and return error
                         // Only log as error on final failure to reduce log spam
@@ -166,7 +164,7 @@ async fn install_helper(_app: tauri::AppHandle) -> Result<(), String> {
                 "i686-pc-windows-msvc"
             }
         );
-        let tried_paths = vec![
+        let tried_paths = [
             exe_dir.join("omni-helper.exe"),
             exe_dir.join(&sidecar_name),
             exe_dir.join("binaries").join("omni-helper.exe"),
@@ -1054,7 +1052,7 @@ async fn get_debug_info(state: tauri::State<'_, AppState>) -> Result<serde_json:
     if let Ok(entries) = std::fs::read_dir(&log_dir) {
         let mut log_files: Vec<_> = entries
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map_or(false, |ext| ext == "log"))
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "log"))
             .collect();
 
         log_files.sort_by_key(|e| e.metadata().and_then(|m| m.modified()).ok());
@@ -1164,7 +1162,7 @@ async fn resize_window(app: tauri::AppHandle, height: u32) -> Result<(), String>
 
     if let Some(window) = app.get_webview_window("main") {
         // Clamp height between min and max
-        let clamped_height = height.max(200).min(700);
+        let clamped_height = height.clamp(200, 700);
 
         // Get current scale factor for proper sizing
         let scale_factor = window.scale_factor().unwrap_or(1.0);
