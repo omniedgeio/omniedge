@@ -1,0 +1,29 @@
+{
+  "id": "com.omniedge.hello-world",
+  "name": "Hello World Plugin",
+  "version": "0.1.0",
+  "author": "OmniEdge Team",
+  "description": "Example plugin that logs VPN lifecycle events",
+  "homepage": "https://github.com/omniedgeio/omniedge",
+  "license": "Apache-2.0",
+  "capabilities": ["EventHooks"],
+  "min_omniedge_version": "2.0.0",
+  "platforms": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "log_level": {
+        "type": "string",
+        "default": "info",
+        "description": "Logging level for the plugin"
+      }
+    }
+  },
+  "default_config": {
+    "log_level": "info"
+  },
+  "entry_points": {
+    "wasm": "plugin.wasm"
+  },
+  "tags": ["example", "events", "logging"]
+}
