@@ -385,7 +385,7 @@ impl ConnectionManager {
         #[allow(unused_assignments)]
         let mut tun_instance: Option<OmniTun> = None;
         let mut port = 51820;
-        #[allow(unused_assignments)]
+        #[allow(unused_mut)]
         let mut tun_loop_already_active = false;
 
         #[cfg(target_os = "windows")]
