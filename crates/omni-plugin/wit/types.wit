@@ -1,0 +1,271 @@
+// OmniEdge Plugin System - Common Types
+// WebAssembly Interface Types (WIT) definition
+
+package omniedge:plugin@1.0.0;
+
+/// Common types used across all plugin interfaces
+interface types {
+    /// Plugin capability enumeration
+    enum capability {
+        event-hooks,
+        authentication,
+        network-policy,
+        data-triage,
+        qos-enforcement,
+        pdm-reporting,
+        compliance,
+        ui-widgets,
+    }
+
+    /// VPN connection state
+    variant connection-state {
+        disconnected,
+        authenticating,
+        authenticated,
+        joining(string),
+        connected(string),
+    }
+
+    /// Peer information
+    record peer-info {
+        public-key: string,
+        virtual-ip: string,
+        endpoint: option<string>,
+        last-handshake: u64,
+        rx-bytes: u64,
+        tx-bytes: u64,
+    }
+
+    /// Network information
+    record network-info {
+        id: string,
+        name: string,
+        subnet: string,
+        peer-count: u32,
+    }
+
+    /// Device information
+    record device-info {
+        id: string,
+        name: string,
+        platform: string,
+        virtual-ip: string,
+        is-online: bool,
+        is-exit-node: bool,
+    }
+
+    /// State change event
+    record state-change-event {
+        old-state: connection-state,
+        new-state: connection-state,
+        timestamp: u64,
+        network-id: option<string>,
+    }
+
+    /// Network event type
+    enum network-event-type {
+        joined,
+        left,
+        peer-added,
+        peer-removed,
+    }
+
+    /// Network event
+    record network-event {
+        event-type: network-event-type,
+        network-id: string,
+        timestamp: u64,
+    }
+
+    /// Connection statistics
+    record connection-stats {
+        rx-bytes: u64,
+        tx-bytes: u64,
+        rx-packets: u64,
+        tx-packets: u64,
+        connected-peers: u32,
+        latency-ms: option<f64>,
+        uptime-seconds: u64,
+    }
+
+    /// Geographic location
+    record geo-location {
+        latitude: f64,
+        longitude: f64,
+        country: option<string>,
+        city: option<string>,
+    }
+
+    /// Network type
+    enum network-type {
+        wifi,
+        cellular,
+        ethernet,
+        unknown,
+    }
+
+    /// Policy context for policy plugins
+    record policy-context {
+        available-networks: list<network-info>,
+        available-exit-nodes: list<device-info>,
+        device-info: device-info,
+        geo-location: option<geo-location>,
+        time-of-day: u64,
+        network-type: network-type,
+    }
+
+    /// Policy decision
+    variant policy-decision {
+        allow,
+        deny(string),
+        require-auth(string),
+    }
+
+    /// Authentication method
+    variant auth-method {
+        oauth2(string),
+        saml(string),
+        oidc(string),
+        api-key,
+        custom(string),
+    }
+
+    /// Authentication request
+    record auth-request {
+        method: auth-method,
+        redirect-uri: option<string>,
+        state: option<string>,
+    }
+
+    /// Authentication response
+    record auth-response {
+        success: bool,
+        token: option<string>,
+        refresh-token: option<string>,
+        expires-at: option<u64>,
+        error: option<string>,
+    }
+
+    /// Traffic class for QoS
+    variant traffic-class {
+        /// URLLC: Teleop control, Safety heartbeats (< 10ms budget)
+        ultra-reliable-low-latency(u8),
+        /// Standard: Routine telemetry
+        standard(u8),
+        /// Background: Bulk logs, OTA downloads
+        background(u8),
+        /// Drop: Non-compliant traffic
+        drop,
+    }
+
+    /// Packet information for QoS classification
+    record packet-info {
+        source-addr: string,
+        source-port: u16,
+        dest-addr: string,
+        dest-port: u16,
+        protocol: u8,
+        size: u32,
+        ros-topic: option<string>,
+    }
+
+    /// Priority level
+    enum priority {
+        critical,
+        high,
+        normal,
+        low,
+    }
+
+    /// Output format for data triage
+    enum output-format {
+        mcap,
+        ros2-bag,
+        custom,
+    }
+
+    /// Triage action
+    variant triage-action {
+        clip(triage-clip-config),
+        discard,
+        stream-to-cloud(priority),
+    }
+
+    /// Clip configuration for triage
+    record triage-clip-config {
+        duration-before: u32,
+        duration-after: u32,
+        format: output-format,
+    }
+
+    /// Actuator sample for PdM
+    record actuator-sample {
+        actuator-id: string,
+        timestamp-ns: u64,
+        torque: f32,
+        current: f32,
+        temperature: f32,
+        position: f32,
+        velocity: f32,
+    }
+
+    /// Health report from PdM
+    record health-report {
+        actuators: list<actuator-health>,
+        overall-health-score: f32,
+        predicted-failures: list<predicted-failure>,
+    }
+
+    /// Individual actuator health
+    record actuator-health {
+        actuator-id: string,
+        health-score: f32,
+        anomaly-detected: bool,
+    }
+
+    /// Predicted failure
+    record predicted-failure {
+        actuator-id: string,
+        failure-type: string,
+        probability: f32,
+        estimated-time-hours: option<f32>,
+    }
+
+    /// Compliance mode
+    variant compliance-mode {
+        standard,
+        gdpr(gdpr-config),
+        hipaa(hipaa-config),
+        custom(string),
+    }
+
+    /// GDPR configuration
+    record gdpr-config {
+        anonymize-video: bool,
+        data-residency: string,
+    }
+
+    /// HIPAA configuration
+    record hipaa-config {
+        encrypt-at-rest: bool,
+    }
+
+    /// Compliance check result
+    variant compliance-result {
+        compliant,
+        requires-transformation(list<string>),
+        blocked(compliance-block-reason),
+    }
+
+    /// Compliance block reason
+    record compliance-block-reason {
+        reason: string,
+        regulation: string,
+    }
+
+    /// Plugin error
+    record plugin-error {
+        code: string,
+        message: string,
+    }
+}

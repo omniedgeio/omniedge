@@ -1,0 +1,40 @@
+# Hello World Plugin Manifest
+# This file describes the plugin for OmniEdge
+
+[plugin]
+id = "com.omniedge.hello-world"
+name = "Hello World Plugin"
+version = "0.1.0"
+author = "OmniEdge Team"
+description = "Example plugin that logs VPN lifecycle events"
+license = "Apache-2.0"
+homepage = "https://github.com/omniedgeio/omniedge"
+repository = "https://github.com/omniedgeio/omniedge"
+icon = "assets/icon.png"
+
+[plugin.capabilities]
+event-hooks = true
+authentication = false
+network-policy = false
+data-triage = false
+qos-enforcement = false
+pdm-reporting = false
+compliance = false
+ui-widgets = false
+
+# Resource limits (optional, uses defaults if not specified)
+[plugin.limits]
+max-memory-mb = 16
+max-execution-time-ms = 50
+
+# Configuration schema (optional)
+[config]
+log-level = { type = "string", default = "info", description = "Logging level for the plugin" }
+
+# Dependencies on other plugins (optional)
+[dependencies]
+# No dependencies for this example
+
+# HTTP hosts this plugin is allowed to contact (for auth plugins)
+[http-allowlist]
+# No HTTP access needed for this plugin

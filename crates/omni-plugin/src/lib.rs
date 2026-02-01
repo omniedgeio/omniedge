@@ -50,6 +50,7 @@ pub mod loader;
 pub mod manager;
 pub mod manifest;
 pub mod registry;
+pub mod runtime;
 pub mod sandbox;
 pub mod traits;
 pub mod types;
@@ -69,6 +70,9 @@ pub use traits::{
     AuthPlugin, CompliancePlugin, DataTriagePlugin, EventPlugin, OmniEdgePlugin, PdMPlugin,
     PolicyPlugin, QoSPlugin,
 };
+
+// Re-export runtime
+pub use runtime::PluginRuntimeManager;
 
 /// Plugin system configuration
 #[derive(Debug, Clone)]

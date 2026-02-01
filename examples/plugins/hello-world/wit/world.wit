@@ -1,0 +1,196 @@
+// OmniEdge Plugin System - Hello World Plugin WIT
+// A simplified world for the example event plugin
+
+package omniedge:plugin@1.0.0;
+
+/// Types used by plugins
+interface types {
+    /// Plugin capability enumeration
+    enum capability {
+        event-hooks,
+        authentication,
+        network-policy,
+        data-triage,
+        qos-enforcement,
+        pdm-reporting,
+        compliance,
+        ui-widgets,
+    }
+
+    /// VPN connection state
+    variant connection-state {
+        disconnected,
+        authenticating,
+        authenticated,
+        joining(string),
+        connected(string),
+    }
+
+    /// Peer information
+    record peer-info {
+        public-key: string,
+        virtual-ip: string,
+        endpoint: option<string>,
+        last-handshake: u64,
+        rx-bytes: u64,
+        tx-bytes: u64,
+    }
+
+    /// State change event
+    record state-change-event {
+        old-state: connection-state,
+        new-state: connection-state,
+        timestamp: u64,
+        network-id: option<string>,
+    }
+
+    /// Network event type
+    enum network-event-type {
+        joined,
+        left,
+        peer-added,
+        peer-removed,
+    }
+
+    /// Network event
+    record network-event {
+        event-type: network-event-type,
+        network-id: string,
+        timestamp: u64,
+    }
+
+    /// Connection statistics
+    record connection-stats {
+        rx-bytes: u64,
+        tx-bytes: u64,
+        rx-packets: u64,
+        tx-packets: u64,
+        connected-peers: u32,
+        latency-ms: option<f64>,
+        uptime-seconds: u64,
+    }
+
+    /// Plugin error
+    record plugin-error {
+        code: string,
+        message: string,
+    }
+    
+    /// Plugin manifest information
+    record plugin-manifest {
+        id: string,
+        name: string,
+        version: string,
+        author: string,
+        description: string,
+        capabilities: list<capability>,
+    }
+}
+
+/// Logging functions available to plugins
+interface logging {
+    /// Log a trace-level message
+    log-trace: func(message: string);
+    
+    /// Log a debug-level message
+    log-debug: func(message: string);
+    
+    /// Log an info-level message
+    log-info: func(message: string);
+    
+    /// Log a warn-level message
+    log-warn: func(message: string);
+    
+    /// Log an error-level message
+    log-error: func(message: string);
+}
+
+/// Configuration access for plugins
+interface config {
+    /// Get a string configuration value
+    get-string: func(key: string) -> option<string>;
+    
+    /// Get an integer configuration value
+    get-int: func(key: string) -> option<s64>;
+    
+    /// Get a float configuration value
+    get-float: func(key: string) -> option<f64>;
+    
+    /// Get a boolean configuration value
+    get-bool: func(key: string) -> option<bool>;
+    
+    /// List all configuration keys
+    keys: func() -> list<string>;
+}
+
+/// Key-value store for plugin state persistence
+interface kv-store {
+    /// Set a value in the store
+    set: func(key: string, value: list<u8>) -> result<_, string>;
+    
+    /// Get a value from the store
+    get: func(key: string) -> option<list<u8>>;
+    
+    /// Delete a value from the store
+    delete: func(key: string) -> bool;
+    
+    /// List all keys in the store
+    list-keys: func() -> list<string>;
+    
+    /// Clear all values
+    clear: func() -> result<_, string>;
+}
+
+/// Time functions
+interface time {
+    /// Get current timestamp in milliseconds since Unix epoch
+    now-ms: func() -> u64;
+    
+    /// Get current timestamp in nanoseconds since Unix epoch
+    now-ns: func() -> u64;
+}
+
+/// Base plugin interface - all plugins must implement this
+interface base-plugin {
+    use types.{plugin-manifest, plugin-error, capability};
+    
+    /// Return the plugin manifest
+    manifest: func() -> plugin-manifest;
+    
+    /// Called when the plugin is loaded
+    on-load: func() -> result<_, plugin-error>;
+    
+    /// Called when the plugin is about to be unloaded
+    on-unload: func() -> result<_, plugin-error>;
+}
+
+/// Event plugin interface - react to VPN lifecycle events
+interface event-plugin {
+    use types.{state-change-event, peer-info, network-event, connection-stats};
+    
+    /// Called when connection state changes
+    on-state-change: func(event: state-change-event);
+    
+    /// Called when a new peer is discovered
+    on-peer-discovered: func(peer: peer-info);
+    
+    /// Called when a peer disconnects
+    on-peer-disconnected: func(peer: peer-info);
+    
+    /// Called on network join/leave
+    on-network-change: func(event: network-event);
+    
+    /// Called periodically with connection statistics
+    on-stats-update: func(stats: connection-stats);
+}
+
+/// World for event plugins
+world event-plugin-world {
+    import logging;
+    import config;
+    import kv-store;
+    import time;
+    
+    export base-plugin;
+    export event-plugin;
+}
