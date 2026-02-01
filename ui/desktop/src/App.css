@@ -1904,3 +1904,702 @@ body {
     background: var(--status-red);
     color: white;
 }
+
+/* =====================================================
+   Robot Data Collection Styles
+   ===================================================== */
+
+.data-collection-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-top: 1px solid var(--divider);
+    transition: background 0.15s;
+}
+
+.data-collection-section-header:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+@media (prefers-color-scheme: dark) {
+    .data-collection-section-header {
+        border-top-color: var(--divider-dark);
+    }
+    .data-collection-section-header:hover {
+        background: rgba(255, 255, 255, 0.03);
+    }
+}
+
+.data-collection-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.data-collection-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pin-window-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    opacity: 0.6;
+}
+
+.pin-window-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+    .pin-window-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
+
+.pin-window-btn.pinned {
+    color: var(--accent-blue);
+    opacity: 1;
+}
+
+.pin-window-btn.pinned:hover {
+    background: rgba(0, 122, 255, 0.1);
+}
+
+.recording-badge {
+    background: var(--status-red);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    animation: recording-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.sim-badge {
+    background: var(--accent-blue);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+}
+
+.simulation-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: rgba(0, 122, 255, 0.05);
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .simulation-toggle-row {
+        background: rgba(0, 122, 255, 0.1);
+    }
+}
+
+.simulation-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+    .simulation-label {
+        color: var(--text-primary-dark);
+    }
+}
+
+.ios-switch.small {
+    width: 36px;
+    height: 20px;
+}
+
+.ios-switch.small .dot {
+    width: 16px;
+    height: 16px;
+    top: 2px;
+    left: 2px;
+}
+
+.ios-switch.small.on .dot {
+    transform: translateX(16px);
+}
+
+.data-collection-pane {
+    padding: 0 14px 14px;
+}
+
+.data-collection-error {
+    background: rgba(255, 59, 48, 0.1);
+    border: 1px solid rgba(255, 59, 48, 0.2);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    color: var(--status-red);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.error-dismiss-small {
+    font-size: 10px;
+    opacity: 0.7;
+    cursor: pointer;
+}
+
+.error-dismiss-small:hover {
+    opacity: 1;
+}
+
+.data-collection-empty {
+    text-align: center;
+    padding: 20px 10px;
+}
+
+.data-collection-empty-icon {
+    margin-bottom: 10px;
+}
+
+.data-collection-empty-text {
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0.7;
+    margin-bottom: 4px;
+}
+
+.data-collection-empty-hint {
+    font-size: 11px;
+    opacity: 0.5;
+    margin-bottom: 12px;
+}
+
+/* Init Form */
+.data-collection-init-form {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .data-collection-init-form {
+        background: rgba(255, 255, 255, 0.03);
+    }
+}
+
+.form-field {
+    margin-bottom: 10px;
+}
+
+.form-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    opacity: 0.7;
+}
+
+.form-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--divider);
+    border-radius: 6px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+    .form-input {
+        background: rgba(0, 0, 0, 0.3);
+        border-color: var(--divider-dark);
+        color: var(--text-primary-dark);
+    }
+}
+
+.form-input::placeholder {
+    opacity: 0.4;
+}
+
+.form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.form-actions button {
+    flex: 1;
+}
+
+/* Recording Controls */
+.recording-controls {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .recording-controls {
+        background: rgba(255, 255, 255, 0.03);
+    }
+}
+
+.recording-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.recording-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.recording-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+}
+
+.recording-dot.recording {
+    background: var(--status-red);
+    animation: recording-pulse 1.5s ease-in-out infinite;
+}
+
+.robot-id-badge {
+    font-size: 10px;
+    background: rgba(0, 122, 255, 0.1);
+    color: var(--accent-blue);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.recording-active-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.recording-stats {
+    font-size: 11px;
+    opacity: 0.6;
+}
+
+.recording-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.stop-btn, .discard-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+
+.stop-btn {
+    background: var(--accent-blue);
+    color: white;
+}
+
+.discard-btn {
+    background: var(--divider);
+    color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+    .discard-btn {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary-dark);
+    }
+}
+
+.record-btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    background: var(--status-red);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.record-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Streams Section */
+.streams-section {
+    margin-bottom: 12px;
+}
+
+.streams-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.refresh-btn-small {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
+}
+
+.refresh-btn-small:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+    .refresh-btn-small:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}
+
+.streams-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stream-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 6px;
+    font-size: 11px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .stream-item {
+        background: rgba(255, 255, 255, 0.02);
+    }
+}
+
+.stream-id {
+    font-weight: 500;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.stream-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stream-samples {
+    font-size: 10px;
+    opacity: 0.6;
+}
+
+.stream-utilization {
+    width: 40px;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+    .stream-utilization {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
+
+.utilization-bar {
+    height: 100%;
+    background: var(--accent-blue);
+    border-radius: 2px;
+    transition: width 0.3s;
+}
+
+/* Episodes Section */
+.episodes-section {
+    margin-bottom: 12px;
+}
+
+.episodes-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.episodes-empty {
+    text-align: center;
+    padding: 16px;
+    font-size: 11px;
+    opacity: 0.5;
+}
+
+.episodes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.episode-item {
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.episode-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.episode-item.is-selected {
+    background: rgba(0, 122, 255, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+    .episode-item {
+        background: rgba(255, 255, 255, 0.02);
+    }
+    .episode-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    .episode-item.is-selected {
+        background: rgba(0, 122, 255, 0.15);
+    }
+}
+
+.episode-main {
+    margin-bottom: 4px;
+}
+
+.episode-id {
+    font-size: 11px;
+    font-weight: 500;
+    font-family: "SF Mono", Monaco, monospace;
+}
+
+.episode-meta {
+    display: flex;
+    gap: 10px;
+    font-size: 10px;
+    opacity: 0.6;
+    margin-top: 2px;
+}
+
+.episode-status {
+    display: flex;
+    gap: 6px;
+}
+
+.episode-status-badge {
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-weight: 500;
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.episode-status-badge.completed {
+    background: rgba(52, 199, 89, 0.15);
+    color: var(--status-green);
+}
+
+.episode-status-badge.recording {
+    background: rgba(255, 59, 48, 0.15);
+    color: var(--status-red);
+}
+
+.upload-status-badge {
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-weight: 500;
+    background: rgba(0, 122, 255, 0.1);
+    color: var(--accent-blue);
+}
+
+.upload-status-badge.uploaded {
+    background: rgba(52, 199, 89, 0.15);
+    color: var(--status-green);
+}
+
+.upload-status-badge.uploading {
+    background: rgba(0, 122, 255, 0.15);
+    color: var(--accent-blue);
+}
+
+.upload-status-badge.failed {
+    background: rgba(255, 59, 48, 0.1);
+    color: var(--status-red);
+}
+
+.episode-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--divider);
+}
+
+@media (prefers-color-scheme: dark) {
+    .episode-actions {
+        border-top-color: var(--divider-dark);
+    }
+}
+
+.episode-action-btn {
+    flex: 1;
+    padding: 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+
+.episode-action-btn.upload {
+    background: var(--accent-blue);
+    color: white;
+}
+
+.episode-action-btn.delete {
+    background: var(--divider);
+    color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+    .episode-action-btn.delete {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary-dark);
+    }
+}
+
+.episode-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Pagination */
+.episodes-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+.pagination-btn {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 500;
+    border: 1px solid var(--divider);
+    background: transparent;
+    cursor: pointer;
+    color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+    .pagination-btn {
+        border-color: var(--divider-dark);
+        color: var(--text-primary-dark);
+    }
+}
+
+.pagination-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.pagination-info {
+    font-size: 10px;
+    opacity: 0.6;
+}
+
+/* Upload Status Section */
+.upload-status-section {
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    background: rgba(0, 122, 255, 0.05);
+    border-radius: 6px;
+}
+
+.upload-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+/* Storage Info */
+.storage-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .storage-info {
+        background: rgba(255, 255, 255, 0.02);
+    }
+}
+
+.storage-value {
+    font-size: 12px;
+    font-weight: 500;
+}

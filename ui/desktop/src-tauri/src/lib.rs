@@ -5,6 +5,7 @@ use omni_api::types::{
 };
 use omni_core::{CliConfig, ConnectionManager, ConnectionState};
 use omni_plugin::{PluginConfig, PluginManager};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 #[cfg(target_os = "macos")]
 use tauri::menu::{Menu, MenuItem};
@@ -23,11 +24,76 @@ use tokio::net::UnixStream;
 
 use omni_helper::{HelperRequest, HelperResponse, StartArgs};
 
+// Robotics data collection imports (Linux-focused feature)
+#[cfg(feature = "robotics")]
+use omni_plugin::robotics::DataCollectionPlugin;
+
+/// Simulation state for demo/testing robot data collection UI
+#[cfg(feature = "robotics")]
+#[derive(Debug, Clone)]
+struct SimulationState {
+    initialized: bool,
+    robot_id: String,
+    is_recording: bool,
+    current_episode_id: Option<String>,
+    recording_start_time: Option<std::time::Instant>,
+    episodes: Vec<SimulatedEpisode>,
+    streams: Vec<SimulatedStream>,
+    samples_received: u64,
+    bytes_written: u64,
+}
+
+#[cfg(feature = "robotics")]
+#[derive(Debug, Clone)]
+struct SimulatedEpisode {
+    episode_id: String,
+    robot_id: String,
+    start_time_ns: u64,
+    duration_seconds: f64,
+    sample_count: u64,
+    size_bytes: u64,
+    uploaded: bool,
+}
+
+#[cfg(feature = "robotics")]
+#[derive(Debug, Clone)]
+struct SimulatedStream {
+    stream_id: String,
+    sample_count: u64,
+    capacity: usize,
+    samples_per_second: f32,
+}
+
+#[cfg(feature = "robotics")]
+impl Default for SimulationState {
+    fn default() -> Self {
+        Self {
+            initialized: false,
+            robot_id: String::new(),
+            is_recording: false,
+            current_episode_id: None,
+            recording_start_time: None,
+            episodes: Vec::new(),
+            streams: Vec::new(),
+            samples_received: 0,
+            bytes_written: 0,
+        }
+    }
+}
+
 struct AppState {
     manager: Arc<Mutex<ConnectionManager>>,
     plugin_manager: Arc<Mutex<PluginManager>>,
     /// Cancellation token for session login - when triggered, aborts the WebSocket wait
     login_cancel_tx: Arc<Mutex<Option<tokio::sync::oneshot::Sender<()>>>>,
+    /// Whether window should stay visible when losing focus (for data collection work)
+    window_pinned: AtomicBool,
+    /// Robot data collection plugin instance (Linux only)
+    #[cfg(feature = "robotics")]
+    data_collection: Arc<Mutex<Option<DataCollectionPlugin>>>,
+    /// Simulation state for demo mode
+    #[cfg(feature = "robotics")]
+    simulation: Arc<Mutex<SimulationState>>,
 }
 
 async fn call_helper(req: &HelperRequest) -> Result<HelperResponse, String> {
@@ -1161,8 +1227,8 @@ async fn resize_window(app: tauri::AppHandle, height: u32) -> Result<(), String>
     use tauri::Manager;
 
     if let Some(window) = app.get_webview_window("main") {
-        // Clamp height between min and max
-        let clamped_height = height.clamp(200, 700);
+        // Clamp height between min and max (900 max to accommodate data collection UI)
+        let clamped_height = height.clamp(200, 900);
 
         // Get current scale factor for proper sizing
         let scale_factor = window.scale_factor().unwrap_or(1.0);
@@ -1210,6 +1276,968 @@ async fn resize_window(app: tauri::AppHandle, height: u32) -> Result<(), String>
         );
     }
     Ok(())
+}
+
+/// Set window pinned state (prevents auto-hide on blur)
+#[tauri::command]
+async fn set_window_pinned(state: tauri::State<'_, AppState>, pinned: bool) -> Result<(), String> {
+    state.window_pinned.store(pinned, Ordering::Relaxed);
+    info!("Window pinned state set to: {}", pinned);
+    Ok(())
+}
+
+/// Get window pinned state
+#[tauri::command]
+async fn get_window_pinned(state: tauri::State<'_, AppState>) -> Result<bool, String> {
+    Ok(state.window_pinned.load(Ordering::Relaxed))
+}
+
+// ============================================================================
+// Robot Data Collection Commands (Linux-focused)
+// ============================================================================
+
+// Response types for the frontend (simplified from API types)
+#[cfg(feature = "robotics")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DataCollectionStatusUI {
+    pub state: String,
+    pub robot_id: String,
+    pub is_recording: bool,
+    pub current_episode_id: Option<String>,
+    pub stats: DataCollectionStatsUI,
+    pub active_episode: Option<ActiveEpisodeInfoUI>,
+}
+
+#[cfg(feature = "robotics")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DataCollectionStatsUI {
+    pub samples_received: u64,
+    pub episodes_started: u64,
+    pub episodes_completed: u64,
+    pub episodes_failed: u64,
+    pub bytes_packaged: u64,
+    pub bytes_uploaded: u64,
+}
+
+#[cfg(feature = "robotics")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ActiveEpisodeInfoUI {
+    pub episode_id: String,
+    pub start_time_ns: u64,
+    pub expected_end_ns: u64,
+    pub elapsed_seconds: f64,
+    pub remaining_seconds: f64,
+}
+
+#[cfg(feature = "robotics")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StartRecordingRequestUI {
+    pub reason: String,
+}
+
+#[cfg(feature = "robotics")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StartRecordingResponseUI {
+    pub episode_id: String,
+    pub start_time_ns: u64,
+}
+
+#[cfg(feature = "robotics")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StopRecordingResponseUI {
+    pub episode_id: String,
+    pub saved: bool,
+    pub duration_seconds: f64,
+    pub file_size_bytes: u64,
+}
+
+#[cfg(feature = "robotics")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EpisodeSummaryUI {
+    pub episode_id: String,
+    pub robot_id: String,
+    pub start_time_ns: u64,
+    pub duration_seconds: f64,
+    pub sample_count: u64,
+    pub size_bytes: u64,
+    pub quality_score: f32,
+    pub uploaded: bool,
+}
+
+#[cfg(feature = "robotics")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StreamInfoUI {
+    pub stream_id: String,
+    pub sample_count: u64,
+    pub capacity: usize,
+    pub utilization_percent: f32,
+}
+
+/// Initialize the data collection plugin with configuration
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn init_data_collection(
+    state: tauri::State<'_, AppState>,
+    robot_id: String,
+    data_dir: String,
+) -> Result<(), String> {
+    use omni_plugin::robotics::DataCollectionConfig;
+
+    let mut dc_lock = state.data_collection.lock().await;
+
+    let config = DataCollectionConfig {
+        robot_id,
+        storage: omni_plugin::robotics::StorageConfig {
+            root_dir: std::path::PathBuf::from(data_dir),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let mut plugin = DataCollectionPlugin::new(config)
+        .map_err(|e| format!("Failed to create data collection plugin: {}", e))?;
+
+    plugin
+        .start()
+        .map_err(|e| format!("Failed to start plugin: {}", e))?;
+
+    *dc_lock = Some(plugin);
+    info!("Data collection plugin initialized and started");
+    Ok(())
+}
+
+/// Get data collection plugin status
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn get_data_collection_status(
+    state: tauri::State<'_, AppState>,
+) -> Result<DataCollectionStatusUI, String> {
+    let dc_lock = state.data_collection.lock().await;
+    let plugin = dc_lock
+        .as_ref()
+        .ok_or("Data collection plugin not initialized")?;
+
+    let stats = plugin.stats();
+    let active_ep = plugin.active_episode_info();
+
+    Ok(DataCollectionStatusUI {
+        state: format!("{:?}", plugin.state()),
+        robot_id: plugin.config().robot_id.clone(),
+        is_recording: plugin.is_recording(),
+        current_episode_id: plugin.current_episode_id().map(|e| e.as_str().to_string()),
+        stats: DataCollectionStatsUI {
+            samples_received: stats.samples_received,
+            episodes_started: stats.episodes_started,
+            episodes_completed: stats.episodes_completed,
+            episodes_failed: stats.episodes_failed,
+            bytes_packaged: stats.bytes_packaged,
+            bytes_uploaded: stats.bytes_uploaded,
+        },
+        active_episode: active_ep.map(|e| ActiveEpisodeInfoUI {
+            episode_id: e.episode_id.as_str().to_string(),
+            start_time_ns: e.start_time_ns,
+            expected_end_ns: e.expected_end_ns,
+            elapsed_seconds: e.elapsed_ns as f64 / 1_000_000_000.0,
+            remaining_seconds: e.remaining_ns as f64 / 1_000_000_000.0,
+        }),
+    })
+}
+
+/// Start a recording episode
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn start_data_recording(
+    state: tauri::State<'_, AppState>,
+    reason: String,
+) -> Result<StartRecordingResponseUI, String> {
+    let mut dc_lock = state.data_collection.lock().await;
+    let plugin = dc_lock
+        .as_mut()
+        .ok_or("Data collection plugin not initialized")?;
+
+    let episode_id = plugin
+        .start_episode_manual(&reason)
+        .map_err(|e| format!("Failed to start recording: {}", e))?;
+
+    let start_time = plugin
+        .active_episode_info()
+        .map(|e| e.start_time_ns)
+        .unwrap_or(0);
+
+    Ok(StartRecordingResponseUI {
+        episode_id: episode_id.as_str().to_string(),
+        start_time_ns: start_time,
+    })
+}
+
+/// Stop the current recording
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn stop_data_recording(
+    state: tauri::State<'_, AppState>,
+    discard: bool,
+) -> Result<StopRecordingResponseUI, String> {
+    let mut dc_lock = state.data_collection.lock().await;
+    let plugin = dc_lock
+        .as_mut()
+        .ok_or("Data collection plugin not initialized")?;
+
+    if !plugin.is_recording() {
+        return Err("No recording in progress".to_string());
+    }
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+
+    if discard {
+        // Just clear the active episode without packaging
+        return Ok(StopRecordingResponseUI {
+            episode_id: plugin
+                .current_episode_id()
+                .map(|e| e.as_str().to_string())
+                .unwrap_or_default(),
+            saved: false,
+            duration_seconds: 0.0,
+            file_size_bytes: 0,
+        });
+    }
+
+    let result = plugin
+        .finish_episode(now)
+        .map_err(|e| format!("Failed to finish episode: {}", e))?;
+
+    Ok(StopRecordingResponseUI {
+        episode_id: result.episode_id.as_str().to_string(),
+        saved: true,
+        duration_seconds: result.duration_ns as f64 / 1_000_000_000.0,
+        file_size_bytes: result.file_size_bytes,
+    })
+}
+
+/// List recorded episodes
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn list_data_episodes(
+    state: tauri::State<'_, AppState>,
+    page: u32,
+    page_size: u32,
+) -> Result<Vec<EpisodeSummaryUI>, String> {
+    let dc_lock = state.data_collection.lock().await;
+    let plugin = dc_lock
+        .as_ref()
+        .ok_or("Data collection plugin not initialized")?;
+
+    let storage = plugin
+        .storage_manager()
+        .ok_or("Storage manager not available")?;
+
+    // Get all episodes sorted by creation time (newest first for UI)
+    let mut all_episodes = storage.index().sorted_by_age();
+    all_episodes.reverse(); // Newest first
+
+    // Apply pagination
+    let start = (page * page_size) as usize;
+    let page_episodes: Vec<_> = all_episodes
+        .into_iter()
+        .skip(start)
+        .take(page_size as usize)
+        .collect();
+
+    Ok(page_episodes
+        .into_iter()
+        .map(|e| EpisodeSummaryUI {
+            episode_id: e.episode_id.as_str().to_string(),
+            robot_id: e.robot_id.clone(),
+            start_time_ns: e.start_time_ns,
+            duration_seconds: e.duration_seconds,
+            sample_count: e.sample_count,
+            size_bytes: e.size_bytes,
+            quality_score: e.quality_score,
+            uploaded: e.uploaded,
+        })
+        .collect())
+}
+
+/// Get a specific episode by ID
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn get_data_episode(
+    state: tauri::State<'_, AppState>,
+    episode_id: String,
+) -> Result<EpisodeSummaryUI, String> {
+    let dc_lock = state.data_collection.lock().await;
+    let plugin = dc_lock
+        .as_ref()
+        .ok_or("Data collection plugin not initialized")?;
+
+    let storage = plugin
+        .storage_manager()
+        .ok_or("Storage manager not available")?;
+
+    let episode = storage
+        .get_episode(&episode_id)
+        .ok_or_else(|| format!("Episode '{}' not found", episode_id))?;
+
+    Ok(EpisodeSummaryUI {
+        episode_id: episode.episode_id.as_str().to_string(),
+        robot_id: episode.robot_id.clone(),
+        start_time_ns: episode.start_time_ns,
+        duration_seconds: episode.duration_seconds,
+        sample_count: episode.sample_count,
+        size_bytes: episode.size_bytes,
+        quality_score: episode.quality_score,
+        uploaded: episode.uploaded,
+    })
+}
+
+/// Delete an episode
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn delete_data_episode(
+    state: tauri::State<'_, AppState>,
+    episode_id: String,
+) -> Result<bool, String> {
+    let mut dc_lock = state.data_collection.lock().await;
+    let plugin = dc_lock
+        .as_mut()
+        .ok_or("Data collection plugin not initialized")?;
+
+    let storage = plugin
+        .storage_manager_mut()
+        .ok_or("Storage manager not available")?;
+
+    storage
+        .delete_episode(&episode_id)
+        .map_err(|e| format!("Failed to delete episode: {}", e))?;
+
+    Ok(true)
+}
+
+/// Upload an episode to cloud storage
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn upload_data_episode(
+    state: tauri::State<'_, AppState>,
+    episode_id: String,
+) -> Result<bool, String> {
+    let mut dc_lock = state.data_collection.lock().await;
+    let plugin = dc_lock
+        .as_mut()
+        .ok_or("Data collection plugin not initialized")?;
+
+    // First get the episode info from storage (immutable borrow)
+    let episode_entry = {
+        let storage = plugin
+            .storage_manager()
+            .ok_or("Storage manager not available")?;
+
+        storage
+            .get_episode(&episode_id)
+            .ok_or_else(|| format!("Episode '{}' not found", episode_id))?
+            .clone()
+    };
+
+    let root_dir = plugin.config().storage.root_dir.clone();
+
+    // Now get upload manager (mutable borrow)
+    let upload = plugin
+        .upload_manager_mut()
+        .ok_or("Upload manager not available")?;
+
+    upload
+        .upload_episode(&episode_entry, &root_dir, None)
+        .map_err(|e| format!("Failed to queue upload: {}", e))?;
+
+    Ok(true)
+}
+
+/// Get upload status
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn get_data_upload_status(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let dc_lock = state.data_collection.lock().await;
+    let plugin = dc_lock
+        .as_ref()
+        .ok_or("Data collection plugin not initialized")?;
+
+    let upload = plugin
+        .upload_manager()
+        .ok_or("Upload manager not available")?;
+
+    let stats = upload.session_stats();
+
+    Ok(serde_json::json!({
+        "queued": stats.queued,
+        "active": stats.active,
+        "bytes_uploaded": stats.bytes_uploaded,
+    }))
+}
+
+/// List active data streams
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn list_data_streams(state: tauri::State<'_, AppState>) -> Result<Vec<StreamInfoUI>, String> {
+    let dc_lock = state.data_collection.lock().await;
+    let plugin = dc_lock
+        .as_ref()
+        .ok_or("Data collection plugin not initialized")?;
+
+    let stream_ids = plugin.list_streams();
+
+    let mut streams = Vec::new();
+    for stream_id in stream_ids {
+        if let Some(buffer) = plugin.get_buffer(&stream_id) {
+            let stats = buffer.stats();
+            let capacity = buffer.capacity();
+            let current_len = buffer.len();
+            streams.push(StreamInfoUI {
+                stream_id: stream_id.as_str().to_string(),
+                sample_count: stats.samples_pushed,
+                capacity,
+                utilization_percent: if capacity > 0 {
+                    (current_len as f32 / capacity as f32) * 100.0
+                } else {
+                    0.0
+                },
+            });
+        }
+    }
+
+    Ok(streams)
+}
+
+/// Trigger a manual recording
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn trigger_manual_recording(
+    state: tauri::State<'_, AppState>,
+    reason: String,
+) -> Result<StartRecordingResponseUI, String> {
+    // Reuse start_data_recording
+    start_data_recording(state, reason).await
+}
+
+/// Check if data collection is available (robotics feature enabled)
+#[tauri::command]
+async fn is_data_collection_available() -> bool {
+    cfg!(feature = "robotics")
+}
+
+/// Check if data collection plugin is initialized
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn is_data_collection_initialized(state: tauri::State<'_, AppState>) -> Result<bool, String> {
+    let dc_lock = state.data_collection.lock().await;
+    Ok(dc_lock.is_some())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn is_data_collection_initialized() -> Result<bool, String> {
+    Ok(false)
+}
+
+// ============================================================================
+// Simulation/Demo Mode Commands for Testing Robot Data Collection UI
+// ============================================================================
+
+/// Initialize simulation mode with demo data
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn init_simulation_mode(
+    state: tauri::State<'_, AppState>,
+    robot_id: String,
+) -> Result<(), String> {
+    let mut sim = state.simulation.lock().await;
+
+    // Create demo streams
+    let demo_streams = vec![
+        SimulatedStream {
+            stream_id: "/camera/rgb".to_string(),
+            sample_count: 0,
+            capacity: 100,
+            samples_per_second: 30.0,
+        },
+        SimulatedStream {
+            stream_id: "/camera/depth".to_string(),
+            sample_count: 0,
+            capacity: 100,
+            samples_per_second: 30.0,
+        },
+        SimulatedStream {
+            stream_id: "/joint_states".to_string(),
+            sample_count: 0,
+            capacity: 1000,
+            samples_per_second: 100.0,
+        },
+        SimulatedStream {
+            stream_id: "/imu/data".to_string(),
+            sample_count: 0,
+            capacity: 500,
+            samples_per_second: 200.0,
+        },
+        SimulatedStream {
+            stream_id: "/cmd_vel".to_string(),
+            sample_count: 0,
+            capacity: 200,
+            samples_per_second: 50.0,
+        },
+    ];
+
+    // Create some demo episodes
+    let now_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+
+    let demo_episodes = vec![
+        SimulatedEpisode {
+            episode_id: format!(
+                "ep-{}",
+                uuid::Uuid::new_v4()
+                    .to_string()
+                    .split('-')
+                    .next()
+                    .unwrap_or("demo1")
+            ),
+            robot_id: robot_id.clone(),
+            start_time_ns: now_ns - 3600_000_000_000, // 1 hour ago
+            duration_seconds: 120.5,
+            sample_count: 48200,
+            size_bytes: 156_000_000,
+            uploaded: true,
+        },
+        SimulatedEpisode {
+            episode_id: format!(
+                "ep-{}",
+                uuid::Uuid::new_v4()
+                    .to_string()
+                    .split('-')
+                    .next()
+                    .unwrap_or("demo2")
+            ),
+            robot_id: robot_id.clone(),
+            start_time_ns: now_ns - 1800_000_000_000, // 30 min ago
+            duration_seconds: 85.2,
+            sample_count: 34080,
+            size_bytes: 98_500_000,
+            uploaded: false,
+        },
+        SimulatedEpisode {
+            episode_id: format!(
+                "ep-{}",
+                uuid::Uuid::new_v4()
+                    .to_string()
+                    .split('-')
+                    .next()
+                    .unwrap_or("demo3")
+            ),
+            robot_id: robot_id.clone(),
+            start_time_ns: now_ns - 600_000_000_000, // 10 min ago
+            duration_seconds: 45.8,
+            sample_count: 18320,
+            size_bytes: 52_300_000,
+            uploaded: false,
+        },
+    ];
+
+    *sim = SimulationState {
+        initialized: true,
+        robot_id,
+        is_recording: false,
+        current_episode_id: None,
+        recording_start_time: None,
+        episodes: demo_episodes,
+        streams: demo_streams,
+        samples_received: 100_600,
+        bytes_written: 306_800_000,
+    };
+
+    info!("Simulation mode initialized with demo data");
+    Ok(())
+}
+
+/// Get simulation status
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn get_simulation_status(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let sim = state.simulation.lock().await;
+
+    if !sim.initialized {
+        return Err("Simulation not initialized".to_string());
+    }
+
+    let elapsed_secs = sim
+        .recording_start_time
+        .map(|t| t.elapsed().as_secs_f64())
+        .unwrap_or(0.0);
+
+    Ok(serde_json::json!({
+        "initialized": sim.initialized,
+        "robot_id": sim.robot_id,
+        "is_recording": sim.is_recording,
+        "current_episode_id": sim.current_episode_id,
+        "recording_elapsed_secs": elapsed_secs,
+        "total_episodes": sim.episodes.len(),
+        "total_streams": sim.streams.len(),
+        "samples_received": sim.samples_received,
+        "bytes_written": sim.bytes_written,
+    }))
+}
+
+/// Start simulated recording
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn start_simulation_recording(
+    state: tauri::State<'_, AppState>,
+    reason: String,
+) -> Result<serde_json::Value, String> {
+    let mut sim = state.simulation.lock().await;
+
+    if !sim.initialized {
+        return Err("Simulation not initialized".to_string());
+    }
+
+    if sim.is_recording {
+        return Err("Already recording".to_string());
+    }
+
+    let episode_id = format!(
+        "ep-{}",
+        uuid::Uuid::new_v4()
+            .to_string()
+            .split('-')
+            .next()
+            .unwrap_or("new")
+    );
+
+    sim.is_recording = true;
+    sim.current_episode_id = Some(episode_id.clone());
+    sim.recording_start_time = Some(std::time::Instant::now());
+
+    // Reset stream sample counts for new recording
+    for stream in &mut sim.streams {
+        stream.sample_count = 0;
+    }
+
+    info!("Simulation recording started: {} ({})", episode_id, reason);
+
+    Ok(serde_json::json!({
+        "episode_id": episode_id,
+        "reason": reason,
+        "started": true,
+    }))
+}
+
+/// Stop simulated recording
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn stop_simulation_recording(
+    state: tauri::State<'_, AppState>,
+    discard: bool,
+) -> Result<serde_json::Value, String> {
+    let mut sim = state.simulation.lock().await;
+
+    if !sim.is_recording {
+        return Err("Not recording".to_string());
+    }
+
+    let episode_id = sim.current_episode_id.clone().unwrap_or_default();
+    let duration = sim
+        .recording_start_time
+        .map(|t| t.elapsed().as_secs_f64())
+        .unwrap_or(0.0);
+
+    let sample_count: u64 = sim.streams.iter().map(|s| s.sample_count).sum();
+    let size_bytes = (sample_count * 4000) as u64; // ~4KB per sample avg
+
+    sim.is_recording = false;
+    sim.current_episode_id = None;
+    sim.recording_start_time = None;
+
+    if !discard {
+        // Add the episode to the list
+        let now_ns = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+
+        // Clone robot_id first to avoid borrow conflict
+        let robot_id_clone = sim.robot_id.clone();
+
+        sim.episodes.insert(
+            0,
+            SimulatedEpisode {
+                episode_id: episode_id.clone(),
+                robot_id: robot_id_clone,
+                start_time_ns: now_ns - (duration * 1_000_000_000.0) as u64,
+                duration_seconds: duration,
+                sample_count,
+                size_bytes,
+                uploaded: false,
+            },
+        );
+
+        sim.samples_received += sample_count;
+        sim.bytes_written += size_bytes;
+    }
+
+    info!(
+        "Simulation recording stopped: {} (discard={})",
+        episode_id, discard
+    );
+
+    Ok(serde_json::json!({
+        "episode_id": episode_id,
+        "duration_seconds": duration,
+        "sample_count": sample_count,
+        "size_bytes": size_bytes,
+        "saved": !discard,
+    }))
+}
+
+/// Get simulated streams with live-updating sample counts
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn get_simulation_streams(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<StreamInfoUI>, String> {
+    let mut sim = state.simulation.lock().await;
+
+    if !sim.initialized {
+        return Err("Simulation not initialized".to_string());
+    }
+
+    // If recording, simulate sample accumulation
+    if sim.is_recording {
+        if let Some(start_time) = sim.recording_start_time {
+            let elapsed = start_time.elapsed().as_secs_f32();
+            for stream in &mut sim.streams {
+                stream.sample_count = (elapsed * stream.samples_per_second) as u64;
+            }
+        }
+    }
+
+    Ok(sim
+        .streams
+        .iter()
+        .map(|s| StreamInfoUI {
+            stream_id: s.stream_id.clone(),
+            sample_count: s.sample_count,
+            capacity: s.capacity,
+            utilization_percent: ((s.sample_count % s.capacity as u64) as f32 / s.capacity as f32)
+                * 100.0,
+        })
+        .collect())
+}
+
+/// Get simulated episodes
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn get_simulation_episodes(
+    state: tauri::State<'_, AppState>,
+    page: u32,
+    page_size: u32,
+) -> Result<Vec<EpisodeSummaryUI>, String> {
+    let sim = state.simulation.lock().await;
+
+    if !sim.initialized {
+        return Err("Simulation not initialized".to_string());
+    }
+
+    let start = (page * page_size) as usize;
+    let episodes: Vec<EpisodeSummaryUI> = sim
+        .episodes
+        .iter()
+        .skip(start)
+        .take(page_size as usize)
+        .map(|e| EpisodeSummaryUI {
+            episode_id: e.episode_id.clone(),
+            robot_id: e.robot_id.clone(),
+            start_time_ns: e.start_time_ns,
+            duration_seconds: e.duration_seconds,
+            sample_count: e.sample_count,
+            size_bytes: e.size_bytes,
+            quality_score: 0.95, // Demo quality
+            uploaded: e.uploaded,
+        })
+        .collect();
+
+    Ok(episodes)
+}
+
+/// Delete a simulated episode
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn delete_simulation_episode(
+    state: tauri::State<'_, AppState>,
+    episode_id: String,
+) -> Result<(), String> {
+    let mut sim = state.simulation.lock().await;
+
+    let initial_len = sim.episodes.len();
+    sim.episodes.retain(|e| e.episode_id != episode_id);
+
+    if sim.episodes.len() == initial_len {
+        return Err("Episode not found".to_string());
+    }
+
+    info!("Simulation episode deleted: {}", episode_id);
+    Ok(())
+}
+
+/// Upload a simulated episode (just marks as uploaded)
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn upload_simulation_episode(
+    state: tauri::State<'_, AppState>,
+    episode_id: String,
+) -> Result<(), String> {
+    let mut sim = state.simulation.lock().await;
+
+    if let Some(ep) = sim.episodes.iter_mut().find(|e| e.episode_id == episode_id) {
+        ep.uploaded = true;
+        info!("Simulation episode marked as uploaded: {}", episode_id);
+        Ok(())
+    } else {
+        Err("Episode not found".to_string())
+    }
+}
+
+/// Check if simulation is initialized
+#[cfg(feature = "robotics")]
+#[tauri::command]
+async fn is_simulation_initialized(state: tauri::State<'_, AppState>) -> Result<bool, String> {
+    let sim = state.simulation.lock().await;
+    Ok(sim.initialized)
+}
+
+// Stub functions for non-robotics builds
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn init_simulation_mode(_robot_id: String) -> Result<(), String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn get_simulation_status() -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn start_simulation_recording(_reason: String) -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn stop_simulation_recording(_discard: bool) -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn get_simulation_streams() -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn get_simulation_episodes(_page: u32, _page_size: u32) -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn delete_simulation_episode(_episode_id: String) -> Result<(), String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn upload_simulation_episode(_episode_id: String) -> Result<(), String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn is_simulation_initialized() -> Result<bool, String> {
+    Ok(false)
+}
+
+// Stub functions for non-robotics builds
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn init_data_collection(_robot_id: String, _data_dir: String) -> Result<(), String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn get_data_collection_status() -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn start_data_recording(_reason: String) -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn stop_data_recording(_discard: bool) -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn list_data_episodes(_page: u32, _page_size: u32) -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn get_data_episode(_episode_id: String) -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn delete_data_episode(_episode_id: String) -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn upload_data_episode(_episode_id: String) -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn get_data_upload_status() -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn list_data_streams() -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
+}
+
+#[cfg(not(feature = "robotics"))]
+#[tauri::command]
+async fn trigger_manual_recording(_reason: String) -> Result<serde_json::Value, String> {
+    Err("Robotics feature not enabled".to_string())
 }
 
 // ============================================================================
@@ -1580,6 +2608,11 @@ pub fn run() {
         manager: Arc::new(Mutex::new(manager)),
         plugin_manager: Arc::new(Mutex::new(plugin_manager)),
         login_cancel_tx: Arc::new(Mutex::new(None)),
+        window_pinned: AtomicBool::new(false),
+        #[cfg(feature = "robotics")]
+        data_collection: Arc::new(Mutex::new(None)),
+        #[cfg(feature = "robotics")]
+        simulation: Arc::new(Mutex::new(SimulationState::default())),
     };
 
     tauri::Builder::default()
@@ -1713,11 +2746,19 @@ pub fn run() {
             });
 
             // Hide window when it loses focus (native tray app behavior)
+            // Unless window is pinned (for data collection work)
             if let Some(window) = app.get_webview_window("main") {
                 let w = window.clone();
+                let app_handle = app.handle().clone();
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::Focused(focused) = event {
                         if !focused {
+                            // Check if window is pinned before hiding
+                            if let Some(state) = app_handle.try_state::<AppState>() {
+                                if state.window_pinned.load(Ordering::Relaxed) {
+                                    return; // Don't hide if pinned
+                                }
+                            }
                             let _ = w.hide();
                         }
                     }
@@ -1750,6 +2791,8 @@ pub fn run() {
             open_browser,
             open_logs,
             resize_window,
+            set_window_pinned,
+            get_window_pinned,
             check_is_admin,
             check_helper,
             get_helper_version,
@@ -1767,7 +2810,31 @@ pub fn run() {
             get_plugin_config,
             set_plugin_config,
             reload_plugin,
-            discover_plugins
+            discover_plugins,
+            // Robot data collection commands
+            is_data_collection_available,
+            is_data_collection_initialized,
+            init_data_collection,
+            get_data_collection_status,
+            start_data_recording,
+            stop_data_recording,
+            list_data_episodes,
+            get_data_episode,
+            delete_data_episode,
+            upload_data_episode,
+            get_data_upload_status,
+            list_data_streams,
+            trigger_manual_recording,
+            // Simulation/Demo mode commands
+            init_simulation_mode,
+            get_simulation_status,
+            start_simulation_recording,
+            stop_simulation_recording,
+            get_simulation_streams,
+            get_simulation_episodes,
+            delete_simulation_episode,
+            upload_simulation_episode,
+            is_simulation_initialized
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
