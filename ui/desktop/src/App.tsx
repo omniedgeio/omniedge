@@ -57,10 +57,20 @@ function App() {
   const [pluginToRemove, setPluginToRemove] = useState<string | null>(null);
 
   // Resize window to fit content
+  // Track last height to avoid unnecessary resize calls
+  const lastHeightRef = useRef<number>(0);
+
   const resizeToContent = useCallback(async () => {
     if (appRef.current) {
       // Use offsetHeight to get the actual rendered height of content
       const contentHeight = appRef.current.offsetHeight;
+      
+      // Skip if height hasn't changed significantly (within 5px tolerance)
+      if (Math.abs(contentHeight - lastHeightRef.current) < 5) {
+        return;
+      }
+      lastHeightRef.current = contentHeight;
+      
       // Call Rust command to resize window (handles both native window and webview)
       try {
         await invoke('resize_window', { height: contentHeight });
@@ -78,7 +88,7 @@ function App() {
 
     const triggerResize = () => {
       clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(resizeToContent, 20);
+      resizeTimeout = setTimeout(resizeToContent, 100); // Increased debounce to 100ms
     };
 
     // ResizeObserver for size changes
@@ -268,13 +278,23 @@ function App() {
     }
   };
 
-  const handleCancelBrowserLogin = () => {
+  const handleCancelBrowserLogin = async () => {
+    try {
+      await invoke('cancel_session_login');
+    } catch (e) {
+      console.error('Failed to cancel session login:', e);
+    }
     setIsWaitingForBrowser(false);
+    setIsLoading(false);
     setError("");
   };
 
-  const handleLogout = () => {
-    invoke('disconnect');
+  const handleLogout = async () => {
+    try {
+      await invoke('logout');
+    } catch (e) {
+      console.error('Logout failed:', e);
+    }
     setIsLoggedIn(false);
     setProfile(null);
     setNetworks([]);

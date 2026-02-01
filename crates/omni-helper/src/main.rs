@@ -144,7 +144,7 @@ async fn run_helper_server(
                 Ok(s) => s,
                 Err(e) => {
                     error!("CreateNamedPipe error: {}", e);
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                     continue;
                 }
             };
@@ -154,12 +154,15 @@ async fn run_helper_server(
                 connect_res = server_instance.connect() => {
                     if connect_res.is_ok() {
                         let server_ref = Arc::clone(&server);
-                        // Handle connection sequentially on Windows to avoid Send issues
-                        // with raw pointers in tun::Configuration from omninervous.
-                        // Single-request handling ensures the server quickly returns to
-                        // create new pipe instances for other clients.
-                        handle_connection(server_instance, server_ref).await;
+                        // IMPORTANT: Spawn the connection handler so we can immediately
+                        // create a new pipe instance for the next client. This prevents
+                        // "All pipe instances are busy" errors when multiple requests
+                        // come in rapid succession.
+                        tokio::spawn(async move {
+                            handle_connection(server_instance, server_ref).await;
+                        });
                     }
+                    // Loop immediately continues to create new pipe instance
                 }
                 _ = shutdown_rx.recv() => {
                     info!("Shutdown signal received, closing Named Pipe listener...");

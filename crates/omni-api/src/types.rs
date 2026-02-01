@@ -148,17 +148,21 @@ impl<'de> Deserialize<'de> for WebSocketTokenResponse {
             .as_object()
             .ok_or_else(|| serde::de::Error::custom("expected object"))?;
 
-        let get_string = |camel: &str, snake: &str| -> String {
-            obj.get(snake)
-                .or_else(|| obj.get(camel))
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string()
+        // Helper to get string from multiple possible field names
+        let get_string = |names: &[&str]| -> String {
+            for name in names {
+                if let Some(v) = obj.get(*name).and_then(|v| v.as_str()) {
+                    return v.to_string();
+                }
+            }
+            String::new()
         };
 
         Ok(WebSocketTokenResponse {
-            token: get_string("accessToken", "access_token"),
-            refresh_token: get_string("refreshToken", "refresh_token"),
+            // Server may send: "token", "accessToken", or "access_token"
+            token: get_string(&["token", "accessToken", "access_token"]),
+            // Server may send: "refresh_token" or "refreshToken"
+            refresh_token: get_string(&["refresh_token", "refreshToken"]),
         })
     }
 }

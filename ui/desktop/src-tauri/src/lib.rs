@@ -1,4 +1,4 @@
-use log::{error, info};
+use log::{debug, error, info};
 use omni_api::types::{
     AuthResp, DeviceCodeResp, DeviceResponse, ProfileResponse, SessionResponse,
     VirtualNetworkDeviceResponse, VirtualNetworkResponse,
@@ -26,11 +26,17 @@ use omni_helper::{HelperRequest, HelperResponse, StartArgs};
 struct AppState {
     manager: Arc<Mutex<ConnectionManager>>,
     plugin_manager: Arc<Mutex<PluginManager>>,
+    /// Cancellation token for session login - when triggered, aborts the WebSocket wait
+    login_cancel_tx: Arc<Mutex<Option<tokio::sync::oneshot::Sender<()>>>>,
 }
 
 async fn call_helper(req: &HelperRequest) -> Result<HelperResponse, String> {
     use tokio::time::{timeout, Duration};
     let req_bytes = serde_json::to_vec(req).map_err(|e| e.to_string())?;
+
+    // Retry configuration for pipe busy errors
+    const MAX_RETRIES: u32 = 5;
+    const INITIAL_BACKOFF_MS: u64 = 100;
 
     let call_future = async {
         let mut buf = [0; 4096];
@@ -50,26 +56,58 @@ async fn call_helper(req: &HelperRequest) -> Result<HelperResponse, String> {
         #[cfg(windows)]
         {
             let pipe_name = r"\\.\pipe\omniedge-helper";
-            let mut client = ClientOptions::new().open(pipe_name).map_err(|e| {
-                error!("Failed to open pipe {}: {}", pipe_name, e);
-                e.to_string()
-            })?;
-            client.write_all(&req_bytes).await.map_err(|e| {
-                error!("Failed to write to pipe: {}", e);
-                e.to_string()
-            })?;
-            let n = client.read(&mut buf).await.map_err(|e| {
-                error!("Failed to read from pipe: {}", e);
-                e.to_string()
-            })?;
-            serde_json::from_slice(&buf[..n]).map_err(|e| {
-                error!(
-                    "Failed to parse response: {} (raw: {:?})",
-                    e,
-                    String::from_utf8_lossy(&buf[..n])
-                );
-                e.to_string()
-            })
+            let mut last_err = String::new();
+
+            for retry in 0..MAX_RETRIES {
+                match ClientOptions::new().open(pipe_name) {
+                    Ok(mut client) => {
+                        // Successfully opened pipe, now write and read
+                        client.write_all(&req_bytes).await.map_err(|e| {
+                            error!("Failed to write to pipe: {}", e);
+                            e.to_string()
+                        })?;
+                        let n = client.read(&mut buf).await.map_err(|e| {
+                            error!("Failed to read from pipe: {}", e);
+                            e.to_string()
+                        })?;
+                        return serde_json::from_slice(&buf[..n]).map_err(|e| {
+                            error!(
+                                "Failed to parse response: {} (raw: {:?})",
+                                e,
+                                String::from_utf8_lossy(&buf[..n])
+                            );
+                            e.to_string()
+                        });
+                    }
+                    Err(e) => {
+                        last_err = e.to_string();
+                        // Check if it's a "pipe busy" error (ERROR_PIPE_BUSY = 231)
+                        if e.raw_os_error() == Some(231) {
+                            if retry < MAX_RETRIES - 1 {
+                                // Exponential backoff: 100ms, 200ms, 400ms, 800ms
+                                let backoff = INITIAL_BACKOFF_MS * (1 << retry);
+                                debug!(
+                                    "Pipe busy, retrying in {}ms (attempt {}/{})",
+                                    backoff,
+                                    retry + 1,
+                                    MAX_RETRIES
+                                );
+                                tokio::time::sleep(Duration::from_millis(backoff)).await;
+                                continue;
+                            }
+                        }
+                        // For non-busy errors or max retries reached, log and return error
+                        // Only log as error on final failure to reduce log spam
+                        if retry == MAX_RETRIES - 1 {
+                            error!(
+                                "Failed to open pipe {} after {} attempts: {}",
+                                pipe_name, MAX_RETRIES, e
+                            );
+                        }
+                    }
+                }
+            }
+            Err(last_err)
         }
     };
 
@@ -747,6 +785,19 @@ async fn disconnect(
 }
 
 #[tauri::command]
+async fn logout(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
+    // First disconnect VPN if connected
+    let _ = disconnect(app.clone(), state.clone()).await;
+
+    // Then clear authentication state
+    let mut manager = state.manager.lock().await;
+    manager.logout().await.map_err(|e| e.to_string())?;
+
+    update_tray_icon(&app, ConnectionState::Disconnected);
+    Ok(())
+}
+
+#[tauri::command]
 async fn quit(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
     use tokio::time::{timeout, Duration};
     // Try to disconnect gracefully within 2 seconds
@@ -810,12 +861,27 @@ async fn wait_for_session_login(
         manager.get_base_url().to_string()
     };
 
-    // 2. Wait for token without holding the lock (prevent UI blocking)
-    let token_resp = ConnectionManager::wait_for_session_login(&base_url, &session_id)
-        .await
-        .map_err(|e| e.to_string())?;
+    // 2. Create cancellation channel and store the sender
+    let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+    {
+        let mut cancel_guard = state.login_cancel_tx.lock().await;
+        *cancel_guard = Some(cancel_tx);
+    }
 
-    // 3. Acquire lock again to update manager state
+    // 3. Wait for token without holding the lock (prevent UI blocking)
+    let token_result =
+        ConnectionManager::wait_for_session_login(&base_url, &session_id, cancel_rx).await;
+
+    // 4. Clear the cancellation sender
+    {
+        let mut cancel_guard = state.login_cancel_tx.lock().await;
+        *cancel_guard = None;
+    }
+
+    // 5. Handle result
+    let token_resp = token_result.map_err(|e| e.to_string())?;
+
+    // 6. Acquire lock again to update manager state
     let mut manager = state.manager.lock().await;
     let auth = manager
         .handle_login_token(token_resp)
@@ -828,6 +894,16 @@ async fn wait_for_session_login(
     }
     update_tray_icon(&app, manager.get_state().await);
     Ok(auth)
+}
+
+#[tauri::command]
+async fn cancel_session_login(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let mut cancel_guard = state.login_cancel_tx.lock().await;
+    if let Some(cancel_tx) = cancel_guard.take() {
+        let _ = cancel_tx.send(());
+        info!("Session login cancellation requested");
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -1505,6 +1581,7 @@ pub fn run() {
     let app_state = AppState {
         manager: Arc::new(Mutex::new(manager)),
         plugin_manager: Arc::new(Mutex::new(plugin_manager)),
+        login_cancel_tx: Arc::new(Mutex::new(None)),
     };
 
     tauri::Builder::default()
@@ -1662,6 +1739,7 @@ pub fn run() {
             get_virtual_ip,
             connect,
             disconnect,
+            logout,
             get_state,
             set_exit_node,
             set_as_exit_node,
@@ -1670,6 +1748,7 @@ pub fn run() {
             poll_device_flow,
             start_session_login,
             wait_for_session_login,
+            cancel_session_login,
             open_browser,
             open_logs,
             resize_window,
