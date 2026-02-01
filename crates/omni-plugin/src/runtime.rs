@@ -566,6 +566,7 @@ mod tests {
     use super::*;
     use crate::types::Capability;
 
+    #[allow(dead_code)]
     fn create_test_manifest() -> PluginManifest {
         let mut manifest = PluginManifest::new("com.test.plugin", "Test Plugin", "1.0.0");
         manifest.capabilities.push(Capability::EventHooks);
