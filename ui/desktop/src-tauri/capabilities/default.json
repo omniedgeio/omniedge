@@ -9,6 +9,8 @@
     "core:default",
     "opener:default",
     "opener:allow-open-url",
-    "opener:allow-default-urls"
+    "opener:allow-default-urls",
+    "dialog:default",
+    "dialog:allow-open"
   ]
 }
