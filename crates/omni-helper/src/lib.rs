@@ -1,3 +1,31 @@
+//! OmniEdge Helper Library
+//!
+//! This library provides the core functionality for the OmniEdge helper service,
+//! which runs with elevated privileges to manage VPN connections.
+//!
+//! # Security Model
+//!
+//! The helper service accepts commands via IPC (Unix socket or Windows named pipe).
+//! The IPC channel is accessible to all local users (0o666 permissions / NULL DACL),
+//! which is intentional for a VPN service that unprivileged users need to control.
+//!
+//! Security is enforced at the command level:
+//!
+//! - **`start_vpn`**: Requires valid authentication token (validated by OmniEdge API)
+//! - **`stop_vpn`**: No authentication required (any local user can stop the VPN)
+//! - **`status`**, **`ping`**, **`version`**: Read-only, no authentication required
+//! - **`set_as_exit_node`**, **`is_exit_node`**, **`get_virtual_ip`**: Operational commands,
+//!   no authentication required (trusted local user model)
+//!
+//! The design assumes that any process running on the local machine with access to
+//! the IPC channel is trusted to control the VPN. This matches the security model
+//! of other VPN clients (WireGuard, OpenVPN, etc.).
+//!
+//! # Rate Limiting
+//!
+//! TODO: Consider adding rate limiting to prevent local DoS attacks. Current mitigation
+//! is the single-request-per-connection model which naturally limits throughput.
+
 use omni_core::{state::ConnectionState, ConnectionManager};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
