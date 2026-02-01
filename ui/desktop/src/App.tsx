@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import logo from './assets/logo.png';
 
 // Plugin types
@@ -481,10 +482,27 @@ function App() {
   };
 
   const handleInstallPlugin = async () => {
-    // Use Tauri's file dialog - we'll invoke the install directly
-    // For simplicity, we'll prompt user to drag & drop or provide path
-    // In production, you'd use tauri-plugin-dialog
-    setError('Plugin installation: Please use the command line to install plugins for now.');
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'Plugin',
+          extensions: ['zip', 'wasm']
+        }],
+        title: 'Select Plugin File'
+      });
+      
+      if (selected) {
+        setIsPluginLoading(true);
+        setError('');
+        await invoke('install_plugin_from_file', { path: selected });
+        await loadPlugins();
+        setIsPluginLoading(false);
+      }
+    } catch (e: any) {
+      setError(`Failed to install plugin: ${e}`);
+      setIsPluginLoading(false);
+    }
   };
 
   // Load plugins when logged in and plugins section is expanded
