@@ -37,6 +37,7 @@ impl PluginState {
 }
 
 /// A loaded and instantiated plugin
+#[allow(dead_code)]
 pub struct PluginRuntime {
     /// Plugin manifest
     manifest: PluginManifest,
@@ -102,6 +103,7 @@ impl PluginRuntime {
 }
 
 /// Event plugin runtime wrapper
+#[allow(dead_code)]
 pub struct EventPluginRuntime {
     inner: PluginRuntime,
     /// Cached function exports
@@ -133,7 +135,7 @@ impl EventPluginRuntime {
     /// Dispatch a state change event
     pub fn dispatch_state_change(
         &self,
-        store: &mut Store<PluginState>,
+        _store: &mut Store<PluginState>,
         event: &StateChangeEvent,
     ) -> PluginResult<()> {
         // Serialize event to JSON for passing to WASM
@@ -163,7 +165,7 @@ impl EventPluginRuntime {
     /// Dispatch a peer discovered event
     pub fn dispatch_peer_discovered(
         &self,
-        store: &mut Store<PluginState>,
+        _store: &mut Store<PluginState>,
         peer: &PeerInfo,
     ) -> PluginResult<()> {
         let peer_json =
@@ -185,7 +187,7 @@ impl EventPluginRuntime {
     /// Dispatch a peer disconnected event
     pub fn dispatch_peer_disconnected(
         &self,
-        store: &mut Store<PluginState>,
+        _store: &mut Store<PluginState>,
         peer: &PeerInfo,
     ) -> PluginResult<()> {
         let peer_json =
@@ -207,7 +209,7 @@ impl EventPluginRuntime {
     /// Dispatch a network change event
     pub fn dispatch_network_change(
         &self,
-        store: &mut Store<PluginState>,
+        _store: &mut Store<PluginState>,
         event: &NetworkEvent,
     ) -> PluginResult<()> {
         let event_json =
@@ -229,7 +231,7 @@ impl EventPluginRuntime {
     /// Dispatch a stats update event
     pub fn dispatch_stats_update(
         &self,
-        store: &mut Store<PluginState>,
+        _store: &mut Store<PluginState>,
         stats: &ConnectionStats,
     ) -> PluginResult<()> {
         let stats_json =
@@ -263,10 +265,10 @@ impl PolicyPluginRuntime {
     /// Query for network selection
     pub fn select_network(
         &self,
-        store: &mut Store<PluginState>,
+        _store: &mut Store<PluginState>,
         ctx: &PolicyContext,
     ) -> PluginResult<Option<String>> {
-        let ctx_json =
+        let _ctx_json =
             serde_json::to_string(ctx).map_err(|e| PluginError::ExecutionError(e.to_string()))?;
 
         debug!(
@@ -282,10 +284,10 @@ impl PolicyPluginRuntime {
     /// Query for exit node selection
     pub fn select_exit_node(
         &self,
-        store: &mut Store<PluginState>,
+        _store: &mut Store<PluginState>,
         ctx: &PolicyContext,
     ) -> PluginResult<Option<String>> {
-        let ctx_json =
+        let _ctx_json =
             serde_json::to_string(ctx).map_err(|e| PluginError::ExecutionError(e.to_string()))?;
 
         debug!(
@@ -301,10 +303,10 @@ impl PolicyPluginRuntime {
     /// Query for connection validation
     pub fn validate_connection(
         &self,
-        store: &mut Store<PluginState>,
+        _store: &mut Store<PluginState>,
         ctx: &PolicyContext,
     ) -> PluginResult<PolicyDecision> {
-        let ctx_json =
+        let _ctx_json =
             serde_json::to_string(ctx).map_err(|e| PluginError::ExecutionError(e.to_string()))?;
 
         debug!(
@@ -331,10 +333,10 @@ impl QoSPluginRuntime {
     /// Classify a packet
     pub fn classify_packet(
         &self,
-        store: &mut Store<PluginState>,
+        _store: &mut Store<PluginState>,
         packet: &PacketInfo,
     ) -> PluginResult<TrafficClass> {
-        let packet_json = serde_json::to_string(packet)
+        let _packet_json = serde_json::to_string(packet)
             .map_err(|e| PluginError::ExecutionError(e.to_string()))?;
 
         debug!(

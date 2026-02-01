@@ -140,7 +140,7 @@ impl PluginManifest {
 
     /// Get the slug (simplified ID for filesystem use)
     pub fn slug(&self) -> String {
-        self.id.replace('.', "-").replace('_', "-").to_lowercase()
+        self.id.replace(['.', '_'], "-").to_lowercase()
     }
 }
 

@@ -100,7 +100,7 @@ impl PluginLoader {
             return Ok(plugins);
         }
 
-        let entries = std::fs::read_dir(&self.plugins_dir).map_err(|e| PluginError::IoError(e))?;
+        let entries = std::fs::read_dir(&self.plugins_dir).map_err(PluginError::IoError)?;
 
         for entry in entries.flatten() {
             let path = entry.path();
@@ -337,12 +337,9 @@ impl PluginLoader {
             .map_err(|e| PluginError::InvalidManifest(format!("Invalid zip: {}", e)))?;
 
         for i in 0..archive.len() {
-            let mut file = archive.by_index(i).map_err(|e| {
-                PluginError::IoError(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e.to_string(),
-                ))
-            })?;
+            let mut file = archive
+                .by_index(i)
+                .map_err(|e| PluginError::IoError(std::io::Error::other(e.to_string())))?;
 
             let outpath = plugin_dir.join(file.name());
 
