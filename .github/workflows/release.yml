@@ -39,12 +39,6 @@ jobs:
             platform: linux
             arch: arm64
             cross: true
-          # Linux ARMv7
-          - target: armv7-unknown-linux-musleabihf
-            os: ubuntu-latest
-            platform: linux
-            arch: armv7
-            cross: true
           # Linux RISC-V 64
           - target: riscv64gc-unknown-linux-musl
             os: ubuntu-latest
