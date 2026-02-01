@@ -1905,6 +1905,83 @@ body {
     color: white;
 }
 
+/* Active Plugin Panel - when a plugin is opened */
+.active-plugin-panel {
+    animation: fadeIn 0.2s ease-out;
+}
+
+.active-plugin-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 0.5px solid var(--divider);
+}
+
+.back-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.05);
+    border: none;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.15s;
+    color: var(--text-primary);
+}
+
+.back-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    .back-btn {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary-dark);
+    }
+    .back-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+    }
+}
+
+.active-plugin-title {
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+}
+
+.active-plugin-badges {
+    display: flex;
+    gap: 6px;
+}
+
+.plugin-open-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: var(--accent-blue);
+    color: white;
+    border: none;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.15s;
+}
+
+.plugin-open-btn:hover {
+    filter: brightness(1.1);
+}
+
+.plugin-open-btn:active {
+    transform: scale(0.97);
+}
+
 /* =====================================================
    Robot Data Collection Styles
    ===================================================== */

@@ -90,9 +90,10 @@ function App() {
   const [pluginConfig, setPluginConfig] = useState<Record<string, any>>({});
   const [isPluginLoading, setIsPluginLoading] = useState(false);
   const [pluginToRemove, setPluginToRemove] = useState<string | null>(null);
+  // Active plugin - the plugin currently being used/viewed
+  const [activePluginId, setActivePluginId] = useState<string | null>(null);
 
-  // Robot Data Collection state
-  const [isDataCollectionExpanded, setIsDataCollectionExpanded] = useState(false);
+  // Robot Data Collection state (built-in plugin: 'data-collection')
   const [dataCollectionAvailable, setDataCollectionAvailable] = useState(false);
   const [dataCollectionStatus, setDataCollectionStatus] = useState<DataCollectionStatus | null>(null);
   const [dataCollectionStreams, setDataCollectionStreams] = useState<StreamInfo[]>([]);
@@ -173,7 +174,7 @@ function App() {
   useEffect(() => {
     const timer = setTimeout(resizeToContent, 50);
     return () => clearTimeout(timer);
-  }, [isLoggedIn, networks, expandedNetworks, isLoading, isConnecting, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode, error, networkDevices, status, virtualIP, showDebug, showSetup, isPluginsExpanded, expandedPluginId, showPluginSettings, plugins, isDataCollectionExpanded, dataCollectionStatus, showDataCollectionInit, simulationMode, simulationInitialized, dataCollectionStreams, dataCollectionEpisodes]);
+  }, [isLoggedIn, networks, expandedNetworks, isLoading, isConnecting, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode, error, networkDevices, status, virtualIP, showDebug, showSetup, isPluginsExpanded, expandedPluginId, showPluginSettings, plugins, activePluginId, dataCollectionStatus, showDataCollectionInit, simulationMode, simulationInitialized, dataCollectionStreams, dataCollectionEpisodes]);
 
   useEffect(() => {
     const init = async () => {
@@ -824,9 +825,9 @@ function App() {
     return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
   };
 
-  // Check data collection availability and load status when section is expanded
+  // Check data collection availability and load status when Data Collection plugin is active
   useEffect(() => {
-    if (isDataCollectionExpanded) {
+    if (activePluginId === 'data-collection') {
       const init = async () => {
         const available = await checkDataCollectionAvailable();
         if (available) {
@@ -846,7 +847,7 @@ function App() {
       };
       init();
     }
-  }, [isDataCollectionExpanded, simulationMode]);
+  }, [activePluginId, simulationMode]);
 
   // Polling for data collection status when recording
   useEffect(() => {
@@ -1512,455 +1513,495 @@ function App() {
 
               {isPluginsExpanded && (
                 <div className="plugins-pane">
-                  {plugins.length === 0 ? (
-                    <div className="plugins-empty">
-                      <div className="plugins-empty-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.3">
-                          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-                        </svg>
-                      </div>
-                      <div className="plugins-empty-text">No plugins installed</div>
-                      <div className="plugins-empty-hint">Plugins extend OmniEdge functionality</div>
-                    </div>
-                  ) : (
-                    <div className="plugins-list">
-                      {plugins.map(plugin => {
-                        const isExpanded = expandedPluginId === plugin.id;
-                        const isRemoving = pluginToRemove === plugin.id;
-                        
-                        return (
-                          <div 
-                            key={plugin.id} 
-                            className={`plugin-item ${plugin.enabled ? 'is-enabled' : ''} ${plugin.status === 'error' ? 'has-error' : ''} ${isExpanded ? 'is-expanded' : ''}`}
+                  {/* Active Plugin Panel - shows when a plugin is being used */}
+                  {activePluginId && (
+                    <div className="active-plugin-panel">
+                      <div className="active-plugin-header">
+                        <button 
+                          className="back-btn"
+                          onClick={() => setActivePluginId(null)}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                          </svg>
+                          Back
+                        </button>
+                        <span className="active-plugin-title">
+                          {activePluginId === 'data-collection' ? 'Data Collection' : plugins.find(p => p.id === activePluginId)?.name}
+                        </span>
+                        {activePluginId === 'data-collection' && (
+                          <div className="active-plugin-badges">
+                            {simulationMode && <span className="sim-badge">SIM</span>}
+                            {dataCollectionStatus?.recording && <span className="recording-badge">REC</span>}
+                          </div>
+                        )}
+                        {activePluginId === 'data-collection' && (
+                          <button 
+                            className={`pin-window-btn ${windowPinned ? 'pinned' : ''}`}
+                            onClick={toggleWindowPinned}
+                            title={windowPinned ? 'Unpin window (will auto-hide)' : 'Pin window (stay visible)'}
                           >
-                            <div 
-                              className="plugin-item-header" 
-                              onClick={() => setExpandedPluginId(isExpanded ? null : plugin.id)}
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill={windowPinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 17v5"></path>
+                              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Data Collection Plugin UI */}
+                      {activePluginId === 'data-collection' && (
+                        <div className="data-collection-pane">
+                          {dataCollectionError && (
+                            <div className="data-collection-error">
+                              <span>{dataCollectionError}</span>
+                              <span className="error-dismiss-small" onClick={() => setDataCollectionError(null)}>Dismiss</span>
+                            </div>
+                          )}
+
+                          {/* Simulation mode toggle */}
+                          <div className="simulation-toggle-row">
+                            <span className="simulation-label">Simulation Mode</span>
+                            <div
+                              className={`ios-switch small ${simulationMode ? 'on' : ''}`}
+                              onClick={() => {
+                                setSimulationMode(!simulationMode);
+                                setDataCollectionStatus(null);
+                                setSimulationInitialized(false);
+                              }}
+                              role="switch"
+                              aria-checked={simulationMode}
                             >
-                              <div className={`plugin-status-dot ${plugin.status}`}></div>
-                              <div className="plugin-info">
-                                <div className="plugin-name">{plugin.name}</div>
-                                {plugin.status === 'error' && plugin.error_message ? (
-                                  <div className="plugin-error-text">{plugin.error_message}</div>
+                              <div className="dot"></div>
+                            </div>
+                          </div>
+
+                          {/* Not initialized - show init form */}
+                          {(simulationMode ? !simulationInitialized : !dataCollectionStatus?.initialized) && !showDataCollectionInit && (
+                            <div className="data-collection-empty">
+                              <div className="data-collection-empty-icon">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.3">
+                                  <circle cx="12" cy="12" r="10"></circle>
+                                  <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                              </div>
+                              <div className="data-collection-empty-text">
+                                {simulationMode ? 'Simulation Not Initialized' : 'Data Collection Not Initialized'}
+                              </div>
+                              <div className="data-collection-empty-hint">
+                                {simulationMode ? 'Initialize simulation with a robot ID to test the UI' : 'Configure a robot ID to start collecting data'}
+                              </div>
+                              <button 
+                                className="secondary-btn" 
+                                onClick={() => setShowDataCollectionInit(true)}
+                              >
+                                {simulationMode ? 'Start Simulation' : 'Initialize'}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Init form */}
+                          {showDataCollectionInit && (
+                            <div className="data-collection-init-form">
+                              <div className="form-field">
+                                <label>Robot ID</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={initRobotId}
+                                  onChange={(e) => setInitRobotId(e.target.value)}
+                                  placeholder="e.g., robot-001"
+                                />
+                              </div>
+                              <div className="form-field">
+                                <label>Data Directory (optional)</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={initDataDir}
+                                  onChange={(e) => setInitDataDir(e.target.value)}
+                                  placeholder="/var/lib/omniedge/data"
+                                />
+                              </div>
+                              <div className="form-actions">
+                                <button 
+                                  className="secondary-btn" 
+                                  onClick={() => setShowDataCollectionInit(false)}
+                                >
+                                  Cancel
+                                </button>
+                                <button 
+                                  className="primary-login-btn" 
+                                  onClick={handleInitDataCollection}
+                                  disabled={dataCollectionLoading}
+                                >
+                                  {dataCollectionLoading ? 'Initializing...' : 'Initialize'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Initialized - show dashboard */}
+                          {(simulationMode ? simulationInitialized : dataCollectionStatus?.initialized) && dataCollectionStatus && (
+                            <>
+                              {/* Recording Controls */}
+                              <div className="recording-controls">
+                                <div className="recording-status-row">
+                                  <div className="recording-indicator">
+                                    <div className={`recording-dot ${dataCollectionStatus.recording ? 'recording' : ''}`}></div>
+                                    <span>{dataCollectionStatus.recording ? 'Recording' : 'Idle'}</span>
+                                  </div>
+                                  <div className="recording-info">
+                                    <span className="robot-id-badge">{dataCollectionStatus.robot_id}</span>
+                                  </div>
+                                </div>
+                                
+                                {dataCollectionStatus.recording ? (
+                                  <div className="recording-active-controls">
+                                    <div className="recording-stats">
+                                      <span>Episode: {dataCollectionStatus.current_episode_id?.slice(0, 8)}...</span>
+                                    </div>
+                                    <div className="recording-buttons">
+                                      <button 
+                                        className="stop-btn" 
+                                        onClick={() => handleStopRecording(false)}
+                                        disabled={dataCollectionLoading}
+                                      >
+                                        Stop & Save
+                                      </button>
+                                      <button 
+                                        className="discard-btn" 
+                                        onClick={() => handleStopRecording(true)}
+                                        disabled={dataCollectionLoading}
+                                      >
+                                        Discard
+                                      </button>
+                                    </div>
+                                  </div>
                                 ) : (
-                                  <div className="plugin-description">{plugin.description}</div>
+                                  <button 
+                                    className="record-btn" 
+                                    onClick={() => handleStartRecording()}
+                                    disabled={dataCollectionLoading}
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                      <circle cx="12" cy="12" r="8"></circle>
+                                    </svg>
+                                    Start Recording
+                                  </button>
                                 )}
                               </div>
-                              <div className="plugin-item-right">
-                                <div
-                                  className={`ios-switch small ${plugin.enabled ? 'on' : ''}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleTogglePlugin(plugin.id, plugin.enabled);
-                                  }}
-                                  onKeyDown={(e) => { 
-                                    if (e.key === 'Enter' || e.key === ' ') { 
-                                      e.preventDefault(); 
-                                      e.stopPropagation(); 
-                                      handleTogglePlugin(plugin.id, plugin.enabled); 
-                                    } 
-                                  }}
-                                  tabIndex={0}
-                                  role="switch"
-                                  aria-checked={plugin.enabled}
-                                  aria-label={`Enable ${plugin.name} plugin`}
-                                >
-                                  <div className="dot"></div>
+
+                              {/* Stream Status */}
+                              {dataCollectionStreams.length > 0 && (
+                                <div className="streams-section">
+                                  <div className="streams-header">
+                                    <span className="label-tiny">ACTIVE STREAMS</span>
+                                    <button className="refresh-btn-small" onClick={loadDataCollectionStreams}>
+                                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                        <path d="M23 4v6h-6"></path>
+                                        <path d="M1 20v-6h6"></path>
+                                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                      </svg>
+                                    </button>
+                                  </div>
+                                  <div className="streams-list">
+                                    {dataCollectionStreams.map(stream => (
+                                      <div key={stream.stream_id} className="stream-item">
+                                        <span className="stream-id">{stream.stream_id}</span>
+                                        <div className="stream-stats">
+                                          <span className="stream-samples">{stream.sample_count} samples</span>
+                                          <div className="stream-utilization">
+                                            <div 
+                                              className="utilization-bar" 
+                                              style={{ width: `${Math.min(stream.utilization_percent, 100)}%` }}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                                <div className="chevron-icon" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none' }}>
-                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="9 18 15 12 9 6"></polyline>
-                                  </svg>
+                              )}
+
+                              {/* Episodes List */}
+                              <div className="episodes-section">
+                                <div className="episodes-header">
+                                  <span className="label-tiny">RECORDED EPISODES ({dataCollectionStatus.total_episodes})</span>
+                                  <button className="refresh-btn-small" onClick={() => loadDataCollectionEpisodes(episodePage)}>
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                      <path d="M23 4v6h-6"></path>
+                                      <path d="M1 20v-6h6"></path>
+                                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                    </svg>
+                                  </button>
+                                </div>
+                                
+                                {dataCollectionEpisodes.length === 0 ? (
+                                  <div className="episodes-empty">No episodes recorded yet</div>
+                                ) : (
+                                  <>
+                                    <div className="episodes-list">
+                                      {dataCollectionEpisodes.map(episode => {
+                                        const isSelected = selectedEpisodeId === episode.episode_id;
+                                        return (
+                                          <div 
+                                            key={episode.episode_id} 
+                                            className={`episode-item ${isSelected ? 'is-selected' : ''}`}
+                                            onClick={() => setSelectedEpisodeId(isSelected ? null : episode.episode_id)}
+                                          >
+                                            <div className="episode-main">
+                                              <div className="episode-id">{episode.episode_id.slice(0, 12)}...</div>
+                                              <div className="episode-meta">
+                                                <span>{formatDuration(episode.duration_secs)}</span>
+                                                <span>{formatBytes(episode.size_bytes)}</span>
+                                                <span>{episode.sample_count} samples</span>
+                                              </div>
+                                            </div>
+                                            <div className="episode-status">
+                                              <span className={`episode-status-badge ${episode.status}`}>{episode.status}</span>
+                                              {episode.upload_status && (
+                                                <span className={`upload-status-badge ${episode.upload_status}`}>{episode.upload_status}</span>
+                                              )}
+                                            </div>
+                                            
+                                            {isSelected && (
+                                              <div className="episode-actions">
+                                                <button 
+                                                  className="episode-action-btn upload"
+                                                  onClick={(e) => { e.stopPropagation(); handleUploadEpisode(episode.episode_id); }}
+                                                  disabled={dataCollectionLoading || episode.upload_status === 'uploading'}
+                                                >
+                                                  Upload
+                                                </button>
+                                                <button 
+                                                  className="episode-action-btn delete"
+                                                  onClick={(e) => { e.stopPropagation(); handleDeleteEpisode(episode.episode_id); }}
+                                                  disabled={dataCollectionLoading}
+                                                >
+                                                  Delete
+                                                </button>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                    
+                                    {/* Pagination */}
+                                    <div className="episodes-pagination">
+                                      <button 
+                                        className="pagination-btn"
+                                        onClick={() => loadDataCollectionEpisodes(episodePage - 1)}
+                                        disabled={episodePage === 0}
+                                      >
+                                        Prev
+                                      </button>
+                                      <span className="pagination-info">Page {episodePage + 1}</span>
+                                      <button 
+                                        className="pagination-btn"
+                                        onClick={() => loadDataCollectionEpisodes(episodePage + 1)}
+                                        disabled={dataCollectionEpisodes.length < 10}
+                                      >
+                                        Next
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+
+                              {/* Upload Status */}
+                              {uploadStatus && (uploadStatus.queued > 0 || uploadStatus.active > 0) && (
+                                <div className="upload-status-section">
+                                  <div className="label-tiny">UPLOAD STATUS</div>
+                                  <div className="upload-stats">
+                                    <span>Queued: {uploadStatus.queued}</span>
+                                    <span>Active: {uploadStatus.active}</span>
+                                    <span>Uploaded: {formatBytes(uploadStatus.bytes_uploaded)}</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Storage Info */}
+                              <div className="storage-info">
+                                <span className="label-tiny">STORAGE</span>
+                                <span className="storage-value">{formatBytes(dataCollectionStatus.storage_used_bytes)}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Plugin List - hidden when a plugin is active */}
+                  {!activePluginId && (
+                    <>
+                      {/* All Plugins List (including Data Collection) */}
+                      {plugins.length === 0 && !dataCollectionAvailable ? (
+                        <div className="plugins-empty">
+                          <div className="plugins-empty-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.3">
+                              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                            </svg>
+                          </div>
+                          <div className="plugins-empty-text">No plugins installed</div>
+                          <div className="plugins-empty-hint">Plugins extend OmniEdge functionality</div>
+                        </div>
+                      ) : (
+                        <div className="plugins-list">
+                          {/* Data Collection Plugin */}
+                          {dataCollectionAvailable && (
+                            <div className={`plugin-item ${dataCollectionStatus?.initialized ? 'is-enabled' : ''}`}>
+                              <div className="plugin-item-header">
+                                <div className={`plugin-status-dot ${dataCollectionStatus?.initialized ? 'active' : 'disabled'}`}></div>
+                                <div className="plugin-info">
+                                  <div className="plugin-name">
+                                    Data Collection
+                                    {dataCollectionStatus?.recording && <span className="recording-badge" style={{ marginLeft: '6px' }}>REC</span>}
+                                  </div>
+                                  <div className="plugin-description">Collect and manage robot training data</div>
+                                </div>
+                                <div className="plugin-item-right">
+                                  <button 
+                                    className="plugin-open-btn"
+                                    onClick={() => setActivePluginId('data-collection')}
+                                  >
+                                    Open
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                  </button>
                                 </div>
                               </div>
                             </div>
+                          )}
 
-                            {isExpanded && (
-                              <div className="plugin-details-panel">
-                                <div className="plugin-detail-row">
-                                  <span className="plugin-detail-label">Version</span>
-                                  <span className="plugin-detail-value">{plugin.version}</span>
-                                </div>
-                                <div className="plugin-detail-row">
-                                  <span className="plugin-detail-label">Author</span>
-                                  <span className="plugin-detail-value">{plugin.author}</span>
-                                </div>
-                                <div className="plugin-detail-row">
-                                  <span className="plugin-detail-label">Type</span>
-                                  <span className="plugin-type-tag">{plugin.plugin_type}</span>
-                                </div>
-                                {plugin.permissions.length > 0 && (
-                                  <div className="plugin-detail-row">
-                                    <span className="plugin-detail-label">Permissions</span>
-                                    <div className="plugin-permissions">
-                                      {plugin.permissions.map(perm => (
-                                        <span key={perm} className="permission-tag">{perm}</span>
-                                      ))}
+                          {/* Other Installed Plugins */}
+                          {plugins.map(plugin => {
+                            const isExpanded = expandedPluginId === plugin.id;
+                            const isRemoving = pluginToRemove === plugin.id;
+                            
+                            return (
+                              <div 
+                                key={plugin.id} 
+                                className={`plugin-item ${plugin.enabled ? 'is-enabled' : ''} ${plugin.status === 'error' ? 'has-error' : ''} ${isExpanded ? 'is-expanded' : ''}`}
+                              >
+                                <div 
+                                  className="plugin-item-header" 
+                                  onClick={() => setExpandedPluginId(isExpanded ? null : plugin.id)}
+                                >
+                                  <div className={`plugin-status-dot ${plugin.enabled ? 'active' : 'disabled'}`}></div>
+                                  <div className="plugin-info">
+                                    <div className="plugin-name">{plugin.name}</div>
+                                    {plugin.status === 'error' && plugin.error_message ? (
+                                      <div className="plugin-error-text">{plugin.error_message}</div>
+                                    ) : (
+                                      <div className="plugin-description">{plugin.description}</div>
+                                    )}
+                                  </div>
+                                  <div className="plugin-item-right">
+                                    <div
+                                      className={`ios-switch small ${plugin.enabled ? 'on' : ''}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleTogglePlugin(plugin.id, plugin.enabled);
+                                      }}
+                                      onKeyDown={(e) => { 
+                                        if (e.key === 'Enter' || e.key === ' ') { 
+                                          e.preventDefault(); 
+                                          e.stopPropagation(); 
+                                          handleTogglePlugin(plugin.id, plugin.enabled); 
+                                        } 
+                                      }}
+                                      tabIndex={0}
+                                      role="switch"
+                                      aria-checked={plugin.enabled}
+                                      aria-label={`Enable ${plugin.name} plugin`}
+                                    >
+                                      <div className="dot"></div>
+                                    </div>
+                                    <div className="chevron-icon" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none' }}>
+                                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                      </svg>
                                     </div>
                                   </div>
-                                )}
+                                </div>
 
-                                {!isRemoving ? (
-                                  <div className="plugin-actions">
-                                    <button 
-                                      className="plugin-action-btn settings" 
-                                      onClick={() => handlePluginSettings(plugin.id)}
-                                    >
-                                      Settings
-                                    </button>
-                                    <button 
-                                      className="plugin-action-btn remove" 
-                                      onClick={() => setPluginToRemove(plugin.id)}
-                                    >
-                                      Remove
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="plugin-remove-confirm">
-                                    <div className="plugin-remove-confirm-text">
-                                      Are you sure you want to remove this plugin?
+                                {isExpanded && (
+                                  <div className="plugin-details-panel">
+                                    <div className="plugin-detail-row">
+                                      <span className="plugin-detail-label">Version</span>
+                                      <span className="plugin-detail-value">{plugin.version}</span>
                                     </div>
-                                    <div className="plugin-remove-confirm-actions">
-                                      <button 
-                                        className="plugin-remove-confirm-btn cancel" 
-                                        onClick={() => setPluginToRemove(null)}
-                                      >
-                                        Cancel
-                                      </button>
-                                      <button 
-                                        className="plugin-remove-confirm-btn confirm" 
-                                        onClick={() => handleRemovePlugin(plugin.id)}
-                                        disabled={isPluginLoading}
-                                      >
-                                        {isPluginLoading ? 'Removing...' : 'Remove'}
-                                      </button>
+                                    <div className="plugin-detail-row">
+                                      <span className="plugin-detail-label">Author</span>
+                                      <span className="plugin-detail-value">{plugin.author}</span>
                                     </div>
+                                    <div className="plugin-detail-row">
+                                      <span className="plugin-detail-label">Type</span>
+                                      <span className="plugin-type-tag">{plugin.plugin_type}</span>
+                                    </div>
+                                    {plugin.permissions.length > 0 && (
+                                      <div className="plugin-detail-row">
+                                        <span className="plugin-detail-label">Permissions</span>
+                                        <div className="plugin-permissions">
+                                          {plugin.permissions.map(perm => (
+                                            <span key={perm} className="permission-tag">{perm}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {!isRemoving ? (
+                                      <div className="plugin-actions">
+                                        <button 
+                                          className="plugin-action-btn settings" 
+                                          onClick={() => handlePluginSettings(plugin.id)}
+                                        >
+                                          Settings
+                                        </button>
+                                        <button 
+                                          className="plugin-action-btn remove" 
+                                          onClick={() => setPluginToRemove(plugin.id)}
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="plugin-remove-confirm">
+                                        <div className="plugin-remove-confirm-text">
+                                          Are you sure you want to remove this plugin?
+                                        </div>
+                                        <div className="plugin-remove-confirm-actions">
+                                          <button 
+                                            className="plugin-remove-confirm-btn cancel" 
+                                            onClick={() => setPluginToRemove(null)}
+                                          >
+                                            Cancel
+                                          </button>
+                                          <button 
+                                            className="plugin-remove-confirm-btn confirm" 
+                                            onClick={() => handleRemovePlugin(plugin.id)}
+                                            disabled={isPluginLoading}
+                                          >
+                                            {isPluginLoading ? 'Removing...' : 'Remove'}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
-                </>
-              )}
-
-              {/* Robot Data Collection Section - Show only when logged in and feature available */}
-              {isLoggedIn && !showSetup && dataCollectionAvailable && (
-                <>
-                  <div className="data-collection-section-header" onClick={() => setIsDataCollectionExpanded(!isDataCollectionExpanded)}>
-                    <div className="data-collection-header-left">
-                      <div className="chevron-icon" style={{ transform: isDataCollectionExpanded ? 'rotate(90deg)' : 'none' }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="9 18 15 12 9 6"></polyline>
-                        </svg>
-                      </div>
-                      <span className="section-title">Data Collection</span>
-                      {simulationMode && <span className="sim-badge">SIM</span>}
-                      {dataCollectionStatus?.recording && (
-                        <span className="recording-badge">REC</span>
-                      )}
-                    </div>
-                    <div className="data-collection-header-right">
-                      {dataCollectionLoading && <div className="loader-mini" style={{ borderTopColor: 'var(--accent-blue)' }}></div>}
-                      <button 
-                        className={`pin-window-btn ${windowPinned ? 'pinned' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); toggleWindowPinned(); }}
-                        title={windowPinned ? 'Unpin window (will auto-hide)' : 'Pin window (stay visible)'}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill={windowPinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 17v5"></path>
-                          <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-
-                  {isDataCollectionExpanded && (
-                    <div className="data-collection-pane">
-                      {dataCollectionError && (
-                        <div className="data-collection-error">
-                          <span>{dataCollectionError}</span>
-                          <span className="error-dismiss-small" onClick={() => setDataCollectionError(null)}>Dismiss</span>
-                        </div>
-                      )}
-
-                      {/* Simulation mode toggle */}
-                      <div className="simulation-toggle-row">
-                        <span className="simulation-label">Simulation Mode</span>
-                        <div
-                          className={`ios-switch small ${simulationMode ? 'on' : ''}`}
-                          onClick={() => {
-                            setSimulationMode(!simulationMode);
-                            setDataCollectionStatus(null);
-                            setSimulationInitialized(false);
-                          }}
-                          role="switch"
-                          aria-checked={simulationMode}
-                        >
-                          <div className="dot"></div>
-                        </div>
-                      </div>
-
-                      {/* Not initialized - show init form */}
-                      {(simulationMode ? !simulationInitialized : !dataCollectionStatus?.initialized) && !showDataCollectionInit && (
-                        <div className="data-collection-empty">
-                          <div className="data-collection-empty-icon">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.3">
-                              <circle cx="12" cy="12" r="10"></circle>
-                              <circle cx="12" cy="12" r="3"></circle>
-                            </svg>
-                          </div>
-                          <div className="data-collection-empty-text">
-                            {simulationMode ? 'Simulation Not Initialized' : 'Data Collection Not Initialized'}
-                          </div>
-                          <div className="data-collection-empty-hint">
-                            {simulationMode ? 'Initialize simulation with a robot ID to test the UI' : 'Configure a robot ID to start collecting data'}
-                          </div>
-                          <button 
-                            className="secondary-btn" 
-                            onClick={() => setShowDataCollectionInit(true)}
-                          >
-                            {simulationMode ? 'Start Simulation' : 'Initialize'}
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Init form */}
-                      {showDataCollectionInit && (
-                        <div className="data-collection-init-form">
-                          <div className="form-field">
-                            <label>Robot ID</label>
-                            <input
-                              type="text"
-                              className="form-input"
-                              value={initRobotId}
-                              onChange={(e) => setInitRobotId(e.target.value)}
-                              placeholder="e.g., robot-001"
-                            />
-                          </div>
-                          <div className="form-field">
-                            <label>Data Directory (optional)</label>
-                            <input
-                              type="text"
-                              className="form-input"
-                              value={initDataDir}
-                              onChange={(e) => setInitDataDir(e.target.value)}
-                              placeholder="/var/lib/omniedge/data"
-                            />
-                          </div>
-                          <div className="form-actions">
-                            <button 
-                              className="secondary-btn" 
-                              onClick={() => setShowDataCollectionInit(false)}
-                            >
-                              Cancel
-                            </button>
-                            <button 
-                              className="primary-login-btn" 
-                              onClick={handleInitDataCollection}
-                              disabled={dataCollectionLoading}
-                            >
-                              {dataCollectionLoading ? 'Initializing...' : 'Initialize'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Initialized - show dashboard */}
-                      {(simulationMode ? simulationInitialized : dataCollectionStatus?.initialized) && dataCollectionStatus && (
-                        <>
-                          {/* Recording Controls */}
-                          <div className="recording-controls">
-                            <div className="recording-status-row">
-                              <div className="recording-indicator">
-                                <div className={`recording-dot ${dataCollectionStatus.recording ? 'recording' : ''}`}></div>
-                                <span>{dataCollectionStatus.recording ? 'Recording' : 'Idle'}</span>
-                              </div>
-                              <div className="recording-info">
-                                <span className="robot-id-badge">{dataCollectionStatus.robot_id}</span>
-                              </div>
-                            </div>
-                            
-                            {dataCollectionStatus.recording ? (
-                              <div className="recording-active-controls">
-                                <div className="recording-stats">
-                                  <span>Episode: {dataCollectionStatus.current_episode_id?.slice(0, 8)}...</span>
-                                </div>
-                                <div className="recording-buttons">
-                                  <button 
-                                    className="stop-btn" 
-                                    onClick={() => handleStopRecording(false)}
-                                    disabled={dataCollectionLoading}
-                                  >
-                                    Stop & Save
-                                  </button>
-                                  <button 
-                                    className="discard-btn" 
-                                    onClick={() => handleStopRecording(true)}
-                                    disabled={dataCollectionLoading}
-                                  >
-                                    Discard
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <button 
-                                className="record-btn" 
-                                onClick={() => handleStartRecording()}
-                                disabled={dataCollectionLoading}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                  <circle cx="12" cy="12" r="8"></circle>
-                                </svg>
-                                Start Recording
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Stream Status */}
-                          {dataCollectionStreams.length > 0 && (
-                            <div className="streams-section">
-                              <div className="streams-header">
-                                <span className="label-tiny">ACTIVE STREAMS</span>
-                                <button className="refresh-btn-small" onClick={loadDataCollectionStreams}>
-                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                    <path d="M23 4v6h-6"></path>
-                                    <path d="M1 20v-6h6"></path>
-                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                                  </svg>
-                                </button>
-                              </div>
-                              <div className="streams-list">
-                                {dataCollectionStreams.map(stream => (
-                                  <div key={stream.stream_id} className="stream-item">
-                                    <span className="stream-id">{stream.stream_id}</span>
-                                    <div className="stream-stats">
-                                      <span className="stream-samples">{stream.sample_count} samples</span>
-                                      <div className="stream-utilization">
-                                        <div 
-                                          className="utilization-bar" 
-                                          style={{ width: `${Math.min(stream.utilization_percent, 100)}%` }}
-                                        ></div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Episodes List */}
-                          <div className="episodes-section">
-                            <div className="episodes-header">
-                              <span className="label-tiny">RECORDED EPISODES ({dataCollectionStatus.total_episodes})</span>
-                              <button className="refresh-btn-small" onClick={() => loadDataCollectionEpisodes(episodePage)}>
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                  <path d="M23 4v6h-6"></path>
-                                  <path d="M1 20v-6h6"></path>
-                                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                                </svg>
-                              </button>
-                            </div>
-                            
-                            {dataCollectionEpisodes.length === 0 ? (
-                              <div className="episodes-empty">No episodes recorded yet</div>
-                            ) : (
-                              <>
-                                <div className="episodes-list">
-                                  {dataCollectionEpisodes.map(episode => {
-                                    const isSelected = selectedEpisodeId === episode.episode_id;
-                                    return (
-                                      <div 
-                                        key={episode.episode_id} 
-                                        className={`episode-item ${isSelected ? 'is-selected' : ''}`}
-                                        onClick={() => setSelectedEpisodeId(isSelected ? null : episode.episode_id)}
-                                      >
-                                        <div className="episode-main">
-                                          <div className="episode-id">{episode.episode_id.slice(0, 12)}...</div>
-                                          <div className="episode-meta">
-                                            <span>{formatDuration(episode.duration_secs)}</span>
-                                            <span>{formatBytes(episode.size_bytes)}</span>
-                                            <span>{episode.sample_count} samples</span>
-                                          </div>
-                                        </div>
-                                        <div className="episode-status">
-                                          <span className={`episode-status-badge ${episode.status}`}>{episode.status}</span>
-                                          {episode.upload_status && (
-                                            <span className={`upload-status-badge ${episode.upload_status}`}>{episode.upload_status}</span>
-                                          )}
-                                        </div>
-                                        
-                                        {isSelected && (
-                                          <div className="episode-actions">
-                                            <button 
-                                              className="episode-action-btn upload"
-                                              onClick={(e) => { e.stopPropagation(); handleUploadEpisode(episode.episode_id); }}
-                                              disabled={dataCollectionLoading || episode.upload_status === 'uploading'}
-                                            >
-                                              Upload
-                                            </button>
-                                            <button 
-                                              className="episode-action-btn delete"
-                                              onClick={(e) => { e.stopPropagation(); handleDeleteEpisode(episode.episode_id); }}
-                                              disabled={dataCollectionLoading}
-                                            >
-                                              Delete
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                                
-                                {/* Pagination */}
-                                <div className="episodes-pagination">
-                                  <button 
-                                    className="pagination-btn"
-                                    onClick={() => loadDataCollectionEpisodes(episodePage - 1)}
-                                    disabled={episodePage === 0}
-                                  >
-                                    Prev
-                                  </button>
-                                  <span className="pagination-info">Page {episodePage + 1}</span>
-                                  <button 
-                                    className="pagination-btn"
-                                    onClick={() => loadDataCollectionEpisodes(episodePage + 1)}
-                                    disabled={dataCollectionEpisodes.length < 10}
-                                  >
-                                    Next
-                                  </button>
-                                </div>
-                              </>
-                            )}
-                          </div>
-
-                          {/* Upload Status */}
-                          {uploadStatus && (uploadStatus.queued > 0 || uploadStatus.active > 0) && (
-                            <div className="upload-status-section">
-                              <div className="label-tiny">UPLOAD STATUS</div>
-                              <div className="upload-stats">
-                                <span>Queued: {uploadStatus.queued}</span>
-                                <span>Active: {uploadStatus.active}</span>
-                                <span>Uploaded: {formatBytes(uploadStatus.bytes_uploaded)}</span>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Storage Info */}
-                          <div className="storage-info">
-                            <span className="label-tiny">STORAGE</span>
-                            <span className="storage-value">{formatBytes(dataCollectionStatus.storage_used_bytes)}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
                 </>
               )}
         </div>
