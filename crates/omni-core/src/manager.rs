@@ -144,7 +144,40 @@ impl ConnectionManager {
         *state = new_state;
     }
 
+    /// Logout - clear authentication state and stored tokens
+    pub async fn logout(&mut self) -> Result<()> {
+        info!("Logging out - clearing authentication state...");
+
+        // Clear API client
+        self.api_client = None;
+
+        // Clear stored tokens from config
+        if let Ok(mut config) = crate::config::CliConfig::load() {
+            config.auth_response = None;
+            if let Err(e) = config.save() {
+                warn!("Failed to clear saved auth tokens: {}", e);
+            } else {
+                info!("Cleared saved authentication tokens");
+            }
+        }
+
+        // Set state to disconnected
+        self.set_state(ConnectionState::Disconnected).await;
+
+        Ok(())
+    }
+
     pub async fn try_auto_login(&mut self) -> Result<bool> {
+        // Skip if already authenticated or connected
+        let current_state = self.get_state().await;
+        if current_state != ConnectionState::Disconnected {
+            info!(
+                "Already authenticated (state: {:?}), skipping auto-login",
+                current_state
+            );
+            return Ok(true);
+        }
+
         info!("Attempting auto-login...");
         let config = crate::config::CliConfig::load()?;
         if let Some(auth) = config.auth_response.clone() {
@@ -232,9 +265,20 @@ impl ConnectionManager {
             *nid = Some(network_id.to_string());
         }
 
-        let _ = self.cleanup_adapters();
-        // Give the OS time to fully release TUN resources
-        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+        // On Windows, skip cleanup if we have an existing TUN we want to reuse
+        // This prevents destroying the adapter on reconnect
+        #[cfg(target_os = "windows")]
+        let should_cleanup = self.tun.is_none();
+        #[cfg(not(target_os = "windows"))]
+        let should_cleanup = true;
+
+        if should_cleanup {
+            let _ = self.cleanup_adapters();
+            // Give the OS time to fully release TUN resources
+            tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+        } else {
+            info!("Windows: Skipping adapter cleanup - reusing existing TUN");
+        }
 
         let client = self.api_client.as_ref().context("Not authenticated")?;
         let dev_service = DeviceService::new(client);
@@ -321,68 +365,113 @@ impl ConnectionManager {
 
         // 2. Setup TUN
         // First, check if an interface with this IP already exists
-        if let Some(existing_iface) = Self::find_interface_with_ip(&join_resp.virtual_ip) {
-            warn!(
-                "Interface {} already exists with IP {}. Cleaning up before creating new TUN.",
-                existing_iface, join_resp.virtual_ip
-            );
-            let _ = self.cleanup_adapters();
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        // On Windows, skip this check if we're reusing our existing TUN
+        #[cfg(target_os = "windows")]
+        let skip_interface_check = self.tun.is_some();
+        #[cfg(not(target_os = "windows"))]
+        let skip_interface_check = false;
+
+        if !skip_interface_check {
+            if let Some(existing_iface) = Self::find_interface_with_ip(&join_resp.virtual_ip) {
+                warn!(
+                    "Interface {} already exists with IP {}. Cleaning up before creating new TUN.",
+                    existing_iface, join_resp.virtual_ip
+                );
+                let _ = self.cleanup_adapters();
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            }
         }
 
         #[allow(unused_assignments)]
         let mut tun_instance: Option<OmniTun> = None;
         let mut port = 51820;
+        #[allow(unused_assignments)]
+        let mut tun_loop_already_active = false;
 
         #[cfg(target_os = "windows")]
         {
-            let if_names = ["OmniEdge"];
-            let mut setup_success = false;
-            let mut last_err = String::new();
-            let max_retries = 3;
-
-            for retry in 0..max_retries {
-                if retry > 0 {
-                    info!("TUN setup retry attempt {} of {}", retry + 1, max_retries);
-                    // Run cleanup again before retry
-                    let _ = self.cleanup_adapters();
-                    tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+            // On Windows, check if we already have a TUN from a previous connection.
+            // WinTun adapters persist and create "wintun 2", "wintun 3" etc. if we
+            // create new ones. Reuse the existing adapter when possible.
+            if let Some(ref existing_tun) = self.tun {
+                // Check if the TUN loop is still active from previous connection
+                if existing_tun.is_tun_active().await {
+                    info!("Windows: TUN loop is still active, reusing for reconnect");
+                    tun_loop_already_active = true;
+                    tun_instance = self.tun.take();
+                    // Reconfigure will happen via add_peer calls
+                    info!("Reconfiguring existing TUN for new connection...");
+                } else {
+                    info!("Windows: TUN exists but loop is not active, will restart loop");
+                    tun_instance = self.tun.take();
                 }
+            } else {
+                // No existing TUN, need to create one
+                // First, clean up any orphaned WinTun adapters from previous runs
+                if Self::windows_adapter_exists("wintun")
+                    || Self::windows_adapter_exists("OmniEdge")
+                {
+                    info!("Found orphaned WinTun/OmniEdge adapter(s), cleaning up...");
+                    let _ = self.cleanup_adapters();
+                    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
-                for ifname in if_names {
-                    debug!("Attempting TUN setup with interface name: {}", ifname);
-                    let mut tun = OmniTun::new_userspace(ifname);
-
-                    match tun
-                        .setup(
-                            &join_resp.virtual_ip,
-                            port,
-                            &::hex::encode(self.identity.private_key_bytes()),
-                        )
-                        .await
+                    if Self::windows_adapter_exists("wintun")
+                        || Self::windows_adapter_exists("OmniEdge")
                     {
-                        Ok(_) => {
-                            info!("TUN setup completed successfully using name: {}", ifname);
-                            setup_success = true;
-                            tun_instance = Some(tun);
-                            break;
-                        }
-                        Err(e) => {
-                            last_err = e.to_string();
-                            warn!("TUN setup failed for name {}: {}", ifname, e);
-                        }
+                        warn!("WinTun adapter still exists after cleanup, attempting force removal...");
+                        Self::windows_force_remove_adapter("wintun");
+                        Self::windows_force_remove_adapter("OmniEdge");
+                        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
                     }
                 }
 
-                if setup_success {
-                    break;
-                }
-            }
+                let if_names = ["OmniEdge"];
+                let mut setup_success = false;
+                let mut last_err = String::new();
+                let max_retries = 3;
 
-            if !setup_success {
-                let err_msg = format!("Failed to create TUN device after {} attempts. Please ensure you are running OmniEdge as Administrator and no other VPN is conflicting. Error: {}", max_retries, last_err);
-                error!("CRITICAL: {}", err_msg);
-                return Err(anyhow::anyhow!(err_msg));
+                for retry in 0..max_retries {
+                    if retry > 0 {
+                        info!("TUN setup retry attempt {} of {}", retry + 1, max_retries);
+                        let _ = self.cleanup_adapters();
+                        tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+                    }
+
+                    for ifname in if_names {
+                        debug!("Attempting TUN setup with interface name: {}", ifname);
+                        let mut tun = OmniTun::new_userspace(ifname);
+
+                        match tun
+                            .setup(
+                                &join_resp.virtual_ip,
+                                port,
+                                &::hex::encode(self.identity.private_key_bytes()),
+                            )
+                            .await
+                        {
+                            Ok(_) => {
+                                info!("TUN setup completed successfully using name: {}", ifname);
+                                setup_success = true;
+                                tun_instance = Some(tun);
+                                break;
+                            }
+                            Err(e) => {
+                                last_err = e.to_string();
+                                warn!("TUN setup failed for name {}: {}", ifname, e);
+                            }
+                        }
+                    }
+
+                    if setup_success {
+                        break;
+                    }
+                }
+
+                if !setup_success {
+                    let err_msg = format!("Failed to create TUN device after {} attempts. Please ensure you are running OmniEdge as Administrator and no other VPN is conflicting. Error: {}", max_retries, last_err);
+                    error!("CRITICAL: {}", err_msg);
+                    return Err(anyhow::anyhow!(err_msg));
+                }
             }
         }
 
@@ -444,6 +533,7 @@ impl ConnectionManager {
             nucleus_state,
             nucleus_port,
             is_nucleus,
+            tun_loop_already_active,
         )
         .await;
 
@@ -472,6 +562,7 @@ impl ConnectionManager {
         nucleus_state: Option<Arc<Mutex<NucleusState>>>,
         nucleus_port: u16,
         is_nucleus: bool,
+        skip_tun_loop: bool,
     ) {
         let (hb_tx, mut hb_rx) = mpsc::channel(1);
         self.heartbeat_tx = Some(hb_tx);
@@ -609,18 +700,23 @@ impl ConnectionManager {
         self.task_handles.push(dispatcher_handle);
 
         // TUN Transmission Loop (TUN -> network) remains necessary for outgoing traffic
-        let mut tun_tx = tun.clone();
-        let socket_tx = socket.clone();
-        let mut shutdown_rx2 = shutdown_tx.subscribe();
-        let tun_handle = tokio::spawn(async move {
-            tokio::select! {
-                _ = tun_tx.start_loop(socket_tx) => {}
-                _ = shutdown_rx2.recv() => {
-                    info!("TUN Transmission Loop shutting down");
+        // Skip if the TUN loop is already active from a previous connection (Windows reconnect)
+        if !skip_tun_loop {
+            let mut tun_tx = tun.clone();
+            let socket_tx = socket.clone();
+            let mut shutdown_rx2 = shutdown_tx.subscribe();
+            let tun_handle = tokio::spawn(async move {
+                tokio::select! {
+                    _ = tun_tx.start_loop(socket_tx) => {}
+                    _ = shutdown_rx2.recv() => {
+                        info!("TUN Transmission Loop shutting down");
+                    }
                 }
-            }
-        });
-        self.task_handles.push(tun_handle);
+            });
+            self.task_handles.push(tun_handle);
+        } else {
+            info!("Skipping TUN loop spawn - already active from previous connection");
+        }
 
         let api_client = self.api_client.as_ref().cloned();
         let proto_hb = proto.clone();
@@ -744,6 +840,7 @@ impl ConnectionManager {
     pub async fn wait_for_session_login(
         base_url: &str,
         session_id: &str,
+        mut cancel_rx: tokio::sync::oneshot::Receiver<()>,
     ) -> Result<WebSocketTokenResponse> {
         use futures_util::{SinkExt, StreamExt};
         use tokio::time::{timeout, Duration};
@@ -773,23 +870,36 @@ impl ConnectionManager {
             .context("WebSocket connection timed out during handshake")?
             .context("Failed to connect to login WebSocket")?;
 
-        info!("WebSocket connection established for session login.");
+        info!("WebSocket connection established for session login. Waiting for browser login...");
 
         let (mut write, mut read) = ws_stream.split();
 
-        // Ping loop to keep connection alive
-        tokio::spawn(async move {
+        // Create a cancellation token for the ping task (internal)
+        let (ping_cancel_tx, mut ping_cancel_rx) = tokio::sync::oneshot::channel::<()>();
+
+        // Ping loop to keep connection alive (will be cancelled when login completes)
+        let ping_handle = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(30));
             loop {
-                interval.tick().await;
-                if let Err(e) = write.send(Message::Ping(vec![])).await {
-                    debug!("WebSocket ping loop stopping: {}", e);
-                    break;
+                tokio::select! {
+                    _ = interval.tick() => {
+                        if let Err(e) = write.send(Message::Ping(vec![])).await {
+                            debug!("WebSocket ping loop stopping: {}", e);
+                            break;
+                        }
+                        debug!("Sent WebSocket ping");
+                    }
+                    _ = &mut ping_cancel_rx => {
+                        debug!("WebSocket ping loop cancelled");
+                        // Try to close the WebSocket gracefully
+                        let _ = write.send(Message::Close(None)).await;
+                        break;
+                    }
                 }
             }
         });
 
-        // 2. Wait for message with timeout
+        // Wait for token message with timeout
         let wait_future = async {
             while let Some(msg) = read.next().await {
                 match msg {
@@ -834,33 +944,49 @@ impl ConnectionManager {
                         info!("WebSocket closed by server: {:?}", frame);
                         return Err(anyhow::anyhow!("WebSocket closed by server: {:?}", frame));
                     }
+                    Ok(Message::Pong(_)) => {
+                        // Pong is expected response to our ping, no need to log at info level
+                        debug!("Received WebSocket Pong");
+                    }
                     Err(e) => {
                         error!("WebSocket error: {}", e);
                         return Err(anyhow::anyhow!("WebSocket error: {}", e));
                     }
                     msg => {
-                        info!("Received other WebSocket message: {:?}", msg);
+                        debug!("Received other WebSocket message: {:?}", msg);
                     }
                 }
             }
             Err(anyhow::anyhow!("WebSocket closed without receiving tokens"))
         };
 
-        // 15 minutes timeout to match Go implementation
-        let result = timeout(Duration::from_secs(900), wait_future).await;
-
-        match result {
-            Ok(res) => res,
-            Err(_) => {
-                error!(
-                    "Login session timed out after 15 minutes for session {}",
-                    session_id
-                );
-                Err(anyhow::anyhow!(
-                    "Login session timed out after 15 minutes. Please try again."
-                ))
+        // 15 minutes timeout to match Go implementation, with cancellation support
+        let result = tokio::select! {
+            res = timeout(Duration::from_secs(900), wait_future) => {
+                match res {
+                    Ok(r) => r,
+                    Err(_) => {
+                        error!(
+                            "Login session timed out after 15 minutes for session {}",
+                            session_id
+                        );
+                        Err(anyhow::anyhow!(
+                            "Login session timed out after 15 minutes. Please try again."
+                        ))
+                    }
+                }
             }
-        }
+            _ = &mut cancel_rx => {
+                info!("Login session cancelled by user for session {}", session_id);
+                Err(anyhow::anyhow!("Login cancelled by user"))
+            }
+        };
+
+        // Cancel the ping task
+        let _ = ping_cancel_tx.send(());
+        ping_handle.abort();
+
+        result
     }
 
     pub async fn get_networks(&self) -> Result<Vec<VirtualNetworkResponse>> {
@@ -1035,17 +1161,38 @@ impl ConnectionManager {
             info!("All background tasks completed or timed out");
         }
 
-        // Shutdown the TUN properly - this closes the file descriptor
-        // and causes macOS to remove the utun interface
-        if let Some(ref tun) = self.tun {
-            info!("Shutting down TUN interface...");
-            tun.shutdown().await;
-            info!("TUN interface shutdown complete");
+        // On Windows, we keep the TUN adapter alive to prevent accumulation of
+        // "wintun", "wintun 2", "wintun 3" etc. on repeated connect/disconnect.
+        // WinTun adapters are not automatically deleted when dropped, so we reuse them.
+        // On macOS/Linux, we shutdown properly as the kernel handles cleanup.
+        #[cfg(not(target_os = "windows"))]
+        {
+            // Shutdown the TUN properly - this closes the file descriptor
+            // and causes macOS to remove the utun interface
+            if let Some(ref tun) = self.tun {
+                info!("Shutting down TUN interface...");
+                tun.shutdown().await;
+                info!("TUN interface shutdown complete");
+            }
+            self.tun = None;
         }
 
-        // Now drop the references
+        #[cfg(target_os = "windows")]
+        {
+            // On Windows, use soft_shutdown to keep the TUN adapter alive.
+            // WinTun adapters persist and create "wintun 2", "wintun 3" etc. if we
+            // fully shutdown and recreate. Instead, keep the adapter/tasks alive
+            // but clear peers so no traffic flows. On reconnect, we'll reconfigure peers.
+            if let Some(ref tun) = self.tun {
+                info!("Windows: Soft shutdown TUN (keeping adapter alive for reconnect)...");
+                tun.soft_shutdown().await;
+                info!("Windows: TUN soft shutdown complete - adapter still active");
+                // Keep self.tun reference for reconnect
+            }
+        }
+
+        // Now drop the protocol reference
         self.proto = None;
-        self.tun = None;
 
         {
             let mut nid = self.current_network_id.write().await;
@@ -1056,7 +1203,12 @@ impl ConnectionManager {
             *vip = None;
         }
 
-        let _ = self.cleanup_adapters();
+        // On Windows, don't run cleanup_adapters during normal disconnect
+        // Only cleanup on app exit to prevent adapter accumulation
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = self.cleanup_adapters();
+        }
 
         if self.exit_node_ip.is_some() {
             let _ = crate::routing::RoutingManager::restore_exit_node();
@@ -1069,33 +1221,27 @@ impl ConnectionManager {
     pub fn cleanup_adapters(&self) -> Result<()> {
         #[cfg(target_os = "windows")]
         {
-            info!("Cleaning up all OmniEdge network adapters (Windows)...");
+            info!("Cleaning up all OmniEdge/WinTun network adapters (Windows)...");
 
-            // Method 1: Try to disable and remove via netsh
-            let ps_cmd = "Get-NetAdapter -IncludeHidden | Where-Object { $_.Name -like 'OmniEdge*' } | ForEach-Object { Disable-NetAdapter -Name $_.Name -Confirm:$false -ErrorAction SilentlyContinue }";
+            // Method 1: Use WinTun API to properly close adapters
+            // This is the most reliable method as it uses the same API that created them
+            let closed_omniedge = omni_tun::windows::delete_wintun_adapters("OmniEdge");
+            let closed_wintun = omni_tun::windows::delete_wintun_adapters("wintun");
+            let total_closed = closed_omniedge + closed_wintun;
+            if total_closed > 0 {
+                info!("Closed {} adapter(s) via WinTun API", total_closed);
+            }
+
+            // Method 2: Try to disable via PowerShell as fallback
+            let ps_cmd = "Get-NetAdapter -IncludeHidden | Where-Object { $_.Name -like 'wintun*' -or $_.Name -like 'OmniEdge*' } | ForEach-Object { Disable-NetAdapter -Name $_.Name -Confirm:$false -ErrorAction SilentlyContinue }";
             let _ = std::process::Command::new("powershell")
                 .args(["-Command", ps_cmd])
                 .output();
 
-            // Method 2: Use pnputil to remove WinTun devices
-            // Find and remove OmniEdge WinTun adapter instances
-            let pnp_find = r#"Get-PnpDevice -FriendlyName '*OmniEdge*' -ErrorAction SilentlyContinue | ForEach-Object { pnputil /remove-device $_.InstanceId 2>$null }"#;
+            // Method 3: Use pnputil to remove WinTun/OmniEdge device instances
+            let pnp_find = r#"Get-PnpDevice -FriendlyName '*wintun*' -ErrorAction SilentlyContinue | ForEach-Object { pnputil /remove-device $_.InstanceId 2>$null }; Get-PnpDevice -FriendlyName '*OmniEdge*' -ErrorAction SilentlyContinue | ForEach-Object { pnputil /remove-device $_.InstanceId 2>$null }"#;
             let _ = std::process::Command::new("powershell")
                 .args(["-Command", pnp_find])
-                .output();
-
-            // Method 3: Reset WinTun driver state by stopping/starting
-            // This can help clear stale ring buffer registrations
-            let reset_cmd = r#"
-                $wintunService = Get-Service -Name 'WinTun' -ErrorAction SilentlyContinue;
-                if ($wintunService) {
-                    Stop-Service -Name 'WinTun' -Force -ErrorAction SilentlyContinue;
-                    Start-Sleep -Milliseconds 500;
-                    Start-Service -Name 'WinTun' -ErrorAction SilentlyContinue;
-                }
-            "#;
-            let _ = std::process::Command::new("powershell")
-                .args(["-Command", reset_cmd])
                 .output();
         }
 
@@ -1224,5 +1370,133 @@ impl ConnectionManager {
     /// Check if we're already connected (have an active TUN)
     pub fn is_connected(&self) -> bool {
         self.tun.is_some()
+    }
+
+    /// Check if a Windows network adapter with the given name pattern exists
+    #[cfg(target_os = "windows")]
+    pub fn windows_adapter_exists(name_pattern: &str) -> bool {
+        let ps_cmd = format!(
+            "Get-NetAdapter -IncludeHidden -ErrorAction SilentlyContinue | Where-Object {{ $_.Name -like '{}*' }} | Measure-Object | Select-Object -ExpandProperty Count",
+            name_pattern
+        );
+
+        let output = std::process::Command::new("powershell")
+            .args(["-Command", &ps_cmd])
+            .output();
+
+        if let Ok(out) = output {
+            let count_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if let Ok(count) = count_str.parse::<i32>() {
+                if count > 0 {
+                    debug!(
+                        "Found {} existing adapter(s) matching pattern '{}'",
+                        count, name_pattern
+                    );
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Force remove a Windows network adapter by name pattern using multiple methods
+    /// This is specifically designed for WinTun adapters which persist across sessions
+    #[cfg(target_os = "windows")]
+    pub fn windows_force_remove_adapter(name_pattern: &str) {
+        info!(
+            "Force removing Windows adapter(s) matching pattern: {}",
+            name_pattern
+        );
+
+        // Method 1: Use pnputil to remove the device completely
+        // This is the most reliable method for WinTun adapters
+        let pnp_cmd = format!(
+            r#"
+            $devices = Get-PnpDevice -FriendlyName '*{0}*' -ErrorAction SilentlyContinue
+            if ($devices) {{
+                foreach ($dev in $devices) {{
+                    Write-Host "Removing device: $($dev.FriendlyName) ($($dev.InstanceId))"
+                    & pnputil /remove-device $dev.InstanceId /force 2>&1 | Out-Null
+                }}
+            }}
+            # Also try by driver description
+            $wintunDevices = Get-PnpDevice -Class Net -ErrorAction SilentlyContinue | Where-Object {{ $_.FriendlyName -like '*{0}*' -or $_.FriendlyName -like '*WinTun*' }}
+            foreach ($dev in $wintunDevices) {{
+                Write-Host "Removing WinTun device: $($dev.FriendlyName)"
+                & pnputil /remove-device $dev.InstanceId /force 2>&1 | Out-Null
+            }}
+            "#,
+            name_pattern
+        );
+        let output = std::process::Command::new("powershell")
+            .args(["-Command", &pnp_cmd])
+            .output();
+        if let Ok(out) = output {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            if !stdout.trim().is_empty() {
+                debug!("pnputil output: {}", stdout.trim());
+            }
+        }
+
+        // Method 2: Remove via devcon if available (Windows Driver Kit tool)
+        let devcon_cmd = format!(
+            r#"
+            $devconPath = Get-Command devcon.exe -ErrorAction SilentlyContinue
+            if ($devconPath) {{
+                & devcon remove "*{0}*" 2>&1 | Out-Null
+                & devcon remove "*WINTUN*" 2>&1 | Out-Null
+            }}
+            "#,
+            name_pattern
+        );
+        let _ = std::process::Command::new("powershell")
+            .args(["-Command", &devcon_cmd])
+            .output();
+
+        // Method 3: Use SetupAPI to remove device (via PowerShell with .NET)
+        // This directly calls Windows Setup API which is what devcon uses
+        let setupapi_cmd = r#"
+            Add-Type -TypeDefinition @"
+            using System;
+            using System.Runtime.InteropServices;
+            public class DeviceRemover {
+                [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Auto)]
+                public static extern IntPtr SetupDiGetClassDevs(ref Guid ClassGuid, IntPtr Enumerator, IntPtr hwndParent, int Flags);
+                
+                [DllImport("setupapi.dll", SetLastError = true)]
+                public static extern bool SetupDiDestroyDeviceInfoList(IntPtr DeviceInfoSet);
+            }
+"@
+            # Note: Full implementation would require more P/Invoke code
+            # This is a placeholder for the SetupAPI approach
+            Write-Host "SetupAPI cleanup attempted"
+        "#;
+        let _ = std::process::Command::new("powershell")
+            .args(["-Command", setupapi_cmd])
+            .output();
+
+        // Method 4: Disable and then try to remove from device manager
+        let disable_cmd = format!(
+            "Get-NetAdapter -IncludeHidden -ErrorAction SilentlyContinue | Where-Object {{ $_.Name -like '{}*' }} | Disable-NetAdapter -Confirm:$false -ErrorAction SilentlyContinue",
+            name_pattern
+        );
+        let _ = std::process::Command::new("powershell")
+            .args(["-Command", &disable_cmd])
+            .output();
+
+        info!(
+            "Completed force removal attempts for adapter pattern: {}",
+            name_pattern
+        );
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    pub fn windows_adapter_exists(_name_pattern: &str) -> bool {
+        false
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    pub fn windows_force_remove_adapter(_name_pattern: &str) {
+        // No-op on non-Windows platforms
     }
 }
