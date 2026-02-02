@@ -79,6 +79,8 @@ async fn is_helper_available() -> bool {
 pub struct ServiceStatus {
     pub is_running: bool,
     pub virtual_ip: Option<String>,
+    /// IPv6 virtual IP address (dual-stack support)
+    pub virtual_ip_v6: Option<String>,
     pub network_id: Option<String>,
     pub interface_name: Option<String>,
     pub mode: Option<String>,
