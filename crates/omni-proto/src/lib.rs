@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use omninervous::signaling::NucleusClient;
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::net::UdpSocket;
 
 // Re-export nucleus server components for dual mode
@@ -33,6 +33,8 @@ pub use omninervous::NetworkConfig as NervousNetworkConfig;
 
 pub struct PeerInfo {
     pub vip: Ipv4Addr,
+    /// IPv6 virtual IP address (dual-stack support)
+    pub vip_v6: Option<Ipv6Addr>,
     pub endpoint: Option<SocketAddr>,
     pub public_key: [u8; 32],
 }
@@ -44,6 +46,8 @@ pub struct PeerUpdate {
 pub struct OmniProto {
     client: NucleusClient,
     nucleus_host: String,
+    /// Local IPv6 virtual IP (dual-stack support)
+    vip_v6: Option<Ipv6Addr>,
 }
 
 impl OmniProto {
@@ -53,6 +57,7 @@ impl OmniProto {
         cluster: String,
         secret_key: String,
         virtual_ip: Ipv4Addr,
+        virtual_ip_v6: Option<Ipv6Addr>,
         listen_port: u16,
         public_key: [u8; 32],
     ) -> Result<Self> {
@@ -76,6 +81,7 @@ impl OmniProto {
         Ok(Self {
             client,
             nucleus_host: nucleus_host.to_string(),
+            vip_v6: virtual_ip_v6,
         })
     }
 
@@ -107,6 +113,8 @@ impl OmniProto {
                 for p in ack.recent_peers {
                     peers.push(PeerInfo {
                         vip: p.vip,
+                        // TODO: Parse vip_v6 from signaling when omninervous supports it
+                        vip_v6: None,
                         endpoint: p.endpoint.parse().ok(),
                         public_key: p.public_key,
                     });
@@ -117,6 +125,8 @@ impl OmniProto {
                 for p in ack.new_peers {
                     peers.push(PeerInfo {
                         vip: p.vip,
+                        // TODO: Parse vip_v6 from signaling when omninervous supports it
+                        vip_v6: None,
                         endpoint: p.endpoint.parse().ok(),
                         public_key: p.public_key,
                     });
@@ -134,6 +144,11 @@ impl OmniProto {
 
     pub fn vip(&self) -> Ipv4Addr {
         self.client.vip()
+    }
+
+    /// Get the IPv6 virtual IP address (if dual-stack is enabled)
+    pub fn vip_v6(&self) -> Option<Ipv6Addr> {
+        self.vip_v6
     }
 
     // ========================================================================

@@ -28,6 +28,8 @@ pub struct ConnectionManager {
     device_id: Option<String>,
     current_network_id: Arc<RwLock<Option<String>>>,
     virtual_ip: Arc<RwLock<Option<String>>>,
+    /// IPv6 virtual IP address (dual-stack support)
+    virtual_ip_v6: Arc<RwLock<Option<String>>>,
     heartbeat_tx: Option<mpsc::Sender<()>>,
     shutdown_tx: Option<broadcast::Sender<()>>,
     task_handles: Vec<JoinHandle<()>>,
@@ -64,6 +66,7 @@ impl ConnectionManager {
             device_id: None,
             current_network_id: Arc::new(RwLock::new(None)),
             virtual_ip: Arc::new(RwLock::new(None)),
+            virtual_ip_v6: Arc::new(RwLock::new(None)),
             heartbeat_tx: None,
             shutdown_tx: None,
             task_handles: Vec::new(),
@@ -85,6 +88,11 @@ impl ConnectionManager {
 
     pub fn get_virtual_ip_handle(&self) -> Arc<RwLock<Option<String>>> {
         self.virtual_ip.clone()
+    }
+
+    /// Get the IPv6 virtual IP handle (dual-stack support)
+    pub fn get_virtual_ip_v6_handle(&self) -> Arc<RwLock<Option<String>>> {
+        self.virtual_ip_v6.clone()
     }
 
     pub fn get_as_exit_node_handle(&self) -> Arc<AtomicBool> {
@@ -127,12 +135,15 @@ impl ConnectionManager {
         state: ConnectionState,
         network_id: Option<String>,
         virtual_ip: Option<String>,
+        virtual_ip_v6: Option<String>,
     ) {
         self.set_state(state).await;
         let mut nid = self.current_network_id.write().await;
         *nid = network_id;
         let mut vip = self.virtual_ip.write().await;
         *vip = virtual_ip;
+        let mut vip_v6 = self.virtual_ip_v6.write().await;
+        *vip_v6 = virtual_ip_v6;
     }
 
     async fn set_state(&self, new_state: ConnectionState) {
@@ -343,6 +354,17 @@ impl ConnectionManager {
 
         // 2. Initialize Proto & Tun
         let vip_addr: std::net::Ipv4Addr = join_resp.virtual_ip.parse()?;
+        
+        // Parse IPv6 address if provided (dual-stack support)
+        let vip_v6_addr: Option<std::net::Ipv6Addr> = join_resp
+            .virtual_ip_v6
+            .as_ref()
+            .and_then(|v| v.parse().ok());
+        
+        if let Some(ref v6) = vip_v6_addr {
+            info!("Dual-stack enabled. VIP: {}, VIPv6: {}", vip_addr, v6);
+        }
+        
         self.cluster_secret = Some(join_resp.secret_key.clone());
         info!("Initializing OmniProto for VIP: {}", vip_addr);
 
@@ -352,6 +374,7 @@ impl ConnectionManager {
                 join_resp.cluster.clone(),
                 join_resp.secret_key.clone(),
                 vip_addr,
+                vip_v6_addr,
                 0,
                 self.identity.public_key_bytes(),
             )
@@ -452,8 +475,10 @@ impl ConnectionManager {
                         let mut tun = OmniTun::new_userspace(ifname);
 
                         match tun
-                            .setup(
+                            .setup_dual_stack(
                                 &join_resp.virtual_ip,
+                                join_resp.virtual_ip_v6.as_deref(),
+                                join_resp.subnet_prefix_v6,
                                 port,
                                 &::hex::encode(self.identity.private_key_bytes()),
                             )
@@ -504,8 +529,10 @@ impl ConnectionManager {
                 }
             );
             let mut tun = OmniTun::new_userspace(ifname);
-            tun.setup(
+            tun.setup_dual_stack(
                 &join_resp.virtual_ip,
+                join_resp.virtual_ip_v6.as_deref(),
+                join_resp.subnet_prefix_v6,
                 port,
                 &::hex::encode(self.identity.private_key_bytes()),
             )
@@ -523,6 +550,10 @@ impl ConnectionManager {
         {
             let mut vip = self.virtual_ip.write().await;
             *vip = Some(join_resp.virtual_ip.clone());
+        }
+        {
+            let mut vip_v6 = self.virtual_ip_v6.write().await;
+            *vip_v6 = join_resp.virtual_ip_v6.clone();
         }
 
         // 4. Start Background Loops
@@ -682,7 +713,11 @@ impl ConnectionManager {
                                     {
                                         for peer in update.peers {
                                             let pubkey = ::hex::encode(peer.public_key);
-                                            let allowed_ips = vec![format!("{}/32", peer.vip)];
+                                            let mut allowed_ips = vec![format!("{}/32", peer.vip)];
+                                            // Add IPv6 allowed IP if peer has one
+                                            if let Some(vip_v6) = peer.vip_v6 {
+                                                allowed_ips.push(format!("{}/128", vip_v6));
+                                            }
                                             let _ = tun_ctrl
                                                 .add_peer(&pubkey, peer.endpoint, &allowed_ips)
                                                 .await;
@@ -1133,6 +1168,11 @@ impl ConnectionManager {
         "".to_string()
     }
 
+    /// Get the IPv6 virtual IP address (dual-stack support)
+    pub async fn get_virtual_ip_v6(&self) -> Option<String> {
+        self.virtual_ip_v6.read().await.clone()
+    }
+
     pub fn get_identity_private_key(&self) -> [u8; 32] {
         self.identity.private_key_bytes()
     }
@@ -1211,6 +1251,10 @@ impl ConnectionManager {
         {
             let mut vip = self.virtual_ip.write().await;
             *vip = None;
+        }
+        {
+            let mut vip_v6 = self.virtual_ip_v6.write().await;
+            *vip_v6 = None;
         }
 
         // On Windows, don't run cleanup_adapters during normal disconnect

@@ -2804,6 +2804,7 @@ pub fn run() {
                                     state: ConnectionState,
                                     network_id: Option<String>,
                                     virtual_ip: Option<String>,
+                                    virtual_ip_v6: Option<String>,
                                 }
 
                                 if let Ok(status) = serde_json::from_value::<HelperStatusData>(data)
@@ -2821,6 +2822,7 @@ pub fn run() {
                                                 status.state.clone(),
                                                 status.network_id.clone(),
                                                 status.virtual_ip.clone(),
+                                                status.virtual_ip_v6.clone(),
                                             )
                                             .await;
 
@@ -2833,6 +2835,7 @@ pub fn run() {
                                                 "state": status.state,
                                                 "network_id": status.network_id,
                                                 "virtual_ip": status.virtual_ip,
+                                                "virtual_ip_v6": status.virtual_ip_v6,
                                             }),
                                         );
 

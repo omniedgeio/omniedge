@@ -184,6 +184,9 @@ pub struct VirtualNetworkResponse {
     pub name: String,
     #[serde(rename = "ip_range", alias = "ipRange", default)]
     pub ip_range: String,
+    /// IPv6 IP range for the network (e.g., "fd00::/120")
+    #[serde(rename = "ip_range_v6", alias = "ipRangeV6", default)]
+    pub ip_range_v6: Option<String>,
     #[serde(default)]
     pub role: i32,
     pub server: Option<ServerResponse>,
@@ -211,6 +214,13 @@ pub struct VirtualNetworkDeviceResponse {
         default
     )]
     pub virtual_ip: String,
+    /// IPv6 virtual IP address (dual-stack support)
+    #[serde(
+        rename = "virtual_ip_v6",
+        alias = "virtualIpV6",
+        default
+    )]
+    pub virtual_ip_v6: Option<String>,
     #[serde(rename = "is_exit_node", alias = "isExitNode", default)]
     pub is_exit_node: bool,
     #[serde(default)]
@@ -240,6 +250,27 @@ pub struct JoinVirtualNetworkResponse {
     pub virtual_ip: String,
     #[serde(rename = "subnetMask", alias = "subnet_mask", alias = "mask", default)]
     pub subnet_mask: String,
+    /// IPv6 virtual IP address (dual-stack support)
+    #[serde(
+        rename = "virtualIpV6",
+        alias = "virtual_ip_v6",
+        default
+    )]
+    pub virtual_ip_v6: Option<String>,
+    /// IPv6 subnet prefix length (e.g., 120 for /120)
+    #[serde(
+        rename = "subnetPrefixV6",
+        alias = "subnet_prefix_v6",
+        default
+    )]
+    pub subnet_prefix_v6: Option<u8>,
+    /// IPv6 IP range for the network (e.g., "fd00::/120")
+    #[serde(
+        rename = "ipRangeV6",
+        alias = "ip_range_v6",
+        default
+    )]
+    pub ip_range_v6: Option<String>,
     pub server: ServerResponse,
 }
 
@@ -250,6 +281,9 @@ impl std::fmt::Debug for JoinVirtualNetworkResponse {
             .field("secret_key", &"***REDACTED***")
             .field("virtual_ip", &self.virtual_ip)
             .field("subnet_mask", &self.subnet_mask)
+            .field("virtual_ip_v6", &self.virtual_ip_v6)
+            .field("subnet_prefix_v6", &self.subnet_prefix_v6)
+            .field("ip_range_v6", &self.ip_range_v6)
             .field("server", &self.server)
             .finish()
     }
@@ -276,6 +310,13 @@ pub struct DeviceResponse {
         default
     )]
     pub virtual_ip: Option<String>,
+    /// IPv6 virtual IP address (dual-stack support)
+    #[serde(
+        rename = "virtual_ip_v6",
+        alias = "virtualIpV6",
+        default
+    )]
+    pub virtual_ip_v6: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
