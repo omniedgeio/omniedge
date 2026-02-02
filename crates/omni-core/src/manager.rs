@@ -398,15 +398,15 @@ impl ConnectionManager {
             );
         }
 
-        // TODO (v0.3.1): Pass remaining NetworkConfig to OmniNervous
-        // Once NucleusClient accepts these configs, uncomment:
-        //
-        // if let Some(relay_server) = &self.network_config.relay_server {
-        //     proto.set_relay_server(relay_server);
-        // }
-        // proto.set_relay_enabled(self.network_config.relay_enabled);
-        // proto.set_portmap_enabled(self.network_config.portmap_enabled);
-        // proto.set_encrypt_signaling(self.network_config.encrypt_signaling);
+        // Pass NetworkConfig relay/portmap settings to OmniNervous runtime state
+        proto
+            .update_relay_enabled(self.network_config.relay_enabled)
+            .await;
+        proto
+            .update_portmap_enabled(self.network_config.portmap_enabled)
+            .await;
+        // Note: relay_server and encrypt_signaling are set via OmniNervous config file,
+        // not through runtime API. See OmniNervous crates/daemon/src/config.rs
 
         // 2. Setup TUN
         // First, check if an interface with this IP already exists
