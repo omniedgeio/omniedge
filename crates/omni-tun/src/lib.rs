@@ -42,9 +42,15 @@ impl OmniTun {
             let prefix = prefix_v6.unwrap_or(120);
             if let Err(e) = self.add_ipv6_address(ipv6, prefix).await {
                 // IPv6 failure is non-fatal - log warning and continue with IPv4 only
-                warn!("Failed to configure IPv6 address {}/{}: {}. Continuing with IPv4 only.", ipv6, prefix, e);
+                warn!(
+                    "Failed to configure IPv6 address {}/{}: {}. Continuing with IPv4 only.",
+                    ipv6, prefix, e
+                );
             } else {
-                info!("Dual-stack configured: IPv4={}, IPv6={}/{}", vip, ipv6, prefix);
+                info!(
+                    "Dual-stack configured: IPv4={}, IPv6={}/{}",
+                    vip, ipv6, prefix
+                );
             }
         }
 
@@ -54,15 +60,22 @@ impl OmniTun {
     /// Add an IPv6 address to the TUN interface (platform-specific)
     async fn add_ipv6_address(&self, ipv6: &str, prefix_len: u8) -> anyhow::Result<()> {
         let ifname = self.get_interface_name().await;
-        
+
         #[cfg(target_os = "linux")]
         {
             // Linux: ip -6 addr add <ipv6>/<prefix> dev <ifname>
             let output = std::process::Command::new("ip")
-                .args(["-6", "addr", "add", &format!("{}/{}", ipv6, prefix_len), "dev", &ifname])
+                .args([
+                    "-6",
+                    "addr",
+                    "add",
+                    &format!("{}/{}", ipv6, prefix_len),
+                    "dev",
+                    &ifname,
+                ])
                 .output()
                 .map_err(|e| anyhow::anyhow!("Failed to run ip command: {}", e))?;
-            
+
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 // Ignore "already exists" error
@@ -80,7 +93,7 @@ impl OmniTun {
                 .args([&ifname, "inet6", ipv6, "prefixlen", &prefix_len.to_string()])
                 .output()
                 .map_err(|e| anyhow::anyhow!("Failed to run ifconfig command: {}", e))?;
-            
+
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 return Err(anyhow::anyhow!("ifconfig inet6 failed: {}", stderr));
@@ -99,12 +112,15 @@ impl OmniTun {
                 .args(["-Command", &ps_cmd])
                 .output()
                 .map_err(|e| anyhow::anyhow!("Failed to run PowerShell command: {}", e))?;
-            
+
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 // Ignore if address already exists
                 if !stderr.contains("already exists") && !stderr.is_empty() {
-                    return Err(anyhow::anyhow!("PowerShell New-NetIPAddress failed: {}", stderr));
+                    return Err(anyhow::anyhow!(
+                        "PowerShell New-NetIPAddress failed: {}",
+                        stderr
+                    ));
                 }
             }
             debug!("Added IPv6 address {}/{} to {}", ipv6, prefix_len, ifname);
@@ -127,7 +143,7 @@ impl OmniTun {
                 return "utun7".to_string();
             }
         }
-        
+
         // On Windows, use "OmniEdge" as the default interface name
         #[cfg(target_os = "windows")]
         {
@@ -135,7 +151,7 @@ impl OmniTun {
                 return "OmniEdge".to_string();
             }
         }
-        
+
         // On Linux, use the configured name or "omniedge0" as default
         #[cfg(target_os = "linux")]
         {
@@ -143,7 +159,7 @@ impl OmniTun {
                 return "omniedge0".to_string();
             }
         }
-        
+
         self.ifname.clone()
     }
 

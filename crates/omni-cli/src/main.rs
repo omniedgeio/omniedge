@@ -872,10 +872,12 @@ async fn main() -> Result<()> {
                 }
 
                 // Show IPv6 virtual IP if available (prefer live data, fall back to config)
-                let virtual_ip_v6 = status
-                    .virtual_ip_v6
-                    .clone()
-                    .or_else(|| config.last_join_info.as_ref().and_then(|j| j.virtual_ip_v6.clone()));
+                let virtual_ip_v6 = status.virtual_ip_v6.clone().or_else(|| {
+                    config
+                        .last_join_info
+                        .as_ref()
+                        .and_then(|j| j.virtual_ip_v6.clone())
+                });
                 if let Some(ref vip6) = virtual_ip_v6 {
                     println!("  Virtual IPv6: {}", vip6);
                 }

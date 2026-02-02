@@ -354,17 +354,17 @@ impl ConnectionManager {
 
         // 2. Initialize Proto & Tun
         let vip_addr: std::net::Ipv4Addr = join_resp.virtual_ip.parse()?;
-        
+
         // Parse IPv6 address if provided (dual-stack support)
         let vip_v6_addr: Option<std::net::Ipv6Addr> = join_resp
             .virtual_ip_v6
             .as_ref()
             .and_then(|v| v.parse().ok());
-        
+
         if let Some(ref v6) = vip_v6_addr {
             info!("Dual-stack enabled. VIP: {}, VIPv6: {}", vip_addr, v6);
         }
-        
+
         self.cluster_secret = Some(join_resp.secret_key.clone());
         info!("Initializing OmniProto for VIP: {}", vip_addr);
 
@@ -381,8 +381,25 @@ impl ConnectionManager {
             .await?,
         );
 
-        // TODO (v0.3.1): Pass NetworkConfig to OmniNervous
-        // Once NucleusClient accepts config, uncomment:
+        // Pass IPv6 configuration to protocol layer
+        // Note: These are currently no-ops until OmniNervous adds full IPv6 support,
+        // but setting them now ensures they'll work when the underlying library is updated.
+        if self.network_config.ipv6_enabled {
+            proto.set_ipv6_enabled(true);
+            proto.set_ipv6_preference(
+                self.network_config.prefer_ipv6,
+                self.network_config.ipv6_preference_threshold_ms,
+            );
+            info!(
+                "IPv6 configuration: enabled={}, prefer={}, threshold={}ms",
+                self.network_config.ipv6_enabled,
+                self.network_config.prefer_ipv6,
+                self.network_config.ipv6_preference_threshold_ms
+            );
+        }
+
+        // TODO (v0.3.1): Pass remaining NetworkConfig to OmniNervous
+        // Once NucleusClient accepts these configs, uncomment:
         //
         // if let Some(relay_server) = &self.network_config.relay_server {
         //     proto.set_relay_server(relay_server);
@@ -390,11 +407,6 @@ impl ConnectionManager {
         // proto.set_relay_enabled(self.network_config.relay_enabled);
         // proto.set_portmap_enabled(self.network_config.portmap_enabled);
         // proto.set_encrypt_signaling(self.network_config.encrypt_signaling);
-        // proto.set_ipv6_enabled(self.network_config.ipv6_enabled);
-        // proto.set_ipv6_preference(
-        //     self.network_config.prefer_ipv6,
-        //     self.network_config.ipv6_preference_threshold_ms
-        // );
 
         // 2. Setup TUN
         // First, check if an interface with this IP already exists
@@ -541,7 +553,19 @@ impl ConnectionManager {
         }
 
         let tun = tun_instance.context("TUN instance not created")?;
-        let socket: Arc<UdpSocket> = Arc::new(UdpSocket::bind("0.0.0.0:0").await?);
+
+        // Create dual-stack UDP socket for IPv6 support
+        // Try binding to [::]:0 first (dual-stack), fall back to 0.0.0.0:0 (IPv4-only)
+        let socket: Arc<UdpSocket> =
+            Arc::new(Self::create_dual_stack_socket().await.unwrap_or_else(|e| {
+                warn!(
+                    "Failed to create dual-stack socket: {}. Falling back to IPv4-only.",
+                    e
+                );
+                // This should not fail, but handle it gracefully
+                futures::executor::block_on(UdpSocket::bind("0.0.0.0:0"))
+                    .expect("Failed to bind IPv4 socket")
+            }));
         port = socket.local_addr()?.port();
         debug!("Bound UDP socket to port: {}", port);
 
@@ -1424,6 +1448,66 @@ impl ConnectionManager {
     /// Check if we're already connected (have an active TUN)
     pub fn is_connected(&self) -> bool {
         self.tun.is_some()
+    }
+
+    /// Create a dual-stack UDP socket that supports both IPv4 and IPv6
+    ///
+    /// This binds to [::]:0 which on most systems accepts both IPv4 and IPv6 traffic.
+    /// On Windows, we need to explicitly disable IPV6_V6ONLY to enable dual-stack.
+    /// On Linux/macOS, dual-stack is typically the default behavior.
+    async fn create_dual_stack_socket() -> Result<UdpSocket> {
+        use std::net::{Ipv6Addr, SocketAddrV6};
+
+        // Create a socket bound to IPv6 any address with port 0 (auto-assign)
+        let addr = SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, 0, 0, 0);
+
+        // First try using socket2 to set IPV6_V6ONLY = false for true dual-stack
+        #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+        {
+            use socket2::{Domain, Protocol, Socket, Type};
+
+            let socket = Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))
+                .context("Failed to create IPv6 UDP socket")?;
+
+            // Disable IPV6_V6ONLY to allow IPv4 connections on IPv6 socket (dual-stack)
+            // On Windows this is required; on Linux/macOS it's usually the default
+            if let Err(e) = socket.set_only_v6(false) {
+                warn!(
+                    "Failed to disable IPV6_V6ONLY (dual-stack may not work): {}",
+                    e
+                );
+            }
+
+            // Set non-blocking before binding
+            socket
+                .set_nonblocking(true)
+                .context("Failed to set socket non-blocking")?;
+
+            // Bind to [::]:0
+            socket
+                .bind(&addr.into())
+                .context("Failed to bind dual-stack socket")?;
+
+            // Convert socket2::Socket to tokio::net::UdpSocket
+            let std_socket: std::net::UdpSocket = socket.into();
+            let tokio_socket =
+                UdpSocket::from_std(std_socket).context("Failed to convert to tokio UdpSocket")?;
+
+            let local_addr = tokio_socket.local_addr()?;
+            info!("Created dual-stack UDP socket on {}", local_addr);
+
+            return Ok(tokio_socket);
+        }
+
+        // Fallback for other platforms: just bind to IPv6 and hope for the best
+        #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+        {
+            let socket = UdpSocket::bind(addr)
+                .await
+                .context("Failed to bind IPv6 UDP socket")?;
+            info!("Created IPv6 UDP socket on {}", socket.local_addr()?);
+            Ok(socket)
+        }
     }
 
     /// Check if a Windows network adapter with the given name pattern exists

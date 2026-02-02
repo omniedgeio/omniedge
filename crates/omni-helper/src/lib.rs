@@ -63,6 +63,8 @@ pub struct HelperServer {
     state: Arc<RwLock<ConnectionState>>,
     network_id: Arc<RwLock<Option<String>>>,
     virtual_ip: Arc<RwLock<Option<String>>>,
+    /// IPv6 virtual IP address (dual-stack support)
+    virtual_ip_v6: Arc<RwLock<Option<String>>>,
     as_exit_node: Arc<AtomicBool>,
 }
 
@@ -72,12 +74,14 @@ impl HelperServer {
         let state = manager.get_state_handle();
         let network_id = manager.get_network_id_handle();
         let virtual_ip = manager.get_virtual_ip_handle();
+        let virtual_ip_v6 = manager.get_virtual_ip_v6_handle();
         let as_exit_node = manager.get_as_exit_node_handle();
         Self {
             manager: Arc::new(Mutex::new(manager)),
             state,
             network_id,
             virtual_ip,
+            virtual_ip_v6,
             as_exit_node,
         }
     }
@@ -101,7 +105,7 @@ impl HelperServer {
                 let state = self.state.read().await.clone();
                 let network_id = self.network_id.read().await.clone();
                 let virtual_ip = self.virtual_ip.read().await.clone();
-                // We could still lock for virtual_ip fallback if needed, but usually it's in the handle
+                let virtual_ip_v6 = self.virtual_ip_v6.read().await.clone();
 
                 HelperResponse {
                     success: true,
@@ -110,6 +114,7 @@ impl HelperServer {
                         "state": state,
                         "network_id": network_id,
                         "virtual_ip": virtual_ip,
+                        "virtual_ip_v6": virtual_ip_v6,
                     })),
                 }
             }
@@ -177,6 +182,14 @@ impl HelperServer {
                     success: true,
                     message: "Current virtual IP".to_string(),
                     data: Some(serde_json::to_value(vip).unwrap()),
+                }
+            }
+            "get_virtual_ip_v6" => {
+                let vip_v6 = self.virtual_ip_v6.read().await.clone().unwrap_or_default();
+                HelperResponse {
+                    success: true,
+                    message: "Current IPv6 virtual IP".to_string(),
+                    data: Some(serde_json::to_value(vip_v6).unwrap()),
                 }
             }
             "stop_vpn" => {

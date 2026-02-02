@@ -242,4 +242,41 @@ impl OmniProto {
     pub async fn update_portmap_enabled(&self, enabled: bool) {
         self.client.update_portmap_enabled(enabled).await;
     }
+
+    // ========================================================================
+    // IPv6 Configuration (v2.1.0+ Dual-Stack Support)
+    // ========================================================================
+
+    /// Check if IPv6 is enabled for this protocol instance
+    /// Returns true if a VIPv6 was provided during construction
+    pub fn is_ipv6_enabled(&self) -> bool {
+        self.vip_v6.is_some()
+    }
+
+    /// Get IPv6 configuration summary for display
+    pub fn get_ipv6_summary(&self) -> String {
+        match self.vip_v6 {
+            Some(v6) => format!("IPv6 Enabled ({})", v6),
+            None => "IPv6 Disabled".to_string(),
+        }
+    }
+
+    // NOTE: The following methods are placeholders for future OmniNervous integration.
+    // Once OmniNervous supports IPv6 configuration, these will call the underlying client.
+
+    /// Set IPv6 enabled state (placeholder for future OmniNervous integration)
+    /// Currently a no-op as OmniNervous doesn't yet support runtime IPv6 config
+    #[allow(unused_variables)]
+    pub fn set_ipv6_enabled(&self, enabled: bool) {
+        // TODO (v0.3.1): Call self.client.set_ipv6_enabled(enabled) when available
+        // For now, IPv6 is configured at construction time via vip_v6 parameter
+    }
+
+    /// Set IPv6 preference settings (placeholder for future OmniNervous integration)
+    /// Currently a no-op as OmniNervous doesn't yet support runtime IPv6 preference config
+    #[allow(unused_variables)]
+    pub fn set_ipv6_preference(&self, prefer_ipv6: bool, threshold_ms: u32) {
+        // TODO (v0.3.1): Call self.client.set_ipv6_preference(prefer_ipv6, threshold_ms) when available
+        // These settings will control Happy Eyeballs behavior when available
+    }
 }
