@@ -10,6 +10,11 @@ pub struct OmniTun {
     interface: WgInterface,
     /// Interface name (for IPv6 configuration)
     ifname: String,
+    /// Cached actual interface name (detected after setup on macOS)
+    #[allow(dead_code)]
+    actual_ifname: Option<String>,
+    /// Virtual IP address (used to detect the actual utun interface on macOS)
+    vip: Option<String>,
 }
 
 impl OmniTun {
@@ -17,10 +22,14 @@ impl OmniTun {
         Self {
             interface: WgInterface::Userspace(UserspaceWgControl::new(ifname)),
             ifname: ifname.to_string(),
+            actual_ifname: None,
+            vip: None,
         }
     }
 
     pub async fn setup(&mut self, vip: &str, port: u16, private_key: &str) -> anyhow::Result<()> {
+        // Store the VIP for later interface detection (needed on macOS)
+        self.vip = Some(vip.to_string());
         let res: Result<(), String> = self.interface.setup_interface(vip, port, private_key).await;
         res.map_err(|e| anyhow::anyhow!("TUN Setup failed: {}", e))
     }
@@ -132,15 +141,28 @@ impl OmniTun {
     /// Get the actual interface name (may differ from configured name on some platforms)
     async fn get_interface_name(&self) -> String {
         // On macOS, the interface name is auto-assigned (utunN)
-        // Try to get it from the WgInterface if available
+        // We need to detect it by matching the VIP address on network interfaces
         #[cfg(target_os = "macos")]
         {
-            // For now, return the configured name - the actual utun name
-            // would need to be retrieved from the interface after creation
             if self.ifname.is_empty() {
-                // Auto-assigned - we need to find it
-                // This is a limitation - for now use a reasonable default
-                return "utun7".to_string();
+                // Auto-assigned - detect by VIP
+                if let Some(ref vip) = self.vip {
+                    if let Some(name) = self.find_interface_by_ip(vip) {
+                        debug!("Detected macOS utun interface '{}' for VIP {}", name, vip);
+                        return name;
+                    }
+                }
+                // Fallback: scan for any utun with a 100.x.x.x address (OmniEdge VIP range)
+                if let Some(name) = self.find_utun_with_omniedge_ip() {
+                    warn!(
+                        "Using fallback utun detection: found '{}' with OmniEdge IP range",
+                        name
+                    );
+                    return name;
+                }
+                // Last resort fallback
+                warn!("Could not detect utun interface name, using fallback 'utun0'");
+                return "utun0".to_string();
             }
         }
 
@@ -161,6 +183,58 @@ impl OmniTun {
         }
 
         self.ifname.clone()
+    }
+
+    /// Find a network interface by its IPv4 address
+    #[cfg(target_os = "macos")]
+    fn find_interface_by_ip(&self, target_ip: &str) -> Option<String> {
+        use std::process::Command;
+
+        // Use ifconfig to find the interface with this IP
+        // Output format: "utunN: flags=... \n inet <ip> ..."
+        let output = Command::new("sh")
+            .args([
+                "-c",
+                &format!(
+                    "ifconfig | grep -B5 'inet {}' | grep -E '^utun[0-9]+:' | head -1 | cut -d: -f1",
+                    target_ip
+                ),
+            ])
+            .output()
+            .ok()?;
+
+        if output.status.success() {
+            let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !name.is_empty() && name.starts_with("utun") {
+                return Some(name);
+            }
+        }
+
+        None
+    }
+
+    /// Find any utun interface with an OmniEdge IP (100.x.x.x range)
+    #[cfg(target_os = "macos")]
+    fn find_utun_with_omniedge_ip(&self) -> Option<String> {
+        use std::process::Command;
+
+        // Find utun interfaces with 100.x.x.x addresses
+        let output = Command::new("sh")
+            .args([
+                "-c",
+                "ifconfig | grep -B1 'inet 100\\.' | grep -E '^utun[0-9]+:' | head -1 | cut -d: -f1",
+            ])
+            .output()
+            .ok()?;
+
+        if output.status.success() {
+            let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !name.is_empty() && name.starts_with("utun") {
+                return Some(name);
+            }
+        }
+
+        None
     }
 
     pub async fn add_peer(

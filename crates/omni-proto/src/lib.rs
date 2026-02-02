@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use log::debug;
 use omninervous::signaling::NucleusClient;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::net::UdpSocket;
@@ -113,7 +114,7 @@ impl OmniProto {
                 for p in ack.recent_peers {
                     peers.push(PeerInfo {
                         vip: p.vip,
-                        // TODO: Parse vip_v6 from signaling when omninervous supports it
+                        // TODO (OmniNervous v0.4.0): Parse vip_v6 from signaling when RegisteredPeer adds IPv6 support
                         vip_v6: None,
                         endpoint: p.endpoint.parse().ok(),
                         public_key: p.public_key,
@@ -125,7 +126,7 @@ impl OmniProto {
                 for p in ack.new_peers {
                     peers.push(PeerInfo {
                         vip: p.vip,
-                        // TODO: Parse vip_v6 from signaling when omninervous supports it
+                        // TODO (OmniNervous v0.4.0): Parse vip_v6 from signaling when RegisteredPeer adds IPv6 support
                         vip_v6: None,
                         endpoint: p.endpoint.parse().ok(),
                         public_key: p.public_key,
@@ -268,15 +269,23 @@ impl OmniProto {
     /// Currently a no-op as OmniNervous doesn't yet support runtime IPv6 config
     #[allow(unused_variables)]
     pub fn set_ipv6_enabled(&self, enabled: bool) {
-        // TODO (v0.3.1): Call self.client.set_ipv6_enabled(enabled) when available
+        // TODO (OmniNervous v0.4.0): Call self.client.set_ipv6_enabled(enabled) when available
         // For now, IPv6 is configured at construction time via vip_v6 parameter
+        debug!(
+            "set_ipv6_enabled({}) called - no-op until OmniNervous adds IPv6 runtime config support",
+            enabled
+        );
     }
 
     /// Set IPv6 preference settings (placeholder for future OmniNervous integration)
     /// Currently a no-op as OmniNervous doesn't yet support runtime IPv6 preference config
     #[allow(unused_variables)]
     pub fn set_ipv6_preference(&self, prefer_ipv6: bool, threshold_ms: u32) {
-        // TODO (v0.3.1): Call self.client.set_ipv6_preference(prefer_ipv6, threshold_ms) when available
+        // TODO (OmniNervous v0.4.0): Call self.client.set_ipv6_preference(prefer_ipv6, threshold_ms) when available
         // These settings will control Happy Eyeballs behavior when available
+        debug!(
+            "set_ipv6_preference(prefer={}, threshold={}ms) called - no-op until OmniNervous adds IPv6 preference support",
+            prefer_ipv6, threshold_ms
+        );
     }
 }
