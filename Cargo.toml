@@ -10,7 +10,3 @@ members = [
     "ui/desktop/src-tauri",
 ]
 resolver = "2"
-
-# Use local OmniNervous for development (v0.4.0 with IPv6 support)
-[patch."https://github.com/omniedgeio/OmniNervous"]
-omninervous = { path = "../OmniNervous/crates/daemon" }
