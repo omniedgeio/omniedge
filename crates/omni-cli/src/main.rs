@@ -871,6 +871,15 @@ async fn main() -> Result<()> {
                     println!("  Virtual IP:  {}", vip);
                 }
 
+                // Show IPv6 virtual IP if available (prefer live data, fall back to config)
+                let virtual_ip_v6 = status
+                    .virtual_ip_v6
+                    .clone()
+                    .or_else(|| config.last_join_info.as_ref().and_then(|j| j.virtual_ip_v6.clone()));
+                if let Some(ref vip6) = virtual_ip_v6 {
+                    println!("  Virtual IPv6: {}", vip6);
+                }
+
                 // Show network ID (prefer live data, fall back to config)
                 let network_id = status.network_id.or(config.last_network_id.clone());
                 if let Some(ref net_id) = network_id {
@@ -922,6 +931,9 @@ async fn main() -> Result<()> {
 
                     if let Some(ref join_info) = config.last_join_info {
                         println!("    Virtual IP: {}", join_info.virtual_ip);
+                        if let Some(ref vip6) = join_info.virtual_ip_v6 {
+                            println!("    Virtual IPv6: {}", vip6);
+                        }
                     }
                     if let Some(ref net_id) = config.last_network_id {
                         println!("    Network:    {}", net_id);
