@@ -116,6 +116,7 @@ pub async fn get_service_status(
                     status.is_running = true;
                     status.interface_name = Some(iface_info.name);
                     status.virtual_ip = Some(iface_info.ip);
+                    status.virtual_ip_v6 = iface_info.ip_v6;
                     status.mode = Some("dual".to_string());
                     if let Some(port) = nucleus_port {
                         if is_port_in_use(port) {
@@ -132,6 +133,7 @@ pub async fn get_service_status(
                     status.is_running = true;
                     status.interface_name = Some(iface_info.name);
                     status.virtual_ip = Some(iface_info.ip);
+                    status.virtual_ip_v6 = iface_info.ip_v6;
                     status.mode = Some("edge".to_string());
                 }
             }
@@ -178,6 +180,7 @@ fn is_port_in_use(port: u16) -> bool {
 struct InterfaceInfo {
     name: String,
     ip: String,
+    ip_v6: Option<String>,
 }
 
 /// Get OmniEdge network interface information
@@ -188,10 +191,10 @@ fn get_omniedge_interface() -> Option<InterfaceInfo> {
     let interfaces = NetworkInterface::show().ok()?;
 
     // Try to get the expected virtual IP from config
-    let expected_vip = CliConfig::load()
-        .ok()
-        .and_then(|c| c.last_join_info)
-        .map(|j| j.virtual_ip);
+    let config = CliConfig::load().ok();
+    let join_info = config.as_ref().and_then(|c| c.last_join_info.as_ref());
+    let expected_vip = join_info.map(|j| j.virtual_ip.clone());
+    let expected_vip_v6 = join_info.and_then(|j| j.virtual_ip_v6.clone());
 
     // On Windows/Linux, look for interface by name
     // On macOS, we must match by virtual IP since utun names are assigned dynamically
@@ -200,15 +203,41 @@ fn get_omniedge_interface() -> Option<InterfaceInfo> {
     #[cfg(target_os = "linux")]
     let target_names = ["omniedge0", "omniedge"];
 
+    // Helper to find IPv6 address on interface, preferring expected VIP if available
+    let find_ipv6 = |iface: &NetworkInterface| -> Option<String> {
+        // First try to find the expected IPv6 VIP
+        if let Some(ref expected) = expected_vip_v6 {
+            for addr in &iface.addr {
+                if let std::net::IpAddr::V6(ipv6) = addr.ip() {
+                    if ipv6.to_string() == *expected {
+                        return Some(ipv6.to_string());
+                    }
+                }
+            }
+        }
+        // Fall back to any non-link-local IPv6 address
+        for addr in &iface.addr {
+            if let std::net::IpAddr::V6(ipv6) = addr.ip() {
+                // Skip link-local addresses (fe80::)
+                if !ipv6.to_string().starts_with("fe80:") {
+                    return Some(ipv6.to_string());
+                }
+            }
+        }
+        None
+    };
+
     // First pass: try to find interface with matching virtual IP (most accurate for macOS)
     if let Some(ref vip) = expected_vip {
         for iface in &interfaces {
             for addr in &iface.addr {
                 if let std::net::IpAddr::V4(ipv4) = addr.ip() {
                     if ipv4.to_string() == *vip {
+                        let ip_v6 = find_ipv6(iface);
                         return Some(InterfaceInfo {
                             name: iface.name.clone(),
                             ip: ipv4.to_string(),
+                            ip_v6,
                         });
                     }
                 }
@@ -230,9 +259,11 @@ fn get_omniedge_interface() -> Option<InterfaceInfo> {
                 if let std::net::IpAddr::V4(ipv4) = addr.ip() {
                     // Skip loopback and link-local
                     if !ipv4.is_loopback() && !ipv4.is_link_local() {
+                        let ip_v6 = find_ipv6(&iface);
                         return Some(InterfaceInfo {
                             name: iface.name.clone(),
                             ip: ipv4.to_string(),
+                            ip_v6,
                         });
                     }
                 }
