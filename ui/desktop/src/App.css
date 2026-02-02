@@ -343,6 +343,48 @@ body {
     color: var(--status-green);
 }
 
+/* IPv6 Display */
+.ip-display-v6 {
+    font-family: "SF Mono", "Menlo", monospace;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: -0.2px;
+    opacity: 0.7;
+    margin-top: 8px;
+    position: relative;
+    display: inline-block;
+    word-break: break-all;
+}
+
+.ip-display-v6:hover {
+    opacity: 1;
+    color: var(--accent-blue);
+}
+
+.ip-display-v6 .copy-hint {
+    font-family: -apple-system, sans-serif;
+    font-size: 9px;
+    font-weight: 500;
+    opacity: 0;
+    position: absolute;
+    bottom: -14px;
+    left: 0;
+    transition: 0.2s;
+}
+
+.ip-display-v6:hover .copy-hint {
+    opacity: 0.4;
+}
+
+/* Platform-specific IPv6 fonts */
+.platform-windows .ip-display-v6 {
+    font-family: "Cascadia Code", "Consolas", monospace;
+}
+
+.platform-linux .ip-display-v6 {
+    font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", monospace;
+}
+
 .dev-ip.clickable-ip.copied {
     color: var(--status-green);
 }

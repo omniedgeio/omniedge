@@ -215,11 +215,7 @@ pub struct VirtualNetworkDeviceResponse {
     )]
     pub virtual_ip: String,
     /// IPv6 virtual IP address (dual-stack support)
-    #[serde(
-        rename = "virtual_ip_v6",
-        alias = "virtualIpV6",
-        default
-    )]
+    #[serde(rename = "virtual_ip_v6", alias = "virtualIpV6", default)]
     pub virtual_ip_v6: Option<String>,
     #[serde(rename = "is_exit_node", alias = "isExitNode", default)]
     pub is_exit_node: bool,
@@ -251,25 +247,13 @@ pub struct JoinVirtualNetworkResponse {
     #[serde(rename = "subnetMask", alias = "subnet_mask", alias = "mask", default)]
     pub subnet_mask: String,
     /// IPv6 virtual IP address (dual-stack support)
-    #[serde(
-        rename = "virtualIpV6",
-        alias = "virtual_ip_v6",
-        default
-    )]
+    #[serde(rename = "virtualIpV6", alias = "virtual_ip_v6", default)]
     pub virtual_ip_v6: Option<String>,
     /// IPv6 subnet prefix length (e.g., 120 for /120)
-    #[serde(
-        rename = "subnetPrefixV6",
-        alias = "subnet_prefix_v6",
-        default
-    )]
+    #[serde(rename = "subnetPrefixV6", alias = "subnet_prefix_v6", default)]
     pub subnet_prefix_v6: Option<u8>,
     /// IPv6 IP range for the network (e.g., "fd00::/120")
-    #[serde(
-        rename = "ipRangeV6",
-        alias = "ip_range_v6",
-        default
-    )]
+    #[serde(rename = "ipRangeV6", alias = "ip_range_v6", default)]
     pub ip_range_v6: Option<String>,
     pub server: ServerResponse,
 }
@@ -311,11 +295,7 @@ pub struct DeviceResponse {
     )]
     pub virtual_ip: Option<String>,
     /// IPv6 virtual IP address (dual-stack support)
-    #[serde(
-        rename = "virtual_ip_v6",
-        alias = "virtualIpV6",
-        default
-    )]
+    #[serde(rename = "virtual_ip_v6", alias = "virtualIpV6", default)]
     pub virtual_ip_v6: Option<String>,
 }
 

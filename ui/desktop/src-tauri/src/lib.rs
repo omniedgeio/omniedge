@@ -600,6 +600,35 @@ async fn get_virtual_ip(state: tauri::State<'_, AppState>) -> Result<String, Str
     }
 }
 
+/// Get the IPv6 virtual IP address (dual-stack support)
+#[tauri::command]
+async fn get_virtual_ip_v6(state: tauri::State<'_, AppState>) -> Result<Option<String>, String> {
+    let req = HelperRequest {
+        command: "get_virtual_ip_v6".to_string(),
+        args: serde_json::json!({}),
+    };
+
+    match call_helper(&req).await {
+        Ok(resp) => {
+            if resp.success {
+                return Ok(resp
+                    .data
+                    .as_ref()
+                    .and_then(|d| d.as_str())
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string()));
+            }
+            // Helper responded but no IPv6 - not an error, just return None
+            Ok(None)
+        }
+        Err(_) => {
+            // Fallback to local manager
+            let manager = state.manager.lock().await;
+            Ok(manager.get_virtual_ip_v6().await)
+        }
+    }
+}
+
 #[tauri::command]
 async fn check_helper() -> Result<bool, String> {
     // First check if helper responds to ping
@@ -2880,6 +2909,7 @@ pub fn run() {
             get_profile,
             get_device_id,
             get_virtual_ip,
+            get_virtual_ip_v6,
             connect,
             disconnect,
             logout,

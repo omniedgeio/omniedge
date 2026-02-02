@@ -21,6 +21,7 @@ interface PluginInfo {
 function App() {
   const [status, setStatus] = useState('disconnected');
   const [virtualIP, setVirtualIP] = useState('');
+  const [virtualIPv6, setVirtualIPv6] = useState<string | null>(null);
   const [networkName, setNetworkName] = useState('');
   const [connectedNetworkID, setConnectedNetworkID] = useState('');
   const [networks, setNetworks] = useState<any[]>([]);
@@ -232,6 +233,14 @@ function App() {
     try {
       const vIP: string = await invoke('get_virtual_ip');
       if (vIP) setVirtualIP(vIP);
+
+      // Fetch IPv6 address
+      try {
+        const vIPv6: string | null = await invoke('get_virtual_ip_v6');
+        setVirtualIPv6(vIPv6);
+      } catch {
+        setVirtualIPv6(null);
+      }
 
       const isExit: boolean = await invoke('is_exit_node');
       setIsBecomingExitNode(isExit);
@@ -1013,6 +1022,14 @@ function App() {
                       {copiedIP === (virtualIP || myAPIIP) ? 'Copied!' : 'Click to copy'}
                     </div>
                   </div>
+                  {virtualIPv6 && (
+                    <div className="ip-display-v6 clickable-ip" onClick={() => handleCopyIP(virtualIPv6)}>
+                      {virtualIPv6}
+                      <div className={`copy-hint ${copiedIP === virtualIPv6 ? 'copied' : ''}`}>
+                        {copiedIP === virtualIPv6 ? 'Copied!' : 'Click to copy'}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

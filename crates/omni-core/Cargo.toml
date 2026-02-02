@@ -23,3 +23,5 @@ thiserror = "1.0"
 dirs = "5.0"
 whoami = "1.5.0"
 dotenvy = "0.15"
+socket2 = { version = "0.5", features = ["all"] }
+futures = "0.3"
