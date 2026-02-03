@@ -55,32 +55,36 @@ jobs:
             use_cross: true
             
           # ===== mipsel (MIPS Little Endian - MT7621) =====
-          # Note: mipsel-unknown-linux-musl requires cross (not in stable rustup)
+          # Note: mipsel-unknown-linux-musl requires cross + build-std (not in stable rustup)
           - rust_target: mipsel-unknown-linux-musl
             openwrt_arch: mipsel_24kc
             openwrt_version: "24.10.0"
             pkg_format: ipk
             use_cross: true
+            needs_build_std: true
             
           - rust_target: mipsel-unknown-linux-musl
             openwrt_arch: mipsel_24kc
             openwrt_version: "snapshot"
             pkg_format: apk
             use_cross: true
+            needs_build_std: true
             
           # ===== mips (MIPS Big Endian - Atheros) =====
-          # Note: mips-unknown-linux-musl requires cross (not in stable rustup)
+          # Note: mips-unknown-linux-musl requires cross + build-std (not in stable rustup)
           - rust_target: mips-unknown-linux-musl
             openwrt_arch: mips_24kc
             openwrt_version: "24.10.0"
             pkg_format: ipk
             use_cross: true
+            needs_build_std: true
             
           - rust_target: mips-unknown-linux-musl
             openwrt_arch: mips_24kc
             openwrt_version: "snapshot"
             pkg_format: apk
             use_cross: true
+            needs_build_std: true
 
     steps:
       - name: Checkout
@@ -105,8 +109,15 @@ jobs:
           sudo rm -rf /usr/local/share/boost
           df -h
 
-      - name: Install Rust
+      - name: Install Rust (stable)
+        if: matrix.needs_build_std != true
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust (nightly for build-std)
+        if: matrix.needs_build_std == true
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
 
       - name: Add Rust target (non-cross builds)
         if: matrix.use_cross == false
