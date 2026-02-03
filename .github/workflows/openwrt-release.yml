@@ -41,18 +41,18 @@ jobs:
             pkg_format: apk
             use_cross: false
             
-          # ===== aarch64 (ARM64) =====
+          # ===== aarch64 (ARM64) - requires cross for proper musl linking =====
           - rust_target: aarch64-unknown-linux-musl
             openwrt_arch: aarch64_generic
             openwrt_version: "24.10.0"
             pkg_format: ipk
-            use_cross: false
+            use_cross: true
             
           - rust_target: aarch64-unknown-linux-musl
             openwrt_arch: aarch64_generic
             openwrt_version: "snapshot"
             pkg_format: apk
-            use_cross: false
+            use_cross: true
             
           # ===== mipsel (MIPS Little Endian - MT7621) =====
           # Note: mipsel-unknown-linux-musl requires cross (not in stable rustup)
