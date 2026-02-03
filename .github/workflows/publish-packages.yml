@@ -97,6 +97,8 @@ jobs:
     needs: prepare
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
       - name: Update Homebrew Formula (CLI)
         env:
@@ -188,6 +190,8 @@ jobs:
             type: desktop
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
       - name: Update PKGBUILD
         env:
@@ -242,6 +246,8 @@ jobs:
     needs: prepare
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
       - name: Download pre-built binary
         env:
@@ -331,6 +337,8 @@ jobs:
     needs: prepare
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
       - name: Update Winget Manifests
         shell: pwsh
@@ -422,6 +430,8 @@ jobs:
             sha_output: desktop_sha256_windows_msi
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
       - name: Update Chocolatey Package
         shell: pwsh
