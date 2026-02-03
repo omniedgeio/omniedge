@@ -1,8 +1,8 @@
 [package]
 name = "omniedge"
 version = "2.3.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "OmniEdge Desktop Client"
+authors = ["OmniEdge Team"]
 edition = "2021"
 license = "Apache-2.0 OR MIT"
 
