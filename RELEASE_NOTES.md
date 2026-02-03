@@ -1,5 +1,102 @@
 # OmniEdge Release Notes
 
+## v2.3.0 (2026-02-03)
+
+### OpenWrt Package Support
+
+This release introduces native **OpenWrt package support** for running OmniEdge directly on your router.
+
+#### Supported Configurations
+
+| OpenWrt Version | Architecture | Package Format |
+|-----------------|--------------|----------------|
+| 24.10.x         | x86_64       | `.ipk`         |
+| 24.10.x         | aarch64      | `.ipk`         |
+| 25.x (snapshot) | x86_64       | `.apk`         |
+| 25.x (snapshot) | aarch64      | `.apk`         |
+
+#### Features
+
+- **UCI Configuration**: Native OpenWrt configuration at `/etc/config/omniedge`
+- **procd Integration**: Proper service management with `procd` init script
+- **Automatic Startup**: Enable with `/etc/init.d/omniedge enable`
+- **Standard Installation**: Install via `opkg` (24.10.x) or `apk` (25.x)
+
+#### Installation
+
+```bash
+# Download for your architecture (example: aarch64, OpenWrt 24.10)
+wget https://github.com/omniedgeio/omniedge/releases/download/v2.3.0/omniedge_2.3.0_aarch64_generic.ipk
+
+# Install
+opkg install omniedge_2.3.0_aarch64_generic.ipk
+
+# Configure
+uci set omniedge.main.enabled='1'
+uci set omniedge.main.network_id='your-network-id'
+uci commit omniedge
+
+# Start
+/etc/init.d/omniedge start
+/etc/init.d/omniedge enable
+```
+
+### IPv6 Dual-Stack Improvements
+
+- Full IPv6 connectivity with Happy Eyeballs (RFC 8305)
+- Automatic IPv4/IPv6 selection based on connectivity
+- Parallel address resolution for faster connections
+- Configurable preference: `omniedge config ipv6 prefer`
+
+### Optional WASM Plugin System
+
+The plugin system is now a compile-time feature (`wasm-plugins`):
+
+- Default enabled on x86_64 and aarch64
+- Allows building minimal binaries for resource-constrained devices
+- OpenWrt packages include full plugin support
+
+### Improvements
+
+- **E2E Testing**: Updated Docker image to `rust:slim-bookworm` for latest Rust compatibility
+- **Cross-compilation**: Improved reliability for aarch64 musl builds using cross-rs
+- **Code Quality**: Resolved all clippy lints and warnings across the codebase
+
+### Download Packages
+
+#### OpenWrt
+
+| OpenWrt Version | Architecture | Download |
+|-----------------|--------------|----------|
+| 24.10.x | x86_64 | [omniedge_2.3.0_x86_64.ipk](https://github.com/omniedgeio/omniedge/releases/download/v2.3.0/omniedge_2.3.0_x86_64.ipk) |
+| 24.10.x | aarch64 | [omniedge_2.3.0_aarch64_generic.ipk](https://github.com/omniedgeio/omniedge/releases/download/v2.3.0/omniedge_2.3.0_aarch64_generic.ipk) |
+| 25.x | x86_64 | [omniedge_2.3.0_x86_64.apk](https://github.com/omniedgeio/omniedge/releases/download/v2.3.0/omniedge_2.3.0_x86_64.apk) |
+| 25.x | aarch64 | [omniedge_2.3.0_aarch64_generic.apk](https://github.com/omniedgeio/omniedge/releases/download/v2.3.0/omniedge_2.3.0_aarch64_generic.apk) |
+
+#### CLI
+
+| Platform | Architecture | Download |
+|----------|--------------|----------|
+| Linux | x86_64 | [omniedge-cli-linux-x86_64.tar.gz](https://github.com/omniedgeio/omniedge/releases/download/v2.3.0/omniedge-cli-linux-x86_64.tar.gz) |
+| Linux | ARM64 | [omniedge-cli-linux-aarch64.tar.gz](https://github.com/omniedgeio/omniedge/releases/download/v2.3.0/omniedge-cli-linux-aarch64.tar.gz) |
+| macOS | Universal | [omniedge-cli-macos.tar.gz](https://github.com/omniedgeio/omniedge/releases/download/v2.3.0/omniedge-cli-macos.tar.gz) |
+| Windows | x86_64 | [omniedge-cli-windows-x86_64.zip](https://github.com/omniedgeio/omniedge/releases/download/v2.3.0/omniedge-cli-windows-x86_64.zip) |
+
+### Known Limitations
+
+- **MIPS not supported**: OpenWrt packages are not available for MIPS-based routers due to Rust toolchain limitations (rust-std removed, Cranelift has no MIPS backend). Modern ARM64 routers and x86 devices are fully supported.
+
+### Compatibility
+
+- **OmniNervous**: Requires v0.4.0 or later
+- **Existing Networks**: Fully backward compatible with v2.2.x networks
+
+### Contributors
+
+Thank you to all contributors who made this release possible!
+
+---
+
 ## v2.2.1 (2026-02-01)
 
 ### Desktop UI Improvements
