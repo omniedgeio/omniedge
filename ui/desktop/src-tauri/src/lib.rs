@@ -1049,6 +1049,7 @@ async fn set_exit_node(
     network_id: String,
     exit_node_id: String,
     exit_node_ip: String,
+    exit_node_ip_v6: Option<String>,
 ) -> Result<(), String> {
     let mut manager = state.manager.lock().await;
     manager
@@ -1060,6 +1061,7 @@ async fn set_exit_node(
             } else {
                 Some(&exit_node_ip)
             },
+            exit_node_ip_v6.as_deref(),
         )
         .await
         .map_err(|e| e.to_string())
