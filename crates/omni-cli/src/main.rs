@@ -5,6 +5,7 @@ use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use omni_api::{ApiClient, DeviceService, NetworkService};
 use omni_core::{CliConfig, ConnectionManager};
+#[cfg(feature = "wasm-plugins")]
 use omni_plugin::{PluginConfig, PluginManager};
 
 mod oauth;
@@ -288,6 +289,7 @@ enum Commands {
     ///   omniedge plugin disable my-plugin       Disable a plugin
     ///   omniedge plugin info my-plugin          Show plugin details
     ///   omniedge plugin uninstall my-plugin     Remove a plugin
+    #[cfg(feature = "wasm-plugins")]
     #[command(subcommand)]
     Plugin(PluginCommands),
 }
@@ -345,6 +347,7 @@ enum ConfigCommands {
 }
 
 /// Plugin management subcommands
+#[cfg(feature = "wasm-plugins")]
 #[derive(Subcommand, Debug)]
 enum PluginCommands {
     /// List all installed plugins
@@ -713,7 +716,9 @@ async fn main() -> Result<()> {
             // Use the effective exit node setting (from flag or saved config)
             let effective_as_exit_node = config.is_exit_node;
             let effective_exit_node = exit_node.clone().or_else(|| config.exit_node_ip.clone());
-            let effective_exit_node_v6 = exit_node_v6.clone().or_else(|| config.exit_node_ip_v6.clone());
+            let effective_exit_node_v6 = exit_node_v6
+                .clone()
+                .or_else(|| config.exit_node_ip_v6.clone());
             config.save()?;
 
             // Create progress spinner
@@ -1113,6 +1118,7 @@ async fn main() -> Result<()> {
         Commands::Config(config_cmd) => {
             handle_config_command(config_cmd, &mut config)?;
         }
+        #[cfg(feature = "wasm-plugins")]
         Commands::Plugin(plugin_cmd) => {
             handle_plugin_command(plugin_cmd).await?;
         }
@@ -1335,6 +1341,7 @@ fn handle_config_command(cmd: ConfigCommands, config: &mut CliConfig) -> Result<
 }
 
 /// Handle plugin management subcommands
+#[cfg(feature = "wasm-plugins")]
 async fn handle_plugin_command(cmd: PluginCommands) -> Result<()> {
     use omni_plugin::registry::PluginState;
 

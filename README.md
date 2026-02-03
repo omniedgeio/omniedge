@@ -86,6 +86,25 @@ sudo omniedge start
 # That's it. Your devices can now reach each other by virtual IP.
 ```
 
+### OpenWrt Installation
+
+```bash
+# Download the package for your architecture (example: aarch64, OpenWrt 24.10)
+wget https://github.com/omniedgeio/omniedge/releases/download/v2.3.0/omniedge_2.3.0_aarch64_generic.ipk
+
+# Install the package
+opkg install omniedge_2.3.0_aarch64_generic.ipk
+
+# Configure via UCI
+uci set omniedge.main.enabled='1'
+uci set omniedge.main.network_id='your-network-id'
+uci commit omniedge
+
+# Start the service
+/etc/init.d/omniedge start
+/etc/init.d/omniedge enable  # Start on boot
+```
+
 ## Supported Hardware
 
 | Device                           | Architecture | Status       |
@@ -95,7 +114,7 @@ sudo omniedge start
 | Intel NUC / x86 Servers          | x86_64       | Tested       |
 | Apple Silicon (M1/M2/M3)         | ARM64        | Tested       |
 | RISC-V Boards                    | riscv64      | Experimental |
-| OpenWrt Routers                  | Various      | Community    |
+| OpenWrt Routers                  | x86_64, ARM64 | Tested      |
 
 ## Supported Platforms
 
@@ -114,6 +133,17 @@ sudo omniedge start
 | **Windows** | x86_64        | `.msi`, `.exe`      |
 | **macOS**   | x86_64, ARM64 | `.dmg`              |
 | **Linux**   | x86_64        | `.deb`, `.AppImage` |
+
+### OpenWrt (`omniedge-openwrt`)
+
+| OpenWrt Version | Architecture | Package Format | Status |
+| --------------- | ------------ | -------------- | ------ |
+| **24.10.x**     | x86_64       | `.ipk`         | Tested |
+| **24.10.x**     | aarch64      | `.ipk`         | Tested |
+| **25.x (snapshot)** | x86_64   | `.apk`         | Tested |
+| **25.x (snapshot)** | aarch64  | `.apk`         | Tested |
+
+> **Note**: MIPS architecture is not supported due to Rust toolchain limitations.
 
 ## Architecture
 

@@ -5,6 +5,7 @@
 //! firing will start episode capture.
 
 use super::types::TimestampNs;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
@@ -77,22 +78,18 @@ impl TriggerType {
 }
 
 /// Priority level for triggers
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
 pub enum TriggerPriority {
     /// Low priority - background collection
     Low = 0,
     /// Normal priority - standard triggers
+    #[default]
     Normal = 1,
     /// High priority - important events
     High = 2,
     /// Critical priority - must capture
     Critical = 3,
-}
-
-impl Default for TriggerPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// Event fired when a trigger activates
@@ -268,6 +265,7 @@ pub trait Trigger: Send + Sync {
 }
 
 /// Manages multiple triggers and evaluates them
+#[allow(dead_code)]
 pub struct TriggerManager {
     /// Registered triggers
     triggers: HashMap<TriggerId, Arc<dyn Trigger>>,
