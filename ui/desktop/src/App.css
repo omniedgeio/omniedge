@@ -343,6 +343,59 @@ body {
     color: var(--status-green);
 }
 
+/* IP Badge Labels */
+.ip-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 600;
+    margin-right: 6px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    vertical-align: middle;
+}
+
+.ip-badge-v4 {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.ip-badge-v6 {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+@media (prefers-color-scheme: dark) {
+    .ip-badge-v4 {
+        background: rgba(21, 101, 192, 0.2);
+        color: #64b5f6;
+    }
+    
+    .ip-badge-v6 {
+        background: rgba(123, 31, 162, 0.2);
+        color: #ce93d8;
+    }
+}
+
+/* Device IP row for multiple IPs */
+.dev-ip-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+}
+
+.dev-ip-line {
+    display: flex;
+    align-items: center;
+}
+
+.dev-ip-line .ip-badge {
+    font-size: 8px;
+    padding: 1px 4px;
+    margin-right: 4px;
+}
+
 /* IPv6 Display */
 .ip-display-v6 {
     font-family: "SF Mono", "Menlo", monospace;

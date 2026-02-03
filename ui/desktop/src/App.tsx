@@ -46,6 +46,7 @@ function App() {
   const [helperDebugInfo, setHelperDebugInfo] = useState<{checked: boolean, active: boolean, error?: string, wrongVersion?: boolean}>({checked: false, active: false});
   const [copiedIP, setCopiedIP] = useState<string | null>(null);
   const appRef = useRef<HTMLDivElement>(null);
+  const autoLoginAttemptedRef = useRef(false);
 
   // Plugin management state
   const [isPluginsExpanded, setIsPluginsExpanded] = useState(false);
@@ -168,9 +169,13 @@ function App() {
           setShowSetup(true);
         }
 
-        const autoLoginSuccess = await invoke('try_auto_login');
-        if (autoLoginSuccess) {
-          await handleSuccessfulLogin();
+        // Guard against duplicate auto-login attempts (React StrictMode double-mount)
+        if (!autoLoginAttemptedRef.current) {
+          autoLoginAttemptedRef.current = true;
+          const autoLoginSuccess = await invoke('try_auto_login');
+          if (autoLoginSuccess) {
+            await handleSuccessfulLogin();
+          }
         }
       } catch (err) {
         console.error("Initialization failed", err);
@@ -192,6 +197,12 @@ function App() {
   }, []); // Run transition only on mount
 
   const handleSuccessfulLogin = async () => {
+    // Guard against duplicate calls
+    if (isLoggedIn) {
+      console.log('handleSuccessfulLogin: Already logged in, skipping');
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const userProfile: any = await invoke('get_profile');
@@ -270,6 +281,12 @@ function App() {
   };
 
   const handleBrowserLogin = async () => {
+    // Guard against duplicate login attempts
+    if (isLoading || isWaitingForBrowser || isLoggedIn) {
+      console.log('handleBrowserLogin: Already in progress or logged in, skipping');
+      return;
+    }
+    
     setIsLoading(true);
     setError('');
     try {
@@ -606,14 +623,17 @@ function App() {
         setError('');
         setShowSetup(false);
         
-        // Try auto-login if we have saved credentials
-        try {
-          const autoLoginSuccess = await invoke('try_auto_login');
-          if (autoLoginSuccess) {
-            await handleSuccessfulLogin();
+        // Try auto-login if we have saved credentials (guard against duplicates)
+        if (!autoLoginAttemptedRef.current) {
+          autoLoginAttemptedRef.current = true;
+          try {
+            const autoLoginSuccess = await invoke('try_auto_login');
+            if (autoLoginSuccess) {
+              await handleSuccessfulLogin();
+            }
+          } catch (e) {
+            console.log('Auto-login after helper install failed:', e);
           }
-        } catch (e) {
-          console.log('Auto-login after helper install failed:', e);
         }
       } else {
         setError('Helper was installed but is not responding correctly. Please try "Check Again" or view Debug info.');
@@ -815,17 +835,17 @@ function App() {
         <div className="header-right">
           <div className="login-status-container" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '11px', opacity: 0.6, fontWeight: 500 }}>
-              {isLoggedIn ? 'Online' : 'Sign In'}
+              {isLoggedIn ? 'Online' : (isWaitingForBrowser ? 'Verifying...' : 'Sign In')}
             </span>
             <div
-              className={`ios-switch header-toggle ${isLoggedIn || isWaitingForBrowser ? 'on' : ''} ${isLoading ? 'disabled' : ''}`}
-              onClick={isLoading ? undefined : (isLoggedIn ? handleLogout : (isWaitingForBrowser ? handleCancelBrowserLogin : handleBrowserLogin))}
-              onKeyDown={(e) => { if (!isLoading && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); (isLoggedIn ? handleLogout : (isWaitingForBrowser ? handleCancelBrowserLogin : handleBrowserLogin))(); } }}
-              tabIndex={isLoading ? -1 : 0}
+              className={`ios-switch header-toggle ${isLoggedIn || isWaitingForBrowser ? 'on' : ''} ${isLoading || isWaitingForBrowser ? 'disabled' : ''}`}
+              onClick={(isLoading || isWaitingForBrowser) ? undefined : (isLoggedIn ? handleLogout : handleBrowserLogin)}
+              onKeyDown={(e) => { if (!(isLoading || isWaitingForBrowser) && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); (isLoggedIn ? handleLogout : handleBrowserLogin)(); } }}
+              tabIndex={(isLoading || isWaitingForBrowser) ? -1 : 0}
               role="switch"
               aria-checked={isLoggedIn || isWaitingForBrowser}
               aria-label={isLoggedIn ? 'Sign out' : 'Sign in'}
-              aria-disabled={isLoading}
+              aria-disabled={isLoading || isWaitingForBrowser}
             >
               <div className="dot">
                 {(isWaitingForBrowser || isLoading) && <div className="loader-mini" style={{ borderTopColor: 'var(--accent-blue)' }}></div>}
@@ -1017,6 +1037,7 @@ function App() {
                     {status === 'connected' && <span className="network-badge">{networkName}</span>}
                   </div>
                   <div className="ip-display-large clickable-ip" onClick={() => handleCopyIP(virtualIP || myAPIIP)}>
+                    <span className="ip-badge ip-badge-v4">IPv4</span>
                     {virtualIP || myAPIIP || '0.0.0.0'}
                     <div className={`copy-hint ${copiedIP === (virtualIP || myAPIIP) ? 'copied' : ''}`}>
                       {copiedIP === (virtualIP || myAPIIP) ? 'Copied!' : 'Click to copy'}
@@ -1024,6 +1045,7 @@ function App() {
                   </div>
                   {virtualIPv6 && (
                     <div className="ip-display-v6 clickable-ip" onClick={() => handleCopyIP(virtualIPv6)}>
+                      <span className="ip-badge ip-badge-v6">IPv6</span>
                       {virtualIPv6}
                       <div className={`copy-hint ${copiedIP === virtualIPv6 ? 'copied' : ''}`}>
                         {copiedIP === virtualIPv6 ? 'Copied!' : 'Click to copy'}
@@ -1110,12 +1132,28 @@ function App() {
                                     <div className={`online-dot ${dev.online ? 'active' : ''}`}></div>
                                     <span className="dev-name truncate">{dev.name}</span>
                                   </div>
-                                  <span
-                                    className={`dev-ip mono clickable-ip ${copiedIP === dev.virtual_ip ? 'copied' : ''}`}
-                                    onClick={() => handleCopyIP(dev.virtual_ip)}
-                                  >
-                                    {copiedIP === dev.virtual_ip ? 'Copied!' : (dev.virtual_ip || '---.---.---.---')}
-                                  </span>
+                                  <div className="dev-ip-row">
+                                    <div className="dev-ip-line">
+                                      <span className="ip-badge ip-badge-v4">v4</span>
+                                      <span
+                                        className={`dev-ip mono clickable-ip ${copiedIP === dev.virtual_ip ? 'copied' : ''}`}
+                                        onClick={() => handleCopyIP(dev.virtual_ip)}
+                                      >
+                                        {copiedIP === dev.virtual_ip ? 'Copied!' : (dev.virtual_ip || '---.---.---.---')}
+                                      </span>
+                                    </div>
+                                    {dev.virtual_ip_v6 && (
+                                      <div className="dev-ip-line">
+                                        <span className="ip-badge ip-badge-v6">v6</span>
+                                        <span
+                                          className={`dev-ip mono clickable-ip ${copiedIP === dev.virtual_ip_v6 ? 'copied' : ''}`}
+                                          onClick={() => handleCopyIP(dev.virtual_ip_v6)}
+                                        >
+                                          {copiedIP === dev.virtual_ip_v6 ? 'Copied!' : dev.virtual_ip_v6}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               ))}
                               {networkDevices[net.id] && networkDevices[net.id].length === 0 && (
