@@ -2,7 +2,7 @@ name: "OpenWrt Packages"
 
 on:
   workflow_run:
-    workflows: ["Release Desktop"]
+    workflows: ["Release CLI"]
     types:
       - completed
   workflow_dispatch:

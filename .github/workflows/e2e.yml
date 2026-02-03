@@ -1,22 +1,21 @@
 name: "E2E Tests"
 
+# E2E tests run on PR and branch pushes, but NOT as part of the release chain
+# to keep the workflow_run chain within the 3-level limit
+
 on:
-  workflow_run:
-    workflows: ["Test and Lint"]
-    types:
-      - completed
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
   workflow_dispatch:
 
 jobs:
   e2e-nucleus:
     name: Nucleus Server E2E
     runs-on: ubuntu-latest
-    # Only run if Test and Lint workflow succeeded (or if manually triggered)
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -100,8 +99,6 @@ jobs:
     needs: e2e-nucleus
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -149,8 +146,6 @@ jobs:
     needs: e2e-signaling
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
