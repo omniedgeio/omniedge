@@ -132,6 +132,42 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           prerelease: ${{ contains(github.ref, '-') }}
+          release_name: "omniedge ${{ github.ref_name }}"
+          body: |
+            ## omniedge ${{ github.ref_name }}
+
+            ### CLI Downloads
+
+            | Platform | Architecture | Package |
+            |----------|--------------|---------|
+            | Linux | x86_64, ARM64, RISC-V 64 | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
+            | macOS | x86_64, ARM64 (Apple Silicon) | `.tar.gz` |
+            | Windows | x86_64 | `.zip` |
+
+            ### Desktop Downloads
+
+            | Platform | Architecture | Package |
+            |----------|--------------|---------|
+            | Windows | x86_64 | `.msi`, `-setup.exe` |
+            | macOS | x86_64, ARM64 (Apple Silicon) | `.dmg` |
+            | Linux | x86_64 | `.deb`, `.AppImage` |
+
+            ### Installation
+
+            **CLI - Debian/Ubuntu:**
+            ```bash
+            sudo dpkg -i omniedge-cli-*-linux-amd64.deb
+            ```
+
+            **CLI - Fedora/RHEL:**
+            ```bash
+            sudo rpm -i omniedge-cli-*-linux-x86_64.rpm
+            ```
+
+            **Desktop - macOS:**
+            1. Download the `.dmg` file for your Mac
+            2. Open the DMG and drag **OmniEdge** to **Applications**
+            3. If you see a security warning, go to **System Settings** → **Privacy & Security** → **Open Anyway**
 
   # ===========================================================================
   # Build DEB packages for Debian/Ubuntu
@@ -269,6 +305,7 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           prerelease: ${{ contains(github.ref, '-') }}
+          release_name: "omniedge ${{ github.ref_name }}"
 
   # ===========================================================================
   # Build RPM packages for Fedora/RHEL/openSUSE
@@ -405,6 +442,7 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           prerelease: ${{ contains(github.ref, '-') }}
+          release_name: "omniedge ${{ github.ref_name }}"
 
   # ===========================================================================
   # Build AppImage for universal Linux distribution
@@ -534,6 +572,7 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           prerelease: ${{ contains(github.ref, '-') }}
+          release_name: "omniedge ${{ github.ref_name }}"
 
   # ===========================================================================
   # Create release summary

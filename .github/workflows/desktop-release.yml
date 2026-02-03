@@ -247,25 +247,39 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           prerelease: ${{ contains(github.ref, '-') }}
-          release_name: "omniedge-desktop ${{ github.ref_name }}"
+          release_name: "omniedge ${{ github.ref_name }}"
           body: |
-            ## omniedge-desktop ${{ github.ref_name }}
+            ## omniedge ${{ github.ref_name }}
 
-            ### Downloads
+            ### CLI Downloads
 
-            | Platform | Architecture | File |
-            |----------|--------------|------|
-            | Windows | x86_64 | `omniedge-desktop-*-windows-x64.msi` / `-setup.exe` |
-            | macOS | x86_64 | `omniedge-desktop-*-macos-x64.dmg` |
-            | macOS | ARM64 (Apple Silicon) | `omniedge-desktop-*-macos-arm64.dmg` |
-            | Linux | x86_64 | `omniedge-desktop-*-linux-x64.deb` / `.AppImage` |
+            | Platform | Architecture | Package |
+            |----------|--------------|---------|
+            | Linux | x86_64, ARM64, RISC-V 64 | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
+            | macOS | x86_64, ARM64 (Apple Silicon) | `.tar.gz` |
+            | Windows | x86_64 | `.zip` |
 
-            ### macOS Installation
+            ### Desktop Downloads
 
-            1. Download the `.dmg` file for your Mac (ARM64 for Apple Silicon, x64 for Intel)
+            | Platform | Architecture | Package |
+            |----------|--------------|---------|
+            | Windows | x86_64 | `.msi`, `-setup.exe` |
+            | macOS | x86_64, ARM64 (Apple Silicon) | `.dmg` |
+            | Linux | x86_64 | `.deb`, `.AppImage` |
+
+            ### Installation
+
+            **CLI - Debian/Ubuntu:**
+            ```bash
+            sudo dpkg -i omniedge-cli-*-linux-amd64.deb
+            ```
+
+            **CLI - Fedora/RHEL:**
+            ```bash
+            sudo rpm -i omniedge-cli-*-linux-x86_64.rpm
+            ```
+
+            **Desktop - macOS:**
+            1. Download the `.dmg` file for your Mac
             2. Open the DMG and drag **OmniEdge** to **Applications**
-            3. Open **OmniEdge** from Applications
-            4. If you see a security warning:
-               - Open **System Settings** → **Privacy & Security**
-               - Scroll down and click **Open Anyway** next to the OmniEdge message
-               - Click **Open** in the confirmation dialog
+            3. If you see a security warning, go to **System Settings** → **Privacy & Security** → **Open Anyway**
