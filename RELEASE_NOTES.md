@@ -1,5 +1,32 @@
 # OmniEdge Release Notes
 
+## v2.2.2 (2026-02-01)
+
+### Desktop UI Improvements
+
+- **Data Collection Theme Fixes**: Fixed color contrast issues in Data Collection UI
+  - Replaced opacity-based text colors with proper CSS variables for better readability
+  - Added proper dark mode support with correct color variables
+  - Improved background contrast on cards and sections
+
+- **Cross-Platform Native Styling**: Data Collection UI now looks native on all platforms
+  - **Windows 11**: Fluent Design with rectangular corners (4-6px radius), no backdrop blur, Cascadia Code font
+  - **Linux (GNOME)**: Adwaita/GTK4 styling with rounded corners (6-8px radius), subtle borders, JetBrains Mono font
+  - **macOS**: Native vibrancy with backdrop blur, SF Mono font (unchanged)
+
+- **Platform-Specific Enhancements**:
+  - Platform-appropriate shadows matching native window styles
+  - Native monospace fonts for episode IDs (SF Mono, Cascadia Code, JetBrains Mono)
+  - Platform-specific close button hover colors
+  - Proper border widths per platform convention
+
+### Compatibility
+
+- **OmniNervous**: Requires v0.3.1 or later
+- **Existing Networks**: Fully backward compatible with v2.2.1 networks
+
+---
+
 ## v2.2.1 (2026-02-01)
 
 ### Desktop UI Improvements
