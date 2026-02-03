@@ -6,13 +6,13 @@ PackageVersion: 2.0.0
 PackageLocale: en-US
 Publisher: OmniEdge
 PublisherUrl: https://omniedge.io
-PublisherSupportUrl: https://github.com/omniedge/omniedge/issues
+PublisherSupportUrl: https://github.com/omniedgeio/omniedge/issues
 PrivacyUrl: https://omniedge.io/privacy
 Author: OmniEdge Team
 PackageName: OmniEdge Desktop
-PackageUrl: https://github.com/omniedge/omniedge
+PackageUrl: https://github.com/omniedgeio/omniedge
 License: GPL-3.0
-LicenseUrl: https://github.com/omniedge/omniedge/blob/main/LICENSE
+LicenseUrl: https://github.com/omniedgeio/omniedge/blob/main/LICENSE
 Copyright: Copyright (c) 2024 OmniEdge
 ShortDescription: Peer-to-peer VPN desktop client for edge computing
 Description: |-
@@ -30,6 +30,6 @@ Tags:
   - tauri
   - vpn
   - wireguard
-ReleaseNotesUrl: https://github.com/omniedge/omniedge/releases/tag/v2.0.0
+ReleaseNotesUrl: https://github.com/omniedgeio/omniedge/releases/tag/v2.0.0
 ManifestType: defaultLocale
 ManifestVersion: 1.6.0

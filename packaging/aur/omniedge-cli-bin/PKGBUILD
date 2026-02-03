@@ -11,8 +11,8 @@ conflicts=('omniedge-cli' 'omniedge')
 depends=('glibc')
 optdepends=('systemd: for systemd service support')
 
-source_x86_64=("https://github.com/omniedge/omniedge/releases/download/v${pkgver}/omniedge-cli-${pkgver}-linux-x64.tar.gz")
-source_aarch64=("https://github.com/omniedge/omniedge/releases/download/v${pkgver}/omniedge-cli-${pkgver}-linux-arm64.tar.gz")
+source_x86_64=("https://github.com/omniedgeio/omniedge/releases/download/v${pkgver}/omniedge-cli-${pkgver}-linux-x64.tar.gz")
+source_aarch64=("https://github.com/omniedgeio/omniedge/releases/download/v${pkgver}/omniedge-cli-${pkgver}-linux-arm64.tar.gz")
 
 sha256sums_x86_64=('PLACEHOLDER_SHA256_X64')
 sha256sums_aarch64=('PLACEHOLDER_SHA256_ARM64')

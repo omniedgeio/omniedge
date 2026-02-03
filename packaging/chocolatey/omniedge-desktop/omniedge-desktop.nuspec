@@ -7,11 +7,11 @@
     <authors>OmniEdge Team</authors>
     <owners>omniedge</owners>
     <projectUrl>https://omniedge.io</projectUrl>
-    <projectSourceUrl>https://github.com/omniedge/omniedge</projectSourceUrl>
-    <packageSourceUrl>https://github.com/omniedge/omniedge/tree/main/packaging/chocolatey/omniedge-desktop</packageSourceUrl>
-    <bugTrackerUrl>https://github.com/omniedge/omniedge/issues</bugTrackerUrl>
+    <projectSourceUrl>https://github.com/omniedgeio/omniedge</projectSourceUrl>
+    <packageSourceUrl>https://github.com/omniedgeio/omniedge/tree/main/packaging/chocolatey/omniedge-desktop</packageSourceUrl>
+    <bugTrackerUrl>https://github.com/omniedgeio/omniedge/issues</bugTrackerUrl>
     <docsUrl>https://omniedge.io/docs</docsUrl>
-    <licenseUrl>https://github.com/omniedge/omniedge/blob/main/LICENSE</licenseUrl>
+    <licenseUrl>https://github.com/omniedgeio/omniedge/blob/main/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <iconUrl>https://omniedge.io/favicon.ico</iconUrl>
     <tags>vpn p2p peer-to-peer mesh network desktop gui wireguard tauri</tags>
@@ -41,7 +41,7 @@ OmniEdge Desktop is a graphical application for creating secure, peer-to-peer me
 
 For more information, visit [https://omniedge.io/docs](https://omniedge.io/docs)
 ]]></description>
-    <releaseNotes>https://github.com/omniedge/omniedge/releases/tag/v2.0.0</releaseNotes>
+    <releaseNotes>https://github.com/omniedgeio/omniedge/releases/tag/v2.0.0</releaseNotes>
   </metadata>
   <files>
     <file src="tools\**" target="tools" />

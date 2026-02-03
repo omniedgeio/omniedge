@@ -13,7 +13,7 @@ NestedInstallerFiles:
     PortableCommandAlias: omniedge
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/omniedge/omniedge/releases/download/v2.0.0/omniedge-cli-2.0.0-windows-x64.zip
+    InstallerUrl: https://github.com/omniedgeio/omniedge/releases/download/v2.0.0/omniedge-cli-2.0.0-windows-x64.zip
     InstallerSha256: PLACEHOLDER_SHA256
 ManifestType: installer
 ManifestVersion: 1.6.0

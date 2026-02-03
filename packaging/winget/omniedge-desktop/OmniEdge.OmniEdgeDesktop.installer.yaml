@@ -18,7 +18,7 @@ InstallerSwitches:
 UpgradeBehavior: install
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/omniedge/omniedge/releases/download/v2.0.0/omniedge-desktop-2.0.0-windows-x64.msi
+    InstallerUrl: https://github.com/omniedgeio/omniedge/releases/download/v2.0.0/omniedge-desktop-2.0.0-windows-x64.msi
     InstallerSha256: PLACEHOLDER_SHA256_MSI
 ProductCode: "{PLACEHOLDER-PRODUCT-CODE}"
 ManifestType: installer

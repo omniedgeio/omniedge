@@ -9,22 +9,22 @@ class OmniedgeCli < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/omniedge/omniedge/releases/download/v#{version}/omniedge-cli-#{version}-macos-arm64.tar.gz"
+      url "https://github.com/omniedgeio/omniedge/releases/download/v#{version}/omniedge-cli-#{version}-macos-arm64.tar.gz"
       sha256 "PLACEHOLDER_SHA256_MACOS_ARM64"
     end
     on_intel do
-      url "https://github.com/omniedge/omniedge/releases/download/v#{version}/omniedge-cli-#{version}-macos-x64.tar.gz"
+      url "https://github.com/omniedgeio/omniedge/releases/download/v#{version}/omniedge-cli-#{version}-macos-x64.tar.gz"
       sha256 "PLACEHOLDER_SHA256_MACOS_X64"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/omniedge/omniedge/releases/download/v#{version}/omniedge-cli-#{version}-linux-arm64.tar.gz"
+      url "https://github.com/omniedgeio/omniedge/releases/download/v#{version}/omniedge-cli-#{version}-linux-arm64.tar.gz"
       sha256 "PLACEHOLDER_SHA256_LINUX_ARM64"
     end
     on_intel do
-      url "https://github.com/omniedge/omniedge/releases/download/v#{version}/omniedge-cli-#{version}-linux-x64.tar.gz"
+      url "https://github.com/omniedgeio/omniedge/releases/download/v#{version}/omniedge-cli-#{version}-linux-x64.tar.gz"
       sha256 "PLACEHOLDER_SHA256_LINUX_X64"
     end
   end
