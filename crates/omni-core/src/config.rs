@@ -210,6 +210,9 @@ pub struct CliConfig {
     pub is_exit_node: bool,
     #[serde(default)]
     pub exit_node_ip: Option<String>,
+    /// IPv6 address of the selected exit node (dual-stack support)
+    #[serde(default)]
+    pub exit_node_ip_v6: Option<String>,
     /// Last running mode (edge, nucleus, dual)
     #[serde(default)]
     pub last_run_mode: Option<String>,
