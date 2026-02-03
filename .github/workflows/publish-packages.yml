@@ -30,6 +30,7 @@ jobs:
       cli_sha256_macos_x64: ${{ steps.checksums.outputs.cli_macos_x64 }}
       cli_sha256_macos_arm64: ${{ steps.checksums.outputs.cli_macos_arm64 }}
       cli_sha256_windows_x64: ${{ steps.checksums.outputs.cli_windows_x64 }}
+      desktop_sha256_linux_x64: ${{ steps.checksums.outputs.desktop_linux_x64 }}
       desktop_sha256_macos_x64: ${{ steps.checksums.outputs.desktop_macos_x64 }}
       desktop_sha256_macos_arm64: ${{ steps.checksums.outputs.desktop_macos_arm64 }}
       desktop_sha256_windows_msi: ${{ steps.checksums.outputs.desktop_windows_msi }}
@@ -78,6 +79,7 @@ jobs:
           echo "cli_windows_x64=$(get_sha256 "${BASE_URL}/omniedge-cli-${VERSION}-windows-x64.zip" "cli-windows-x64.zip")" >> $GITHUB_OUTPUT
           
           # Desktop checksums
+          echo "desktop_linux_x64=$(get_sha256 "${BASE_URL}/omniedge-desktop-${VERSION}-linux-x64.AppImage" "desktop-linux-x64.AppImage")" >> $GITHUB_OUTPUT
           echo "desktop_macos_x64=$(get_sha256 "${BASE_URL}/omniedge-desktop-${VERSION}-macos-x64.dmg" "desktop-macos-x64.dmg")" >> $GITHUB_OUTPUT
           echo "desktop_macos_arm64=$(get_sha256 "${BASE_URL}/omniedge-desktop-${VERSION}-macos-arm64.dmg" "desktop-macos-arm64.dmg")" >> $GITHUB_OUTPUT
           echo "desktop_windows_msi=$(get_sha256 "${BASE_URL}/omniedge-desktop-${VERSION}-windows-x64.msi" "desktop-windows-msi.msi")" >> $GITHUB_OUTPUT
@@ -105,11 +107,15 @@ jobs:
           # Update version
           sed -i "s/version \".*\"/version \"${VERSION}\"/" "$FORMULA"
           
-          # Update checksums
-          sed -i "s/PLACEHOLDER_SHA256_MACOS_ARM64/${SHA256_MACOS_ARM64}/" "$FORMULA"
-          sed -i "s/PLACEHOLDER_SHA256_MACOS_X64/${SHA256_MACOS_X64}/" "$FORMULA"
-          sed -i "s/PLACEHOLDER_SHA256_LINUX_ARM64/${SHA256_LINUX_ARM64}/" "$FORMULA"
-          sed -i "s/PLACEHOLDER_SHA256_LINUX_X64/${SHA256_LINUX_X64}/" "$FORMULA"
+          # Update GitHub URL (omniedge -> omniedgeio)
+          sed -i "s|github.com/omniedge/omniedge|github.com/omniedgeio/omniedge|g" "$FORMULA"
+          
+          # Update checksums (replace any existing SHA256 with new ones)
+          sed -i "s/sha256 \"[a-f0-9]\{64\}\"/sha256 \"PLACEHOLDER\"/g" "$FORMULA"
+          sed -i "s/PLACEHOLDER_SHA256_MACOS_ARM64/${SHA256_MACOS_ARM64}/g" "$FORMULA"
+          sed -i "s/PLACEHOLDER_SHA256_MACOS_X64/${SHA256_MACOS_X64}/g" "$FORMULA"
+          sed -i "s/PLACEHOLDER_SHA256_LINUX_ARM64/${SHA256_LINUX_ARM64}/g" "$FORMULA"
+          sed -i "s/PLACEHOLDER_SHA256_LINUX_X64/${SHA256_LINUX_X64}/g" "$FORMULA"
           
           echo "Updated Formula for version ${VERSION}"
           cat "$FORMULA"
@@ -125,15 +131,18 @@ jobs:
           # Update version
           sed -i "s/version \".*\"/version \"${VERSION}\"/" "$CASK"
           
-          # Cask needs separate checksums for arm64 and x64
-          # For now, use arm64 as primary (most common for modern Macs)
-          sed -i "s/PLACEHOLDER_SHA256/${SHA256_MACOS_ARM64}/" "$CASK"
+          # Update GitHub URL (omniedge -> omniedgeio)
+          sed -i "s|github.com/omniedge/omniedge|github.com/omniedgeio/omniedge|g" "$CASK"
+          
+          # Update checksum (use arm64 as primary for modern Macs)
+          sed -i "s/sha256 \"[a-f0-9]\{64\}\"/sha256 \"${SHA256_MACOS_ARM64}\"/g" "$CASK"
+          sed -i "s/PLACEHOLDER_SHA256/${SHA256_MACOS_ARM64}/g" "$CASK"
           
           echo "Updated Cask for version ${VERSION}"
           cat "$CASK"
 
       - name: Push to Homebrew Tap
-        if: ${{ vars.HOMEBREW_TAP_REPO != '' }}
+        if: ${{ vars.HOMEBREW_TAP_REPO != '' && secrets.HOMEBREW_TAP_TOKEN != '' }}
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
@@ -156,7 +165,7 @@ jobs:
   # Publish to AUR (CLI and Desktop)
   # ===========================================================================
   aur:
-    name: Update AUR
+    name: Update AUR (${{ matrix.package }})
     runs-on: ubuntu-latest
     needs: prepare
     strategy:
@@ -175,16 +184,29 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
           SHA256_CLI_X64: ${{ needs.prepare.outputs.cli_sha256_linux_x64 }}
           SHA256_CLI_ARM64: ${{ needs.prepare.outputs.cli_sha256_linux_arm64 }}
+          SHA256_DESKTOP_X64: ${{ needs.prepare.outputs.desktop_sha256_linux_x64 }}
         run: |
           PKGBUILD="packaging/aur/${{ matrix.package }}/PKGBUILD"
           
           # Update version
           sed -i "s/pkgver=.*/pkgver=${VERSION}/" "$PKGBUILD"
           
+          # Reset pkgrel to 1 for new version
+          sed -i "s/pkgrel=.*/pkgrel=1/" "$PKGBUILD"
+          
+          # Update GitHub URL (omniedge -> omniedgeio)
+          sed -i "s|github.com/omniedge/omniedge|github.com/omniedgeio/omniedge|g" "$PKGBUILD"
+          
           # Update checksums based on package type
           if [ "${{ matrix.type }}" = "cli" ]; then
             sed -i "s/PLACEHOLDER_SHA256_X64/${SHA256_CLI_X64}/" "$PKGBUILD"
             sed -i "s/PLACEHOLDER_SHA256_ARM64/${SHA256_CLI_ARM64}/" "$PKGBUILD"
+            # Also update any existing SHA256 patterns
+            sed -i "s/sha256sums_x86_64=('[a-f0-9]\{64\}')/sha256sums_x86_64=('${SHA256_CLI_X64}')/" "$PKGBUILD"
+            sed -i "s/sha256sums_aarch64=('[a-f0-9]\{64\}')/sha256sums_aarch64=('${SHA256_CLI_ARM64}')/" "$PKGBUILD"
+          else
+            sed -i "s/PLACEHOLDER_SHA256/${SHA256_DESKTOP_X64}/" "$PKGBUILD"
+            sed -i "s/sha256sums_x86_64=('[a-f0-9]\{64\}')/sha256sums_x86_64=('${SHA256_DESKTOP_X64}')/" "$PKGBUILD"
           fi
           
           echo "Updated PKGBUILD for ${{ matrix.package }}:"
@@ -192,7 +214,7 @@ jobs:
 
       - name: Publish to AUR
         if: ${{ secrets.AUR_SSH_PRIVATE_KEY != '' }}
-        uses: KSXGitHub/github-actions-deploy-aur@v2
+        uses: KSXGitHub/github-actions-deploy-aur@v3
         with:
           pkgname: ${{ matrix.package }}
           pkgbuild: packaging/aur/${{ matrix.package }}/PKGBUILD
@@ -219,23 +241,37 @@ jobs:
           curl -fsSL -o omniedge.tar.gz \
             "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/omniedge-cli-${VERSION}-linux-x64.tar.gz"
           tar -xzf omniedge.tar.gz
-          chmod +x omniedge-cli-${VERSION}-linux-x64
-          mv omniedge-cli-${VERSION}-linux-x64 packaging/snap/omniedge
-
-      - name: Update snapcraft.yaml version
-        run: |
-          sed -i "s/version: .*/version: '${{ needs.prepare.outputs.version }}'/" packaging/snap/snapcraft.yaml
           
-          # Update to use pre-built binary instead of building from source
-          cat > packaging/snap/snapcraft.yaml << 'EOF'
+          # Find and rename the binary
+          BINARY=$(find . -maxdepth 1 -name "omniedge-cli-*-linux-x64" -o -name "omniedge" | head -1)
+          if [ -n "$BINARY" ]; then
+            chmod +x "$BINARY"
+            mv "$BINARY" packaging/snap/omniedge
+          else
+            echo "ERROR: Could not find binary in archive"
+            ls -la
+            exit 1
+          fi
+
+      - name: Generate snapcraft.yaml
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          cat > packaging/snap/snapcraft.yaml << EOF
           name: omniedge-cli
           base: core22
-          version: '${{ needs.prepare.outputs.version }}'
+          version: '${VERSION}'
           summary: Peer-to-peer VPN CLI for edge computing
           description: |
             OmniEdge CLI is a command-line tool for creating secure, peer-to-peer mesh 
             VPN connections. It enables devices to communicate directly across networks 
             with minimal latency and maximum security.
+          
+            Features:
+            - Peer-to-peer connections without central relay
+            - Automatic mesh network topology  
+            - Built on WireGuard protocol
+            - Cross-platform support
           
           grade: stable
           confinement: classic
@@ -257,6 +293,9 @@ jobs:
             omniedge:
               command: bin/omniedge
           EOF
+          
+          echo "Generated snapcraft.yaml:"
+          cat packaging/snap/snapcraft.yaml
 
       - name: Build Snap
         uses: snapcore/action-build@v1
@@ -290,12 +329,13 @@ jobs:
           SHA256_CLI: ${{ needs.prepare.outputs.cli_sha256_windows_x64 }}
           SHA256_DESKTOP: ${{ needs.prepare.outputs.desktop_sha256_windows_msi }}
         run: |
-          # Update CLI manifest
+          # Update CLI installer manifest
           $cliInstaller = Get-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.installer.yaml" -Raw
           $cliInstaller = $cliInstaller -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
           $cliInstaller = $cliInstaller -replace "PLACEHOLDER_SHA256", "$env:SHA256_CLI"
-          $cliInstaller = $cliInstaller -replace "v\d+\.\d+\.\d+", "v$env:VERSION"
-          $cliInstaller = $cliInstaller -replace "(?<!\d)\d+\.\d+\.\d+(?!\d)", "$env:VERSION"
+          $cliInstaller = $cliInstaller -replace "InstallerSha256: [a-fA-F0-9]{64}", "InstallerSha256: $env:SHA256_CLI"
+          $cliInstaller = $cliInstaller -replace "github\.com/omniedge/omniedge", "github.com/omniedgeio/omniedge"
+          $cliInstaller = $cliInstaller -replace "omniedge-cli-[\d.]+-windows-x64", "omniedge-cli-$env:VERSION-windows-x64"
           Set-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.installer.yaml" $cliInstaller
           
           # Update CLI version manifest
@@ -303,18 +343,21 @@ jobs:
           $cliVersion = $cliVersion -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
           Set-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.yaml" $cliVersion
           
-          # Update Desktop manifest
+          # Update Desktop installer manifest
           $desktopInstaller = Get-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml" -Raw
           $desktopInstaller = $desktopInstaller -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
           $desktopInstaller = $desktopInstaller -replace "PLACEHOLDER_SHA256_MSI", "$env:SHA256_DESKTOP"
-          $desktopInstaller = $desktopInstaller -replace "v\d+\.\d+\.\d+", "v$env:VERSION"
-          $desktopInstaller = $desktopInstaller -replace "(?<!\d)\d+\.\d+\.\d+(?!\d)", "$env:VERSION"
+          $desktopInstaller = $desktopInstaller -replace "InstallerSha256: [a-fA-F0-9]{64}", "InstallerSha256: $env:SHA256_DESKTOP"
+          $desktopInstaller = $desktopInstaller -replace "github\.com/omniedge/omniedge", "github.com/omniedgeio/omniedge"
+          $desktopInstaller = $desktopInstaller -replace "omniedge-desktop-[\d.]+-windows-x64", "omniedge-desktop-$env:VERSION-windows-x64"
           Set-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml" $desktopInstaller
           
           # Update Desktop version manifest
           $desktopVersion = Get-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.yaml" -Raw
           $desktopVersion = $desktopVersion -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
           Set-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.yaml" $desktopVersion
+          
+          Write-Host "Updated Winget manifests for version $env:VERSION"
 
       - name: Submit CLI to Winget
         if: ${{ secrets.WINGET_TOKEN != '' }}
@@ -338,7 +381,7 @@ jobs:
   # Publish to Chocolatey
   # ===========================================================================
   chocolatey:
-    name: Publish to Chocolatey
+    name: Publish to Chocolatey (${{ matrix.package }})
     runs-on: windows-latest
     needs: prepare
     strategy:
@@ -346,9 +389,9 @@ jobs:
       matrix:
         include:
           - package: omniedge-cli
-            sha_key: cli_sha256_windows_x64
+            sha_output: cli_sha256_windows_x64
           - package: omniedge-desktop
-            sha_key: desktop_sha256_windows_msi
+            sha_output: desktop_sha256_windows_msi
     steps:
       - uses: actions/checkout@v4
 
@@ -356,9 +399,17 @@ jobs:
         shell: pwsh
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
-          SHA256: ${{ needs.prepare.outputs[matrix.sha_key] }}
+          SHA256_CLI: ${{ needs.prepare.outputs.cli_sha256_windows_x64 }}
+          SHA256_DESKTOP: ${{ needs.prepare.outputs.desktop_sha256_windows_msi }}
         run: |
           $pkg = "${{ matrix.package }}"
+          
+          # Determine which SHA to use
+          if ($pkg -eq "omniedge-cli") {
+            $sha = $env:SHA256_CLI
+          } else {
+            $sha = $env:SHA256_DESKTOP
+          }
           
           # Update nuspec
           $nuspec = Get-Content "packaging/chocolatey/$pkg/$pkg.nuspec" -Raw
@@ -368,8 +419,12 @@ jobs:
           # Update install script
           $install = Get-Content "packaging/chocolatey/$pkg/tools/chocolateyInstall.ps1" -Raw
           $install = $install -replace "\`$version = '.*'", "`$version = '$env:VERSION'"
-          $install = $install -replace "PLACEHOLDER_SHA256", "$env:SHA256"
+          $install = $install -replace "PLACEHOLDER_SHA256", "$sha"
+          $install = $install -replace "checksum64\s*=\s*'[a-fA-F0-9]{64}'", "checksum64     = '$sha'"
+          $install = $install -replace "github\.com/omniedge/omniedge", "github.com/omniedgeio/omniedge"
           Set-Content "packaging/chocolatey/$pkg/tools/chocolateyInstall.ps1" $install
+          
+          Write-Host "Updated $pkg for version $env:VERSION with SHA256: $sha"
 
       - name: Build and Push Package
         if: ${{ secrets.CHOCOLATEY_API_KEY != '' }}
@@ -389,9 +444,9 @@ jobs:
     if: always()
     steps:
       - name: Generate Summary
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          VERSION="${{ needs.prepare.outputs.version }}"
-          
           echo "## Package Publishing Summary for v${VERSION}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Package Manager | Status |" >> $GITHUB_STEP_SUMMARY
@@ -402,20 +457,31 @@ jobs:
           echo "| Winget | ${{ needs.winget.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Chocolatey | ${{ needs.chocolatey.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Required Secrets" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Setup Required" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "To enable publishing, configure the following secrets:" >> $GITHUB_STEP_SUMMARY
+          echo "To enable publishing, configure the following:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Secret | Purpose |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| \`HOMEBREW_TAP_TOKEN\` | Push to Homebrew tap repository |" >> $GITHUB_STEP_SUMMARY
-          echo "| \`AUR_SSH_PRIVATE_KEY\` | Push to Arch User Repository |" >> $GITHUB_STEP_SUMMARY
-          echo "| \`SNAPCRAFT_STORE_CREDENTIALS\` | Publish to Snap Store |" >> $GITHUB_STEP_SUMMARY
-          echo "| \`WINGET_TOKEN\` | Submit to Windows Package Manager |" >> $GITHUB_STEP_SUMMARY
-          echo "| \`CHOCOLATEY_API_KEY\` | Publish to Chocolatey.org |" >> $GITHUB_STEP_SUMMARY
+          echo "#### Secrets" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Required Variables" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret | Purpose | How to Get |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|---------|------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`HOMEBREW_TAP_TOKEN\` | Push to Homebrew tap | PAT with \`repo\` scope |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`AUR_SSH_PRIVATE_KEY\` | Push to AUR | SSH key registered with AUR |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`SNAPCRAFT_STORE_CREDENTIALS\` | Publish to Snap Store | \`snapcraft export-login\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`WINGET_TOKEN\` | Submit to winget-pkgs | PAT with \`public_repo\` scope |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`CHOCOLATEY_API_KEY\` | Publish to Chocolatey.org | From Chocolatey account |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Variables" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Variable | Purpose | Example |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|---------|---------|" >> $GITHUB_STEP_SUMMARY
           echo "| \`HOMEBREW_TAP_REPO\` | Homebrew tap repository | \`omniedgeio/homebrew-tap\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### One-Time Setup" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. **Homebrew**: Create \`github.com/omniedgeio/homebrew-tap\` repository" >> $GITHUB_STEP_SUMMARY
+          echo "2. **AUR**: Register \`omniedge-cli-bin\` and \`omniedge-desktop-bin\` packages" >> $GITHUB_STEP_SUMMARY
+          echo "3. **Snap**: Run \`snapcraft register omniedge-cli\`" >> $GITHUB_STEP_SUMMARY
+          echo "4. **Chocolatey**: Create account and reserve package names" >> $GITHUB_STEP_SUMMARY

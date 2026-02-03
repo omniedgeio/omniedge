@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $packageName = 'omniedge-desktop'
 $version = '2.0.0'
-$url64 = "https://github.com/omniedge/omniedge/releases/download/v$version/omniedge-desktop-$version-windows-x64.msi"
+$url64 = "https://github.com/omniedgeio/omniedge/releases/download/v$version/omniedge-desktop-$version-windows-x64.msi"
 $checksum64 = 'PLACEHOLDER_SHA256'
 $checksumType64 = 'sha256'
 

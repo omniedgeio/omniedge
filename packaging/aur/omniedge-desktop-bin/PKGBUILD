@@ -11,7 +11,7 @@ conflicts=('omniedge-desktop')
 depends=('gtk3' 'webkit2gtk' 'libayatana-appindicator')
 optdepends=('libappindicator-gtk3: legacy tray icon support')
 
-source_x86_64=("https://github.com/omniedge/omniedge/releases/download/v${pkgver}/omniedge-desktop-${pkgver}-linux-x64.AppImage")
+source_x86_64=("https://github.com/omniedgeio/omniedge/releases/download/v${pkgver}/omniedge-desktop-${pkgver}-linux-x64.AppImage")
 
 sha256sums_x86_64=('PLACEHOLDER_SHA256')
 

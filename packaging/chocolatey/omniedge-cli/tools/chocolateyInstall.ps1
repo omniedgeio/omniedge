@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $packageName = 'omniedge-cli'
 $version = '2.0.0'
-$url64 = "https://github.com/omniedge/omniedge/releases/download/v$version/omniedge-cli-$version-windows-x64.zip"
+$url64 = "https://github.com/omniedgeio/omniedge/releases/download/v$version/omniedge-cli-$version-windows-x64.zip"
 $checksum64 = 'PLACEHOLDER_SHA256'
 $checksumType64 = 'sha256'
 

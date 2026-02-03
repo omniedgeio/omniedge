@@ -5,7 +5,7 @@ cask "omniedge-desktop" do
   version "2.0.0"
   sha256 "PLACEHOLDER_SHA256"
 
-  url "https://github.com/omniedge/omniedge/releases/download/v#{version}/omniedge-desktop-#{version}-macos-#{Hardware::CPU.arm? ? "arm64" : "x64"}.dmg"
+  url "https://github.com/omniedgeio/omniedge/releases/download/v#{version}/omniedge-desktop-#{version}-macos-#{Hardware::CPU.arm? ? "arm64" : "x64"}.dmg"
   name "OmniEdge Desktop"
   desc "Peer-to-peer VPN desktop client for edge computing"
   homepage "https://omniedge.io"
