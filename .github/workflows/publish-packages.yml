@@ -1,11 +1,11 @@
 name: "Publish Packages"
 
 # This workflow publishes packages to various package managers
-# It runs after the main release workflows complete successfully
+# It runs after the OpenWrt release workflow completes successfully
 
 on:
   workflow_run:
-    workflows: ["Release CLI", "Release Desktop"]
+    workflows: ["OpenWrt Packages"]
     types:
       - completed
   workflow_dispatch:
@@ -22,7 +22,11 @@ jobs:
   prepare:
     name: Prepare Release Info
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    # Only run if OpenWrt Packages succeeded and was triggered by a tag, or if manually dispatched
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
     outputs:
       version: ${{ steps.version.outputs.version }}
       cli_sha256_linux_x64: ${{ steps.checksums.outputs.cli_linux_x64 }}

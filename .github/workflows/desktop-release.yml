@@ -1,15 +1,14 @@
 name: "Release Desktop"
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
-      - 'v*.*.*-beta'
-      - 'v*.*.*-rc'
+  workflow_run:
+    workflows: ["Release CLI"]
+    types:
+      - completed
   workflow_dispatch:
 
 concurrency:
-  group: release-desktop-${{ github.ref }}
+  group: release-desktop-${{ github.event.workflow_run.head_branch || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -20,6 +19,11 @@ jobs:
   publish-tauri:
     permissions:
       contents: write
+    # Only run if Release CLI succeeded and was triggered by a tag, or if manually dispatched
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
     strategy:
       fail-fast: false
       matrix:
@@ -100,8 +104,11 @@ jobs:
         id: version
         shell: bash
         run: |
-          # For tag pushes, use the tag name; for workflow_dispatch, read from tauri.conf.json
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          # Handle workflow_run trigger (from Release CLI)
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            VERSION="${{ github.event.workflow_run.head_branch }}"
+            VERSION="${VERSION#v}"  # Remove 'v' prefix
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION="${{ github.ref_name }}"
             VERSION="${VERSION#v}"  # Remove 'v' prefix
           else
@@ -109,6 +116,7 @@ jobs:
             VERSION=$(jq -r '.version' ui/desktop/src-tauri/tauri.conf.json)
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
           echo "==> Version: $VERSION"
 
       - name: Build desktop (Tauri)
@@ -239,17 +247,17 @@ jobs:
 
       - name: Upload to Release
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/') && steps.artifacts.outputs.has_artifacts == 'true'
+        if: steps.artifacts.outputs.has_artifacts == 'true'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}*
           file_glob: true
-          tag: ${{ github.ref }}
+          tag: ${{ steps.version.outputs.tag }}
           overwrite: true
-          prerelease: ${{ contains(github.ref, '-') }}
-          release_name: "omniedge ${{ github.ref_name }}"
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          release_name: "omniedge ${{ steps.version.outputs.tag }}"
           body: |
-            ## omniedge ${{ github.ref_name }}
+            ## omniedge ${{ steps.version.outputs.tag }}
 
             ### CLI Downloads
 
