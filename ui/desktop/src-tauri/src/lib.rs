@@ -797,6 +797,7 @@ async fn connect(
     as_exit_node: Option<bool>,
     nucleus: Option<bool>,
     exit_node: Option<String>,
+    exit_node_v6: Option<String>,
 ) -> Result<(), String> {
     ensure_wintun_dll(&app);
     let mut config = CliConfig::load().map_err(|e| e.to_string())?;
@@ -834,6 +835,7 @@ async fn connect(
             as_exit_node: as_exit_node.unwrap_or(false),
             nucleus: nucleus.unwrap_or(false),
             exit_node_ip: exit_node.clone(),
+            exit_node_ip_v6: exit_node_v6.clone(),
         })
         .map_err(|e| e.to_string())?,
     };

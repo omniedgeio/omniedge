@@ -420,6 +420,7 @@ pub async fn run_worker(
     mode: RunMode,
     as_exit_node: bool,
     exit_node: Option<String>,
+    exit_node_v6: Option<String>,
     nucleus_port: u16,
     _cluster_secret: Option<String>,
 ) -> Result<()> {
@@ -465,6 +466,7 @@ pub async fn run_worker(
             is_nucleus,
             as_exit_node,
             exit_node,
+            exit_node_v6,
         )
         .await?;
 
