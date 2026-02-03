@@ -33,44 +33,54 @@ jobs:
             openwrt_arch: x86_64
             openwrt_version: "24.10.0"
             pkg_format: ipk
+            use_cross: false
             
           - rust_target: x86_64-unknown-linux-musl
             openwrt_arch: x86_64
             openwrt_version: "snapshot"
             pkg_format: apk
+            use_cross: false
             
           # ===== aarch64 (ARM64) =====
           - rust_target: aarch64-unknown-linux-musl
             openwrt_arch: aarch64_generic
             openwrt_version: "24.10.0"
             pkg_format: ipk
+            use_cross: false
             
           - rust_target: aarch64-unknown-linux-musl
             openwrt_arch: aarch64_generic
             openwrt_version: "snapshot"
             pkg_format: apk
+            use_cross: false
             
           # ===== mipsel (MIPS Little Endian - MT7621) =====
+          # Note: mipsel-unknown-linux-musl requires cross (not in stable rustup)
           - rust_target: mipsel-unknown-linux-musl
             openwrt_arch: mipsel_24kc
             openwrt_version: "24.10.0"
             pkg_format: ipk
+            use_cross: true
             
           - rust_target: mipsel-unknown-linux-musl
             openwrt_arch: mipsel_24kc
             openwrt_version: "snapshot"
             pkg_format: apk
+            use_cross: true
             
           # ===== mips (MIPS Big Endian - Atheros) =====
+          # Note: mips-unknown-linux-musl requires cross (not in stable rustup)
           - rust_target: mips-unknown-linux-musl
             openwrt_arch: mips_24kc
             openwrt_version: "24.10.0"
             pkg_format: ipk
+            use_cross: true
             
           - rust_target: mips-unknown-linux-musl
             openwrt_arch: mips_24kc
             openwrt_version: "snapshot"
             pkg_format: apk
+            use_cross: true
 
     steps:
       - name: Checkout
@@ -97,10 +107,18 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rust_target }}
 
-      - name: Install cross-compilation tools
+      - name: Add Rust target (non-cross builds)
+        if: ${{ !matrix.use_cross }}
+        run: rustup target add ${{ matrix.rust_target }}
+
+      - name: Install cross
+        if: ${{ matrix.use_cross }}
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Install cross-compilation tools (non-cross builds)
+        if: ${{ !matrix.use_cross }}
         run: |
           sudo apt-get update
           sudo apt-get install -y musl-tools musl-dev
@@ -110,15 +128,10 @@ jobs:
             "aarch64-unknown-linux-musl")
               sudo apt-get install -y gcc-aarch64-linux-gnu
               ;;
-            "mipsel-unknown-linux-musl")
-              sudo apt-get install -y gcc-mipsel-linux-gnu
-              ;;
-            "mips-unknown-linux-musl")
-              sudo apt-get install -y gcc-mips-linux-gnu
-              ;;
           esac
 
-      - name: Configure Cargo for cross-compilation
+      - name: Configure Cargo for cross-compilation (non-cross builds)
+        if: ${{ !matrix.use_cross }}
         run: |
           mkdir -p ~/.cargo
           cat >> ~/.cargo/config.toml << 'EOF'
@@ -128,32 +141,35 @@ jobs:
           [target.aarch64-unknown-linux-musl]
           linker = "aarch64-linux-gnu-gcc"
           rustflags = ["-C", "target-feature=+crt-static"]
-          
-          [target.mipsel-unknown-linux-musl]
-          linker = "mipsel-linux-gnu-gcc"
-          rustflags = ["-C", "target-feature=+crt-static"]
-          
-          [target.mips-unknown-linux-musl]
-          linker = "mips-linux-gnu-gcc"
-          rustflags = ["-C", "target-feature=+crt-static"]
           EOF
 
-      - name: Build omniedge-cli
+      - name: Build omniedge-cli (native)
+        if: ${{ !matrix.use_cross }}
         run: |
           cargo build --release -p omniedge-cli --target ${{ matrix.rust_target }}
-          
+
+      - name: Build omniedge-cli (cross)
+        if: ${{ matrix.use_cross }}
+        run: |
+          cross build --release -p omniedge-cli --target ${{ matrix.rust_target }}
+
+      - name: Strip binary
+        run: |
           # Strip binary to reduce size
           case "${{ matrix.rust_target }}" in
             "x86_64-unknown-linux-musl")
               strip target/${{ matrix.rust_target }}/release/omniedge
               ;;
             "aarch64-unknown-linux-musl")
+              sudo apt-get update && sudo apt-get install -y binutils-aarch64-linux-gnu
               aarch64-linux-gnu-strip target/${{ matrix.rust_target }}/release/omniedge || true
               ;;
             "mipsel-unknown-linux-musl")
+              sudo apt-get update && sudo apt-get install -y binutils-mipsel-linux-gnu
               mipsel-linux-gnu-strip target/${{ matrix.rust_target }}/release/omniedge || true
               ;;
             "mips-unknown-linux-musl")
+              sudo apt-get update && sudo apt-get install -y binutils-mips-linux-gnu
               mips-linux-gnu-strip target/${{ matrix.rust_target }}/release/omniedge || true
               ;;
           esac
