@@ -63,10 +63,11 @@ pub enum PluginError {
 }
 
 /// Plugin state
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PluginState {
     /// Plugin created but not initialized
+    #[default]
     Created,
     /// Plugin initialized and ready
     Initialized,
@@ -80,12 +81,6 @@ pub enum PluginState {
     Stopped,
     /// Plugin in error state
     Error,
-}
-
-impl Default for PluginState {
-    fn default() -> Self {
-        Self::Created
-    }
 }
 
 /// Buffer settings for plugin configuration
@@ -265,6 +260,7 @@ struct ActiveEpisode {
 /// Data collection plugin
 ///
 /// Main plugin that coordinates all data collection functionality.
+#[allow(dead_code)]
 pub struct DataCollectionPlugin {
     /// Configuration
     config: DataCollectionConfig,

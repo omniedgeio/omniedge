@@ -278,6 +278,7 @@ pub async fn run_nucleus_only(port: u16, secret: &str) -> Result<()> {
 }
 
 /// Run edge or dual mode worker
+#[allow(clippy::too_many_arguments)]
 pub async fn run_worker(
     base_url: &str,
     network_id: &str,
@@ -378,6 +379,7 @@ pub async fn setup_and_start_nucleus_service(port: u16, secret: &str) -> Result<
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn setup_and_start_service(
     _base_url: &str,
     network_id: &str,
@@ -479,6 +481,7 @@ async fn setup_windows_nucleus_service(port: u16, secret: &str) -> Result<()> {
 }
 
 #[cfg(windows)]
+#[allow(clippy::too_many_arguments)]
 async fn setup_windows_service(
     _base_url: &str,
     network_id: &str,

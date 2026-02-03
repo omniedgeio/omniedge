@@ -32,7 +32,7 @@ use omni_plugin::robotics::DataCollectionPlugin;
 
 /// Simulation state for demo/testing robot data collection UI
 #[cfg(feature = "robotics")]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct SimulationState {
     initialized: bool,
     robot_id: String,
@@ -64,23 +64,6 @@ struct SimulatedStream {
     sample_count: u64,
     capacity: usize,
     samples_per_second: f32,
-}
-
-#[cfg(feature = "robotics")]
-impl Default for SimulationState {
-    fn default() -> Self {
-        Self {
-            initialized: false,
-            robot_id: String::new(),
-            is_recording: false,
-            current_episode_id: None,
-            recording_start_time: None,
-            episodes: Vec::new(),
-            streams: Vec::new(),
-            samples_received: 0,
-            bytes_written: 0,
-        }
-    }
 }
 
 struct AppState {
@@ -1939,7 +1922,7 @@ async fn init_simulation_mode(
                     .unwrap_or("demo1")
             ),
             robot_id: robot_id.clone(),
-            start_time_ns: now_ns - 3600_000_000_000, // 1 hour ago
+            start_time_ns: now_ns - 3_600_000_000_000, // 1 hour ago
             duration_seconds: 120.5,
             sample_count: 48200,
             size_bytes: 156_000_000,
@@ -1955,7 +1938,7 @@ async fn init_simulation_mode(
                     .unwrap_or("demo2")
             ),
             robot_id: robot_id.clone(),
-            start_time_ns: now_ns - 1800_000_000_000, // 30 min ago
+            start_time_ns: now_ns - 1_800_000_000_000, // 30 min ago
             duration_seconds: 85.2,
             sample_count: 34080,
             size_bytes: 98_500_000,
@@ -2089,7 +2072,7 @@ async fn stop_simulation_recording(
         .unwrap_or(0.0);
 
     let sample_count: u64 = sim.streams.iter().map(|s| s.sample_count).sum();
-    let size_bytes = (sample_count * 4000) as u64; // ~4KB per sample avg
+    let size_bytes = sample_count * 4000; // ~4KB per sample avg
 
     sim.is_recording = false;
     sim.current_episode_id = None;
