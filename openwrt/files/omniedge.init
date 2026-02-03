@@ -1,0 +1,136 @@
+#!/bin/sh /etc/rc.common
+# OmniEdge init script for OpenWrt (procd-based)
+#
+# Installation:
+#   1. Copy to /etc/init.d/omniedge
+#   2. chmod +x /etc/init.d/omniedge
+#   3. /etc/init.d/omniedge enable
+#   4. /etc/init.d/omniedge start
+
+START=99
+STOP=10
+
+USE_PROCD=1
+
+PROG=/usr/bin/omniedge
+CONFIG=/etc/config/omniedge
+
+# Read UCI configuration
+config_load() {
+    local enabled
+    local network_id
+    local secret_key
+    local log_level
+    local exit_node
+    local exit_node_v6
+    
+    config_get_bool enabled omniedge enabled 0
+    config_get network_id omniedge network_id ""
+    config_get secret_key omniedge secret_key ""
+    config_get log_level omniedge log_level "info"
+    config_get exit_node omniedge exit_node ""
+    config_get exit_node_v6 omniedge exit_node_v6 ""
+    
+    # Export for use in start_service
+    OMNIEDGE_ENABLED="$enabled"
+    OMNIEDGE_NETWORK_ID="$network_id"
+    OMNIEDGE_SECRET_KEY="$secret_key"
+    OMNIEDGE_LOG_LEVEL="$log_level"
+    OMNIEDGE_EXIT_NODE="$exit_node"
+    OMNIEDGE_EXIT_NODE_V6="$exit_node_v6"
+}
+
+start_service() {
+    # Load configuration
+    . /lib/functions.sh
+    config_load omniedge
+    
+    # Check if enabled
+    local enabled
+    config_get_bool enabled omniedge enabled 0
+    [ "$enabled" -eq 0 ] && {
+        echo "OmniEdge is disabled in /etc/config/omniedge"
+        return 0
+    }
+    
+    # Get configuration values
+    local network_id
+    local secret_key
+    local log_level
+    local exit_node
+    local exit_node_v6
+    
+    config_get network_id omniedge network_id ""
+    config_get secret_key omniedge secret_key ""
+    config_get log_level omniedge log_level "info"
+    config_get exit_node omniedge exit_node ""
+    config_get exit_node_v6 omniedge exit_node_v6 ""
+    
+    # Validate required configuration
+    [ -z "$network_id" ] && {
+        echo "Error: network_id not configured"
+        return 1
+    }
+    
+    [ -z "$secret_key" ] && {
+        echo "Error: secret_key not configured"
+        return 1
+    }
+    
+    # Build command arguments
+    local args="start --network-id $network_id --secret-key $secret_key"
+    
+    [ -n "$exit_node" ] && args="$args --exit-node $exit_node"
+    [ -n "$exit_node_v6" ] && args="$args --exit-node-v6 $exit_node_v6"
+    
+    procd_open_instance
+    procd_set_param command $PROG $args
+    procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_set_param env RUST_LOG="$log_level"
+    procd_set_param pidfile /var/run/omniedge.pid
+    
+    # Network trigger - restart when network changes
+    procd_set_param netdev br-lan
+    procd_add_reload_trigger "omniedge"
+    
+    procd_close_instance
+}
+
+stop_service() {
+    # procd handles stopping automatically
+    :
+}
+
+reload_service() {
+    stop
+    start
+}
+
+service_triggers() {
+    procd_add_reload_trigger "omniedge"
+    procd_add_reload_trigger "network"
+}
+
+# Status command
+status() {
+    if pgrep -x omniedge > /dev/null; then
+        echo "OmniEdge is running"
+        $PROG status 2>/dev/null || true
+        return 0
+    else
+        echo "OmniEdge is not running"
+        return 1
+    fi
+}
+
+# Login command (for initial setup)
+login() {
+    $PROG login "$@"
+}
+
+# Join network command
+join() {
+    $PROG join "$@"
+}
