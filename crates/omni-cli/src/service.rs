@@ -520,6 +520,7 @@ pub async fn setup_and_start_service(
     mode: RunMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
+    exit_node_v6: Option<&str>,
     nucleus_port: u16,
     cluster_secret: Option<&str>,
 ) -> Result<()> {
@@ -538,6 +539,7 @@ pub async fn setup_and_start_service(
             mode,
             as_exit_node,
             exit_node,
+            exit_node_v6,
             nucleus_port,
             cluster_secret,
         )
@@ -551,6 +553,7 @@ pub async fn setup_and_start_service(
             mode,
             as_exit_node,
             exit_node,
+            exit_node_v6,
             nucleus_port,
             cluster_secret,
         )?;
@@ -563,6 +566,7 @@ pub async fn setup_and_start_service(
             mode,
             as_exit_node,
             exit_node,
+            exit_node_v6,
             nucleus_port,
             cluster_secret,
         )?;
@@ -622,6 +626,7 @@ async fn setup_windows_service(
     mode: RunMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
+    exit_node_v6: Option<&str>,
     nucleus_port: u16,
     cluster_secret: Option<&str>,
 ) -> Result<()> {
@@ -640,6 +645,10 @@ async fn setup_windows_service(
     }
     if let Some(ip) = exit_node {
         args.push("--exit-node".to_string());
+        args.push(ip.to_string());
+    }
+    if let Some(ip) = exit_node_v6 {
+        args.push("--exit-node-v6".to_string());
         args.push(ip.to_string());
     }
     args.push("--daemon".to_string());
@@ -785,6 +794,7 @@ fn setup_linux_service(
     mode: RunMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
+    exit_node_v6: Option<&str>,
     nucleus_port: u16,
     cluster_secret: Option<&str>,
 ) -> Result<()> {
@@ -814,6 +824,11 @@ fn setup_linux_service(
     } else {
         "".to_string()
     };
+    let exit_node_v6_flag = if let Some(ip) = exit_node_v6 {
+        format!("--exit-node-v6 {}", ip)
+    } else {
+        "".to_string()
+    };
 
     let nucleus_flags = if mode == RunMode::Dual {
         let secret_flag = cluster_secret
@@ -830,7 +845,7 @@ Description=OmniEdge Service
 After=network.target
 
 [Service]
-ExecStart={} start -n {} --mode {} {} {} {} --daemon
+ExecStart={} start -n {} --mode {} {} {} {} {} --daemon
 Restart=always
 RestartSec=5
 
@@ -842,7 +857,8 @@ WantedBy=multi-user.target
         mode_str,
         nucleus_flags,
         as_exit_flag,
-        exit_node_flag
+        exit_node_flag,
+        exit_node_v6_flag
     );
 
     fs::write("/tmp/omniedge.service", &service_content)?;
@@ -984,6 +1000,7 @@ fn setup_macos_service(
     mode: RunMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
+    exit_node_v6: Option<&str>,
     nucleus_port: u16,
     cluster_secret: Option<&str>,
 ) -> Result<()> {
@@ -1031,6 +1048,10 @@ fn setup_macos_service(
     }
     if let Some(ip) = exit_node {
         args.push("--exit-node".to_string());
+        args.push(ip.to_string());
+    }
+    if let Some(ip) = exit_node_v6 {
+        args.push("--exit-node-v6".to_string());
         args.push(ip.to_string());
     }
     args.push("--daemon".to_string());

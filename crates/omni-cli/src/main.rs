@@ -226,6 +226,11 @@ enum Commands {
         #[arg(short = 'e', long = "exit-node")]
         exit_node: Option<String>,
 
+        /// Use a specific exit node IPv6 address (e.g., fd00::1)
+        /// Used together with --exit-node for dual-stack exit node routing
+        #[arg(long = "exit-node-v6")]
+        exit_node_v6: Option<String>,
+
         /// UDP port for nucleus signaling server (default: 51820)
         #[arg(short = 'p', long, default_value = "51820")]
         port: u16,
@@ -495,6 +500,7 @@ async fn main() -> Result<()> {
             as_exit_node,
             no_exit_node,
             exit_node,
+            exit_node_v6,
             port,
             secret,
             security_key,
@@ -620,6 +626,16 @@ async fn main() -> Result<()> {
                 }
             }
 
+            if let Some(ip) = &exit_node_v6 {
+                // Validate that the exit node IPv6 is a valid IPv6 address
+                use std::net::Ipv6Addr;
+                if ip.parse::<Ipv6Addr>().is_err() {
+                    eprintln!("Error: Invalid exit node IPv6 address '{}'.", ip);
+                    eprintln!("Expected format: fd00::1 or 2001:db8::1 (IPv6 address)");
+                    std::process::exit(exit_codes::INVALID_INPUT);
+                }
+            }
+
             // Daemon mode handling
             if daemon {
                 match mode {
@@ -636,7 +652,7 @@ async fn main() -> Result<()> {
                             mode,
                             as_exit_node,
                             exit_node,
-                            None, // exit_node_v6 - CLI doesn't support IPv6 exit node yet
+                            exit_node_v6,
                             port,
                             secret,
                         )
@@ -676,6 +692,9 @@ async fn main() -> Result<()> {
             if exit_node.is_some() {
                 config.exit_node_ip = exit_node.clone();
             }
+            if exit_node_v6.is_some() {
+                config.exit_node_ip_v6 = exit_node_v6.clone();
+            }
             // Save running mode
             config.last_run_mode = Some(match mode {
                 RunMode::Edge => "edge".to_string(),
@@ -694,6 +713,7 @@ async fn main() -> Result<()> {
             // Use the effective exit node setting (from flag or saved config)
             let effective_as_exit_node = config.is_exit_node;
             let effective_exit_node = exit_node.clone().or_else(|| config.exit_node_ip.clone());
+            let effective_exit_node_v6 = exit_node_v6.clone().or_else(|| config.exit_node_ip_v6.clone());
             config.save()?;
 
             // Create progress spinner
@@ -778,6 +798,7 @@ async fn main() -> Result<()> {
                 mode,
                 effective_as_exit_node,
                 effective_exit_node.as_deref(),
+                effective_exit_node_v6.as_deref(),
                 port,
                 secret.as_deref(),
             )
@@ -800,6 +821,9 @@ async fn main() -> Result<()> {
             }
             if let Some(ref exit_ip) = effective_exit_node {
                 println!("  Exit:    Routing through {}", exit_ip);
+            }
+            if let Some(ref exit_ip_v6) = effective_exit_node_v6 {
+                println!("  Exit v6: Routing through {}", exit_ip_v6);
             }
             println!();
             println!("Run 'omniedge status' to see connection details.");
@@ -905,6 +929,9 @@ async fn main() -> Result<()> {
                 }
                 if let Some(ref exit_ip) = config.exit_node_ip {
                     println!("  Exit Node:   {}", exit_ip);
+                }
+                if let Some(ref exit_ip_v6) = config.exit_node_ip_v6 {
+                    println!("  Exit Node v6: {}", exit_ip_v6);
                 }
             } else {
                 println!("  Connection:  ○ Disconnected");
@@ -1605,6 +1632,7 @@ async fn service_main_res(base_url: &str) -> Result<()> {
             daemon,
             as_exit_node,
             exit_node,
+            exit_node_v6,
             port,
             secret,
             ..
@@ -1631,7 +1659,7 @@ async fn service_main_res(base_url: &str) -> Result<()> {
                     mode,
                     as_exit_node,
                     exit_node,
-                    None, // exit_node_v6 - CLI doesn't support IPv6 exit node yet
+                    exit_node_v6,
                     port,
                     secret,
                 )
