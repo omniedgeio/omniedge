@@ -56,12 +56,14 @@ jobs:
             
           # ===== mipsel (MIPS Little Endian - MT7621) =====
           # Note: mipsel-unknown-linux-musl requires cross + build-std (not in stable rustup)
+          # Cranelift doesn't support MIPS, so WASM plugins are disabled
           - rust_target: mipsel-unknown-linux-musl
             openwrt_arch: mipsel_24kc
             openwrt_version: "24.10.0"
             pkg_format: ipk
             use_cross: true
             needs_build_std: true
+            no_wasm: true
             
           - rust_target: mipsel-unknown-linux-musl
             openwrt_arch: mipsel_24kc
@@ -69,15 +71,18 @@ jobs:
             pkg_format: apk
             use_cross: true
             needs_build_std: true
+            no_wasm: true
             
           # ===== mips (MIPS Big Endian - Atheros) =====
           # Note: mips-unknown-linux-musl requires cross + build-std (not in stable rustup)
+          # Cranelift doesn't support MIPS, so WASM plugins are disabled
           - rust_target: mips-unknown-linux-musl
             openwrt_arch: mips_24kc
             openwrt_version: "24.10.0"
             pkg_format: ipk
             use_cross: true
             needs_build_std: true
+            no_wasm: true
             
           - rust_target: mips-unknown-linux-musl
             openwrt_arch: mips_24kc
@@ -85,6 +90,7 @@ jobs:
             pkg_format: apk
             use_cross: true
             needs_build_std: true
+            no_wasm: true
 
     steps:
       - name: Checkout
@@ -159,10 +165,15 @@ jobs:
         run: |
           cargo build --release -p omniedge-cli --target ${{ matrix.rust_target }}
 
-      - name: Build omniedge-cli (cross)
-        if: matrix.use_cross == true
+      - name: Build omniedge-cli (cross with WASM)
+        if: matrix.use_cross == true && matrix.no_wasm != true
         run: |
           cross build --release -p omniedge-cli --target ${{ matrix.rust_target }}
+
+      - name: Build omniedge-cli (cross without WASM - MIPS)
+        if: matrix.use_cross == true && matrix.no_wasm == true
+        run: |
+          cross build --release -p omniedge-cli --target ${{ matrix.rust_target }} --no-default-features
 
       - name: Strip binary
         run: |
