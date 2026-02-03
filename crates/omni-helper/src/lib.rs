@@ -49,6 +49,9 @@ pub struct StartArgs {
     #[serde(default)]
     pub nucleus: bool,
     pub exit_node_ip: Option<String>,
+    /// IPv6 address of the selected exit node (dual-stack support)
+    #[serde(default)]
+    pub exit_node_ip_v6: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -140,6 +143,7 @@ impl HelperServer {
                         args.nucleus,
                         args.as_exit_node,
                         args.exit_node_ip,
+                        args.exit_node_ip_v6,
                     )
                     .await
                 {

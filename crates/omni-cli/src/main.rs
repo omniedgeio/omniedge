@@ -636,6 +636,7 @@ async fn main() -> Result<()> {
                             mode,
                             as_exit_node,
                             exit_node,
+                            None, // exit_node_v6 - CLI doesn't support IPv6 exit node yet
                             port,
                             secret,
                         )
@@ -1630,6 +1631,7 @@ async fn service_main_res(base_url: &str) -> Result<()> {
                     mode,
                     as_exit_node,
                     exit_node,
+                    None, // exit_node_v6 - CLI doesn't support IPv6 exit node yet
                     port,
                     secret,
                 )

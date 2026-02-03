@@ -231,6 +231,7 @@ impl ConnectionManager {
         is_nucleus: bool,
         as_exit_node: bool,
         exit_node_ip: Option<String>,
+        exit_node_ip_v6: Option<String>,
     ) -> Result<JoinVirtualNetworkResponse> {
         // Disconnect any existing connection first to prevent duplicate TUN interfaces
         if self.is_connected() {
@@ -242,6 +243,7 @@ impl ConnectionManager {
         self.is_nucleus = is_nucleus;
         self.as_exit_node.store(as_exit_node, Ordering::SeqCst);
         self.exit_node_ip = exit_node_ip;
+        self.exit_node_ip_v6 = exit_node_ip_v6;
 
         // Initialize nucleus state if running in nucleus mode
         if is_nucleus {
