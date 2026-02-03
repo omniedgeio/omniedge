@@ -239,6 +239,7 @@ unsafe impl Send for RingBuffer {}
 unsafe impl Sync for RingBuffer {}
 
 /// Multi-stream buffer manager
+#[allow(dead_code)]
 pub struct BufferManager {
     /// Buffers by stream ID
     buffers: parking_lot::RwLock<HashMap<StreamId, Arc<RingBuffer>>>,

@@ -672,6 +672,7 @@ pub struct UploadManager {
 }
 
 /// State of an active upload
+#[allow(dead_code)]
 struct UploadState {
     /// Job
     job: UploadJob,
@@ -741,7 +742,7 @@ impl UploadManager {
     pub fn cancel_all(&mut self) {
         self.cancel_flag.store(true, Ordering::SeqCst);
         self.queue.clear();
-        for (_, state) in &self.active_uploads {
+        for state in self.active_uploads.values() {
             state.cancelled.store(true, Ordering::SeqCst);
         }
     }
@@ -926,7 +927,7 @@ impl UploadManager {
 
         self.enqueue(job);
         self.process_next(progress_callback)
-            .ok_or_else(|| UploadError::Cancelled)
+            .ok_or(UploadError::Cancelled)
     }
 
     /// Get session statistics
@@ -1031,7 +1032,7 @@ mod tests {
     fn test_s3_credentials_from_env() {
         let creds = S3Credentials::from_env();
         // Credentials may or may not be set in test environment
-        assert!(creds.region.len() > 0);
+        assert!(!creds.region.is_empty());
     }
 
     #[test]

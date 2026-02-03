@@ -1,7 +1,8 @@
 # E2E Test Dockerfile for OmniEdge
 # Builds the CLI and provides tools for P2P connectivity testing
 
-FROM rust:1.87-slim AS builder
+# Use bookworm base for stable build environment
+FROM rust:slim-bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config libssl-dev \

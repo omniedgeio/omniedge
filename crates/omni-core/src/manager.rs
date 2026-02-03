@@ -611,7 +611,10 @@ impl ConnectionManager {
 
         // 5. Setup Exit Node Routing if requested
         if let Some(ref exit_ip) = self.exit_node_ip {
-            info!("Configuring system to use exit node: {} (v6: {:?})", exit_ip, self.exit_node_ip_v6);
+            info!(
+                "Configuring system to use exit node: {} (v6: {:?})",
+                exit_ip, self.exit_node_ip_v6
+            );
             let nucleus_host = &join_resp.server.host;
             if let Err(e) = crate::routing::RoutingManager::setup_exit_node(
                 exit_ip,
@@ -1115,7 +1118,10 @@ impl ConnectionManager {
         // Refresh routing if connected
         if let ConnectionState::Connected = *self.state.read().await {
             if let Some(ip) = exit_node_ip {
-                info!("Enabling exit node routing to: {} (v6: {:?})", ip, exit_node_ip_v6);
+                info!(
+                    "Enabling exit node routing to: {} (v6: {:?})",
+                    ip, exit_node_ip_v6
+                );
                 // We need the nucleus host to add a persistent route to it
                 // For simplicity, we can try to get it from the current proto if available
                 if let Some(ref proto) = self.proto {
@@ -1508,7 +1514,7 @@ impl ConnectionManager {
             let local_addr = tokio_socket.local_addr()?;
             info!("Created dual-stack UDP socket on {}", local_addr);
 
-            return Ok(tokio_socket);
+            Ok(tokio_socket)
         }
 
         // Fallback for other platforms: just bind to IPv6 and hope for the best

@@ -169,6 +169,7 @@ impl RobotModel {
     }
 
     /// Add a joint to the model
+    #[allow(clippy::too_many_arguments)]
     pub fn add_joint(
         &mut self,
         name: impl Into<String>,

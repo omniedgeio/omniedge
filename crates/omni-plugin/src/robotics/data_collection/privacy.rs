@@ -304,6 +304,7 @@ impl FaceBlurFilter {
     }
 
     /// Apply blur to a specific region (simple box blur)
+    #[allow(clippy::too_many_arguments)]
     fn blur_region(
         &self,
         data: &mut [u8],
@@ -752,15 +753,13 @@ mod tests {
         // Create a simple 4x4 RGB image with known values
         let mut data = vec![0u8; 4 * 4 * 3];
         // Set all pixels to white
-        for i in 0..data.len() {
-            data[i] = 255;
-        }
+        data.fill(255);
 
         // Blur a 2x2 region (the blur should average to white since all pixels are white)
         filter.blur_region(&mut data, 4, 4, 0, 0, 2, 2, 0.5);
 
-        // Verify the image was processed (values should still be valid)
-        assert!(data.iter().all(|&v| v <= 255));
+        // Verify the image was processed (data length should be unchanged)
+        assert_eq!(data.len(), 4 * 4 * 3);
     }
 
     #[test]
