@@ -442,8 +442,9 @@ function App() {
       const devices = networkDevices[activeNetwork] || [];
       const selectedDevice = devices.find(d => d.id === exitNodeId);
       const exitNodeIp = selectedDevice ? selectedDevice.virtual_ip : '';
+      const exitNodeIpV6 = selectedDevice?.virtual_ip_v6 || null;
 
-      await invoke('set_exit_node', { networkId: activeNetwork, exitNodeId, exitNodeIp });
+      await invoke('set_exit_node', { networkId: activeNetwork, exitNodeId, exitNodeIp, exitNodeIpV6 });
       const nets: any = await invoke('list_networks');
       setNetworks(nets || []);
     } catch (err) {

@@ -24,6 +24,8 @@ pub struct ConnectionManager {
     nucleus_port: u16,
     as_exit_node: Arc<AtomicBool>,
     exit_node_ip: Option<String>,
+    /// IPv6 address of the selected exit node (dual-stack support)
+    exit_node_ip_v6: Option<String>,
     cluster_secret: Option<String>,
     device_id: Option<String>,
     current_network_id: Arc<RwLock<Option<String>>>,
@@ -62,6 +64,7 @@ impl ConnectionManager {
             nucleus_port: 51820, // Default nucleus signaling port
             as_exit_node: Arc::new(AtomicBool::new(is_exit_node)),
             exit_node_ip: None,
+            exit_node_ip_v6: None,
             cluster_secret: None,
             device_id: None,
             current_network_id: Arc::new(RwLock::new(None)),
@@ -606,9 +609,13 @@ impl ConnectionManager {
 
         // 5. Setup Exit Node Routing if requested
         if let Some(ref exit_ip) = self.exit_node_ip {
-            info!("Configuring system to use exit node: {}", exit_ip);
+            info!("Configuring system to use exit node: {} (v6: {:?})", exit_ip, self.exit_node_ip_v6);
             let nucleus_host = &join_resp.server.host;
-            if let Err(e) = crate::routing::RoutingManager::setup_exit_node(exit_ip, nucleus_host) {
+            if let Err(e) = crate::routing::RoutingManager::setup_exit_node(
+                exit_ip,
+                self.exit_node_ip_v6.as_deref(),
+                nucleus_host,
+            ) {
                 error!("Failed to setup exit node routing: {}", e);
             }
         }
@@ -1084,6 +1091,7 @@ impl ConnectionManager {
         network_id: &str,
         exit_node_id: &str,
         exit_node_ip: Option<&str>,
+        exit_node_ip_v6: Option<&str>,
     ) -> Result<()> {
         let client = self.api_client.as_ref().context("Not authenticated")?;
         let net_service = NetworkService::new(client);
@@ -1100,16 +1108,18 @@ impl ConnectionManager {
 
         // Update local state
         self.exit_node_ip = exit_node_ip.map(|s| s.to_string());
+        self.exit_node_ip_v6 = exit_node_ip_v6.map(|s| s.to_string());
 
         // Refresh routing if connected
         if let ConnectionState::Connected = *self.state.read().await {
             if let Some(ip) = exit_node_ip {
-                info!("Enabling exit node routing to: {}", ip);
+                info!("Enabling exit node routing to: {} (v6: {:?})", ip, exit_node_ip_v6);
                 // We need the nucleus host to add a persistent route to it
                 // For simplicity, we can try to get it from the current proto if available
                 if let Some(ref proto) = self.proto {
                     let _ = crate::routing::RoutingManager::setup_exit_node(
                         ip,
+                        exit_node_ip_v6,
                         proto.get_nucleus_host(),
                     );
                 }
