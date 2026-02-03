@@ -11,7 +11,7 @@ PrivacyUrl: https://omniedge.io/privacy
 Author: OmniEdge Team
 PackageName: OmniEdge CLI
 PackageUrl: https://github.com/omniedgeio/omniedge
-License: GPL-3.0
+License: Apache-2.0 OR MIT
 LicenseUrl: https://github.com/omniedgeio/omniedge/blob/main/LICENSE
 Copyright: Copyright (c) 2024 OmniEdge
 ShortDescription: Peer-to-peer VPN CLI for edge computing
