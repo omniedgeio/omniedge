@@ -2,7 +2,7 @@ name: "Release CLI"
 
 on:
   workflow_run:
-    workflows: ["E2E Tests"]
+    workflows: ["Test and Lint"]
     types:
       - completed
   workflow_dispatch:
