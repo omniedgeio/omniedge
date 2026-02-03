@@ -1,13 +1,13 @@
 # Maintainer: OmniEdge Team <support@omniedge.io>
-pkgname=omniedge-cli-bin
+pkgname=omniedge-cli
 pkgver=2.0.0
 pkgrel=1
 pkgdesc="Peer-to-peer VPN CLI for edge computing"
 arch=('x86_64' 'aarch64')
 url="https://omniedge.io"
-license=('GPL3')
-provides=('omniedge-cli' 'omniedge')
-conflicts=('omniedge-cli' 'omniedge')
+license=('Apache-2.0' 'MIT')
+provides=('omniedge')
+conflicts=('omniedge')
 depends=('glibc')
 optdepends=('systemd: for systemd service support')
 

@@ -110,8 +110,14 @@ jobs:
           # Update GitHub URL (omniedge -> omniedgeio)
           sed -i "s|github.com/omniedge/omniedge|github.com/omniedgeio/omniedge|g" "$FORMULA"
           
-          # Update checksums (replace any existing SHA256 with new ones)
-          sed -i "s/sha256 \"[a-f0-9]\{64\}\"/sha256 \"PLACEHOLDER\"/g" "$FORMULA"
+          # Update checksums - replace placeholders OR existing SHA256 hashes
+          # The formula uses platform-specific blocks, we need to match each one by context
+          # Using perl for multi-line aware replacement
+          perl -i -pe "
+            if (/on_arm/ && /macos/../end/) { s/sha256 \"(PLACEHOLDER_SHA256_MACOS_ARM64|[a-f0-9]{64})\"/sha256 \"${SHA256_MACOS_ARM64}\"/; }
+          " "$FORMULA"
+          
+          # Simpler approach: just replace all placeholder patterns and existing hashes
           sed -i "s/PLACEHOLDER_SHA256_MACOS_ARM64/${SHA256_MACOS_ARM64}/g" "$FORMULA"
           sed -i "s/PLACEHOLDER_SHA256_MACOS_X64/${SHA256_MACOS_X64}/g" "$FORMULA"
           sed -i "s/PLACEHOLDER_SHA256_LINUX_ARM64/${SHA256_LINUX_ARM64}/g" "$FORMULA"
@@ -172,9 +178,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - package: omniedge-cli-bin
+          - package: omniedge-cli
             type: cli
-          - package: omniedge-desktop-bin
+          - package: omniedge-desktop
             type: desktop
     steps:
       - uses: actions/checkout@v4
@@ -258,12 +264,12 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           cat > packaging/snap/snapcraft.yaml << EOF
-          name: omniedge-cli
+          name: omniedge
           base: core22
           version: '${VERSION}'
           summary: Peer-to-peer VPN CLI for edge computing
           description: |
-            OmniEdge CLI is a command-line tool for creating secure, peer-to-peer mesh 
+            OmniEdge is a command-line tool for creating secure, peer-to-peer mesh 
             VPN connections. It enables devices to communicate directly across networks 
             with minimal latency and maximum security.
           
@@ -335,7 +341,11 @@ jobs:
           $cliInstaller = $cliInstaller -replace "PLACEHOLDER_SHA256", "$env:SHA256_CLI"
           $cliInstaller = $cliInstaller -replace "InstallerSha256: [a-fA-F0-9]{64}", "InstallerSha256: $env:SHA256_CLI"
           $cliInstaller = $cliInstaller -replace "github\.com/omniedge/omniedge", "github.com/omniedgeio/omniedge"
-          $cliInstaller = $cliInstaller -replace "omniedge-cli-[\d.]+-windows-x64", "omniedge-cli-$env:VERSION-windows-x64"
+          # Update version in URLs and RelativeFilePath (includes .exe extension)
+          $cliInstaller = $cliInstaller -replace "omniedge-cli-[\d.]+-windows-x64\.zip", "omniedge-cli-$env:VERSION-windows-x64.zip"
+          $cliInstaller = $cliInstaller -replace "omniedge-cli-[\d.]+-windows-x64\.exe", "omniedge-cli-$env:VERSION-windows-x64.exe"
+          # Update download/v{version} in URLs
+          $cliInstaller = $cliInstaller -replace "download/v[\d.]+/", "download/v$env:VERSION/"
           Set-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.installer.yaml" $cliInstaller
           
           # Update CLI version manifest
@@ -343,19 +353,33 @@ jobs:
           $cliVersion = $cliVersion -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
           Set-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.yaml" $cliVersion
           
+          # Update CLI locale manifest
+          $cliLocale = Get-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.locale.en-US.yaml" -Raw
+          $cliLocale = $cliLocale -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
+          $cliLocale = $cliLocale -replace "releases/tag/v[\d.]+", "releases/tag/v$env:VERSION"
+          Set-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.locale.en-US.yaml" $cliLocale
+          
           # Update Desktop installer manifest
           $desktopInstaller = Get-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml" -Raw
           $desktopInstaller = $desktopInstaller -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
           $desktopInstaller = $desktopInstaller -replace "PLACEHOLDER_SHA256_MSI", "$env:SHA256_DESKTOP"
           $desktopInstaller = $desktopInstaller -replace "InstallerSha256: [a-fA-F0-9]{64}", "InstallerSha256: $env:SHA256_DESKTOP"
           $desktopInstaller = $desktopInstaller -replace "github\.com/omniedge/omniedge", "github.com/omniedgeio/omniedge"
-          $desktopInstaller = $desktopInstaller -replace "omniedge-desktop-[\d.]+-windows-x64", "omniedge-desktop-$env:VERSION-windows-x64"
+          # Update version in URLs
+          $desktopInstaller = $desktopInstaller -replace "omniedge-desktop-[\d.]+-windows-x64\.msi", "omniedge-desktop-$env:VERSION-windows-x64.msi"
+          $desktopInstaller = $desktopInstaller -replace "download/v[\d.]+/", "download/v$env:VERSION/"
           Set-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml" $desktopInstaller
           
           # Update Desktop version manifest
           $desktopVersion = Get-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.yaml" -Raw
           $desktopVersion = $desktopVersion -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
           Set-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.yaml" $desktopVersion
+          
+          # Update Desktop locale manifest
+          $desktopLocale = Get-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.locale.en-US.yaml" -Raw
+          $desktopLocale = $desktopLocale -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
+          $desktopLocale = $desktopLocale -replace "releases/tag/v[\d.]+", "releases/tag/v$env:VERSION"
+          Set-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.locale.en-US.yaml" $desktopLocale
           
           Write-Host "Updated Winget manifests for version $env:VERSION"
 
@@ -414,6 +438,8 @@ jobs:
           # Update nuspec
           $nuspec = Get-Content "packaging/chocolatey/$pkg/$pkg.nuspec" -Raw
           $nuspec = $nuspec -replace "<version>.*</version>", "<version>$env:VERSION</version>"
+          # Update releaseNotes URL with new version
+          $nuspec = $nuspec -replace "releases/tag/v[\d.]+", "releases/tag/v$env:VERSION"
           Set-Content "packaging/chocolatey/$pkg/$pkg.nuspec" $nuspec
           
           # Update install script
@@ -482,6 +508,6 @@ jobs:
           echo "### One-Time Setup" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "1. **Homebrew**: Create \`github.com/omniedgeio/homebrew-tap\` repository" >> $GITHUB_STEP_SUMMARY
-          echo "2. **AUR**: Register \`omniedge-cli-bin\` and \`omniedge-desktop-bin\` packages" >> $GITHUB_STEP_SUMMARY
-          echo "3. **Snap**: Run \`snapcraft register omniedge-cli\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. **AUR**: Register \`omniedge-cli\` and \`omniedge-desktop\` packages" >> $GITHUB_STEP_SUMMARY
+          echo "3. **Snap**: Run \`snapcraft register omniedge\`" >> $GITHUB_STEP_SUMMARY
           echo "4. **Chocolatey**: Create account and reserve package names" >> $GITHUB_STEP_SUMMARY

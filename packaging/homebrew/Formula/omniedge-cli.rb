@@ -5,7 +5,7 @@ class OmniedgeCli < Formula
   desc "Peer-to-peer VPN CLI for edge computing"
   homepage "https://omniedge.io"
   version "2.0.0"
-  license "GPL-3.0"
+  license any_of: ["Apache-2.0", "MIT"]
 
   on_macos do
     on_arm do

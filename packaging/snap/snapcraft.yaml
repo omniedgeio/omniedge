@@ -1,4 +1,4 @@
-name: omniedge-cli
+name: omniedge
 base: core22
 version: '2.0.0'
 summary: Peer-to-peer VPN CLI for edge computing

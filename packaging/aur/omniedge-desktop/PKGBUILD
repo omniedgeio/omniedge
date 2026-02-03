@@ -1,13 +1,13 @@
 # Maintainer: OmniEdge Team <support@omniedge.io>
-pkgname=omniedge-desktop-bin
+pkgname=omniedge-desktop
 pkgver=2.0.0
 pkgrel=1
 pkgdesc="Peer-to-peer VPN desktop client for edge computing"
 arch=('x86_64')
 url="https://omniedge.io"
-license=('GPL3')
-provides=('omniedge-desktop')
-conflicts=('omniedge-desktop')
+license=('Apache-2.0' 'MIT')
+provides=()
+conflicts=()
 depends=('gtk3' 'webkit2gtk' 'libayatana-appindicator')
 optdepends=('libappindicator-gtk3: legacy tray icon support')
 
