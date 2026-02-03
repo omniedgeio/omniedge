@@ -257,6 +257,7 @@ enum WriterState {
 
 /// Message index entry
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct MessageIndexEntry {
     timestamp: TimestampNs,
     offset: u64,
@@ -264,6 +265,7 @@ struct MessageIndexEntry {
 
 /// Chunk index entry
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct ChunkIndexEntry {
     start_time: TimestampNs,
     end_time: TimestampNs,

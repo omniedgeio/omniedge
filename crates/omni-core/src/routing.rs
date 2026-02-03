@@ -6,6 +6,7 @@ use std::process::Command;
 /// Default DNS server to use when system DNS cannot be detected
 const FALLBACK_DNS: &str = "8.8.8.8";
 /// Default IPv6 DNS server fallback
+#[allow(dead_code)]
 const FALLBACK_DNS_V6: &str = "2001:4860:4860::8888";
 
 pub struct RoutingManager;
@@ -77,6 +78,7 @@ impl RoutingManager {
     }
 
     /// Validate that a string is a valid IPv4 address
+    #[allow(dead_code)]
     fn is_valid_ipv4(s: &str) -> bool {
         s.parse::<std::net::Ipv4Addr>().is_ok()
     }
@@ -90,12 +92,12 @@ impl RoutingManager {
 
 impl RoutingManager {
     /// Setup exit node routing for both IPv4 and optionally IPv6
-    /// 
+    ///
     /// # Arguments
     /// * `exit_node_ip` - The IPv4 address of the exit node
     /// * `exit_node_ip_v6` - Optional IPv6 address of the exit node
     /// * `nucleus_host` - The nucleus server host (for persistent route)
-    /// 
+    ///
     /// # Safety
     /// IPv6 routing is optional and failures are logged but don't fail the overall setup.
     /// This ensures backward compatibility with IPv4-only exit nodes.
@@ -133,7 +135,11 @@ impl RoutingManager {
 
     // --- Linux Implementation Shell ---
     #[cfg(target_os = "linux")]
-    fn setup_linux(exit_node_ip: &str, exit_node_ip_v6: Option<&str>, nucleus_host: &str) -> Result<()> {
+    fn setup_linux(
+        exit_node_ip: &str,
+        exit_node_ip_v6: Option<&str>,
+        nucleus_host: &str,
+    ) -> Result<()> {
         info!(
             "Setting up exit node on Linux: {} (v6: {:?}) via {}",
             exit_node_ip, exit_node_ip_v6, nucleus_host
@@ -200,10 +206,10 @@ impl RoutingManager {
         // 6. Setup IPv6 routing if exit node has IPv6 (safe - failures logged but don't fail overall)
         if let Some(exit_v6) = exit_node_ip_v6 {
             info!("Setting up IPv6 exit node routing via {}", exit_v6);
-            
+
             // Delete existing IPv6 default route (ignore errors)
             let _ = Self::run_command("sudo", &["ip", "-6", "route", "del", "default"]);
-            
+
             // Add IPv6 default route via exit node
             match Self::run_command(
                 "sudo",
@@ -212,7 +218,10 @@ impl RoutingManager {
                 Ok(_) => info!("IPv6 exit node routing configured successfully"),
                 Err(e) => {
                     // Log warning but don't fail - IPv4 exit node still works
-                    log::warn!("Failed to setup IPv6 exit node routing (IPv4 still active): {}", e);
+                    log::warn!(
+                        "Failed to setup IPv6 exit node routing (IPv4 still active): {}",
+                        e
+                    );
                 }
             }
         }
@@ -263,12 +272,12 @@ impl RoutingManager {
     #[cfg(target_os = "linux")]
     fn restore_linux() -> Result<()> {
         info!("Restoring original routing on Linux");
-        
+
         // Restore IPv6 default route (remove tunnel route, let system reconfigure)
         // This is safe - if there was no IPv6 exit route, this just fails silently
         let _ = Self::run_command("sudo", &["ip", "-6", "route", "del", "default"]);
         info!("IPv6 default route cleared (will be restored by DHCP/RA)");
-        
+
         Self::restore_dns_linux()?;
         // Original gateway restoration logic would go here
         Ok(())
@@ -297,7 +306,11 @@ impl RoutingManager {
 
     // --- macOS Implementation Shell ---
     #[cfg(target_os = "macos")]
-    fn setup_macos(exit_node_ip: &str, exit_node_ip_v6: Option<&str>, nucleus_host: &str) -> Result<()> {
+    fn setup_macos(
+        exit_node_ip: &str,
+        exit_node_ip_v6: Option<&str>,
+        nucleus_host: &str,
+    ) -> Result<()> {
         info!(
             "Setting up exit node on macOS: {} (v6: {:?}) via {}",
             exit_node_ip, exit_node_ip_v6, nucleus_host
@@ -345,10 +358,10 @@ impl RoutingManager {
         // Setup IPv6 routing if exit node has IPv6 (safe - failures logged but don't fail overall)
         if let Some(exit_v6) = exit_node_ip_v6 {
             info!("Setting up IPv6 exit node routing via {}", exit_v6);
-            
+
             // Delete existing IPv6 default route (ignore errors)
             let _ = Self::run_command("sudo", &["route", "-n", "delete", "-inet6", "default"]);
-            
+
             // Add IPv6 default route via exit node
             match Self::run_command(
                 "sudo",
@@ -357,7 +370,10 @@ impl RoutingManager {
                 Ok(_) => info!("IPv6 exit node routing configured successfully"),
                 Err(e) => {
                     // Log warning but don't fail - IPv4 exit node still works
-                    log::warn!("Failed to setup IPv6 exit node routing (IPv4 still active): {}", e);
+                    log::warn!(
+                        "Failed to setup IPv6 exit node routing (IPv4 still active): {}",
+                        e
+                    );
                 }
             }
         }
@@ -397,12 +413,12 @@ impl RoutingManager {
     #[cfg(target_os = "macos")]
     fn restore_macos() -> Result<()> {
         info!("Restoring original routing on macOS");
-        
+
         // Restore IPv6 default route (remove tunnel route, let system reconfigure)
         // This is safe - if there was no IPv6 exit route, this just fails silently
         let _ = Self::run_command("sudo", &["route", "-n", "delete", "-inet6", "default"]);
         info!("IPv6 default route cleared (will be restored by DHCP/RA)");
-        
+
         Self::restore_dns_macos()?;
         Ok(())
     }
@@ -432,8 +448,15 @@ impl RoutingManager {
 
     // --- Windows Implementation Shell ---
     #[cfg(target_os = "windows")]
-    fn setup_windows(exit_node_ip: &str, exit_node_ip_v6: Option<&str>, _nucleus_host: &str) -> Result<()> {
-        info!("Setting up exit node on Windows: {} (v6: {:?})", exit_node_ip, exit_node_ip_v6);
+    fn setup_windows(
+        exit_node_ip: &str,
+        exit_node_ip_v6: Option<&str>,
+        _nucleus_host: &str,
+    ) -> Result<()> {
+        info!(
+            "Setting up exit node on Windows: {} (v6: {:?})",
+            exit_node_ip, exit_node_ip_v6
+        );
         let iface = Self::get_primary_interface()?;
 
         // On Windows, 'route' can use interface names or indices.
@@ -455,13 +478,13 @@ impl RoutingManager {
         // Setup IPv6 routing if exit node has IPv6 (safe - failures logged but don't fail overall)
         if let Some(exit_v6) = exit_node_ip_v6 {
             info!("Setting up IPv6 exit node routing via {}", exit_v6);
-            
+
             // Get interface index for IPv6 routing
             let iface_idx = Self::get_interface_index(&iface).unwrap_or_else(|_| iface.clone());
-            
+
             // Delete existing IPv6 default route (ignore errors)
             let _ = Self::run_command("route", &["-6", "delete", "::/0"]);
-            
+
             // Add IPv6 default route via exit node using PowerShell for better reliability
             // PowerShell's New-NetRoute is more reliable for IPv6 on Windows
             match Self::run_command(
@@ -544,7 +567,7 @@ impl RoutingManager {
     #[cfg(target_os = "windows")]
     fn restore_windows() -> Result<()> {
         info!("Restoring original routing on Windows");
-        
+
         // Restore IPv6 default route (remove tunnel route)
         // Try PowerShell first, then fallback to route command
         let _ = Self::run_command(
@@ -556,7 +579,7 @@ impl RoutingManager {
         );
         let _ = Self::run_command("route", &["-6", "delete", "::/0"]);
         info!("IPv6 default route cleared");
-        
+
         Self::restore_dns_windows()?;
         Ok(())
     }

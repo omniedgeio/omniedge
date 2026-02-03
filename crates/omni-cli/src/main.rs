@@ -713,7 +713,9 @@ async fn main() -> Result<()> {
             // Use the effective exit node setting (from flag or saved config)
             let effective_as_exit_node = config.is_exit_node;
             let effective_exit_node = exit_node.clone().or_else(|| config.exit_node_ip.clone());
-            let effective_exit_node_v6 = exit_node_v6.clone().or_else(|| config.exit_node_ip_v6.clone());
+            let effective_exit_node_v6 = exit_node_v6
+                .clone()
+                .or_else(|| config.exit_node_ip_v6.clone());
             config.save()?;
 
             // Create progress spinner

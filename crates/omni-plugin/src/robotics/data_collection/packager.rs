@@ -421,11 +421,7 @@ impl EpisodePackager {
         let mcap_file = File::create(&mcap_path)?;
         let mcap_writer = BufWriter::new(mcap_file);
 
-        let mcap_config = self
-            .config
-            .mcap_config
-            .clone()
-            .unwrap_or_else(McapWriterConfig::default);
+        let mcap_config = self.config.mcap_config.clone().unwrap_or_default();
 
         let mut writer = McapWriter::new(mcap_writer, mcap_config);
         writer.start()?;
