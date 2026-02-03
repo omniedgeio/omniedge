@@ -24,30 +24,6 @@ pre-build = [
 ]
 
 # =============================================================================
-# mipsel (Little Endian MIPS - Ramips MT7621, MT7620, RT3052)
-# Common devices: Xiaomi routers, many budget routers
-# Note: rust-std not available, must build from source
-# =============================================================================
-[target.mipsel-unknown-linux-musl]
-image = "ghcr.io/cross-rs/mipsel-unknown-linux-musl:main"
-build-std = ["std", "panic_abort"]
-pre-build = [
-    "apt-get update && apt-get install -y musl-tools"
-]
-
-# =============================================================================
-# mips (Big Endian MIPS - Atheros AR71xx/AR9xxx, QCA956x)
-# Common devices: TP-Link Archer, Ubiquiti EdgeRouter
-# Note: rust-std not available, must build from source
-# =============================================================================
-[target.mips-unknown-linux-musl]
-image = "ghcr.io/cross-rs/mips-unknown-linux-musl:main"
-build-std = ["std", "panic_abort"]
-pre-build = [
-    "apt-get update && apt-get install -y musl-tools"
-]
-
-# =============================================================================
 # armv7 (ARM Cortex-A7/A9 - Sunxi, Marvell, some Qualcomm IPQ40xx)
 # Common devices: Linksys WRT series, some NAS devices
 # =============================================================================
