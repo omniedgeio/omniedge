@@ -6,6 +6,10 @@ on:
     types:
       - completed
     branches: [main, dev]
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-beta.*'
+      - 'v*.*.*-rc.*'
   workflow_dispatch:
 
 jobs:

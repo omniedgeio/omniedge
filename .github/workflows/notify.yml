@@ -2,7 +2,7 @@ name: "Notify Dependent Repos"
 
 on:
   workflow_run:
-    workflows: ["Release CLI", "Release Desktop"]
+    workflows: ["Publish Packages"]
     types:
       - completed
   workflow_dispatch:
@@ -26,8 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       (github.event_name == 'workflow_dispatch' && (inputs.type == 'cli' || inputs.type == 'all')) ||
-      (github.event.workflow_run.name == 'Release CLI' &&
-       github.event.workflow_run.conclusion == 'success' && 
+      (github.event.workflow_run.conclusion == 'success' && 
        startsWith(github.event.workflow_run.head_branch, 'v') &&
        !contains(github.event.workflow_run.head_branch, '-beta') &&
        !contains(github.event.workflow_run.head_branch, '-rc'))
