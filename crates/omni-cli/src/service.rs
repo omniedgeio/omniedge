@@ -6,73 +6,9 @@ use anyhow::{Context, Result};
 use log::info;
 use omni_core::{CliConfig, ConnectionManager};
 use omni_proto::{handle_nucleus_message, NucleusState};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
-
-#[derive(Debug, Serialize, Deserialize)]
-struct HelperRequest {
-    command: String,
-    args: serde_json::Value,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct HelperResponse {
-    success: bool,
-    message: String,
-    data: Option<serde_json::Value>,
-}
-
-/// Try to connect to the omni-helper service
-async fn call_helper(req: &HelperRequest) -> Result<HelperResponse> {
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-    #[cfg(windows)]
-    {
-        use tokio::net::windows::named_pipe::ClientOptions;
-        let pipe_name = r"\\.\pipe\omniedge-helper";
-
-        let mut client = ClientOptions::new().open(pipe_name)?;
-        let payload = serde_json::to_vec(req)?;
-        client.write_all(&payload).await?;
-        client.shutdown().await?;
-
-        let mut buf = Vec::new();
-        client.read_to_end(&mut buf).await?;
-        let resp: HelperResponse = serde_json::from_slice(&buf)?;
-        Ok(resp)
-    }
-
-    #[cfg(unix)]
-    {
-        use tokio::net::UnixStream;
-        let socket_path = "/var/run/omniedge-helper.sock";
-
-        let mut stream = UnixStream::connect(socket_path).await?;
-        let payload = serde_json::to_vec(req)?;
-        stream.write_all(&payload).await?;
-        stream.shutdown().await?;
-
-        let mut buf = Vec::new();
-        stream.read_to_end(&mut buf).await?;
-        let resp: HelperResponse = serde_json::from_slice(&buf)?;
-        Ok(resp)
-    }
-}
-
-/// Check if helper service is running and available
-async fn is_helper_available() -> bool {
-    let req = HelperRequest {
-        command: "ping".to_string(),
-        args: serde_json::json!({}),
-    };
-
-    match call_helper(&req).await {
-        Ok(resp) => resp.success,
-        Err(_) => false,
-    }
-}
 
 /// Status information for the OmniEdge service
 #[derive(Debug, Default)]
@@ -135,33 +71,6 @@ pub async fn get_service_status(
                     status.virtual_ip = Some(iface_info.ip);
                     status.virtual_ip_v6 = iface_info.ip_v6;
                     status.mode = Some("edge".to_string());
-                }
-            }
-        }
-    }
-
-    // Try to get additional info from helper if available
-    if is_helper_available().await {
-        let req = HelperRequest {
-            command: "status".to_string(),
-            args: serde_json::json!({}),
-        };
-        if let Ok(resp) = call_helper(&req).await {
-            if resp.success {
-                if let Some(data) = resp.data {
-                    if let Some(net_id) = data.get("network_id").and_then(|v| v.as_str()) {
-                        if !net_id.is_empty() {
-                            status.network_id = Some(net_id.to_string());
-                        }
-                    }
-                    // Use helper's virtual_ip if we don't have one from interface
-                    if status.virtual_ip.is_none() {
-                        if let Some(vip) = data.get("virtual_ip").and_then(|v| v.as_str()) {
-                            if !vip.is_empty() {
-                                status.virtual_ip = Some(vip.to_string());
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -304,51 +213,6 @@ fn is_omniedge_daemon_running() -> bool {
     }
 
     false
-}
-
-/// Check if OmniEdge service is currently running
-#[allow(dead_code)]
-pub async fn is_service_running(last_mode: Option<&str>, nucleus_port: Option<u16>) -> bool {
-    get_service_status(last_mode, nucleus_port).await.is_running
-}
-
-/// Start VPN through helper service
-/// NOTE: Currently disabled as the old helper uses incompatible n2n protocol
-#[allow(dead_code)]
-async fn start_via_helper(
-    token: &str,
-    network_id: &str,
-    device_id: &str,
-    hardware_id: &str,
-    mode: RunMode,
-    as_exit_node: bool,
-    exit_node_ip: Option<String>,
-) -> Result<()> {
-    let mode_str = match mode {
-        RunMode::Edge => "edge",
-        RunMode::Nucleus => "nucleus",
-        RunMode::Dual => "dual",
-    };
-
-    let req = HelperRequest {
-        command: "start_vpn".to_string(),
-        args: serde_json::json!({
-            "token": token,
-            "network_id": network_id,
-            "device_id": device_id,
-            "hardware_id": hardware_id,
-            "mode": mode_str,
-            "as_exit_node": as_exit_node,
-            "exit_node_ip": exit_node_ip,
-        }),
-    };
-
-    let resp = call_helper(&req).await?;
-    if resp.success {
-        Ok(())
-    } else {
-        Err(anyhow::anyhow!("Helper failed: {}", resp.message))
-    }
 }
 
 /// Run nucleus-only signaling server (no VPN, no network auth)
@@ -524,11 +388,6 @@ pub async fn setup_and_start_service(
     nucleus_port: u16,
     cluster_secret: Option<&str>,
 ) -> Result<()> {
-    // NOTE: The old omni-helper service uses n2n protocol which is incompatible
-    // with the new WireGuard-based CLI. Skip helper and use standalone service.
-    // TODO: Re-enable helper when omni-helper is updated to use WireGuard protocol.
-
-    // Create standalone background service with sudo (required for TUN on macOS)
     info!("Starting standalone background service...");
 
     #[cfg(windows)]
@@ -1083,16 +942,6 @@ fn setup_macos_service(
 }
 
 pub async fn stop_and_cleanup_service(base_url: &str) -> Result<()> {
-    // First try to stop via helper if available
-    if is_helper_available().await {
-        info!("Stopping VPN via helper service...");
-        let req = HelperRequest {
-            command: "stop_vpn".to_string(),
-            args: serde_json::json!({}),
-        };
-        let _ = call_helper(&req).await;
-    }
-
     #[cfg(windows)]
     {
         use std::process::Command;
