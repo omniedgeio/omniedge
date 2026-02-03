@@ -1,11 +1,12 @@
 name: "Publish Packages"
 
 # This workflow publishes packages to various package managers
-# It runs after the OpenWrt release workflow completes successfully
+# It runs after the Release CLI workflow completes successfully
+# Note: Desktop artifacts may not be available yet when this runs
 
 on:
   workflow_run:
-    workflows: ["OpenWrt Packages"]
+    workflows: ["Release CLI"]
     types:
       - completed
   workflow_dispatch:

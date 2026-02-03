@@ -6,6 +6,11 @@ on:
     types:
       - completed
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 2.3.0)'
+        required: false
+        type: string
 
 concurrency:
   group: release-desktop-${{ github.event.workflow_run.head_branch || github.ref }}

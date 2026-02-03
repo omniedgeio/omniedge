@@ -2,7 +2,7 @@ name: "Notify Dependent Repos"
 
 on:
   workflow_run:
-    workflows: ["OpenWrt Packages"]
+    workflows: ["Release CLI"]
     types:
       - completed
   workflow_dispatch:
