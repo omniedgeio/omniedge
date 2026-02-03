@@ -9,29 +9,23 @@ default-target = "x86_64-unknown-linux-musl"
 # x86_64 (PC Engines APU, virtual machines, x86 routers)
 # =============================================================================
 [target.x86_64-unknown-linux-musl]
+# The cross-rs image already includes musl toolchain - no pre-build needed
 image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:main"
-pre-build = [
-    "apt-get update && apt-get install -y musl-tools"
-]
 
 # =============================================================================
 # aarch64 / ARM64 (Modern routers: MediaTek Filogic, Qualcomm IPQ807x)
 # =============================================================================
 [target.aarch64-unknown-linux-musl]
+# The cross-rs image already includes musl toolchain - no pre-build needed
 image = "ghcr.io/cross-rs/aarch64-unknown-linux-musl:main"
-pre-build = [
-    "apt-get update && apt-get install -y musl-tools"
-]
 
 # =============================================================================
 # armv7 (ARM Cortex-A7/A9 - Sunxi, Marvell, some Qualcomm IPQ40xx)
 # Common devices: Linksys WRT series, some NAS devices
 # =============================================================================
 [target.armv7-unknown-linux-musleabihf]
+# The cross-rs image already includes musl toolchain - no pre-build needed
 image = "ghcr.io/cross-rs/armv7-unknown-linux-musleabihf:main"
-pre-build = [
-    "apt-get update && apt-get install -y musl-tools"
-]
 
 # =============================================================================
 # RISC-V 64 (Emerging architecture - some development boards)
