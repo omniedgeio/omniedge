@@ -138,3 +138,26 @@ async fn test_select_exit_node() {
     assert!(result.is_ok());
     mock.assert_async().await;
 }
+
+#[tokio::test]
+async fn test_join_network_response_parsing() {
+    use crate::types::{JoinVirtualNetworkResponse, SuccessResponse};
+
+    // This is the exact response from the API that was failing
+    let json_body = r#"{"code":200,"data":{"cluster":"rLl13SS0U0MXval","community_name":"rLl13SS0U0MXval","secret_key":"89c3b07614869022aed5771aa5f67764d1a5b5e094a83b131b8afae6777b84ee","virtual_ip":"100.100.0.158","virtual_ip_v6":null,"subnet_mask":"255.255.255.0","subnet_prefix_v6":null,"ip_range_v6":null,"server":{"name":"Australia","host":"prod-us.omniedge.io:7787","country":"AU"}}}"#;
+
+    // First try parsing with SuccessResponse wrapper (like client.rs does)
+    let wrapped_result: Result<SuccessResponse<JoinVirtualNetworkResponse>, _> =
+        serde_json::from_str(json_body);
+
+    match &wrapped_result {
+        Ok(resp) => {
+            assert_eq!(resp.data.cluster, "rLl13SS0U0MXval");
+            assert_eq!(resp.data.virtual_ip, "100.100.0.158");
+            assert_eq!(resp.data.server.host, "prod-us.omniedge.io:7787");
+        }
+        Err(e) => {
+            panic!("Failed to parse wrapped response: {}", e);
+        }
+    }
+}

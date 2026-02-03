@@ -233,8 +233,20 @@ pub struct VirtualNetworkDeviceResponse {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct JoinVirtualNetworkResponse {
-    #[serde(alias = "communityName", alias = "community_name", default)]
+    /// The cluster/community name for the VPN connection.
+    /// API may return both "cluster" and "community_name" fields with the same value.
+    /// We use a custom deserializer to handle this without serde's duplicate field error.
+    #[serde(default)]
     pub cluster: String,
+    /// Ignored during deserialization - we use `cluster` field instead.
+    /// This field exists because the API returns both "cluster" and "community_name".
+    #[serde(
+        rename = "community_name",
+        alias = "communityName",
+        default,
+        skip_serializing
+    )]
+    pub _community_name: Option<String>,
     #[serde(rename = "secretKey", alias = "secret_key", default)]
     pub secret_key: String,
     #[serde(
