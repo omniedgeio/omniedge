@@ -616,7 +616,9 @@ jobs:
           else
             VERSION="${{ github.ref_name }}"
           fi
-          echo "tag=${VERSION}" >> $GITHUB_OUTPUT
+          VERSION="${VERSION#v}"  # Remove 'v' prefix
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         run: |
