@@ -862,7 +862,7 @@ jobs:
             SECRETS_CONFIGURED=true
           else
             echo "homebrew=false" >> $GITHUB_OUTPUT
-            echo "::warning::HOMEBREW_TAP_TOKEN not configured, skipping Homebrew publish"
+            echo "::notice::HOMEBREW_TAP_TOKEN not configured, skipping Homebrew publish"
           fi
           
           if [ -n "${{ secrets.AUR_SSH_PRIVATE_KEY }}" ]; then
@@ -870,7 +870,7 @@ jobs:
             SECRETS_CONFIGURED=true
           else
             echo "aur=false" >> $GITHUB_OUTPUT
-            echo "::warning::AUR_SSH_PRIVATE_KEY not configured, skipping AUR publish"
+            echo "::notice::AUR_SSH_PRIVATE_KEY not configured, skipping AUR publish"
           fi
           
           if [ -n "${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}" ]; then
@@ -878,19 +878,21 @@ jobs:
             SECRETS_CONFIGURED=true
           else
             echo "snap=false" >> $GITHUB_OUTPUT
-            echo "::warning::SNAPCRAFT_STORE_CREDENTIALS not configured, skipping Snap publish"
+            echo "::notice::SNAPCRAFT_STORE_CREDENTIALS not configured, skipping Snap publish"
           fi
           
           if [ "$SECRETS_CONFIGURED" = "false" ]; then
-            echo "::error::No publishing secrets configured. Set at least one of: HOMEBREW_TAP_TOKEN, AUR_SSH_PRIVATE_KEY, SNAPCRAFT_STORE_CREDENTIALS"
-            exit 1
+            echo "::notice::No publishing secrets configured, skipping all package publishing"
+            echo "skip_all=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip_all=false" >> $GITHUB_OUTPUT
           fi
-          
-          echo "has_secrets=true" >> $GITHUB_OUTPUT
 
       - uses: actions/checkout@v4
+        if: steps.check_secrets.outputs.skip_all != 'true'
 
       - name: Get version and checksums
+        if: steps.check_secrets.outputs.skip_all != 'true'
         id: info
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1046,7 +1048,7 @@ jobs:
             SECRETS_CONFIGURED=true
           else
             echo "winget=false" >> $GITHUB_OUTPUT
-            echo "::warning::WINGET_TOKEN not configured, skipping Winget publish"
+            echo "::notice::WINGET_TOKEN not configured, skipping Winget publish"
           fi
           
           if [ -n "${{ secrets.CHOCOLATEY_API_KEY }}" ]; then
@@ -1054,19 +1056,21 @@ jobs:
             SECRETS_CONFIGURED=true
           else
             echo "chocolatey=false" >> $GITHUB_OUTPUT
-            echo "::warning::CHOCOLATEY_API_KEY not configured, skipping Chocolatey publish"
+            echo "::notice::CHOCOLATEY_API_KEY not configured, skipping Chocolatey publish"
           fi
           
           if [ "$SECRETS_CONFIGURED" = "false" ]; then
-            echo "::error::No Windows publishing secrets configured. Set at least one of: WINGET_TOKEN, CHOCOLATEY_API_KEY"
-            exit 1
+            echo "::notice::No Windows publishing secrets configured, skipping all Windows package publishing"
+            echo "skip_all=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip_all=false" >> $GITHUB_OUTPUT
           fi
-          
-          echo "has_secrets=true" >> $GITHUB_OUTPUT
 
       - uses: actions/checkout@v4
+        if: steps.check_secrets.outputs.skip_all != 'true'
 
       - name: Get version and checksums
+        if: steps.check_secrets.outputs.skip_all != 'true'
         id: info
         shell: bash
         env:
