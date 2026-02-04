@@ -17,7 +17,7 @@ env:
 
 jobs:
   # ===========================================================================
-  # Build CLI binaries for all platforms
+  # Build CLI binaries for all platforms (with integrated packaging for Linux)
   # ===========================================================================
   build-cli:
     name: Build CLI - ${{ matrix.target }}
@@ -30,19 +30,26 @@ jobs:
             os: ubuntu-latest
             platform: linux
             arch: x64
+            deb_arch: amd64
+            rpm_arch: x86_64
             cross: true
+            build_appimage: true
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
             platform: linux
             arch: arm64
+            deb_arch: arm64
+            rpm_arch: aarch64
             cross: true
+            build_appimage: false
           - target: riscv64gc-unknown-linux-musl
             os: ubuntu-latest
             platform: linux
             arch: riscv64
             cross: true
+            build_appimage: false
           - target: x86_64-apple-darwin
-            os: macos-15-intel
+            os: macos-13
             platform: macos
             arch: x64
             cross: false
@@ -65,9 +72,16 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # Rust caching for faster builds
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: cli-${{ matrix.target }}
+
+      # Use pre-built cross binary instead of cargo install
       - name: Install cross
         if: matrix.cross
-        run: cargo install cross --git https://github.com/cross-rs/cross.git
+        uses: taiki-e/install-action@cross
 
       - name: Build (native)
         if: "!matrix.cross"
@@ -84,6 +98,7 @@ jobs:
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "rpm_version=${VERSION//-/_}" >> $GITHUB_OUTPUT
 
       - name: Package (Unix)
         if: matrix.os != 'windows-latest'
@@ -106,6 +121,143 @@ jobs:
           Copy-Item "target/${{ matrix.target }}/release/omniedge.exe" "dist/${ARTIFACT_NAME}.exe"
           Compress-Archive -Path "dist/*" -DestinationPath "${ARTIFACT_NAME}.zip"
 
+      # ==== Linux-only: Build DEB package ====
+      - name: Build DEB package
+        if: matrix.platform == 'linux' && matrix.deb_arch != ''
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BINARY="dist/omniedge-cli-${VERSION}-linux-${{ matrix.arch }}"
+          
+          PKG_DIR="omniedge-cli_${VERSION}_${{ matrix.deb_arch }}"
+          mkdir -p "${PKG_DIR}/DEBIAN" "${PKG_DIR}/usr/bin" "${PKG_DIR}/usr/lib/systemd/system"
+          
+          cp "${BINARY}" "${PKG_DIR}/usr/bin/omniedge"
+          chmod 755 "${PKG_DIR}/usr/bin/omniedge"
+          
+          cat > "${PKG_DIR}/DEBIAN/control" << EOF
+          Package: omniedge-cli
+          Version: ${VERSION}
+          Section: net
+          Priority: optional
+          Architecture: ${{ matrix.deb_arch }}
+          Maintainer: OmniEdge Team <support@omniedge.io>
+          Description: OmniEdge CLI - Peer-to-peer VPN for edge computing
+          Homepage: https://omniedge.io
+          EOF
+          
+          cat > "${PKG_DIR}/usr/lib/systemd/system/omniedge.service" << EOF
+          [Unit]
+          Description=OmniEdge VPN Service
+          After=network-online.target
+          Wants=network-online.target
+          
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/omniedge start
+          Restart=on-failure
+          RestartSec=5
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+          dpkg-deb --build "${PKG_DIR}"
+          mv "${PKG_DIR}.deb" "omniedge-cli-${VERSION}-linux-${{ matrix.deb_arch }}.deb"
+
+      # ==== Linux-only: Build RPM package ====
+      - name: Install RPM tools
+        if: matrix.platform == 'linux' && matrix.rpm_arch != ''
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Build RPM package
+        if: matrix.platform == 'linux' && matrix.rpm_arch != ''
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          RPM_VERSION="${{ steps.version.outputs.rpm_version }}"
+          BINARY="dist/omniedge-cli-${VERSION}-linux-${{ matrix.arch }}"
+          
+          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          cp "${BINARY}" ~/rpmbuild/SOURCES/omniedge
+          
+          cat > ~/rpmbuild/SOURCES/omniedge.service << EOF
+          [Unit]
+          Description=OmniEdge VPN Service
+          After=network-online.target
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/omniedge start
+          Restart=on-failure
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+          cat > ~/rpmbuild/SPECS/omniedge-cli.spec << EOF
+          %define __strip /bin/true
+          %define debug_package %{nil}
+          Name: omniedge-cli
+          Version: ${RPM_VERSION}
+          Release: 1
+          Summary: OmniEdge CLI - Peer-to-peer VPN
+          License: Apache-2.0 OR MIT
+          URL: https://omniedge.io
+          %description
+          Peer-to-peer mesh VPN for edge computing.
+          %install
+          mkdir -p %{buildroot}/usr/bin %{buildroot}/usr/lib/systemd/system
+          install -m 755 %{_sourcedir}/omniedge %{buildroot}/usr/bin/omniedge
+          install -m 644 %{_sourcedir}/omniedge.service %{buildroot}/usr/lib/systemd/system/
+          %files
+          /usr/bin/omniedge
+          /usr/lib/systemd/system/omniedge.service
+          EOF
+          
+          rpmbuild -bb ~/rpmbuild/SPECS/omniedge-cli.spec --target ${{ matrix.rpm_arch }} --define "_rpmdir $(pwd)"
+          find . -name "*.rpm" -exec mv {} "omniedge-cli-${VERSION}-linux-${{ matrix.rpm_arch }}.rpm" \;
+
+      # ==== Linux x64-only: Build AppImage ====
+      - name: Build AppImage
+        if: matrix.build_appimage == true
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BINARY="dist/omniedge-cli-${VERSION}-linux-${{ matrix.arch }}"
+          
+          sudo apt-get update && sudo apt-get install -y libfuse2
+          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
+          chmod +x appimagetool
+          
+          APPDIR="OmniEdge-CLI.AppDir"
+          mkdir -p "${APPDIR}/usr/bin"
+          cp "${BINARY}" "${APPDIR}/usr/bin/omniedge"
+          chmod 755 "${APPDIR}/usr/bin/omniedge"
+          
+          cat > "${APPDIR}/omniedge.desktop" << EOF
+          [Desktop Entry]
+          Type=Application
+          Name=OmniEdge CLI
+          Exec=omniedge
+          Icon=omniedge
+          Terminal=true
+          Categories=Network;
+          EOF
+          
+          cat > "${APPDIR}/omniedge.svg" << 'EOF'
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="45" fill="#4A90D9"/>
+            <text x="50" y="60" font-family="Arial" font-size="30" fill="white" text-anchor="middle">OE</text>
+          </svg>
+          EOF
+          
+          cat > "${APPDIR}/AppRun" << 'EOF'
+          #!/bin/bash
+          exec "${0%/*}/usr/bin/omniedge" "$@"
+          EOF
+          chmod 755 "${APPDIR}/AppRun"
+          
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run "${APPDIR}" "omniedge-cli-${VERSION}-linux-x86_64.AppImage"
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -113,6 +265,9 @@ jobs:
           path: |
             omniedge-cli-*.zip
             omniedge-cli-*.tar.gz
+            omniedge-cli-*.deb
+            omniedge-cli-*.rpm
+            omniedge-cli-*.AppImage
           if-no-files-found: ignore
 
       - name: Upload to Release
@@ -120,8 +275,12 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: omniedge-cli-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.*
           file_glob: true
+          file: |
+            omniedge-cli-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.*
+            omniedge-cli-${{ steps.version.outputs.version }}-linux-*.deb
+            omniedge-cli-${{ steps.version.outputs.version }}-linux-*.rpm
+            omniedge-cli-${{ steps.version.outputs.version }}-linux-*.AppImage
           tag: ${{ github.ref }}
           overwrite: true
           prerelease: ${{ contains(github.ref, '-') }}
@@ -148,7 +307,7 @@ jobs:
             target: aarch64-apple-darwin
             platform: macos
             helper_name: omni-helper-aarch64-apple-darwin
-          - os: macos-15-intel
+          - os: macos-13
             arch: x64
             target: x86_64-apple-darwin
             platform: macos
@@ -166,8 +325,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-          cache-dependency-path: ui/desktop/package-lock.json
+
+      # Global npm cache for all Desktop builds
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ui/desktop/node_modules
+          key: npm-desktop-${{ hashFiles('ui/desktop/package-lock.json') }}
+          restore-keys: |
+            npm-desktop-
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -180,7 +348,7 @@ jobs:
           workspaces: |
             . -> target
             ui/desktop/src-tauri -> target
-          shared-key: ${{ matrix.target }}
+          shared-key: desktop-${{ matrix.target }}
 
       - name: Install dependencies (Linux)
         if: matrix.platform == 'linux'
@@ -288,280 +456,12 @@ jobs:
           prerelease: ${{ contains(github.ref, '-') }}
 
   # ===========================================================================
-  # Build DEB packages
-  # ===========================================================================
-  build-deb:
-    name: Build DEB - ${{ matrix.arch }}
-    runs-on: ubuntu-latest
-    needs: build-cli
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            src_arch: x64
-          - arch: arm64
-            src_arch: arm64
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get version
-        id: version
-        run: |
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-${{ matrix.src_arch }}
-
-      - name: Extract and build DEB
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          tar -xzvf omniedge-cli-${VERSION}-linux-${{ matrix.src_arch }}.tar.gz
-          chmod +x omniedge-cli-${VERSION}-linux-${{ matrix.src_arch }}
-          
-          PKG_DIR="omniedge-cli_${VERSION}_${{ matrix.arch }}"
-          mkdir -p "${PKG_DIR}/DEBIAN" "${PKG_DIR}/usr/bin" "${PKG_DIR}/usr/lib/systemd/system"
-          
-          cp "omniedge-cli-${VERSION}-linux-${{ matrix.src_arch }}" "${PKG_DIR}/usr/bin/omniedge"
-          chmod 755 "${PKG_DIR}/usr/bin/omniedge"
-          
-          cat > "${PKG_DIR}/DEBIAN/control" << EOF
-          Package: omniedge-cli
-          Version: ${VERSION}
-          Section: net
-          Priority: optional
-          Architecture: ${{ matrix.arch }}
-          Maintainer: OmniEdge Team <support@omniedge.io>
-          Description: OmniEdge CLI - Peer-to-peer VPN for edge computing
-          Homepage: https://omniedge.io
-          EOF
-          
-          cat > "${PKG_DIR}/usr/lib/systemd/system/omniedge.service" << EOF
-          [Unit]
-          Description=OmniEdge VPN Service
-          After=network-online.target
-          Wants=network-online.target
-          
-          [Service]
-          Type=simple
-          ExecStart=/usr/bin/omniedge start
-          Restart=on-failure
-          RestartSec=5
-          
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-          
-          dpkg-deb --build "${PKG_DIR}"
-          mv "${PKG_DIR}.deb" "omniedge-cli-${VERSION}-linux-${{ matrix.arch }}.deb"
-
-      - name: Upload DEB
-        uses: actions/upload-artifact@v4
-        with:
-          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}-deb
-          path: "*.deb"
-
-      - name: Upload to Release
-        uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: "*.deb"
-          file_glob: true
-          tag: ${{ github.ref }}
-          overwrite: true
-          prerelease: ${{ contains(github.ref, '-') }}
-
-  # ===========================================================================
-  # Build RPM packages
-  # ===========================================================================
-  build-rpm:
-    name: Build RPM - ${{ matrix.arch }}
-    runs-on: ubuntu-latest
-    needs: build-cli
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x86_64
-            src_arch: x64
-          - arch: aarch64
-            src_arch: arm64
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get version
-        id: version
-        run: |
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "rpm_version=${VERSION//-/_}" >> $GITHUB_OUTPUT
-
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-${{ matrix.src_arch }}
-
-      - name: Install RPM tools
-        run: sudo apt-get update && sudo apt-get install -y rpm
-
-      - name: Build RPM
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          RPM_VERSION="${{ steps.version.outputs.rpm_version }}"
-          
-          tar -xzvf omniedge-cli-${VERSION}-linux-${{ matrix.src_arch }}.tar.gz
-          chmod +x omniedge-cli-${VERSION}-linux-${{ matrix.src_arch }}
-          
-          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-          cp "omniedge-cli-${VERSION}-linux-${{ matrix.src_arch }}" ~/rpmbuild/SOURCES/omniedge
-          
-          cat > ~/rpmbuild/SOURCES/omniedge.service << EOF
-          [Unit]
-          Description=OmniEdge VPN Service
-          After=network-online.target
-          [Service]
-          Type=simple
-          ExecStart=/usr/bin/omniedge start
-          Restart=on-failure
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-          
-          cat > ~/rpmbuild/SPECS/omniedge-cli.spec << EOF
-          %define __strip /bin/true
-          %define debug_package %{nil}
-          Name: omniedge-cli
-          Version: ${RPM_VERSION}
-          Release: 1
-          Summary: OmniEdge CLI - Peer-to-peer VPN
-          License: Apache-2.0 OR MIT
-          URL: https://omniedge.io
-          %description
-          Peer-to-peer mesh VPN for edge computing.
-          %install
-          mkdir -p %{buildroot}/usr/bin %{buildroot}/usr/lib/systemd/system
-          install -m 755 %{_sourcedir}/omniedge %{buildroot}/usr/bin/omniedge
-          install -m 644 %{_sourcedir}/omniedge.service %{buildroot}/usr/lib/systemd/system/
-          %files
-          /usr/bin/omniedge
-          /usr/lib/systemd/system/omniedge.service
-          EOF
-          
-          rpmbuild -bb ~/rpmbuild/SPECS/omniedge-cli.spec --target ${{ matrix.arch }} --define "_rpmdir $(pwd)"
-          find . -name "*.rpm" -exec mv {} "omniedge-cli-${VERSION}-linux-${{ matrix.arch }}.rpm" \;
-
-      - name: Upload RPM
-        uses: actions/upload-artifact@v4
-        with:
-          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}-rpm
-          path: "*.rpm"
-
-      - name: Upload to Release
-        uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: "*.rpm"
-          file_glob: true
-          tag: ${{ github.ref }}
-          overwrite: true
-          prerelease: ${{ contains(github.ref, '-') }}
-
-  # ===========================================================================
-  # Build AppImage
-  # ===========================================================================
-  build-appimage:
-    name: Build AppImage
-    runs-on: ubuntu-latest
-    needs: build-cli
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get version
-        id: version
-        run: |
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-x64
-
-      - name: Build AppImage
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          tar -xzvf omniedge-cli-${VERSION}-linux-x64.tar.gz
-          chmod +x omniedge-cli-${VERSION}-linux-x64
-          
-          sudo apt-get update && sudo apt-get install -y libfuse2
-          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
-          chmod +x appimagetool
-          
-          APPDIR="OmniEdge-CLI.AppDir"
-          mkdir -p "${APPDIR}/usr/bin"
-          cp "omniedge-cli-${VERSION}-linux-x64" "${APPDIR}/usr/bin/omniedge"
-          chmod 755 "${APPDIR}/usr/bin/omniedge"
-          
-          cat > "${APPDIR}/omniedge.desktop" << EOF
-          [Desktop Entry]
-          Type=Application
-          Name=OmniEdge CLI
-          Exec=omniedge
-          Icon=omniedge
-          Terminal=true
-          Categories=Network;
-          EOF
-          
-          cat > "${APPDIR}/omniedge.svg" << 'EOF'
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="45" fill="#4A90D9"/>
-            <text x="50" y="60" font-family="Arial" font-size="30" fill="white" text-anchor="middle">OE</text>
-          </svg>
-          EOF
-          
-          cat > "${APPDIR}/AppRun" << 'EOF'
-          #!/bin/bash
-          exec "${0%/*}/usr/bin/omniedge" "$@"
-          EOF
-          chmod 755 "${APPDIR}/AppRun"
-          
-          ARCH=x86_64 ./appimagetool --appimage-extract-and-run "${APPDIR}" "omniedge-cli-${VERSION}-linux-x86_64.AppImage"
-
-      - name: Upload AppImage
-        uses: actions/upload-artifact@v4
-        with:
-          name: omniedge-cli-${{ steps.version.outputs.version }}-linux-x86_64-appimage
-          path: "*.AppImage"
-
-      - name: Upload to Release
-        uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: "*.AppImage"
-          file_glob: true
-          tag: ${{ github.ref }}
-          overwrite: true
-          prerelease: ${{ contains(github.ref, '-') }}
-
-  # ===========================================================================
   # Release Summary - Final job that downstream workflows wait for
   # ===========================================================================
   release-summary:
     name: Release Summary
     runs-on: ubuntu-latest
-    needs: [build-cli, build-desktop, build-deb, build-rpm, build-appimage]
+    needs: [build-cli, build-desktop]
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Generate summary
