@@ -18,16 +18,64 @@ env:
 
 jobs:
   # ===========================================================================
+  # Resolve tag/version for workflow_run or manual dispatch
+  # ===========================================================================
+  resolve-tag:
+    name: Resolve Tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      is_tag: ${{ steps.resolve.outputs.is_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_run'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: resolve
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            INPUT_VERSION="${{ github.event.inputs.version }}"
+            if [ -z "$INPUT_VERSION" ]; then
+              echo "is_tag=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            VERSION="${INPUT_VERSION#v}"
+            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "is_tag=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          TAG=$(git tag --points-at HEAD | grep -E '^v' | sort -V | tail -n 1)
+          if [ -z "$TAG" ]; then
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "is_tag=true" >> "$GITHUB_OUTPUT"
+
+  # ===========================================================================
   # Build OpenWrt packages for all architectures
   # ===========================================================================
   build-openwrt:
     name: Build ${{ matrix.openwrt_arch }} (${{ matrix.pkg_format }})
     runs-on: ubuntu-latest
-    # Only run if Release Desktop succeeded and was triggered by a tag, or if manually dispatched
+    needs: resolve-tag
+    # Only run if Release CLI succeeded and resolved a tag, or if manually dispatched with a version
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       startsWith(github.event.workflow_run.head_branch, 'v'))
+      (github.event.workflow_run.conclusion == 'success' && needs.resolve-tag.outputs.is_tag == 'true')
     strategy:
       fail-fast: false
       matrix:
@@ -62,22 +110,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: Get version
         id: version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
-            VERSION="${{ github.event.workflow_run.head_branch }}"
-            VERSION="${VERSION#v}"  # Remove 'v' prefix
+            VERSION_INPUT="${{ github.event.inputs.version }}"
+            VERSION="${VERSION_INPUT#v}"
+            TAG="v${VERSION}"
           else
-            VERSION="${{ github.ref_name }}"
-            VERSION="${VERSION#v}"  # Remove 'v' prefix
+            TAG="${{ needs.resolve-tag.outputs.tag }}"
+            VERSION="${TAG#v}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
       - name: Free disk space
@@ -308,7 +356,7 @@ jobs:
   publish-release:
     name: Publish to Release
     runs-on: ubuntu-latest
-    needs: [build-openwrt]
+    needs: [resolve-tag, build-openwrt]
     steps:
       - name: Get version
         id: version

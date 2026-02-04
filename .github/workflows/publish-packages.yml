@@ -18,16 +18,64 @@ on:
 
 jobs:
   # ===========================================================================
+  # Resolve tag/version for workflow_run or manual dispatch
+  # ===========================================================================
+  resolve-tag:
+    name: Resolve Tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      is_tag: ${{ steps.resolve.outputs.is_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_run'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: resolve
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            INPUT_VERSION="${{ github.event.inputs.version }}"
+            if [ -z "$INPUT_VERSION" ]; then
+              echo "is_tag=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            VERSION="${INPUT_VERSION#v}"
+            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "is_tag=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          TAG=$(git tag --points-at HEAD | grep -E '^v' | sort -V | tail -n 1)
+          if [ -z "$TAG" ]; then
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "is_tag=true" >> "$GITHUB_OUTPUT"
+
+  # ===========================================================================
   # Prepare - Get version and download release assets
   # ===========================================================================
   prepare:
     name: Prepare Release Info
     runs-on: ubuntu-latest
-    # Only run if OpenWrt Packages succeeded and was triggered by a tag, or if manually dispatched
+    needs: resolve-tag
+    # Only run if Release CLI succeeded and resolved a tag, or if manually dispatched with a version
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       startsWith(github.event.workflow_run.head_branch, 'v'))
+      (github.event.workflow_run.conclusion == 'success' && needs.resolve-tag.outputs.is_tag == 'true')
     outputs:
       version: ${{ steps.version.outputs.version }}
       cli_sha256_linux_x64: ${{ steps.checksums.outputs.cli_linux_x64 }}
@@ -43,16 +91,12 @@ jobs:
       - name: Get version
         id: version
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            # Manual dispatch - version provided directly
-            VERSION="${{ github.event.inputs.version }}"
-          elif [ -n "${{ github.event.workflow_run.head_branch }}" ]; then
-            # Triggered by workflow_run - extract from tag
-            VERSION="${{ github.event.workflow_run.head_branch }}"
-            VERSION="${VERSION#v}"  # Remove 'v' prefix if present
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION_INPUT="${{ github.event.inputs.version }}"
+            VERSION="${VERSION_INPUT#v}"
           else
-            echo "ERROR: Could not determine version"
-            exit 1
+            TAG="${{ needs.resolve-tag.outputs.tag }}"
+            VERSION="${TAG#v}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
@@ -99,7 +143,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: Update Homebrew Formula (CLI)
         env:
@@ -192,7 +237,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: Update PKGBUILD
         env:
@@ -248,7 +294,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: Download pre-built binary
         env:
@@ -339,7 +386,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: Update Winget Manifests
         shell: pwsh
@@ -432,7 +480,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: Update Chocolatey Package
         shell: pwsh

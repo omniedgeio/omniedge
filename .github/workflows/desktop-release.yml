@@ -13,7 +13,7 @@ on:
         type: string
 
 concurrency:
-  group: release-desktop-${{ github.event.workflow_run.head_branch || github.ref }}
+  group: release-desktop-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -21,14 +21,62 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # ===========================================================================
+  # Resolve tag/version for workflow_run or manual dispatch
+  # ===========================================================================
+  resolve-tag:
+    name: Resolve Tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      is_tag: ${{ steps.resolve.outputs.is_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_run'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: resolve
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            INPUT_VERSION="${{ github.event.inputs.version }}"
+            if [ -z "$INPUT_VERSION" ]; then
+              echo "is_tag=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            VERSION="${INPUT_VERSION#v}"
+            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "is_tag=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          TAG=$(git tag --points-at HEAD | grep -E '^v' | sort -V | tail -n 1)
+          if [ -z "$TAG" ]; then
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "is_tag=true" >> "$GITHUB_OUTPUT"
+
   publish-tauri:
     permissions:
       contents: write
-    # Only run if Release CLI succeeded and was triggered by a tag, or if manually dispatched
+    needs: resolve-tag
+    # Only run if Release CLI succeeded and resolved a tag, or if manually dispatched with a version
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       startsWith(github.event.workflow_run.head_branch, 'v'))
+      (github.event.workflow_run.conclusion == 'success' && needs.resolve-tag.outputs.is_tag == 'true')
     strategy:
       fail-fast: false
       matrix:
@@ -58,7 +106,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -111,19 +160,20 @@ jobs:
         id: version
         shell: bash
         run: |
-          # Handle workflow_run trigger (from Release CLI)
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            VERSION="${{ github.event.workflow_run.head_branch }}"
-            VERSION="${VERSION#v}"  # Remove 'v' prefix
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION="${{ github.ref_name }}"
-            VERSION="${VERSION#v}"  # Remove 'v' prefix
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            INPUT_VERSION="${{ github.event.inputs.version }}"
+            if [ -n "$INPUT_VERSION" ]; then
+              VERSION="${INPUT_VERSION#v}"
+            else
+              VERSION=$(jq -r '.version' ui/desktop/src-tauri/tauri.conf.json)
+            fi
+            TAG="v${VERSION}"
           else
-            # Read version from tauri.conf.json for manual runs using jq
-            VERSION=$(jq -r '.version' ui/desktop/src-tauri/tauri.conf.json)
+            TAG="${{ needs.resolve-tag.outputs.tag }}"
+            VERSION="${TAG#v}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "==> Version: $VERSION"
 
       - name: Build desktop (Tauri)
