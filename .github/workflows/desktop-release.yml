@@ -1,16 +1,12 @@
 name: "Release Desktop"
 
 on:
-  workflow_run:
-    workflows: ["Release CLI"]
-    types:
-      - completed
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-beta'
+      - 'v*.*.*-rc'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., 2.3.0)'
-        required: false
-        type: string
 
 concurrency:
   group: release-desktop-${{ github.ref }}
