@@ -276,11 +276,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
-          file: |
-            omniedge-cli-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.*
-            omniedge-cli-${{ steps.version.outputs.version }}-linux-*.deb
-            omniedge-cli-${{ steps.version.outputs.version }}-linux-*.rpm
-            omniedge-cli-${{ steps.version.outputs.version }}-linux-*.AppImage
+          file: omniedge-cli-*
           tag: ${{ github.ref }}
           overwrite: true
           prerelease: ${{ contains(github.ref, '-') }}
