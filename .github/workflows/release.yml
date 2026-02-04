@@ -11,70 +11,18 @@ on:
 env:
   CARGO_TERM_COLOR: always
   PACKAGE_NAME: omniedge-cli
+  PACKAGE_VERSION: ${{ github.ref_name }}
   PACKAGE_DESCRIPTION: "OmniEdge CLI - Peer-to-peer VPN for edge computing"
   PACKAGE_MAINTAINER: "OmniEdge Team <support@omniedge.io>"
   PACKAGE_LICENSE: "Apache-2.0 OR MIT"
 
 jobs:
   # ===========================================================================
-  # Resolve tag/version for workflow_run or manual dispatch
-  # ===========================================================================
-  resolve-tag:
-    name: Resolve Tag
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.resolve.outputs.tag }}
-      version: ${{ steps.resolve.outputs.version }}
-      is_tag: ${{ steps.resolve.outputs.is_tag }}
-    steps:
-      - uses: actions/checkout@v4
-        if: github.event_name == 'workflow_run'
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 0
-
-      - name: Resolve release tag
-        id: resolve
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            INPUT_VERSION="${{ github.event.inputs.version }}"
-            if [ -z "$INPUT_VERSION" ]; then
-              echo "is_tag=false" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            VERSION="${INPUT_VERSION#v}"
-            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
-            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-            echo "is_tag=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [ "${{ github.event_name }}" != "workflow_run" ]; then
-            echo "is_tag=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          TAG=$(git tag --points-at HEAD | grep -E '^v' | sort -V | tail -n 1)
-          if [ -z "$TAG" ]; then
-            echo "is_tag=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-          echo "is_tag=true" >> "$GITHUB_OUTPUT"
-
-  # ===========================================================================
   # Build CLI binaries for all platforms
   # ===========================================================================
   build:
     name: Build CLI - ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
-    needs: resolve-tag
-    # Only run if Test and Lint succeeded and resolved a tag, or if manually dispatched with a version
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && needs.resolve-tag.outputs.is_tag == 'true')
     strategy:
       fail-fast: false
       matrix:
@@ -118,9 +66,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
-          fetch-depth: 0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -143,16 +88,9 @@ jobs:
         id: version
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION_INPUT="${{ github.event.inputs.version }}"
-            VERSION="${VERSION_INPUT#v}"
-            TAG="v${VERSION}"
-          else
-            TAG="${{ needs.resolve-tag.outputs.tag }}"
-            VERSION="${TAG#v}"
-          fi
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Rename and Package (Unix)
         if: matrix.os != 'windows-latest'
@@ -186,49 +124,14 @@ jobs:
 
       - name: Upload to Release
         uses: svenstaro/upload-release-action@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: omniedge-cli-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.*
           file_glob: true
-          tag: ${{ steps.version.outputs.tag }}
+          tag: ${{ github.ref }}
           overwrite: true
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          release_name: "omniedge ${{ steps.version.outputs.tag }}"
-          body: |
-            ## omniedge ${{ steps.version.outputs.tag }}
-
-            ### CLI Downloads
-
-            | Platform | Architecture | Package |
-            |----------|--------------|---------|
-            | Linux | x86_64, ARM64, RISC-V 64 | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
-            | macOS | x86_64, ARM64 (Apple Silicon) | `.tar.gz` |
-            | Windows | x86_64 | `.zip` |
-
-            ### Desktop Downloads
-
-            | Platform | Architecture | Package |
-            |----------|--------------|---------|
-            | Windows | x86_64 | `.msi`, `-setup.exe` |
-            | macOS | x86_64, ARM64 (Apple Silicon) | `.dmg` |
-            | Linux | x86_64 | `.deb`, `.AppImage` |
-
-            ### Installation
-
-            **CLI - Debian/Ubuntu:**
-            ```bash
-            sudo dpkg -i omniedge-cli-*-linux-amd64.deb
-            ```
-
-            **CLI - Fedora/RHEL:**
-            ```bash
-            sudo rpm -i omniedge-cli-*-linux-x86_64.rpm
-            ```
-
-            **Desktop - macOS:**
-            1. Download the `.dmg` file for your Mac
-            2. Open the DMG and drag **OmniEdge** to **Applications**
-            3. If you see a security warning, go to **System Settings** → **Privacy & Security** → **Open Anyway**
+          prerelease: ${{ contains(github.ref, '-') }}
 
   # ===========================================================================
   # Build DEB packages for Debian/Ubuntu
@@ -236,7 +139,7 @@ jobs:
   build-deb:
     name: Build DEB - ${{ matrix.arch }}
     runs-on: ubuntu-latest
-    needs: [resolve-tag, build]
+    needs: build
     strategy:
       fail-fast: false
       matrix:
@@ -250,23 +153,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
-          fetch-depth: 0
 
       - name: Get version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION_INPUT="${{ github.event.inputs.version }}"
-            VERSION="${VERSION_INPUT#v}"
-            TAG="v${VERSION}"
-          else
-            TAG="${{ needs.resolve-tag.outputs.tag }}"
-            VERSION="${TAG#v}"
-          fi
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -368,14 +261,14 @@ jobs:
 
       - name: Upload DEB to Release
         uses: svenstaro/upload-release-action@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: "*.deb"
           file_glob: true
-          tag: ${{ steps.version.outputs.tag }}
+          tag: ${{ github.ref }}
           overwrite: true
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          release_name: "omniedge ${{ steps.version.outputs.tag }}"
+          prerelease: ${{ contains(github.ref, '-') }}
 
   # ===========================================================================
   # Build RPM packages for Fedora/RHEL/openSUSE
@@ -383,7 +276,7 @@ jobs:
   build-rpm:
     name: Build RPM - ${{ matrix.arch }}
     runs-on: ubuntu-latest
-    needs: [resolve-tag, build]
+    needs: build
     strategy:
       fail-fast: false
       matrix:
@@ -397,23 +290,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
-          fetch-depth: 0
 
       - name: Get version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION_INPUT="${{ github.event.inputs.version }}"
-            VERSION="${VERSION_INPUT#v}"
-            TAG="v${VERSION}"
-          else
-            TAG="${{ needs.resolve-tag.outputs.tag }}"
-            VERSION="${TAG#v}"
-          fi
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
           # Replace any dashes with underscores for RPM compatibility
           RPM_VERSION="${VERSION//-/_}"
           echo "rpm_version=$RPM_VERSION" >> $GITHUB_OUTPUT
@@ -514,14 +397,14 @@ jobs:
 
       - name: Upload RPM to Release
         uses: svenstaro/upload-release-action@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: "*.rpm"
           file_glob: true
-          tag: ${{ steps.version.outputs.tag }}
+          tag: ${{ github.ref }}
           overwrite: true
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          release_name: "omniedge ${{ steps.version.outputs.tag }}"
+          prerelease: ${{ contains(github.ref, '-') }}
 
   # ===========================================================================
   # Build AppImage for universal Linux distribution
@@ -529,7 +412,7 @@ jobs:
   build-appimage:
     name: Build AppImage - ${{ matrix.arch }}
     runs-on: ubuntu-latest
-    needs: [resolve-tag, build]
+    needs: build
     strategy:
       fail-fast: false
       matrix:
@@ -541,23 +424,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
-          fetch-depth: 0
 
       - name: Get version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION_INPUT="${{ github.event.inputs.version }}"
-            VERSION="${VERSION_INPUT#v}"
-            TAG="v${VERSION}"
-          else
-            TAG="${{ needs.resolve-tag.outputs.tag }}"
-            VERSION="${TAG#v}"
-          fi
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -653,15 +526,14 @@ jobs:
 
       - name: Upload AppImage to Release
         uses: svenstaro/upload-release-action@v2
-        if: matrix.arch == 'x86_64'
+        if: startsWith(github.ref, 'refs/tags/') && matrix.arch == 'x86_64'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: "*.AppImage"
           file_glob: true
-          tag: ${{ steps.version.outputs.tag }}
+          tag: ${{ github.ref }}
           overwrite: true
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          release_name: "omniedge ${{ steps.version.outputs.tag }}"
+          prerelease: ${{ contains(github.ref, '-') }}
 
   # ===========================================================================
   # Create release summary
@@ -669,26 +541,12 @@ jobs:
   release-summary:
     name: Release Summary
     runs-on: ubuntu-latest
-    needs: [resolve-tag, build, build-deb, build-rpm, build-appimage]
-    if: always()
+    needs: [build, build-deb, build-rpm, build-appimage]
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION_INPUT="${{ github.event.inputs.version }}"
-            VERSION="${VERSION_INPUT#v}"
-            TAG="v${VERSION}"
-          else
-            TAG="${{ needs.resolve-tag.outputs.tag }}"
-            VERSION="${TAG#v}"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-
       - name: Generate release notes
         run: |
-          echo "## OmniEdge CLI ${{ steps.version.outputs.tag }}" > release_notes.md
+          echo "## OmniEdge CLI ${{ github.ref_name }}" > release_notes.md
           echo "" >> release_notes.md
           echo "### Platforms" >> release_notes.md
           echo "" >> release_notes.md
