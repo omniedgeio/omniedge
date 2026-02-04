@@ -2,7 +2,7 @@ name: "OpenWrt Packages"
 
 on:
   workflow_run:
-    workflows: ["Release CLI"]
+    workflows: ["Release"]
     types:
       - completed
   workflow_dispatch:
@@ -72,7 +72,7 @@ jobs:
     name: Build ${{ matrix.openwrt_arch }} (${{ matrix.pkg_format }})
     runs-on: ubuntu-latest
     needs: resolve-tag
-    # Only run if Release CLI succeeded and resolved a tag, or if manually dispatched with a version
+    # Only run if Release succeeded and resolved a tag, or if manually dispatched with a version
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' && needs.resolve-tag.outputs.is_tag == 'true')
