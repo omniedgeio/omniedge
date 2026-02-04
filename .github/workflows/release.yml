@@ -842,3 +842,277 @@ jobs:
           echo "omniedge-desktop-{version}-{platform}-{arch}.{ext}" >> $GITHUB_STEP_SUMMARY
           echo "omniedge-{version}-openwrt-{arch}.{ipk|apk}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Publish Packages - Update package managers with new release
+  # ===========================================================================
+  publish-packages:
+    name: Publish Packages
+    runs-on: ubuntu-latest
+    needs: [prepare-release, build-cli, build-desktop, release-summary]
+    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, '-beta') && !contains(github.ref, '-rc')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version and checksums
+        id: info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          BASE_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}"
+          
+          # Function to get SHA256
+          get_sha256() {
+            local url="$1"
+            local name="$2"
+            if curl -fsSL -o "$name" "$url" 2>/dev/null; then
+              sha256sum "$name" | cut -d' ' -f1
+            else
+              echo "UNAVAILABLE"
+            fi
+          }
+          
+          # CLI checksums
+          echo "cli_linux_x64=$(get_sha256 "${BASE_URL}/omniedge-cli-${VERSION}-linux-x64.tar.gz" "cli-linux-x64.tar.gz")" >> $GITHUB_OUTPUT
+          echo "cli_linux_arm64=$(get_sha256 "${BASE_URL}/omniedge-cli-${VERSION}-linux-arm64.tar.gz" "cli-linux-arm64.tar.gz")" >> $GITHUB_OUTPUT
+          echo "cli_macos_x64=$(get_sha256 "${BASE_URL}/omniedge-cli-${VERSION}-macos-x64.tar.gz" "cli-macos-x64.tar.gz")" >> $GITHUB_OUTPUT
+          echo "cli_macos_arm64=$(get_sha256 "${BASE_URL}/omniedge-cli-${VERSION}-macos-arm64.tar.gz" "cli-macos-arm64.tar.gz")" >> $GITHUB_OUTPUT
+          echo "cli_windows_x64=$(get_sha256 "${BASE_URL}/omniedge-cli-${VERSION}-windows-x64.zip" "cli-windows-x64.zip")" >> $GITHUB_OUTPUT
+          
+          # Desktop checksums
+          echo "desktop_macos_x64=$(get_sha256 "${BASE_URL}/omniedge-desktop-${VERSION}-macos-x64.dmg" "desktop-macos-x64.dmg")" >> $GITHUB_OUTPUT
+          echo "desktop_macos_arm64=$(get_sha256 "${BASE_URL}/omniedge-desktop-${VERSION}-macos-arm64.dmg" "desktop-macos-arm64.dmg")" >> $GITHUB_OUTPUT
+          echo "desktop_windows_msi=$(get_sha256 "${BASE_URL}/omniedge-desktop-${VERSION}-windows-x64.msi" "desktop-windows-msi.msi")" >> $GITHUB_OUTPUT
+
+      # ---- Homebrew ----
+      - name: Update Homebrew Formula
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          SHA256_MACOS_ARM64: ${{ steps.info.outputs.cli_macos_arm64 }}
+          SHA256_MACOS_X64: ${{ steps.info.outputs.cli_macos_x64 }}
+          SHA256_LINUX_ARM64: ${{ steps.info.outputs.cli_linux_arm64 }}
+          SHA256_LINUX_X64: ${{ steps.info.outputs.cli_linux_x64 }}
+        run: |
+          if [ -f "packaging/homebrew/Formula/omniedge-cli.rb" ]; then
+            sed -i "s/version \".*\"/version \"${VERSION}\"/" packaging/homebrew/Formula/omniedge-cli.rb
+            sed -i "s/PLACEHOLDER_SHA256_MACOS_ARM64/${SHA256_MACOS_ARM64}/" packaging/homebrew/Formula/omniedge-cli.rb
+            sed -i "s/PLACEHOLDER_SHA256_MACOS_X64/${SHA256_MACOS_X64}/" packaging/homebrew/Formula/omniedge-cli.rb
+            sed -i "s/PLACEHOLDER_SHA256_LINUX_ARM64/${SHA256_LINUX_ARM64}/" packaging/homebrew/Formula/omniedge-cli.rb
+            sed -i "s/PLACEHOLDER_SHA256_LINUX_X64/${SHA256_LINUX_X64}/" packaging/homebrew/Formula/omniedge-cli.rb
+            echo "Updated Homebrew formula for version ${VERSION}"
+          else
+            echo "No Homebrew formula found, skipping"
+          fi
+
+      - name: Push to Homebrew Tap
+        if: vars.HOMEBREW_TAP_REPO != ''
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${{ vars.HOMEBREW_TAP_REPO }}.git" tap
+          cp packaging/homebrew/Formula/*.rb tap/Formula/
+          cp packaging/homebrew/Casks/*.rb tap/Casks/ 2>/dev/null || true
+          cd tap
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Update to version ${{ steps.info.outputs.version }}" || echo "No changes to commit"
+          git push
+
+      # ---- AUR ----
+      - name: Update AUR PKGBUILD
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          SHA256_X64: ${{ steps.info.outputs.cli_linux_x64 }}
+          SHA256_ARM64: ${{ steps.info.outputs.cli_linux_arm64 }}
+        run: |
+          if [ -f "packaging/aur/omniedge-cli-bin/PKGBUILD" ]; then
+            cd packaging/aur/omniedge-cli-bin
+            sed -i "s/pkgver=.*/pkgver=${VERSION}/" PKGBUILD
+            sed -i "s/PLACEHOLDER_SHA256_X64/${SHA256_X64}/" PKGBUILD
+            sed -i "s/PLACEHOLDER_SHA256_ARM64/${SHA256_ARM64}/" PKGBUILD
+            echo "Updated AUR PKGBUILD for version ${VERSION}"
+          else
+            echo "No AUR PKGBUILD found, skipping"
+          fi
+
+      - name: Publish to AUR
+        if: secrets.AUR_SSH_PRIVATE_KEY != ''
+        uses: KSXGitHub/github-actions-deploy-aur@v2
+        with:
+          pkgname: omniedge-cli-bin
+          pkgbuild: packaging/aur/omniedge-cli-bin/PKGBUILD
+          commit_username: GitHub Actions
+          commit_email: actions@github.com
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to version ${{ steps.info.outputs.version }}"
+
+      # ---- Snap ----
+      - name: Update Snap version
+        run: |
+          if [ -f "packaging/snap/snapcraft.yaml" ]; then
+            sed -i "s/version: .*/version: '${{ steps.info.outputs.version }}'/" packaging/snap/snapcraft.yaml
+            echo "Updated snapcraft.yaml for version ${{ steps.info.outputs.version }}"
+          else
+            echo "No snapcraft.yaml found, skipping"
+          fi
+
+      - name: Build Snap
+        if: hashFiles('packaging/snap/snapcraft.yaml') != ''
+        uses: snapcore/action-build@v1
+        id: build_snap
+        with:
+          path: packaging/snap
+
+      - name: Publish to Snap Store
+        if: steps.build_snap.outputs.snap != '' && secrets.SNAPCRAFT_STORE_CREDENTIALS != ''
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.build_snap.outputs.snap }}
+          release: stable
+
+      - name: Publish summary
+        run: |
+          echo "## Package Publishing Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version: ${{ steps.info.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Checksums" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | SHA256 |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| CLI Linux x64 | \`${{ steps.info.outputs.cli_linux_x64 }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| CLI Linux arm64 | \`${{ steps.info.outputs.cli_linux_arm64 }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| CLI macOS x64 | \`${{ steps.info.outputs.cli_macos_x64 }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| CLI macOS arm64 | \`${{ steps.info.outputs.cli_macos_arm64 }}\` |" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Publish Windows Packages - Winget and Chocolatey
+  # ===========================================================================
+  publish-windows-packages:
+    name: Publish Windows Packages
+    runs-on: windows-latest
+    needs: [prepare-release, build-cli, build-desktop, release-summary]
+    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, '-beta') && !contains(github.ref, '-rc')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version and checksums
+        id: info
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          BASE_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}"
+          
+          # CLI checksum
+          curl -fsSL -o cli.zip "${BASE_URL}/omniedge-cli-${VERSION}-windows-x64.zip" 2>/dev/null && \
+            echo "cli_windows_x64=$(sha256sum cli.zip | cut -d' ' -f1)" >> $GITHUB_OUTPUT || \
+            echo "cli_windows_x64=UNAVAILABLE" >> $GITHUB_OUTPUT
+          
+          # Desktop MSI checksum
+          curl -fsSL -o desktop.msi "${BASE_URL}/omniedge-desktop-${VERSION}-windows-x64.msi" 2>/dev/null && \
+            echo "desktop_windows_msi=$(sha256sum desktop.msi | cut -d' ' -f1)" >> $GITHUB_OUTPUT || \
+            echo "desktop_windows_msi=UNAVAILABLE" >> $GITHUB_OUTPUT
+
+      # ---- Winget ----
+      - name: Update Winget Manifests
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          SHA256_CLI: ${{ steps.info.outputs.cli_windows_x64 }}
+          SHA256_DESKTOP: ${{ steps.info.outputs.desktop_windows_msi }}
+        run: |
+          # Update CLI manifest
+          if (Test-Path "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.installer.yaml") {
+            $cliInstaller = Get-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.installer.yaml" -Raw
+            $cliInstaller = $cliInstaller -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
+            $cliInstaller = $cliInstaller -replace "PLACEHOLDER_SHA256", "$env:SHA256_CLI"
+            $cliInstaller = $cliInstaller -replace "v2\.0\.0", "v$env:VERSION"
+            $cliInstaller = $cliInstaller -replace "2\.0\.0", "$env:VERSION"
+            Set-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.installer.yaml" $cliInstaller
+            Write-Host "Updated Winget CLI manifest"
+          }
+          
+          # Update Desktop manifest
+          if (Test-Path "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml") {
+            $desktopInstaller = Get-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml" -Raw
+            $desktopInstaller = $desktopInstaller -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
+            $desktopInstaller = $desktopInstaller -replace "PLACEHOLDER_SHA256_MSI", "$env:SHA256_DESKTOP"
+            $desktopInstaller = $desktopInstaller -replace "v2\.0\.0", "v$env:VERSION"
+            $desktopInstaller = $desktopInstaller -replace "2\.0\.0", "$env:VERSION"
+            Set-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml" $desktopInstaller
+            Write-Host "Updated Winget Desktop manifest"
+          }
+
+      - name: Submit to Winget
+        if: secrets.WINGET_TOKEN != ''
+        uses: vedantmgoyal2009/winget-releaser@v2
+        with:
+          identifier: OmniEdge.OmniEdgeCLI
+          version: ${{ steps.info.outputs.version }}
+          installers-regex: '\.zip$'
+          token: ${{ secrets.WINGET_TOKEN }}
+
+      # ---- Chocolatey ----
+      - name: Update Chocolatey Packages
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          SHA256_CLI: ${{ steps.info.outputs.cli_windows_x64 }}
+          SHA256_DESKTOP: ${{ steps.info.outputs.desktop_windows_msi }}
+        run: |
+          # Update CLI package
+          if (Test-Path "packaging/chocolatey/omniedge-cli/omniedge-cli.nuspec") {
+            $nuspec = Get-Content "packaging/chocolatey/omniedge-cli/omniedge-cli.nuspec" -Raw
+            $nuspec = $nuspec -replace "<version>.*</version>", "<version>$env:VERSION</version>"
+            $nuspec = $nuspec -replace "v2\.0\.0", "v$env:VERSION"
+            Set-Content "packaging/chocolatey/omniedge-cli/omniedge-cli.nuspec" $nuspec
+            
+            $install = Get-Content "packaging/chocolatey/omniedge-cli/tools/chocolateyInstall.ps1" -Raw
+            $install = $install -replace "\`$version = '.*'", "`$version = '$env:VERSION'"
+            $install = $install -replace "PLACEHOLDER_SHA256", "$env:SHA256_CLI"
+            Set-Content "packaging/chocolatey/omniedge-cli/tools/chocolateyInstall.ps1" $install
+            Write-Host "Updated Chocolatey CLI package"
+          }
+          
+          # Update Desktop package
+          if (Test-Path "packaging/chocolatey/omniedge-desktop/omniedge-desktop.nuspec") {
+            $nuspec = Get-Content "packaging/chocolatey/omniedge-desktop/omniedge-desktop.nuspec" -Raw
+            $nuspec = $nuspec -replace "<version>.*</version>", "<version>$env:VERSION</version>"
+            $nuspec = $nuspec -replace "v2\.0\.0", "v$env:VERSION"
+            Set-Content "packaging/chocolatey/omniedge-desktop/omniedge-desktop.nuspec" $nuspec
+            
+            $install = Get-Content "packaging/chocolatey/omniedge-desktop/tools/chocolateyInstall.ps1" -Raw
+            $install = $install -replace "\`$version = '.*'", "`$version = '$env:VERSION'"
+            $install = $install -replace "PLACEHOLDER_SHA256", "$env:SHA256_DESKTOP"
+            Set-Content "packaging/chocolatey/omniedge-desktop/tools/chocolateyInstall.ps1" $install
+            Write-Host "Updated Chocolatey Desktop package"
+          }
+
+      - name: Build and Push CLI Chocolatey Package
+        if: secrets.CHOCOLATEY_API_KEY != ''
+        shell: pwsh
+        run: |
+          if (Test-Path "packaging/chocolatey/omniedge-cli/omniedge-cli.nuspec") {
+            cd packaging/chocolatey/omniedge-cli
+            choco pack
+            choco push omniedge-cli.${{ steps.info.outputs.version }}.nupkg --source https://push.chocolatey.org/ --api-key ${{ secrets.CHOCOLATEY_API_KEY }}
+          }
+
+      - name: Build and Push Desktop Chocolatey Package
+        if: secrets.CHOCOLATEY_API_KEY != ''
+        shell: pwsh
+        run: |
+          if (Test-Path "packaging/chocolatey/omniedge-desktop/omniedge-desktop.nuspec") {
+            cd packaging/chocolatey/omniedge-desktop
+            choco pack
+            choco push omniedge-desktop.${{ steps.info.outputs.version }}.nupkg --source https://push.chocolatey.org/ --api-key ${{ secrets.CHOCOLATEY_API_KEY }}
+          }
