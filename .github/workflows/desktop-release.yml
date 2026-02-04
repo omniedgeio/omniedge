@@ -17,62 +17,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # ===========================================================================
-  # Resolve tag/version for workflow_run or manual dispatch
-  # ===========================================================================
-  resolve-tag:
-    name: Resolve Tag
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.resolve.outputs.tag }}
-      version: ${{ steps.resolve.outputs.version }}
-      is_tag: ${{ steps.resolve.outputs.is_tag }}
-    steps:
-      - uses: actions/checkout@v4
-        if: github.event_name == 'workflow_run'
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 0
-
-      - name: Resolve release tag
-        id: resolve
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            INPUT_VERSION="${{ github.event.inputs.version }}"
-            if [ -z "$INPUT_VERSION" ]; then
-              echo "is_tag=false" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            VERSION="${INPUT_VERSION#v}"
-            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
-            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-            echo "is_tag=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [ "${{ github.event_name }}" != "workflow_run" ]; then
-            echo "is_tag=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          TAG=$(git tag --points-at HEAD | grep -E '^v' | sort -V | tail -n 1)
-          if [ -z "$TAG" ]; then
-            echo "is_tag=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-          echo "is_tag=true" >> "$GITHUB_OUTPUT"
-
   publish-tauri:
     permissions:
       contents: write
-    needs: resolve-tag
-    # Only run if Release CLI succeeded and resolved a tag, or if manually dispatched with a version
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && needs.resolve-tag.outputs.is_tag == 'true')
     strategy:
       fail-fast: false
       matrix:
@@ -101,9 +48,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.resolve-tag.outputs.tag || github.ref }}
-          fetch-depth: 0
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -156,20 +100,15 @@ jobs:
         id: version
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            INPUT_VERSION="${{ github.event.inputs.version }}"
-            if [ -n "$INPUT_VERSION" ]; then
-              VERSION="${INPUT_VERSION#v}"
-            else
-              VERSION=$(jq -r '.version' ui/desktop/src-tauri/tauri.conf.json)
-            fi
-            TAG="v${VERSION}"
+          # For tag pushes, use the tag name; for workflow_dispatch, read from tauri.conf.json
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"  # Remove 'v' prefix
           else
-            TAG="${{ needs.resolve-tag.outputs.tag }}"
-            VERSION="${TAG#v}"
+            # Read version from tauri.conf.json for manual runs using jq
+            VERSION=$(jq -r '.version' ui/desktop/src-tauri/tauri.conf.json)
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "==> Version: $VERSION"
 
       - name: Build desktop (Tauri)
@@ -300,47 +239,33 @@ jobs:
 
       - name: Upload to Release
         uses: svenstaro/upload-release-action@v2
-        if: steps.artifacts.outputs.has_artifacts == 'true'
+        if: startsWith(github.ref, 'refs/tags/') && steps.artifacts.outputs.has_artifacts == 'true'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}*
           file_glob: true
-          tag: ${{ steps.version.outputs.tag }}
+          tag: ${{ github.ref }}
           overwrite: true
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          release_name: "omniedge ${{ steps.version.outputs.tag }}"
+          prerelease: ${{ contains(github.ref, '-') }}
+          release_name: "omniedge-desktop ${{ github.ref_name }}"
           body: |
-            ## omniedge ${{ steps.version.outputs.tag }}
+            ## omniedge-desktop ${{ github.ref_name }}
 
-            ### CLI Downloads
+            ### Downloads
 
-            | Platform | Architecture | Package |
-            |----------|--------------|---------|
-            | Linux | x86_64, ARM64, RISC-V 64 | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
-            | macOS | x86_64, ARM64 (Apple Silicon) | `.tar.gz` |
-            | Windows | x86_64 | `.zip` |
+            | Platform | Architecture | File |
+            |----------|--------------|------|
+            | Windows | x86_64 | `omniedge-desktop-*-windows-x64.msi` / `-setup.exe` |
+            | macOS | x86_64 | `omniedge-desktop-*-macos-x64.dmg` |
+            | macOS | ARM64 (Apple Silicon) | `omniedge-desktop-*-macos-arm64.dmg` |
+            | Linux | x86_64 | `omniedge-desktop-*-linux-x64.deb` / `.AppImage` |
 
-            ### Desktop Downloads
+            ### macOS Installation
 
-            | Platform | Architecture | Package |
-            |----------|--------------|---------|
-            | Windows | x86_64 | `.msi`, `-setup.exe` |
-            | macOS | x86_64, ARM64 (Apple Silicon) | `.dmg` |
-            | Linux | x86_64 | `.deb`, `.AppImage` |
-
-            ### Installation
-
-            **CLI - Debian/Ubuntu:**
-            ```bash
-            sudo dpkg -i omniedge-cli-*-linux-amd64.deb
-            ```
-
-            **CLI - Fedora/RHEL:**
-            ```bash
-            sudo rpm -i omniedge-cli-*-linux-x86_64.rpm
-            ```
-
-            **Desktop - macOS:**
-            1. Download the `.dmg` file for your Mac
+            1. Download the `.dmg` file for your Mac (ARM64 for Apple Silicon, x64 for Intel)
             2. Open the DMG and drag **OmniEdge** to **Applications**
-            3. If you see a security warning, go to **System Settings** → **Privacy & Security** → **Open Anyway**
+            3. Open **OmniEdge** from Applications
+            4. If you see a security warning:
+               - Open **System Settings** → **Privacy & Security**
+               - Scroll down and click **Open Anyway** next to the OmniEdge message
+               - Click **Open** in the confirmation dialog
