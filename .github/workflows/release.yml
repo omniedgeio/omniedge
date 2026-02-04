@@ -1093,42 +1093,106 @@ jobs:
 
       # ---- Winget ----
       - name: Update Winget Manifests
+        if: steps.check_secrets.outputs.skip_all != 'true'
         shell: pwsh
         env:
           VERSION: ${{ steps.info.outputs.version }}
           SHA256_CLI: ${{ steps.info.outputs.cli_windows_x64 }}
           SHA256_DESKTOP: ${{ steps.info.outputs.desktop_windows_msi }}
         run: |
-          # Update CLI manifest
-          if (Test-Path "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.installer.yaml") {
-            $cliInstaller = Get-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.installer.yaml" -Raw
-            $cliInstaller = $cliInstaller -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
-            $cliInstaller = $cliInstaller -replace "PLACEHOLDER_SHA256", "$env:SHA256_CLI"
-            $cliInstaller = $cliInstaller -replace "v2\.0\.0", "v$env:VERSION"
-            $cliInstaller = $cliInstaller -replace "2\.0\.0", "$env:VERSION"
-            Set-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.installer.yaml" $cliInstaller
-            Write-Host "Updated Winget CLI manifest"
+          # Update CLI manifest files
+          if (Test-Path "packaging/winget/omniedge-cli") {
+            $version = $env:VERSION
+            
+            # Update version manifest
+            $versionYaml = Get-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.yaml" -Raw
+            $versionYaml = $versionYaml -replace "PackageVersion: .*", "PackageVersion: $version"
+            Set-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.yaml" $versionYaml
+            
+            # Update installer manifest
+            $installerYaml = Get-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.installer.yaml" -Raw
+            $installerYaml = $installerYaml -replace "PackageVersion: .*", "PackageVersion: $version"
+            $installerYaml = $installerYaml -replace "PLACEHOLDER_SHA256", "$env:SHA256_CLI"
+            $installerYaml = $installerYaml -replace "omniedge-cli-[\d\.]+(-windows-x64\.exe)", "omniedge-cli-$version-windows-x64.exe"
+            $installerYaml = $installerYaml -replace "download/v[\d\.]+/", "download/v$version/"
+            Set-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.installer.yaml" $installerYaml
+            
+            # Update locale manifest
+            $localeYaml = Get-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.locale.en-US.yaml" -Raw
+            $localeYaml = $localeYaml -replace "PackageVersion: .*", "PackageVersion: $version"
+            $localeYaml = $localeYaml -replace "releases/tag/v[\d\.]+", "releases/tag/v$version"
+            Set-Content "packaging/winget/omniedge-cli/OmniEdge.OmniEdgeCLI.locale.en-US.yaml" $localeYaml
+            
+            Write-Host "Updated Winget CLI manifests for version $version"
           }
           
-          # Update Desktop manifest
-          if (Test-Path "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml") {
-            $desktopInstaller = Get-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml" -Raw
-            $desktopInstaller = $desktopInstaller -replace "PackageVersion: .*", "PackageVersion: $env:VERSION"
-            $desktopInstaller = $desktopInstaller -replace "PLACEHOLDER_SHA256_MSI", "$env:SHA256_DESKTOP"
-            $desktopInstaller = $desktopInstaller -replace "v2\.0\.0", "v$env:VERSION"
-            $desktopInstaller = $desktopInstaller -replace "2\.0\.0", "$env:VERSION"
-            Set-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml" $desktopInstaller
-            Write-Host "Updated Winget Desktop manifest"
+          # Update Desktop manifest files
+          if (Test-Path "packaging/winget/omniedge-desktop") {
+            $version = $env:VERSION
+            
+            # Update version manifest
+            $versionYaml = Get-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.yaml" -Raw
+            $versionYaml = $versionYaml -replace "PackageVersion: .*", "PackageVersion: $version"
+            Set-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.yaml" $versionYaml
+            
+            # Update installer manifest
+            $installerYaml = Get-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml" -Raw
+            $installerYaml = $installerYaml -replace "PackageVersion: .*", "PackageVersion: $version"
+            $installerYaml = $installerYaml -replace "PLACEHOLDER_SHA256_MSI", "$env:SHA256_DESKTOP"
+            $installerYaml = $installerYaml -replace "omniedge-desktop-[\d\.]+(-windows-x64\.msi)", "omniedge-desktop-$version-windows-x64.msi"
+            $installerYaml = $installerYaml -replace "download/v[\d\.]+/", "download/v$version/"
+            Set-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.installer.yaml" $installerYaml
+            
+            # Update locale manifest
+            $localeYaml = Get-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.locale.en-US.yaml" -Raw
+            $localeYaml = $localeYaml -replace "PackageVersion: .*", "PackageVersion: $version"
+            $localeYaml = $localeYaml -replace "releases/tag/v[\d\.]+", "releases/tag/v$version"
+            Set-Content "packaging/winget/omniedge-desktop/OmniEdge.OmniEdgeDesktop.locale.en-US.yaml" $localeYaml
+            
+            Write-Host "Updated Winget Desktop manifests for version $version"
           }
 
-      - name: Submit to Winget
+      - name: Submit to Winget via wingetcreate
         if: steps.check_secrets.outputs.winget == 'true'
-        uses: vedantmgoyal2009/winget-releaser@v2
-        with:
-          identifier: OmniEdge.OmniEdgeCLI
-          version: ${{ steps.info.outputs.version }}
-          installers-regex: '\.zip$'
-          token: ${{ secrets.WINGET_TOKEN }}
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          # Install wingetcreate
+          Invoke-WebRequest -Uri "https://aka.ms/wingetcreate/latest" -OutFile "wingetcreate.exe"
+          
+          $version = $env:VERSION
+          $cliUrl = "https://github.com/${{ github.repository }}/releases/download/v$version/omniedge-cli-$version-windows-x64.zip"
+          $desktopUrl = "https://github.com/${{ github.repository }}/releases/download/v$version/omniedge-desktop-$version-windows-x64.msi"
+          
+          # Submit CLI package (update if exists, otherwise skip - first version must be manual)
+          Write-Host "Submitting OmniEdge CLI to winget-pkgs..."
+          try {
+            ./wingetcreate.exe update OmniEdge.OmniEdgeCLI `
+              --urls $cliUrl `
+              --version $version `
+              --token $env:WINGET_TOKEN `
+              --submit
+            Write-Host "CLI package submitted successfully"
+          } catch {
+            Write-Host "::warning::Failed to submit CLI package. If this is the first version, submit manually first."
+            Write-Host $_.Exception.Message
+          }
+          
+          # Submit Desktop package (update if exists, otherwise skip - first version must be manual)
+          Write-Host "Submitting OmniEdge Desktop to winget-pkgs..."
+          try {
+            ./wingetcreate.exe update OmniEdge.OmniEdgeDesktop `
+              --urls $desktopUrl `
+              --version $version `
+              --token $env:WINGET_TOKEN `
+              --submit
+            Write-Host "Desktop package submitted successfully"
+          } catch {
+            Write-Host "::warning::Failed to submit Desktop package. If this is the first version, submit manually first."
+            Write-Host $_.Exception.Message
+          }
 
       # ---- Chocolatey ----
       - name: Update Chocolatey Packages
