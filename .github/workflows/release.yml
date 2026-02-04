@@ -17,11 +17,78 @@ env:
 
 jobs:
   # ===========================================================================
+  # Prepare Release - Extract release notes and create GitHub release
+  # ===========================================================================
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION (tag: $TAG)"
+
+      - name: Extract release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          
+          # Extract the section for this version from RELEASE_NOTES.md
+          # Match from "## vX.Y.Z" until the next "## v" or end of file
+          if [ -f "RELEASE_NOTES.md" ]; then
+            # Use awk to extract the section for this version
+            NOTES=$(awk -v ver="$TAG" '
+              BEGIN { found=0; printing=0 }
+              /^## v[0-9]+\.[0-9]+\.[0-9]+/ {
+                if (printing) exit
+                if ($2 == ver || index($0, ver) > 0) { found=1; printing=1; next }
+              }
+              printing { print }
+            ' RELEASE_NOTES.md)
+            
+            if [ -z "$NOTES" ]; then
+              echo "No release notes found for $TAG, using default"
+              NOTES="Release $TAG"
+            fi
+          else
+            NOTES="Release $TAG"
+          fi
+          
+          # Write to file for the release action
+          echo "$NOTES" > release_notes.md
+          echo "Release notes extracted:"
+          head -20 release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "OmniEdge ${{ steps.version.outputs.tag }}"
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ===========================================================================
   # Build CLI binaries for all platforms (with integrated packaging for Linux)
   # ===========================================================================
   build-cli:
-    name: Build CLI - ${{ matrix.target }}
+    name: Build CLI - ${{ matrix.platform }}-${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
+    needs: prepare-release
+    if: always() && (needs.prepare-release.result == 'success' || needs.prepare-release.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
@@ -30,23 +97,25 @@ jobs:
             os: ubuntu-latest
             platform: linux
             arch: x64
-            deb_arch: amd64
-            rpm_arch: x86_64
             cross: true
+            build_deb: true
+            build_rpm: true
             build_appimage: true
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
             platform: linux
             arch: arm64
-            deb_arch: arm64
-            rpm_arch: aarch64
             cross: true
+            build_deb: true
+            build_rpm: true
             build_appimage: false
           - target: riscv64gc-unknown-linux-musl
             os: ubuntu-latest
             platform: linux
             arch: riscv64
             cross: true
+            build_deb: false
+            build_rpm: false
             build_appimage: false
           - target: x86_64-apple-darwin
             os: macos-15-intel
@@ -72,13 +141,11 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      # Rust caching for faster builds
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: cli-${{ matrix.target }}
 
-      # Use pre-built cross binary instead of cargo install
       - name: Install cross
         if: matrix.cross
         uses: taiki-e/install-action@cross
@@ -95,10 +162,15 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION=$(grep -m1 '^version' crates/omniedge-cli/Cargo.toml | cut -d'"' -f2)
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "rpm_version=${VERSION//-/_}" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
 
       - name: Package (Unix)
         if: matrix.os != 'windows-latest'
@@ -123,13 +195,20 @@ jobs:
 
       # ==== Linux-only: Build DEB package ====
       - name: Build DEB package
-        if: matrix.platform == 'linux' && matrix.deb_arch != ''
+        if: matrix.build_deb == true
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           BINARY="dist/omniedge-cli-${VERSION}-linux-${{ matrix.arch }}"
           
-          PKG_DIR="omniedge-cli_${VERSION}_${{ matrix.deb_arch }}"
+          # Map arch to DEB arch
+          case "${{ matrix.arch }}" in
+            x64) DEB_ARCH="amd64" ;;
+            arm64) DEB_ARCH="arm64" ;;
+            *) DEB_ARCH="${{ matrix.arch }}" ;;
+          esac
+          
+          PKG_DIR="omniedge-cli_${VERSION}_${DEB_ARCH}"
           mkdir -p "${PKG_DIR}/DEBIAN" "${PKG_DIR}/usr/bin" "${PKG_DIR}/usr/lib/systemd/system"
           
           cp "${BINARY}" "${PKG_DIR}/usr/bin/omniedge"
@@ -140,7 +219,7 @@ jobs:
           Version: ${VERSION}
           Section: net
           Priority: optional
-          Architecture: ${{ matrix.deb_arch }}
+          Architecture: ${DEB_ARCH}
           Maintainer: OmniEdge Team <support@omniedge.io>
           Description: OmniEdge CLI - Peer-to-peer VPN for edge computing
           Homepage: https://omniedge.io
@@ -163,15 +242,16 @@ jobs:
           EOF
           
           dpkg-deb --build "${PKG_DIR}"
-          mv "${PKG_DIR}.deb" "omniedge-cli-${VERSION}-linux-${{ matrix.deb_arch }}.deb"
+          # Use consistent naming: omniedge-cli-{version}-linux-{arch}.deb
+          mv "${PKG_DIR}.deb" "omniedge-cli-${VERSION}-linux-${{ matrix.arch }}.deb"
 
       # ==== Linux-only: Build RPM package ====
       - name: Install RPM tools
-        if: matrix.platform == 'linux' && matrix.rpm_arch != ''
+        if: matrix.build_rpm == true
         run: sudo apt-get update && sudo apt-get install -y rpm
 
       - name: Build RPM package
-        if: matrix.platform == 'linux' && matrix.rpm_arch != ''
+        if: matrix.build_rpm == true
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -193,6 +273,13 @@ jobs:
           WantedBy=multi-user.target
           EOF
           
+          # Map arch to RPM arch for build
+          case "${{ matrix.arch }}" in
+            x64) RPM_ARCH="x86_64" ;;
+            arm64) RPM_ARCH="aarch64" ;;
+            *) RPM_ARCH="${{ matrix.arch }}" ;;
+          esac
+          
           cat > ~/rpmbuild/SPECS/omniedge-cli.spec << EOF
           %define __strip /bin/true
           %define debug_package %{nil}
@@ -213,8 +300,9 @@ jobs:
           /usr/lib/systemd/system/omniedge.service
           EOF
           
-          rpmbuild -bb ~/rpmbuild/SPECS/omniedge-cli.spec --target ${{ matrix.rpm_arch }} --define "_rpmdir $(pwd)"
-          find . -name "*.rpm" -exec mv {} "omniedge-cli-${VERSION}-linux-${{ matrix.rpm_arch }}.rpm" \;
+          rpmbuild -bb ~/rpmbuild/SPECS/omniedge-cli.spec --target ${RPM_ARCH} --define "_rpmdir $(pwd)"
+          # Use consistent naming: omniedge-cli-{version}-linux-{arch}.rpm
+          find . -name "*.rpm" -exec mv {} "omniedge-cli-${VERSION}-linux-${{ matrix.arch }}.rpm" \;
 
       # ==== Linux x64-only: Build AppImage ====
       - name: Build AppImage
@@ -256,7 +344,8 @@ jobs:
           EOF
           chmod 755 "${APPDIR}/AppRun"
           
-          ARCH=x86_64 ./appimagetool --appimage-extract-and-run "${APPDIR}" "omniedge-cli-${VERSION}-linux-x86_64.AppImage"
+          # Use consistent naming: omniedge-cli-{version}-linux-{arch}.AppImage
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run "${APPDIR}" "omniedge-cli-${VERSION}-linux-${{ matrix.arch }}.AppImage"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -279,7 +368,6 @@ jobs:
           file: omniedge-cli-*
           tag: ${{ github.ref }}
           overwrite: true
-          prerelease: ${{ contains(github.ref, '-') }}
 
   # ===========================================================================
   # Build Desktop (Tauri) for all platforms
@@ -287,6 +375,8 @@ jobs:
   build-desktop:
     name: Build Desktop - ${{ matrix.platform }}-${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
+    needs: prepare-release
+    if: always() && (needs.prepare-release.result == 'success' || needs.prepare-release.result == 'skipped')
     permissions:
       contents: write
     strategy:
@@ -322,7 +412,6 @@ jobs:
         with:
           node-version: 20
 
-      # Global npm cache for all Desktop builds
       - name: Cache npm dependencies
         uses: actions/cache@v4
         with:
@@ -352,7 +441,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
-      # Disable Spotlight indexing to prevent "Resource busy" errors during DMG creation
       - name: Disable Spotlight (macOS)
         if: matrix.platform == 'macos'
         run: |
@@ -395,7 +483,6 @@ jobs:
           unset APPLE_CERTIFICATE_PASSWORD
           export APPLE_SIGNING_IDENTITY="-"
           
-          # Retry logic for macOS DMG creation issues
           MAX_ATTEMPTS=3
           ATTEMPT=1
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
@@ -407,14 +494,12 @@ jobs:
             
             if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
               echo "==> Build failed, cleaning up and retrying..."
-              # Force unmount any stuck disk images
               if [[ "${{ matrix.platform }}" == "macos" ]]; then
                 hdiutil info | grep -E '^/dev/' | awk '{print $1}' | while read dev; do
                   hdiutil detach "$dev" -force 2>/dev/null || true
                 done
                 sleep 5
               fi
-              # Clean bundle directory
               rm -rf ../../target/${{ matrix.target }}/release/bundle/dmg 2>/dev/null || true
             else
               echo "==> Build failed after $MAX_ATTEMPTS attempts"
@@ -479,11 +564,10 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/') && steps.artifacts.outputs.has_artifacts == 'true'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: omniedge-desktop-${{ steps.version.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}*
           file_glob: true
+          file: omniedge-desktop-*
           tag: ${{ github.ref }}
           overwrite: true
-          prerelease: ${{ contains(github.ref, '-') }}
 
   # ===========================================================================
   # Release Summary - Final job that downstream workflows wait for
@@ -491,19 +575,33 @@ jobs:
   release-summary:
     name: Release Summary
     runs-on: ubuntu-latest
-    needs: [build-cli, build-desktop]
-    if: startsWith(github.ref, 'refs/tags/')
+    needs: [prepare-release, build-cli, build-desktop]
+    if: always() && startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Generate summary
         run: |
           echo "## Release ${{ github.ref_name }} Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### CLI Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Linux: x64, arm64, riscv64 (.tar.gz, .deb, .rpm, .AppImage)" >> $GITHUB_STEP_SUMMARY
-          echo "- macOS: x64, arm64 (.tar.gz)" >> $GITHUB_STEP_SUMMARY
-          echo "- Windows: x64 (.zip)" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Architecture | Formats |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux | x64 | .tar.gz, .deb, .rpm, .AppImage |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux | arm64 | .tar.gz, .deb, .rpm |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux | riscv64 | .tar.gz |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | x64 | .tar.gz |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | arm64 | .tar.gz |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows | x64 | .zip |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Desktop Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Linux: x64 (.deb, .AppImage)" >> $GITHUB_STEP_SUMMARY
-          echo "- macOS: x64, arm64 (.dmg)" >> $GITHUB_STEP_SUMMARY
-          echo "- Windows: x64 (.msi, .exe)" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Architecture | Formats |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux | x64 | .deb, .rpm, .AppImage |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | x64 | .dmg |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | arm64 | .dmg |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows | x64 | .msi, -setup.exe |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifact Naming Convention" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "omniedge-cli-{version}-{platform}-{arch}.{ext}" >> $GITHUB_STEP_SUMMARY
+          echo "omniedge-desktop-{version}-{platform}-{arch}.{ext}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
