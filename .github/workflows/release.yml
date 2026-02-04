@@ -49,7 +49,7 @@ jobs:
             cross: true
             build_appimage: false
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-15-intel
             platform: macos
             arch: x64
             cross: false
@@ -307,7 +307,7 @@ jobs:
             target: aarch64-apple-darwin
             platform: macos
             helper_name: omni-helper-aarch64-apple-darwin
-          - os: macos-13
+          - os: macos-15-intel
             arch: x64
             target: x86_64-apple-darwin
             platform: macos
@@ -356,6 +356,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
+      # Disable Spotlight indexing to prevent "Resource busy" errors during DMG creation
+      - name: Disable Spotlight (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          sudo mdutil -a -i off
+          sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.metadata.mds.plist 2>/dev/null || true
+
       - name: Install frontend dependencies
         working-directory: ui/desktop
         run: npm ci
@@ -391,7 +398,34 @@ jobs:
           unset APPLE_CERTIFICATE
           unset APPLE_CERTIFICATE_PASSWORD
           export APPLE_SIGNING_IDENTITY="-"
-          npm run tauri -- build --target ${{ matrix.target }} --verbose
+          
+          # Retry logic for macOS DMG creation issues
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "==> Build attempt $ATTEMPT of $MAX_ATTEMPTS"
+            if npm run tauri -- build --target ${{ matrix.target }} --verbose; then
+              echo "==> Build succeeded"
+              break
+            fi
+            
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              echo "==> Build failed, cleaning up and retrying..."
+              # Force unmount any stuck disk images
+              if [[ "${{ matrix.platform }}" == "macos" ]]; then
+                hdiutil info | grep -E '^/dev/' | awk '{print $1}' | while read dev; do
+                  hdiutil detach "$dev" -force 2>/dev/null || true
+                done
+                sleep 5
+              fi
+              # Clean bundle directory
+              rm -rf ../../target/${{ matrix.target }}/release/bundle/dmg 2>/dev/null || true
+            else
+              echo "==> Build failed after $MAX_ATTEMPTS attempts"
+              exit 1
+            fi
+            ATTEMPT=$((ATTEMPT + 1))
+          done
 
       - name: Find and rename artifacts
         id: artifacts
