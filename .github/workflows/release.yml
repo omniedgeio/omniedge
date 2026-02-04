@@ -852,6 +852,42 @@ jobs:
     needs: [prepare-release, build-cli, build-desktop, release-summary]
     if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, '-beta') && !contains(github.ref, '-rc')
     steps:
+      - name: Check required secrets
+        id: check_secrets
+        run: |
+          SECRETS_CONFIGURED=false
+          
+          if [ -n "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]; then
+            echo "homebrew=true" >> $GITHUB_OUTPUT
+            SECRETS_CONFIGURED=true
+          else
+            echo "homebrew=false" >> $GITHUB_OUTPUT
+            echo "::warning::HOMEBREW_TAP_TOKEN not configured, skipping Homebrew publish"
+          fi
+          
+          if [ -n "${{ secrets.AUR_SSH_PRIVATE_KEY }}" ]; then
+            echo "aur=true" >> $GITHUB_OUTPUT
+            SECRETS_CONFIGURED=true
+          else
+            echo "aur=false" >> $GITHUB_OUTPUT
+            echo "::warning::AUR_SSH_PRIVATE_KEY not configured, skipping AUR publish"
+          fi
+          
+          if [ -n "${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}" ]; then
+            echo "snap=true" >> $GITHUB_OUTPUT
+            SECRETS_CONFIGURED=true
+          else
+            echo "snap=false" >> $GITHUB_OUTPUT
+            echo "::warning::SNAPCRAFT_STORE_CREDENTIALS not configured, skipping Snap publish"
+          fi
+          
+          if [ "$SECRETS_CONFIGURED" = "false" ]; then
+            echo "::error::No publishing secrets configured. Set at least one of: HOMEBREW_TAP_TOKEN, AUR_SSH_PRIVATE_KEY, SNAPCRAFT_STORE_CREDENTIALS"
+            exit 1
+          fi
+          
+          echo "has_secrets=true" >> $GITHUB_OUTPUT
+
       - uses: actions/checkout@v4
 
       - name: Get version and checksums
@@ -908,7 +944,7 @@ jobs:
           fi
 
       - name: Push to Homebrew Tap
-        if: vars.HOMEBREW_TAP_REPO != ''
+        if: steps.check_secrets.outputs.homebrew == 'true' && vars.HOMEBREW_TAP_REPO != ''
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
@@ -940,7 +976,7 @@ jobs:
           fi
 
       - name: Publish to AUR
-        if: secrets.AUR_SSH_PRIVATE_KEY != ''
+        if: steps.check_secrets.outputs.aur == 'true'
         uses: KSXGitHub/github-actions-deploy-aur@v2
         with:
           pkgname: omniedge-cli-bin
@@ -961,14 +997,14 @@ jobs:
           fi
 
       - name: Build Snap
-        if: hashFiles('packaging/snap/snapcraft.yaml') != ''
+        if: steps.check_secrets.outputs.snap == 'true' && hashFiles('packaging/snap/snapcraft.yaml') != ''
         uses: snapcore/action-build@v1
         id: build_snap
         with:
           path: packaging/snap
 
       - name: Publish to Snap Store
-        if: steps.build_snap.outputs.snap != '' && secrets.SNAPCRAFT_STORE_CREDENTIALS != ''
+        if: steps.check_secrets.outputs.snap == 'true' && steps.build_snap.outputs.snap != ''
         uses: snapcore/action-publish@v1
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
@@ -999,6 +1035,35 @@ jobs:
     needs: [prepare-release, build-cli, build-desktop, release-summary]
     if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, '-beta') && !contains(github.ref, '-rc')
     steps:
+      - name: Check required secrets
+        id: check_secrets
+        shell: bash
+        run: |
+          SECRETS_CONFIGURED=false
+          
+          if [ -n "${{ secrets.WINGET_TOKEN }}" ]; then
+            echo "winget=true" >> $GITHUB_OUTPUT
+            SECRETS_CONFIGURED=true
+          else
+            echo "winget=false" >> $GITHUB_OUTPUT
+            echo "::warning::WINGET_TOKEN not configured, skipping Winget publish"
+          fi
+          
+          if [ -n "${{ secrets.CHOCOLATEY_API_KEY }}" ]; then
+            echo "chocolatey=true" >> $GITHUB_OUTPUT
+            SECRETS_CONFIGURED=true
+          else
+            echo "chocolatey=false" >> $GITHUB_OUTPUT
+            echo "::warning::CHOCOLATEY_API_KEY not configured, skipping Chocolatey publish"
+          fi
+          
+          if [ "$SECRETS_CONFIGURED" = "false" ]; then
+            echo "::error::No Windows publishing secrets configured. Set at least one of: WINGET_TOKEN, CHOCOLATEY_API_KEY"
+            exit 1
+          fi
+          
+          echo "has_secrets=true" >> $GITHUB_OUTPUT
+
       - uses: actions/checkout@v4
 
       - name: Get version and checksums
@@ -1053,7 +1118,7 @@ jobs:
           }
 
       - name: Submit to Winget
-        if: secrets.WINGET_TOKEN != ''
+        if: steps.check_secrets.outputs.winget == 'true'
         uses: vedantmgoyal2009/winget-releaser@v2
         with:
           identifier: OmniEdge.OmniEdgeCLI
@@ -1098,7 +1163,7 @@ jobs:
           }
 
       - name: Build and Push CLI Chocolatey Package
-        if: secrets.CHOCOLATEY_API_KEY != ''
+        if: steps.check_secrets.outputs.chocolatey == 'true'
         shell: pwsh
         run: |
           if (Test-Path "packaging/chocolatey/omniedge-cli/omniedge-cli.nuspec") {
@@ -1108,7 +1173,7 @@ jobs:
           }
 
       - name: Build and Push Desktop Chocolatey Package
-        if: secrets.CHOCOLATEY_API_KEY != ''
+        if: steps.check_secrets.outputs.chocolatey == 'true'
         shell: pwsh
         run: |
           if (Test-Path "packaging/chocolatey/omniedge-desktop/omniedge-desktop.nuspec") {
