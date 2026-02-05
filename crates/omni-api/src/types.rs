@@ -329,3 +329,36 @@ pub struct ScanResult {
     pub vendor: String,
     pub os: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserServer {
+    pub id: String,
+    pub name: String,
+    pub host: String,
+    #[serde(default)]
+    pub country: Option<String>,
+    #[serde(rename = "type", default)]
+    pub server_type: Option<i32>,
+    #[serde(default)]
+    pub is_default: bool,
+    #[serde(default)]
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CreateUserServerRequest {
+    pub name: String,
+    pub host: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UpdateUserServerRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+}

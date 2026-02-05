@@ -1,9 +1,11 @@
+use crate::RunMode;
 use anyhow::{anyhow, Result};
 use ipnetwork::Ipv4Network;
 use local_ip_address::local_ip;
 use mac_address::get_mac_address;
 use machineid_rs::{Encryption, IdBuilder};
 use network_interface::{NetworkInterface, NetworkInterfaceConfig};
+use omni_api::{CreateUserServerRequest, UpdateUserServerRequest, UserServerService};
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -125,4 +127,77 @@ pub fn get_current_device_net_status(cidr_hint: &str) -> Result<DeviceNet> {
         mac: "00:00:00:00:00:00".to_string(),
         mask: network.mask().to_string(),
     })
+}
+
+pub async fn fetch_public_ip() -> Option<String> {
+    let output = tokio::process::Command::new("curl")
+        .arg("-s")
+        .arg("ifconfig.me")
+        .output()
+        .await
+        .ok()?;
+
+    if !output.status.success() {
+        log::info!("Public IP lookup failed with status: {}", output.status);
+        return None;
+    }
+
+    let ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if ip.is_empty() {
+        log::info!("Public IP lookup returned empty response");
+        return None;
+    }
+
+    Some(ip)
+}
+
+pub async fn sync_custom_server(
+    user_server_service: &UserServerService<'_>,
+    auth_token: &str,
+    mode: RunMode,
+    nucleus_port: u16,
+) -> Result<()> {
+    if mode != RunMode::Nucleus && mode != RunMode::Dual {
+        return Ok(());
+    }
+
+    if auth_token.is_empty() {
+        log::info!("Skipping custom server sync (no auth token)");
+        return Ok(());
+    }
+
+    let public_ip = match fetch_public_ip().await {
+        Some(ip) => ip,
+        None => {
+            log::info!("Skipping custom server sync (public IP unavailable)");
+            return Ok(());
+        }
+    };
+
+    let hostname = whoami::fallible::hostname().unwrap_or_else(|_| "omniedge-device".to_string());
+    let name = format!("Nucleus - {}", hostname);
+    let host = format!("{}:{}", public_ip, nucleus_port);
+
+    let servers = user_server_service.list().await?;
+    let existing = servers
+        .iter()
+        .find(|server| !server.is_default && server.name == name);
+
+    if let Some(server) = existing {
+        let request = UpdateUserServerRequest {
+            name: Some(name),
+            host: Some(host),
+            country: None,
+        };
+        let _ = user_server_service.update(&server.id, request).await?;
+    } else {
+        let request = CreateUserServerRequest {
+            name,
+            host,
+            country: None,
+        };
+        let _ = user_server_service.create(request).await?;
+    }
+
+    Ok(())
 }

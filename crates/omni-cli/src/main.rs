@@ -3,7 +3,8 @@ extern crate hex;
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
-use omni_api::{ApiClient, DeviceService, NetworkService};
+use omni_api::{ApiClient, DeviceService, NetworkService, UserServerService};
+
 use omni_core::{CliConfig, ConnectionManager};
 #[cfg(feature = "wasm-plugins")]
 use omni_plugin::{PluginConfig, PluginManager};
@@ -13,7 +14,7 @@ mod service;
 mod utils;
 
 use regex::Regex;
-use utils::get_hardware_id;
+use utils::{get_hardware_id, sync_custom_server};
 
 /// Get the real user's home directory, even when running with sudo
 #[cfg(not(windows))]
@@ -744,7 +745,8 @@ async fn main() -> Result<()> {
                 .as_ref()
                 .and_then(|k| hex::decode(k).ok())
                 .and_then(|b| b.try_into().ok());
-            let client = ApiClient::new(base_url.clone(), Some(auth.token.clone()));
+            let token = auth.effective_token().to_string();
+            let client = ApiClient::new(base_url.clone(), Some(token.clone()));
             let conn_manager = ConnectionManager::new(base_url.clone(), identity_pk);
 
             // Persist newly generated identity if needed
@@ -756,6 +758,7 @@ async fn main() -> Result<()> {
 
             let net_service = NetworkService::new(&client);
             let device_service = DeviceService::new(&client);
+            let user_server_service = UserServerService::new(&client);
 
             // 2. Ensure Device Registration
             if config.device_uuid.is_none() {
@@ -793,7 +796,14 @@ async fn main() -> Result<()> {
                 first.id.clone()
             };
 
-            // 4. Start Background Service
+            // 4. Sync custom user server for nucleus/dual mode
+            if mode == RunMode::Nucleus || mode == RunMode::Dual {
+                if let Err(e) = sync_custom_server(&user_server_service, &token, mode, port).await {
+                    log::info!("Custom server sync skipped: {}", e);
+                }
+            }
+
+            // 5. Start Background Service
             // Note: Exit node status will be synced after the device joins the network
             // via the heartbeat mechanism in the background service.
             spinner.set_message(format!("Connecting to network {}...", vn_id));
