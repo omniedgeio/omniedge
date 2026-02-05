@@ -130,25 +130,68 @@ pub fn get_current_device_net_status(cidr_hint: &str) -> Result<DeviceNet> {
 }
 
 pub async fn fetch_public_ip() -> Option<String> {
-    let output = tokio::process::Command::new("curl")
-        .arg("-s")
-        .arg("ifconfig.me")
-        .output()
-        .await
-        .ok()?;
+    // Try multiple methods to fetch public IP
 
-    if !output.status.success() {
-        log::info!("Public IP lookup failed with status: {}", output.status);
+    // Method 1: Use curl.exe on Windows (not the PowerShell alias)
+    #[cfg(windows)]
+    {
+        // First try curl.exe directly (if installed, e.g., via Git for Windows)
+        if let Ok(output) = tokio::process::Command::new("curl.exe")
+            .args(["-s", "--connect-timeout", "5", "https://api.ipify.org"])
+            .output()
+            .await
+        {
+            if output.status.success() {
+                let ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !ip.is_empty() && ip.chars().all(|c| c.is_ascii_digit() || c == '.') {
+                    return Some(ip);
+                }
+            }
+        }
+
+        // Fallback: Use PowerShell's Invoke-WebRequest with ipify.org (returns plain text)
+        if let Ok(output) = tokio::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "(Invoke-WebRequest -Uri 'https://api.ipify.org' -TimeoutSec 5 -UseBasicParsing).Content",
+            ])
+            .output()
+            .await
+        {
+            if output.status.success() {
+                let ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !ip.is_empty() && ip.chars().all(|c| c.is_ascii_digit() || c == '.') {
+                    return Some(ip);
+                }
+            }
+        }
+
+        log::info!("Public IP lookup failed on Windows");
         return None;
     }
 
-    let ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if ip.is_empty() {
-        log::info!("Public IP lookup returned empty response");
-        return None;
-    }
+    #[cfg(not(windows))]
+    {
+        let output = tokio::process::Command::new("curl")
+            .args(["-s", "--connect-timeout", "5", "https://api.ipify.org"])
+            .output()
+            .await
+            .ok()?;
 
-    Some(ip)
+        if !output.status.success() {
+            log::info!("Public IP lookup failed with status: {}", output.status);
+            return None;
+        }
+
+        let ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if ip.is_empty() {
+            log::info!("Public IP lookup returned empty response");
+            return None;
+        }
+
+        Some(ip)
+    }
 }
 
 pub async fn sync_custom_server(
