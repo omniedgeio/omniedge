@@ -1,5 +1,51 @@
 # OmniEdge Release Notes
 
+## v2.5.0 (2026-02-05)
+
+### OmniNervous v0.5.0 Upgrade
+
+This release upgrades the core networking library **OmniNervous from v0.4.0 to v0.5.0**, bringing improved performance and laying the groundwork for future L2 VPN support.
+
+#### What's New in OmniNervous v0.5.0
+
+| Feature | Description | Status in OmniEdge |
+|---------|-------------|-------------------|
+| **L2 VPN Transport** | Ethernet-level bridging via TAP devices | Available (Linux-only, opt-in) |
+| **L2 Fragmentation** | MTU-aware packet fragmentation/reassembly | Available with L2 mode |
+| **L2 Prometheus Metrics** | Observability for L2 traffic | Available with L2 mode |
+| **Userspace WireGuard Improvements** | Better handshake timing, memory efficiency | Automatic |
+
+#### Compatibility
+
+- **100% Backward Compatible**: All existing L3 VPN functionality unchanged
+- **No Breaking Changes**: All APIs used by OmniEdge remain identical
+- **Same Behavior**: Default mode continues to use L3 (IP-level) transport
+
+#### L2 VPN (Future Feature)
+
+OmniNervous v0.5.0 introduces L2 VPN support for Linux systems. This enables Ethernet-level bridging useful for:
+- Legacy protocol support (NetBIOS, ARP-based discovery)
+- Network appliance virtualization
+- VLAN bridging across sites
+
+**Note**: L2 VPN is not yet exposed in OmniEdge CLI/Desktop but can be enabled in future releases by adding the `l2-vpn` feature flag.
+
+#### Technical Details
+
+| Component | Change |
+|-----------|--------|
+| `omninervous` | v0.4.0 → v0.5.0 |
+| Crates updated | `omni-tun`, `omni-proto`, `omni-core` |
+| New dependencies | None (L2 module is feature-gated) |
+
+### Compatibility
+
+- **OmniNervous**: v0.5.0
+- **Existing Networks**: Fully backward compatible with v2.4.x networks
+- **Mixed Versions**: v2.5.0 clients work seamlessly with v2.4.x clients
+
+---
+
 ## v2.4.0 (2026-02-05)
 
 ### CLI Custom Server Sync

@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/github/license/omniedgeio/omniedge?style=flat-square)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![Tauri](https://img.shields.io/badge/tauri-v2-blue?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
-[![OmniNervous](https://img.shields.io/badge/OmniNervous-v0.3.1-green?style=flat-square)](https://github.com/omniedgeio/OmniNervous)
+[![OmniNervous](https://img.shields.io/badge/OmniNervous-v0.5.0-green?style=flat-square)](https://github.com/omniedgeio/OmniNervous)
 <br/>
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-blue?style=flat-square)](#supported-platforms)
 [![Discord](https://img.shields.io/discord/1234567890?color=5865F2&label=discord&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/d4faRPYj)
@@ -176,7 +176,7 @@ uci commit omniedge
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Plugin System (v2.2.1)
+## Plugin System (v2.5.0)
 
 OmniEdge now supports a **WASM-based plugin system** that allows extending functionality without modifying the core application.
 
