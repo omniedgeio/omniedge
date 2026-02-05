@@ -1,10 +1,10 @@
 # Maintainer: OmniEdge Team <support@omniedge.io>
 pkgname=omniedge-cli
-pkgver=2.0.0
+pkgver=2.3.0
 pkgrel=1
-pkgdesc="Peer-to-peer VPN CLI for edge computing"
+pkgdesc="Zero-Config P2P Mesh VPN for AI, Robotics, and Edge Computing"
 arch=('x86_64' 'aarch64')
-url="https://omniedge.io"
+url="https://connect.omniedge.io"
 license=('Apache-2.0' 'MIT')
 provides=('omniedge')
 conflicts=('omniedge')

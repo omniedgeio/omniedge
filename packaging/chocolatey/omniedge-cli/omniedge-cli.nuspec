@@ -2,24 +2,24 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>omniedge-cli</id>
-    <version>2.0.0</version>
+    <version>2.3.0</version>
     <title>OmniEdge CLI</title>
-    <authors>OmniEdge Team</authors>
+    <authors>OmniEdge</authors>
     <owners>omniedge</owners>
-    <projectUrl>https://omniedge.io</projectUrl>
+    <projectUrl>https://connect.omniedge.io</projectUrl>
     <projectSourceUrl>https://github.com/omniedgeio/omniedge</projectSourceUrl>
     <packageSourceUrl>https://github.com/omniedgeio/omniedge/tree/main/packaging/chocolatey/omniedge-cli</packageSourceUrl>
     <bugTrackerUrl>https://github.com/omniedgeio/omniedge/issues</bugTrackerUrl>
-    <docsUrl>https://omniedge.io/docs</docsUrl>
-    <licenseUrl>https://github.com/omniedgeio/omniedge/blob/main/LICENSE</licenseUrl>
+    <docsUrl>https://connect.omniedge.io/docs</docsUrl>
+    <licenseUrl>https://github.com/omniedgeio/omniedge/blob/main/LICENSING.md</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <iconUrl>https://omniedge.io/favicon.ico</iconUrl>
+    <iconUrl>https://connect.omniedge.io/favicon.ico</iconUrl>
     <tags>vpn p2p peer-to-peer mesh network cli wireguard</tags>
-    <summary>Peer-to-peer VPN CLI for edge computing</summary>
+    <summary>Zero-Config P2P Mesh VPN for AI, Robotics, and Edge Computing</summary>
     <description><![CDATA[
 ## OmniEdge CLI
 
-OmniEdge CLI is a command-line tool for creating secure, peer-to-peer mesh VPN connections.
+OmniEdge CLI is a command-line tool for creating secure, peer-to-peer mesh VPN connections for AI, robotics, and edge computing.
 
 ### Features
 
@@ -44,9 +44,9 @@ omniedge status
 
 ### Documentation
 
-For more information, visit [https://omniedge.io/docs](https://omniedge.io/docs)
+For more information, visit [https://connect.omniedge.io/docs](https://connect.omniedge.io/docs)
 ]]></description>
-    <releaseNotes>https://github.com/omniedgeio/omniedge/releases/tag/v2.0.0</releaseNotes>
+    <releaseNotes>https://github.com/omniedgeio/omniedge/releases/tag/v2.3.0</releaseNotes>
   </metadata>
   <files>
     <file src="tools\**" target="tools" />

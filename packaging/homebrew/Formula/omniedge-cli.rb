@@ -2,9 +2,9 @@
 # frozen_string_literal: true
 
 class OmniedgeCli < Formula
-  desc "Peer-to-peer VPN CLI for edge computing"
-  homepage "https://omniedge.io"
-  version "2.0.0"
+  desc "Zero-Config P2P Mesh VPN for AI, Robotics, and Edge Computing"
+  homepage "https://connect.omniedge.io"
+  version "2.3.0"
   license any_of: ["Apache-2.0", "MIT"]
 
   on_macos do
