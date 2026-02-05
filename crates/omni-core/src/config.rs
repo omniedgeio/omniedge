@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+#[cfg(not(target_os = "windows"))]
+use anyhow::Context;
+use anyhow::Result;
 use omni_api::types::{AuthResp, JoinVirtualNetworkResponse, ScanResult};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -248,9 +250,9 @@ impl CliConfig {
             // No token or no timestamp - consider expired to force refresh
             (None, _) => true,
             (Some(_), None) => {
-                // Token exists but no timestamp - assume it might be old
-                // Don't force refresh, let it fail naturally if expired
-                false
+                // Token exists but no timestamp - try to refresh to be safe
+                // Old configs may not have token_obtained_at set
+                true
             }
         }
     }
@@ -310,8 +312,11 @@ impl CliConfig {
     pub fn config_path() -> Result<PathBuf> {
         #[cfg(target_os = "windows")]
         {
+            // On Windows, use LocalAppData for user-specific config
+            // This is appropriate for desktop app and interactive CLI
+            // The CLI service copies auth to ProgramData when needed
             let mut path = dirs::data_local_dir()
-                .context("Could not find local app data directory")?
+                .unwrap_or_else(|| PathBuf::from("C:\\ProgramData"))
                 .join("OmniEdge");
             let _ = fs::create_dir_all(&path);
             path.push("auth.json");
@@ -330,10 +335,43 @@ impl CliConfig {
         }
     }
 
+    /// Get the system-wide config path (used by Windows service running as SYSTEM)
+    #[cfg(target_os = "windows")]
+    pub fn system_config_path() -> Result<PathBuf> {
+        let mut path = PathBuf::from("C:\\ProgramData\\OmniEdge");
+        let _ = fs::create_dir_all(&path);
+        path.push("auth.json");
+        Ok(path)
+    }
+
+    /// Copy current config to system-wide location for Windows service access
+    #[cfg(target_os = "windows")]
+    pub fn copy_to_system_config(&self) -> Result<()> {
+        let system_path = Self::system_config_path()?;
+        if let Some(parent) = system_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let content = serde_json::to_string_pretty(self)?;
+        fs::write(&system_path, content)?;
+        Ok(())
+    }
+
+    /// Load config from system-wide location (for Windows service)
+    #[cfg(target_os = "windows")]
+    pub fn load_system_config() -> Result<Self> {
+        let path = Self::system_config_path()?;
+        if !path.exists() {
+            return Self::default_with_paths();
+        }
+        let content = fs::read_to_string(path)?;
+        let config: CliConfig = serde_json::from_str(&content)?;
+        Ok(config)
+    }
+
     fn default_with_paths() -> Result<Self> {
         #[cfg(target_os = "windows")]
         let path = dirs::data_local_dir()
-            .context("Could not find local app data directory")?
+            .unwrap_or_else(|| PathBuf::from("C:\\ProgramData"))
             .join("OmniEdge");
         #[cfg(not(target_os = "windows"))]
         let path = get_real_user_home()

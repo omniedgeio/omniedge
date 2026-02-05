@@ -405,8 +405,46 @@ enum PluginCommands {
     Discover,
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+/// Main entry point - handles both CLI and Windows service modes
+///
+/// IMPORTANT: On Windows, when started by SCM (Service Control Manager), we must call
+/// service_dispatcher::start() BEFORE creating any tokio runtime or initializing logging.
+/// The SCM expects the service to register within a short timeout, and any delays
+/// (like logging setup) can cause the service to fail with exit code 1067.
+fn main() -> Result<()> {
+    // On Windows, try service dispatcher FIRST before any other initialization
+    // This must happen before tokio runtime, logging, or any heavy initialization
+    #[cfg(windows)]
+    {
+        // Check if we have --daemon flag in args (quick check without full parsing)
+        let args: Vec<String> = std::env::args().collect();
+        let has_daemon_flag = args.iter().any(|a| a == "--daemon");
+
+        if has_daemon_flag {
+            // Try to start as Windows service - if SCM started us, this will take over
+            // If started from CLI, this will fail and we continue with normal execution
+            match service_dispatcher::start(SERVICE_NAME, ffi_service_main) {
+                Ok(_) => {
+                    // SCM took over, service_main will handle everything
+                    return Ok(());
+                }
+                Err(_) => {
+                    // Not started by SCM, continue with normal CLI execution
+                    // This is expected when user runs "omniedge start --daemon" from terminal
+                }
+            }
+        }
+    }
+
+    // Now safe to start tokio runtime for CLI mode
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(async_main())
+}
+
+/// Async main logic - runs after service dispatcher check
+async fn async_main() -> Result<()> {
     // Parse CLI first to get verbose flag (before logger setup)
     let cli = match Cli::try_parse() {
         Ok(c) => c,
@@ -465,28 +503,6 @@ async fn main() -> Result<()> {
         env!("CARGO_PKG_VERSION"),
         std::env::args().collect::<Vec<_>>()
     );
-
-    // Root check moved to start/stop commands only
-
-    let is_daemon_start = matches!(&cli.command, Commands::Start { daemon: true, .. });
-
-    // On Windows, if we are started by SCM, dispatcher will take over
-    #[cfg(windows)]
-    if is_daemon_start {
-        log::info!("Attempting service dispatcher start...");
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(parent) = exe_path.parent() {
-                let _ = std::env::set_current_dir(parent);
-            }
-        }
-        if let Err(e) = service_dispatcher::start(SERVICE_NAME, ffi_service_main) {
-            log::info!("Service dispatcher failed (probably CLI mode): {}", e);
-            // If dispatcher fails, it probably means we were started from CLI
-        } else {
-            log::info!("Service dispatcher successfully took over.");
-            return Ok(()); // SCM took over
-        }
-    }
 
     dotenvy::dotenv().ok();
 
@@ -674,6 +690,20 @@ async fn main() -> Result<()> {
                 config.nucleus_port = Some(port);
                 config.has_cluster_secret = secret.is_some();
                 config.save()?;
+
+                // Sync custom server to backend if we have auth token
+                if let Some(ref auth) = config.auth_response {
+                    let client =
+                        omni_api::ApiClient::new(base_url.clone(), Some(auth.token.clone()));
+                    let user_server_service = UserServerService::new(&client);
+                    if let Err(e) =
+                        sync_custom_server(&user_server_service, &auth.token, mode, port).await
+                    {
+                        log::info!("Custom server sync skipped: {}", e);
+                    } else {
+                        println!("Custom server synced to backend.");
+                    }
+                }
 
                 println!(
                     "Starting OmniEdge Nucleus signaling server on port {}...",
@@ -1599,21 +1629,65 @@ define_windows_service!(ffi_service_main, win_service_main);
 
 #[cfg(windows)]
 fn win_service_main(_arguments: Vec<std::ffi::OsString>) {
+    // Initialize logging FIRST when running as a Windows service
+    // Use C:\ProgramData which is writable by SYSTEM account
+    let log_dir = std::path::PathBuf::from("C:\\ProgramData\\OmniEdge\\logs");
+    let _ = std::fs::create_dir_all(&log_dir);
+
+    let _logger = flexi_logger::Logger::try_with_str("info")
+        .and_then(|l| {
+            l.log_to_file(
+                flexi_logger::FileSpec::default()
+                    .directory(&log_dir)
+                    .basename("omniedge-service")
+                    .suffix("log"),
+            )
+            .start()
+        })
+        .ok(); // Don't fail if logging can't be set up
+
+    log::info!(
+        "Windows service starting. Args: {:?}",
+        std::env::args().collect::<Vec<_>>()
+    );
+
     dotenvy::dotenv().ok();
     let base_url = omni_core::config::get_api_base_url();
-    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    log::info!("Creating tokio runtime for service...");
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            log::error!("Failed to create tokio runtime: {}", e);
+            return;
+        }
+    };
+
     rt.block_on(async {
         if let Err(e) = service_main_res(&base_url).await {
             log::error!("Service error: {}", e);
         }
     });
+
+    log::info!("Windows service main exiting");
 }
 
 #[cfg(windows)]
 async fn service_main_res(base_url: &str) -> Result<()> {
+    use std::sync::Arc;
+    use tokio::sync::Notify;
+
+    // Create shutdown notification channel
+    let shutdown = Arc::new(Notify::new());
+    let shutdown_clone = shutdown.clone();
+
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
         match control_event {
-            ServiceControl::Stop => ServiceControlHandlerResult::NoError,
+            ServiceControl::Stop => {
+                log::info!("Received stop signal from SCM");
+                shutdown_clone.notify_one();
+                ServiceControlHandlerResult::NoError
+            }
             ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
             _ => ServiceControlHandlerResult::NotImplemented,
         }
@@ -1661,11 +1735,17 @@ async fn service_main_res(base_url: &str) -> Result<()> {
         } if daemon => match mode {
             RunMode::Nucleus => {
                 log::info!("Starting nucleus-only signaling server on port {}", port);
-                if let Err(e) =
-                    service::run_nucleus_only(port, secret.as_deref().unwrap_or("")).await
-                {
-                    log::error!("Nucleus server failed: {}", e);
-                    return Err(e);
+                // Run nucleus with shutdown signal
+                tokio::select! {
+                    result = service::run_nucleus_only(port, secret.as_deref().unwrap_or("")) => {
+                        if let Err(e) = result {
+                            log::error!("Nucleus server failed: {}", e);
+                            return Err(e);
+                        }
+                    }
+                    _ = shutdown.notified() => {
+                        log::info!("Nucleus server stopping due to SCM stop signal");
+                    }
                 }
             }
             RunMode::Edge | RunMode::Dual => {
@@ -1675,20 +1755,26 @@ async fn service_main_res(base_url: &str) -> Result<()> {
                     vn_id,
                     mode
                 );
-                if let Err(e) = service::run_worker(
-                    base_url,
-                    &vn_id,
-                    mode,
-                    as_exit_node,
-                    exit_node,
-                    exit_node_v6,
-                    port,
-                    secret,
-                )
-                .await
-                {
-                    log::error!("Worker failed: {}", e);
-                    return Err(e);
+                // Run worker with shutdown signal
+                tokio::select! {
+                    result = service::run_worker(
+                        base_url,
+                        &vn_id,
+                        mode,
+                        as_exit_node,
+                        exit_node,
+                        exit_node_v6,
+                        port,
+                        secret,
+                    ) => {
+                        if let Err(e) = result {
+                            log::error!("Worker failed: {}", e);
+                            return Err(e);
+                        }
+                    }
+                    _ = shutdown.notified() => {
+                        log::info!("Worker stopping due to SCM stop signal");
+                    }
                 }
             }
         },

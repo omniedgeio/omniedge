@@ -188,20 +188,75 @@ fn is_omniedge_daemon_running() -> bool {
     #[cfg(windows)]
     {
         use std::process::Command;
-        if let Ok(output) = Command::new("tasklist")
-            .args(["/FI", "IMAGENAME eq omniedge.exe", "/NH"])
+        let current_pid = std::process::id();
+
+        // Use WMIC to get PIDs of omniedge.exe processes, so we can exclude current process
+        // WMIC gives us: ProcessId and CommandLine so we can check for --daemon
+        if let Ok(output) = Command::new("wmic")
+            .args([
+                "process",
+                "where",
+                "name='omniedge.exe'",
+                "get",
+                "ProcessId,CommandLine",
+                "/format:csv",
+            ])
             .output()
         {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            let mut lines = stdout.lines();
-            return lines.any(|line| {
-                let trimmed = line.trim();
-                if trimmed.is_empty() || trimmed.starts_with("INFO:") {
-                    return false;
+            for line in stdout.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with("Node,") {
+                    continue; // Skip header
                 }
-                trimmed.to_lowercase().starts_with("omniedge.exe")
-            });
+                // CSV format: Node,CommandLine,ProcessId
+                let parts: Vec<&str> = line.split(',').collect();
+                if parts.len() >= 3 {
+                    // Last part is PID
+                    if let Ok(pid) = parts.last().unwrap_or(&"").trim().parse::<u32>() {
+                        if pid != current_pid {
+                            // Check if this process has --daemon in its command line
+                            let cmd_line = parts[1..parts.len() - 1].join(",").to_lowercase();
+                            if cmd_line.contains("--daemon") {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
         }
+
+        // Fallback: use tasklist to count processes, but exclude current PID
+        if let Ok(output) = Command::new("tasklist")
+            .args(["/FI", "IMAGENAME eq omniedge.exe", "/FO", "CSV", "/NH"])
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut other_process_count = 0;
+            for line in stdout.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with("INFO:") {
+                    continue;
+                }
+                // CSV format: "omniedge.exe","PID",...
+                if line.to_lowercase().contains("omniedge.exe") {
+                    // Extract PID from CSV
+                    let parts: Vec<&str> = line.split(',').collect();
+                    if parts.len() >= 2 {
+                        let pid_str = parts[1].trim().trim_matches('"');
+                        if let Ok(pid) = pid_str.parse::<u32>() {
+                            if pid != current_pid {
+                                other_process_count += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            // If there's at least one OTHER omniedge.exe process, daemon might be running
+            // But without --daemon check, we can't be sure, so be conservative
+            return other_process_count > 0;
+        }
+        false
     }
 
     #[cfg(unix)]
@@ -216,9 +271,8 @@ fn is_omniedge_daemon_running() -> bool {
             let pids: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
             return !pids.is_empty();
         }
+        false
     }
-
-    false
 }
 
 /// Run nucleus-only signaling server (no VPN, no network auth)
@@ -307,7 +361,12 @@ pub async fn run_worker(
         base_url
     );
 
+    // On Windows, when running as service (SYSTEM account), load from system config path
+    #[cfg(windows)]
+    let config = CliConfig::load_system_config().context("Failed to load system config")?;
+    #[cfg(not(windows))]
     let config = CliConfig::load().context("Failed to load config")?;
+
     let auth = config.auth_response.context("Not authenticated")?;
     let device_id = config.device_uuid.context("Device not registered")?;
 
@@ -342,14 +401,39 @@ pub async fn run_worker(
         .await?;
 
     // Save the join info to config for status detection
+    // On Windows service, save to system config path
     {
+        #[cfg(windows)]
+        let mut config = CliConfig::load_system_config().unwrap_or_default();
+        #[cfg(not(windows))]
         let mut config = CliConfig::load().unwrap_or_default();
+
         config.last_join_info = Some(join_resp);
         config.last_network_id = Some(network_id.to_string());
-        if let Err(e) = config.save() {
-            log::warn!("Failed to save join info to config: {}", e);
-        } else {
-            info!("Saved join info to config for status detection");
+
+        #[cfg(windows)]
+        {
+            // Save to system config path for service
+            if let Ok(system_path) = CliConfig::system_config_path() {
+                if let Some(parent) = system_path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                if let Ok(content) = serde_json::to_string_pretty(&config) {
+                    if let Err(e) = std::fs::write(&system_path, content) {
+                        log::warn!("Failed to save join info to system config: {}", e);
+                    } else {
+                        info!("Saved join info to system config for status detection");
+                    }
+                }
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            if let Err(e) = config.save() {
+                log::warn!("Failed to save join info to config: {}", e);
+            } else {
+                info!("Saved join info to config for status detection");
+            }
         }
     }
 
@@ -400,6 +484,15 @@ pub async fn setup_and_start_service(
 
     #[cfg(windows)]
     {
+        // Copy user config to system config location so Windows service (SYSTEM account) can access it
+        if let Ok(config) = CliConfig::load() {
+            if let Err(e) = config.copy_to_system_config() {
+                log::warn!("Failed to copy config to system location: {}. Service may fail to authenticate.", e);
+            } else {
+                info!("Copied user config to system location for service access");
+            }
+        }
+
         setup_windows_service(
             _base_url,
             network_id,
