@@ -624,8 +624,8 @@ async fn setup_windows_service_common(bin_path_val: &str) -> Result<()> {
 
     let current_pid = std::process::id();
     let kill_cmd = format!(
-        "Get-Process {} -ErrorAction SilentlyContinue | Where-Object {{ $_.Id -ne {} }} | Stop-Process -Force",
-        "omniedge", current_pid
+        "Get-Process omniedge -ErrorAction SilentlyContinue | Where-Object {{ $_.Id -ne {} }} | Stop-Process -Force",
+        current_pid
     );
     let _ = Command::new("powershell")
         .args(["-Command", &kill_cmd])
