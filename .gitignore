@@ -28,6 +28,7 @@ ui/desktop/src-tauri/binaries/*
 .DS_Store
 Thumbs.db
 desktop.ini
+nul
 
 # --- Logs & Temporary ---
 # Ignore all log files but keep the log directory if it exists as a container
