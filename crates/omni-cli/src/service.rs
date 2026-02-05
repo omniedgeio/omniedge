@@ -193,8 +193,14 @@ fn is_omniedge_daemon_running() -> bool {
             .output()
         {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            // Count running instances - if more than 1 (current process), daemon is running
-            return stdout.matches("omniedge.exe").count() > 1;
+            let mut lines = stdout.lines();
+            return lines.any(|line| {
+                let trimmed = line.trim();
+                if trimmed.is_empty() || trimmed.starts_with("INFO:") {
+                    return false;
+                }
+                trimmed.to_lowercase().starts_with("omniedge.exe")
+            });
         }
     }
 
