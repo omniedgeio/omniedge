@@ -1,6 +1,6 @@
-// build.rs - Tauri build script with git version injection
+// build.rs - Extract version from git tags at compile time
 //
-// This ensures the desktop app reports the same git-based version as the CLI.
+// This ensures the helper reports the same git-based version as the CLI.
 
 use std::process::Command;
 
@@ -12,14 +12,6 @@ fn main() {
     let version = get_git_version().unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
 
     println!("cargo:rustc-env=GIT_VERSION={}", version);
-
-    // Also provide git commit hash
-    if let Some(commit) = get_git_commit_short() {
-        println!("cargo:rustc-env=GIT_COMMIT={}", commit);
-    }
-
-    // Run Tauri build
-    tauri_build::build()
 }
 
 /// Get version from the nearest git tag
@@ -61,23 +53,6 @@ fn get_git_version() -> Option<String> {
 
         if !desc.is_empty() {
             return Some(desc.to_string());
-        }
-    }
-
-    None
-}
-
-/// Get short git commit hash
-fn get_git_commit_short() -> Option<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()?;
-
-    if output.status.success() {
-        let commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !commit.is_empty() {
-            return Some(commit);
         }
     }
 

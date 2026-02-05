@@ -254,7 +254,7 @@ EXAMPLES:
   omniedge start --mode nucleus --secret mysecret123456
   omniedge scan --cidr 192.168.1.0/24
 
-For more help: https://omniedge.io/docs/cli"#,
+For more help: https://connect.omniedge.io/docs/cli"#,
     version = VERSION,
     long_version = long_version(),
     after_help = "Use 'omniedge <command> --help' for more information about a command.",
@@ -590,7 +590,7 @@ async fn async_main() -> Result<()> {
 
     log::info!(
         "OmniEdge CLI starting. Version: {}. Args: {:?}",
-        env!("CARGO_PKG_VERSION"),
+        VERSION,
         std::env::args().collect::<Vec<_>>()
     );
 
@@ -923,7 +923,7 @@ async fn async_main() -> Result<()> {
                     eprintln!("Error: No networks found in your account.");
                     eprintln!();
                     eprintln!("To create a network:");
-                    eprintln!("  1. Visit https://omniedge.io/dashboard");
+                    eprintln!("  1. Visit https://connect.omniedge.io/dashboard");
                     eprintln!("  2. Create a new virtual network");
                     eprintln!("  3. Run 'omniedge start -n YOUR_NETWORK_ID'");
                     std::process::exit(exit_codes::GENERAL_ERROR);

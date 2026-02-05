@@ -26,6 +26,9 @@
 //! TODO: Consider adding rate limiting to prevent local DoS attacks. Current mitigation
 //! is the single-request-per-connection model which naturally limits throughput.
 
+/// Version from git tag (set by build.rs), falls back to Cargo.toml version
+const VERSION: &str = env!("GIT_VERSION");
+
 use omni_core::{state::ConnectionState, ConnectionManager};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -100,7 +103,7 @@ impl HelperServer {
                 success: true,
                 message: "omniedge-helper".to_string(),
                 data: Some(serde_json::json!({
-                    "version": env!("CARGO_PKG_VERSION"),
+                    "version": VERSION,
                     "protocol": "rust-v2",
                 })),
             },
