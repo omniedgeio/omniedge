@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-02-05
+
+### Changed
+- **OmniNervous Upgrade**: Updated core networking library from v0.4.0 to v0.5.0
+  - Improved userspace WireGuard handshake timing
+  - Better memory efficiency in packet processing
+  - Foundation for L2 VPN support (Linux-only, feature-gated)
+
+### Added
+- **L2 VPN Readiness**: OmniNervous v0.5.0 includes L2 transport module (not yet exposed in CLI)
+  - TAP-based Ethernet bridging for Linux
+  - L2 fragmentation/reassembly for large frames
+  - L2 Prometheus metrics for observability
+
+### Fixed
+- Added Windows `nul` artifact to `.gitignore`
+
+## [2.4.0] - 2026-02-05
+
 ### Added
 - **OpenWrt Package Support**: Native IPK (24.10.x) and APK (25.x) packages for OpenWrt routers
   - Supported architectures: x86_64, aarch64 (ARM64)
@@ -102,7 +121,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/omniedgeio/omniedge/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/omniedgeio/omniedge/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/omniedgeio/omniedge/compare/v2.4.0...v2.5.0
+[2.4.0]: https://github.com/omniedgeio/omniedge/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/omniedgeio/omniedge/compare/v2.2.1...v2.3.0
 [2.2.1]: https://github.com/omniedgeio/omniedge/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/omniedgeio/omniedge/compare/v2.1.0...v2.2.0
