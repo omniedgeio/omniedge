@@ -12,6 +12,8 @@ path = "src/main.rs"
 default = ["wasm-plugins"]
 # WASM plugin support - disabled on architectures without Cranelift support (MIPS)
 wasm-plugins = ["dep:omni-plugin"]
+# L2 VPN support (TAP-based Ethernet bridging) - Linux only
+l2-vpn = ["omni-core/l2-vpn"]
 
 [dependencies]
 omni-api = { path = "../omni-api" }

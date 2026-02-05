@@ -4,6 +4,12 @@ version = "2.3.0"
 edition = "2021"
 license = "Apache-2.0 OR MIT"
 
+[features]
+default = []
+# L2 VPN support (TAP-based Ethernet bridging) - Linux only
+# This enables the OmniNervous L2 module for Layer 2 networking
+l2-vpn = []
+
 [dependencies]
 omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "omninervous", tag = "v0.5.0" }
 anyhow = "1.0"

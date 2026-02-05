@@ -1,7 +1,7 @@
 use crate::utils::get_hardware_id;
-use crate::RunMode;
 #[cfg(windows)]
 use crate::SERVICE_NAME;
+use crate::{RunMode, TransportMode};
 use anyhow::{Context, Result};
 use log::info;
 use omni_core::{CliConfig, ConnectionManager};
@@ -343,6 +343,7 @@ pub async fn run_worker(
     base_url: &str,
     network_id: &str,
     mode: RunMode,
+    transport_mode: TransportMode,
     as_exit_node: bool,
     exit_node: Option<String>,
     exit_node_v6: Option<String>,
@@ -354,9 +355,14 @@ pub async fn run_worker(
         RunMode::Nucleus => "nucleus-only",
         RunMode::Dual => "dual (edge + nucleus)",
     };
+    let transport_str = match transport_mode {
+        TransportMode::L3 => "L3 (TUN)",
+        TransportMode::L2 => "L2 (TAP)",
+    };
     log::info!(
-        "Starting OmniEdge background worker in {} mode for network: {} (API: {})",
+        "Starting OmniEdge background worker in {} mode, transport {} for network: {} (API: {})",
         mode_str,
+        transport_str,
         network_id,
         base_url
     );
@@ -474,6 +480,7 @@ pub async fn setup_and_start_service(
     _base_url: &str,
     network_id: &str,
     mode: RunMode,
+    transport_mode: TransportMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
     exit_node_v6: Option<&str>,
@@ -497,6 +504,7 @@ pub async fn setup_and_start_service(
             _base_url,
             network_id,
             mode,
+            transport_mode,
             as_exit_node,
             exit_node,
             exit_node_v6,
@@ -511,6 +519,7 @@ pub async fn setup_and_start_service(
         setup_linux_service(
             network_id,
             mode,
+            transport_mode,
             as_exit_node,
             exit_node,
             exit_node_v6,
@@ -524,6 +533,7 @@ pub async fn setup_and_start_service(
         setup_macos_service(
             network_id,
             mode,
+            transport_mode,
             as_exit_node,
             exit_node,
             exit_node_v6,
@@ -536,13 +546,23 @@ pub async fn setup_and_start_service(
 }
 
 #[cfg(windows)]
-fn build_mode_args(mode: RunMode, nucleus_port: u16, cluster_secret: Option<&str>) -> Vec<String> {
+fn build_mode_args(
+    mode: RunMode,
+    transport_mode: TransportMode,
+    nucleus_port: u16,
+    cluster_secret: Option<&str>,
+) -> Vec<String> {
     let mut args = vec![
         "--mode".to_string(),
         match mode {
             RunMode::Edge => "edge".to_string(),
             RunMode::Nucleus => "nucleus".to_string(),
             RunMode::Dual => "dual".to_string(),
+        },
+        "--transport-mode".to_string(),
+        match transport_mode {
+            TransportMode::L3 => "l3".to_string(),
+            TransportMode::L2 => "l2".to_string(),
         },
     ];
 
@@ -585,6 +605,7 @@ async fn setup_windows_service(
     _base_url: &str,
     network_id: &str,
     mode: RunMode,
+    transport_mode: TransportMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
     exit_node_v6: Option<&str>,
@@ -599,7 +620,12 @@ async fn setup_windows_service(
         network_id.to_string(),
     ];
 
-    args.extend(build_mode_args(mode, nucleus_port, cluster_secret));
+    args.extend(build_mode_args(
+        mode,
+        transport_mode,
+        nucleus_port,
+        cluster_secret,
+    ));
 
     if as_exit_node {
         args.push("--as-exit-node".to_string());
@@ -753,6 +779,7 @@ WantedBy=multi-user.target
 fn setup_linux_service(
     network_id: &str,
     mode: RunMode,
+    transport_mode: TransportMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
     exit_node_v6: Option<&str>,
@@ -777,6 +804,11 @@ fn setup_linux_service(
         RunMode::Edge => "edge",
         RunMode::Nucleus => "nucleus",
         RunMode::Dual => "dual",
+    };
+
+    let transport_str = match transport_mode {
+        TransportMode::L3 => "l3",
+        TransportMode::L2 => "l2",
     };
 
     let as_exit_flag = if as_exit_node { "--as-exit-node" } else { "" };
@@ -806,7 +838,7 @@ Description=OmniEdge Service
 After=network.target
 
 [Service]
-ExecStart={} start -n {} --mode {} {} {} {} {} --daemon
+ExecStart={} start -n {} --mode {} --transport-mode {} {} {} {} {} --daemon
 Restart=always
 RestartSec=5
 
@@ -816,6 +848,7 @@ WantedBy=multi-user.target
         exe_path.display(),
         network_id,
         mode_str,
+        transport_str,
         nucleus_flags,
         as_exit_flag,
         exit_node_flag,
@@ -959,6 +992,7 @@ fn setup_macos_nucleus_service(port: u16, secret: &str) -> Result<()> {
 fn setup_macos_service(
     network_id: &str,
     mode: RunMode,
+    transport_mode: TransportMode,
     as_exit_node: bool,
     exit_node: Option<&str>,
     exit_node_v6: Option<&str>,
@@ -986,6 +1020,11 @@ fn setup_macos_service(
         RunMode::Dual => "dual",
     };
 
+    let transport_str = match transport_mode {
+        TransportMode::L3 => "l3",
+        TransportMode::L2 => "l2",
+    };
+
     // Build command arguments
     let mut args = vec![
         "start".to_string(),
@@ -993,6 +1032,8 @@ fn setup_macos_service(
         network_id.to_string(),
         "--mode".to_string(),
         mode_str.to_string(),
+        "--transport-mode".to_string(),
+        transport_str.to_string(),
     ];
 
     if mode == RunMode::Dual {
