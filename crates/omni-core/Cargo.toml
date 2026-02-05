@@ -8,6 +8,8 @@ license = "Apache-2.0 OR MIT"
 default = []
 # L2 VPN support (TAP-based Ethernet bridging) - Linux only
 l2-vpn = ["omni-tun/l2-vpn"]
+# Self-update functionality (requires additional dependencies)
+updater = ["zip", "flate2", "tar", "walkdir"]
 
 [dependencies]
 omni-api = { path = "../omni-api" }
@@ -30,3 +32,10 @@ whoami = "1.5.0"
 dotenvy = "0.15"
 socket2 = { version = "0.5", features = ["all"] }
 futures = "0.3"
+# Updater dependencies
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "stream"] }
+# Optional dependencies for self-update
+zip = { version = "0.6", optional = true }
+flate2 = { version = "1.0", optional = true }
+tar = { version = "0.4", optional = true }
+walkdir = { version = "2.4", optional = true }

@@ -9,11 +9,13 @@ name = "omniedge"
 path = "src/main.rs"
 
 [features]
-default = ["wasm-plugins"]
+default = ["wasm-plugins", "updater"]
 # WASM plugin support - disabled on architectures without Cranelift support (MIPS)
 wasm-plugins = ["dep:omni-plugin"]
 # L2 VPN support (TAP-based Ethernet bridging) - Linux only
 l2-vpn = ["omni-core/l2-vpn"]
+# Self-update functionality
+updater = ["omni-core/updater"]
 
 [dependencies]
 omni-api = { path = "../omni-api" }
