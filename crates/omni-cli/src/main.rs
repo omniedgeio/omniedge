@@ -383,6 +383,50 @@ enum Commands {
     #[cfg(feature = "wasm-plugins")]
     #[command(subcommand)]
     Plugin(PluginCommands),
+
+    /// Check for updates and show version information
+    ///
+    /// EXAMPLES:
+    ///   omniedge version                Check current version
+    ///   omniedge version --check        Check for updates
+    ///   omniedge version --releases     Show recent releases
+    Version {
+        /// Check GitHub for available updates
+        #[arg(short, long)]
+        check: bool,
+
+        /// Show recent release history
+        #[arg(short, long)]
+        releases: bool,
+
+        /// Include pre-release versions
+        #[arg(long)]
+        prerelease: bool,
+    },
+
+    /// Upgrade OmniEdge to the latest version
+    ///
+    /// Downloads and installs the latest release from GitHub.
+    /// The current executable is backed up before replacement.
+    ///
+    /// EXAMPLES:
+    ///   omniedge upgrade               Upgrade to latest stable
+    ///   omniedge upgrade --check       Check only, don't install
+    ///   omniedge upgrade --prerelease  Include pre-release versions
+    #[cfg(feature = "updater")]
+    Upgrade {
+        /// Only check for updates, don't install
+        #[arg(short, long)]
+        check: bool,
+
+        /// Include pre-release versions
+        #[arg(long)]
+        prerelease: bool,
+
+        /// Skip confirmation prompt
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
 }
 
 /// Network configuration subcommands
@@ -1277,6 +1321,21 @@ async fn async_main() -> Result<()> {
         Commands::Plugin(plugin_cmd) => {
             handle_plugin_command(plugin_cmd).await?;
         }
+        Commands::Version {
+            check,
+            releases,
+            prerelease,
+        } => {
+            handle_version_command(check, releases, prerelease).await?;
+        }
+        #[cfg(feature = "updater")]
+        Commands::Upgrade {
+            check,
+            prerelease,
+            yes,
+        } => {
+            handle_upgrade_command(check, prerelease, yes).await?;
+        }
     }
 
     Ok(())
@@ -1728,6 +1787,247 @@ async fn handle_plugin_command(cmd: PluginCommands) -> Result<()> {
                 }
             }
             println!();
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle version command
+async fn handle_version_command(check: bool, releases: bool, prerelease: bool) -> Result<()> {
+    use omni_core::updater::{Product, Updater, UpdaterConfig};
+
+    println!();
+    println!("OmniEdge CLI");
+    println!("────────────");
+    println!("  Version:  {}", VERSION);
+    if let Some(commit) = GIT_COMMIT {
+        println!("  Commit:   {}", commit);
+    }
+    if let Some(date) = BUILD_DATE {
+        println!("  Built:    {}", date);
+    }
+    println!();
+
+    if releases {
+        println!("Fetching release history...");
+        let config = UpdaterConfig {
+            include_prerelease: prerelease,
+            ..Default::default()
+        };
+        let updater = Updater::new(config);
+
+        match updater.get_all_releases(10).await {
+            Ok(releases) => {
+                println!();
+                println!("Recent Releases:");
+                println!("────────────────");
+                for release in releases {
+                    let current_marker = if release.version == VERSION {
+                        " (current)"
+                    } else {
+                        ""
+                    };
+                    let pre_marker = if release.prerelease {
+                        " [pre-release]"
+                    } else {
+                        ""
+                    };
+                    println!(
+                        "  v{}{}{} - {}",
+                        release.version,
+                        current_marker,
+                        pre_marker,
+                        &release.published_at[..10]
+                    );
+                }
+                println!();
+                println!("View all releases: https://github.com/omniedgeio/omniedge/releases");
+            }
+            Err(e) => {
+                eprintln!("Error fetching releases: {}", e);
+                std::process::exit(exit_codes::GENERAL_ERROR);
+            }
+        }
+    } else if check {
+        println!("Checking for updates...");
+        let config = UpdaterConfig {
+            include_prerelease: prerelease,
+            ..Default::default()
+        };
+        let updater = Updater::new(config);
+
+        match updater.check_for_update(Product::Cli, VERSION).await {
+            Ok(result) => {
+                if result.update_available {
+                    let release = result.latest_release.unwrap();
+                    println!();
+                    println!("╔════════════════════════════════════════════╗");
+                    println!("║  Update available: v{:<23}║", release.version);
+                    println!("╚════════════════════════════════════════════╝");
+                    println!();
+                    println!("Release Notes:");
+                    // Print first 5 lines of release notes
+                    for line in release.body.lines().take(5) {
+                        println!("  {}", line);
+                    }
+                    println!();
+                    println!("To upgrade, run:  omniedge upgrade");
+                    println!("Release page:     {}", release.html_url);
+                } else {
+                    println!();
+                    println!("✓ You are running the latest version ({})", VERSION);
+                }
+            }
+            Err(e) => {
+                eprintln!("Error checking for updates: {}", e);
+                std::process::exit(exit_codes::GENERAL_ERROR);
+            }
+        }
+    }
+
+    println!();
+    Ok(())
+}
+
+/// Handle upgrade command
+#[cfg(feature = "updater")]
+async fn handle_upgrade_command(
+    check_only: bool,
+    prerelease: bool,
+    skip_confirm: bool,
+) -> Result<()> {
+    use omni_core::updater::{Product, Updater, UpdaterConfig};
+
+    println!();
+    println!("OmniEdge Updater");
+    println!("────────────────");
+    println!("  Current version: {}", VERSION);
+    println!();
+
+    let config = UpdaterConfig {
+        include_prerelease: prerelease,
+        ..Default::default()
+    };
+    let updater = Updater::new(config);
+
+    println!("Checking for updates...");
+    let result = match updater.check_for_update(Product::Cli, VERSION).await {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Error checking for updates: {}", e);
+            std::process::exit(exit_codes::GENERAL_ERROR);
+        }
+    };
+
+    if !result.update_available {
+        println!();
+        println!("✓ You are running the latest version ({})", VERSION);
+        println!();
+        return Ok(());
+    }
+
+    let release = result.latest_release.unwrap();
+    println!();
+    println!("╔════════════════════════════════════════════╗");
+    println!("║  New version available: v{:<18}║", release.version);
+    println!("╚════════════════════════════════════════════╝");
+    println!();
+
+    if let Some(ref asset_name) = result.asset_name {
+        println!("  Asset:    {}", asset_name);
+    }
+    if let Some(ref url) = result.download_url {
+        println!("  Download: {}", url);
+    }
+    println!("  Released: {}", &release.published_at[..10]);
+    println!();
+
+    if check_only {
+        println!("Release Notes:");
+        for line in release.body.lines().take(10) {
+            println!("  {}", line);
+        }
+        println!();
+        println!("To install this update, run: omniedge upgrade");
+        println!();
+        return Ok(());
+    }
+
+    // Check if we have a download URL
+    if result.download_url.is_none() {
+        eprintln!("Error: No compatible binary found for your platform.");
+        eprintln!("Please download manually from: {}", release.html_url);
+        std::process::exit(exit_codes::GENERAL_ERROR);
+    }
+
+    // Confirm unless --yes flag
+    if !skip_confirm {
+        print!("Do you want to upgrade to v{}? [y/N] ", release.version);
+        use std::io::{self, Write};
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        if !input.trim().eq_ignore_ascii_case("y") && !input.trim().eq_ignore_ascii_case("yes") {
+            println!("Upgrade cancelled.");
+            return Ok(());
+        }
+    }
+
+    println!();
+    println!("Downloading v{}...", release.version);
+
+    // Create progress bar
+    let pb = ProgressBar::new(100);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .unwrap()
+            .progress_chars("#>-"),
+    );
+
+    let pb_clone = pb.clone();
+    let progress_callback: Option<omni_core::updater::ProgressCallback> =
+        Some(Box::new(move |downloaded, total| {
+            pb_clone.set_length(total);
+            pb_clone.set_position(downloaded);
+        }));
+
+    let downloaded_path = match updater
+        .download_update(&release, Product::Cli, progress_callback)
+        .await
+    {
+        Ok(path) => {
+            pb.finish_with_message("Download complete");
+            path
+        }
+        Err(e) => {
+            pb.finish_with_message("Download failed");
+            eprintln!("Error downloading update: {}", e);
+            std::process::exit(exit_codes::GENERAL_ERROR);
+        }
+    };
+
+    println!();
+    println!("Installing...");
+
+    match updater.install_cli_update(&downloaded_path).await {
+        Ok(()) => {
+            println!();
+            println!("╔════════════════════════════════════════════╗");
+            println!("║  ✓ Successfully upgraded to v{:<13}║", release.version);
+            println!("╚════════════════════════════════════════════╝");
+            println!();
+            println!("Please restart omniedge to use the new version.");
+            println!();
+        }
+        Err(e) => {
+            eprintln!("Error installing update: {}", e);
+            eprintln!();
+            eprintln!("The downloaded file is available at: {:?}", downloaded_path);
+            eprintln!("You can try installing it manually.");
+            std::process::exit(exit_codes::GENERAL_ERROR);
         }
     }
 

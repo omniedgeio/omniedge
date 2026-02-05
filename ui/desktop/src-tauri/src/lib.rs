@@ -2616,6 +2616,133 @@ async fn discover_plugins(state: tauri::State<'_, AppState>) -> Result<Vec<Strin
     manager.discover_plugins().await.map_err(|e| e.to_string())
 }
 
+// ============================================================================
+// Update/Version Check Commands
+// ============================================================================
+
+/// Version from git tag (set by build.rs), falls back to Cargo.toml version
+const VERSION: &str = env!("GIT_VERSION");
+/// Git commit hash (set by build.rs)
+const GIT_COMMIT: Option<&str> = option_env!("GIT_COMMIT");
+
+/// Response for version info
+#[derive(serde::Serialize)]
+struct VersionInfo {
+    version: String,
+    commit: Option<String>,
+    build_date: Option<String>,
+}
+
+/// Response for update check
+#[derive(serde::Serialize)]
+struct UpdateCheckResponse {
+    current_version: String,
+    update_available: bool,
+    latest_version: Option<String>,
+    release_notes: Option<String>,
+    download_url: Option<String>,
+    release_url: Option<String>,
+    published_at: Option<String>,
+}
+
+/// Get current version info
+#[tauri::command]
+fn get_version_info() -> VersionInfo {
+    VersionInfo {
+        version: VERSION.to_string(),
+        commit: GIT_COMMIT.map(String::from),
+        build_date: option_env!("BUILD_DATE").map(String::from),
+    }
+}
+
+/// Check for updates from GitHub
+#[tauri::command]
+async fn check_for_updates(include_prerelease: bool) -> Result<UpdateCheckResponse, String> {
+    use omni_core::updater::{Product, Updater, UpdaterConfig};
+
+    let config = UpdaterConfig {
+        include_prerelease,
+        ..Default::default()
+    };
+    let updater = Updater::new(config);
+
+    let result = updater
+        .check_for_update(Product::Desktop, VERSION)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(UpdateCheckResponse {
+        current_version: result.current_version,
+        update_available: result.update_available,
+        latest_version: result.latest_release.as_ref().map(|r| r.version.clone()),
+        release_notes: result.latest_release.as_ref().map(|r| r.body.clone()),
+        download_url: result.download_url,
+        release_url: result.latest_release.as_ref().map(|r| r.html_url.clone()),
+        published_at: result.latest_release.map(|r| r.published_at),
+    })
+}
+
+/// Get list of recent releases
+#[tauri::command]
+async fn get_releases(
+    limit: usize,
+    include_prerelease: bool,
+) -> Result<Vec<ReleaseInfoResponse>, String> {
+    use omni_core::updater::{Updater, UpdaterConfig};
+
+    let config = UpdaterConfig {
+        include_prerelease,
+        ..Default::default()
+    };
+    let updater = Updater::new(config);
+
+    let releases = updater
+        .get_all_releases(limit)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(releases
+        .into_iter()
+        .map(|r| {
+            let is_current = r.version == VERSION;
+            ReleaseInfoResponse {
+                version: r.version,
+                tag_name: r.tag_name,
+                name: r.name,
+                body: r.body,
+                prerelease: r.prerelease,
+                published_at: r.published_at,
+                html_url: r.html_url,
+                is_current,
+            }
+        })
+        .collect())
+}
+
+#[derive(serde::Serialize)]
+struct ReleaseInfoResponse {
+    version: String,
+    tag_name: String,
+    name: String,
+    body: String,
+    prerelease: bool,
+    published_at: String,
+    html_url: String,
+    is_current: bool,
+}
+
+/// Open the download page in the browser for manual update
+#[tauri::command]
+async fn open_download_page(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(
+            "https://github.com/omniedgeio/omniedge/releases/latest",
+            None::<&str>,
+        )
+        .map_err(|e| e.to_string())
+}
+
 fn toggle_window<R: Runtime>(
     app: &tauri::AppHandle<R>,
     tray_position: Option<tauri::PhysicalPosition<f64>>,
@@ -2934,6 +3061,11 @@ pub fn run() {
             set_plugin_config,
             reload_plugin,
             discover_plugins,
+            // Update/Version commands
+            get_version_info,
+            check_for_updates,
+            get_releases,
+            open_download_page,
             // Robot data collection commands
             is_data_collection_available,
             is_data_collection_initialized,
