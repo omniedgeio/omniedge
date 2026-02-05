@@ -28,15 +28,15 @@ Building distributed AI systems is hard. Connecting robots, edge devices, and cl
 
 ## Why Researchers & Developers Choose OmniEdge
 
-| Challenge                     | OmniEdge Solution                              |
-| ----------------------------- | ---------------------------------------------- |
+| Challenge                     | OmniEdge Solution                                      |
+| ----------------------------- | ------------------------------------------------------ |
 | NAT traversal                 | Automatic hole punching + relay fallback, 99%+ success |
-| Symmetric NAT                 | Zero-knowledge relay for hardest NAT types     |
-| Latency-critical AI inference | WireGuard encryption, ~0.3ms overhead          |
-| Deterministic networking      | 6-Sigma stability (Cpk 2.92) for teleoperation |
-| Secure model transfer         | End-to-end encrypted mesh                      |
-| Heterogeneous devices         | Single binary for x86, ARM64, RISC-V           |
-| Air-gapped labs               | Self-hosted nucleus mode (no cloud dependency) |
+| Symmetric NAT                 | Zero-knowledge relay for hardest NAT types             |
+| Latency-critical AI inference | WireGuard encryption, ~0.3ms overhead                  |
+| Deterministic networking      | 6-Sigma stability (Cpk 2.92) for teleoperation         |
+| Secure model transfer         | End-to-end encrypted mesh                              |
+| Heterogeneous devices         | Single binary for x86, ARM64, RISC-V                   |
+| Air-gapped labs               | Self-hosted nucleus mode (no cloud dependency)         |
 
 ## Performance: Industrial-Grade Stability
 
@@ -112,14 +112,14 @@ uci commit omniedge
 
 ## Supported Hardware
 
-| Device                           | Architecture | Status       |
-| -------------------------------- | ------------ | ------------ |
-| NVIDIA Jetson (Nano/Xavier/Orin) | ARM64        | Tested       |
-| Raspberry Pi 4/5                  | ARM64        | Tested       |
-| Intel NUC / x86 Servers          | x86_64       | Tested       |
-| Apple Silicon (M1/M2/M3)         | ARM64        | Tested       |
-| RISC-V Boards                    | riscv64      | Experimental |
-| OpenWrt Routers                  | x86_64, ARM64 | Tested      |
+| Device                           | Architecture  | Status       |
+| -------------------------------- | ------------- | ------------ |
+| NVIDIA Jetson (Nano/Xavier/Orin) | ARM64         | Tested       |
+| Raspberry Pi 4/5                 | ARM64         | Tested       |
+| Intel NUC / x86 Servers          | x86_64        | Tested       |
+| Apple Silicon (M1/M2/M3)         | ARM64         | Tested       |
+| RISC-V Boards                    | riscv64       | Experimental |
+| OpenWrt Routers                  | x86_64, ARM64 | Tested       |
 
 ## Supported Platforms
 
@@ -127,7 +127,7 @@ uci commit omniedge
 
 | Platform    | Architecture                          | Package Formats                        |
 | ----------- | ------------------------------------- | -------------------------------------- |
-| **Linux**   | x86_64, ARM64, RISC-V             | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
+| **Linux**   | x86_64, ARM64, RISC-V                 | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
 | **macOS**   | x86_64 (Intel), ARM64 (Apple Silicon) | `.tar.gz`                              |
 | **Windows** | x86_64                                | `.zip`                                 |
 
@@ -141,12 +141,12 @@ uci commit omniedge
 
 ### OpenWrt (`omniedge-openwrt`)
 
-| OpenWrt Version | Architecture | Package Format | Status |
-| --------------- | ------------ | -------------- | ------ |
-| **24.10.x**     | x86_64       | `.ipk`         | Tested |
-| **24.10.x**     | aarch64      | `.ipk`         | Tested |
-| **25.x (snapshot)** | x86_64   | `.apk`         | Tested |
-| **25.x (snapshot)** | aarch64  | `.apk`         | Tested |
+| OpenWrt Version     | Architecture | Package Format | Status |
+| ------------------- | ------------ | -------------- | ------ |
+| **24.10.x**         | x86_64       | `.ipk`         | Tested |
+| **24.10.x**         | aarch64      | `.ipk`         | Tested |
+| **25.x (snapshot)** | x86_64       | `.apk`         | Tested |
+| **25.x (snapshot)** | aarch64      | `.apk`         | Tested |
 
 > **Note**: MIPS architecture is not supported due to Rust toolchain limitations.
 
@@ -176,31 +176,31 @@ uci commit omniedge
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Plugin System (v2.5.0)
+## Plugin System (v2.2.0)
 
 OmniEdge now supports a **WASM-based plugin system** that allows extending functionality without modifying the core application.
 
 ### Features
 
-| Feature | Description |
-|---------|-------------|
-| **WASM Sandboxing** | Plugins run in secure WebAssembly sandboxes |
-| **Event Hooks** | React to VPN state changes, peer events, network changes |
-| **Capability-Based Security** | Fine-grained permissions per plugin |
-| **Hot Reload** | Install, enable, disable plugins without restart |
-| **Cross-Platform** | Single plugin binary works on all platforms |
+| Feature                       | Description                                              |
+| ----------------------------- | -------------------------------------------------------- |
+| **WASM Sandboxing**           | Plugins run in secure WebAssembly sandboxes              |
+| **Event Hooks**               | React to VPN state changes, peer events, network changes |
+| **Capability-Based Security** | Fine-grained permissions per plugin                      |
+| **Hot Reload**                | Install, enable, disable plugins without restart         |
+| **Cross-Platform**            | Single plugin binary works on all platforms              |
 
 ### Plugin Capabilities
 
-| Capability | Description |
-|------------|-------------|
-| `network-status` | Read VPN connection state |
-| `peer-info` | Access peer list and status |
-| `event-hooks` | Subscribe to VPN events |
-| `http-client` | Make outbound HTTP requests |
-| `key-value-store` | Persist plugin data |
-| `notifications` | Show system notifications |
-| `logging` | Write to application logs |
+| Capability        | Description                 |
+| ----------------- | --------------------------- |
+| `network-status`  | Read VPN connection state   |
+| `peer-info`       | Access peer list and status |
+| `event-hooks`     | Subscribe to VPN events     |
+| `http-client`     | Make outbound HTTP requests |
+| `key-value-store` | Persist plugin data         |
+| `notifications`   | Show system notifications   |
+| `logging`         | Write to application logs   |
 
 ### Installing Plugins
 
@@ -265,23 +265,23 @@ OmniEdge automatically handles complex network environments with multi-layer NAT
 
 ### NAT Type Compatibility
 
-| Your NAT | Peer NAT | Connection Method |
-|----------|----------|-------------------|
-| Open/Full Cone | Any | Direct P2P |
-| Restricted Cone | Open/Full/Restricted | Direct P2P |
-| Port-Restricted | Open/Full Cone | Direct P2P |
-| Symmetric | Open/Full Cone | Direct P2P (usually) |
-| Symmetric | Symmetric | **Relay** (automatic) |
+| Your NAT        | Peer NAT             | Connection Method     |
+| --------------- | -------------------- | --------------------- |
+| Open/Full Cone  | Any                  | Direct P2P            |
+| Restricted Cone | Open/Full/Restricted | Direct P2P            |
+| Port-Restricted | Open/Full Cone       | Direct P2P            |
+| Symmetric       | Open/Full Cone       | Direct P2P (usually)  |
+| Symmetric       | Symmetric            | **Relay** (automatic) |
 
 ### Features
 
-| Feature | Description |
-|---------|-------------|
-| **Auto NAT Detection** | STUN-based detection on connection |
-| **Relay Fallback** | Zero-knowledge relay for symmetric NAT |
-| **Port Mapping** | UPnP/NAT-PMP/PCP support |
-| **Encrypted Signaling** | X25519 + XSalsa20-Poly1305 |
-| **IPv6 Dual-Stack** | Happy Eyeballs (RFC 8305) |
+| Feature                 | Description                            |
+| ----------------------- | -------------------------------------- |
+| **Auto NAT Detection**  | STUN-based detection on connection     |
+| **Relay Fallback**      | Zero-knowledge relay for symmetric NAT |
+| **Port Mapping**        | UPnP/NAT-PMP/PCP support               |
+| **Encrypted Signaling** | X25519 + XSalsa20-Poly1305             |
+| **IPv6 Dual-Stack**     | Happy Eyeballs (RFC 8305)              |
 
 ### Configuration
 
@@ -315,6 +315,47 @@ sudo omniedge start --mode nucleus --port 51821 --secret "YourLabSecret123"
 # Dual mode - Hub node that also participates in mesh
 sudo omniedge start -n <network_id> --mode dual --secret "YourSecret123456"
 ```
+
+## Transport Modes (v2.5.0)
+
+OmniEdge supports two transport modes for different networking requirements:
+
+| Mode             | Layer              | Interface | Platforms  | Use Case                   |
+| ---------------- | ------------------ | --------- | ---------- | -------------------------- |
+| **L3** (default) | IP (Layer 3)       | TUN       | All        | Standard VPN, IP routing   |
+| **L2**           | Ethernet (Layer 2) | TAP       | Linux only | Bridging, non-IP protocols |
+
+### L3 Mode (Default)
+
+Layer 3 mode operates at the IP level, routing IP packets between peers. This is the default and works on all platforms.
+
+```bash
+# L3 mode (default - no flag needed)
+sudo omniedge start -n <network_id>
+
+# Explicit L3 mode
+sudo omniedge start -n <network_id> --transport-mode l3
+```
+
+### L2 Mode (Linux Only)
+
+Layer 2 mode operates at the Ethernet level, bridging Ethernet frames between peers. This enables:
+
+- **Non-IP Protocols**: ARP, DHCP relay, NetBIOS, STP
+- **MAC Address Visibility**: See actual MAC addresses across the mesh
+- **VLAN Bridging**: Extend VLANs across sites
+- **Legacy Protocol Support**: Protocols that don't use IP
+
+```bash
+# L2 mode (Linux only, requires l2-vpn feature)
+sudo omniedge start -n <network_id> --transport-mode l2
+```
+
+**Requirements**:
+- Linux operating system (TAP devices require Linux kernel)
+- Build with `--features l2-vpn` flag
+
+**Note**: L2 mode is currently in preview. Full OmniNervous L2 module integration is in progress.
 
 ## Self-Hosted Mode (Air-Gapped Labs)
 

@@ -4,6 +4,11 @@ version = "2.3.0"
 edition = "2021"
 license = "Apache-2.0 OR MIT"
 
+[features]
+default = []
+# L2 VPN support (TAP-based Ethernet bridging) - Linux only
+l2-vpn = ["omni-tun/l2-vpn"]
+
 [dependencies]
 omni-api = { path = "../omni-api" }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-native-roots"] }

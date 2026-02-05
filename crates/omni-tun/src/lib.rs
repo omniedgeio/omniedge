@@ -418,3 +418,166 @@ pub mod windows {
         vec![]
     }
 }
+
+/// L2 VPN (TAP) support module - Linux only
+///
+/// This module provides Layer 2 Ethernet bridging capabilities using TAP devices.
+/// L2 mode allows bridging Ethernet frames between peers, enabling:
+/// - Non-IP protocols (ARP, DHCP relay, NetBIOS, etc.)
+/// - MAC address visibility across the mesh
+/// - True Layer 2 LAN bridging
+///
+/// # Requirements
+/// - Linux only (TAP devices require Linux kernel support)
+/// - Compile with `--features l2-vpn`
+/// - OmniNervous v0.5.0+ with L2 module
+///
+/// # Example
+/// ```ignore
+/// use omni_tun::l2::OmniTapTun;
+///
+/// let mut tap = OmniTapTun::new("omniedge-tap0")?;
+/// tap.setup("10.0.0.1", 51820, &private_key).await?;
+/// ```
+#[cfg(all(feature = "l2-vpn", target_os = "linux"))]
+pub mod l2 {
+    use anyhow::Result;
+    use log::info;
+
+    /// OmniTapTun provides Layer 2 TAP-based Ethernet bridging.
+    ///
+    /// Unlike the standard OmniTun (TUN/L3), this creates a TAP device that
+    /// operates at the Ethernet layer, allowing Ethernet frame forwarding.
+    #[derive(Clone)]
+    pub struct OmniTapTun {
+        /// TAP interface name
+        ifname: String,
+        /// Virtual IP address for the TAP interface
+        vip: Option<String>,
+        // TODO: Add OmniNervous L2Transport when available
+        // l2_transport: Option<omninervous::l2::L2Transport>,
+    }
+
+    impl OmniTapTun {
+        /// Create a new L2 TAP interface.
+        ///
+        /// # Arguments
+        /// * `ifname` - Name for the TAP interface (e.g., "omniedge-tap0")
+        ///
+        /// # Returns
+        /// A new OmniTapTun instance (not yet configured)
+        pub fn new(ifname: &str) -> Result<Self> {
+            info!("Creating L2 TAP interface: {}", ifname);
+            Ok(Self {
+                ifname: ifname.to_string(),
+                vip: None,
+            })
+        }
+
+        /// Setup the TAP interface with the given configuration.
+        ///
+        /// This creates the TAP device and configures it with the specified
+        /// IP address. The TAP device will be ready to send/receive Ethernet frames.
+        ///
+        /// # Arguments
+        /// * `vip` - Virtual IP address for the interface
+        /// * `port` - UDP port for WireGuard-over-L2 encapsulation
+        /// * `private_key` - WireGuard private key (hex encoded)
+        ///
+        /// # Note
+        /// This is a stub implementation. Full L2 support requires OmniNervous
+        /// L2 module integration which is available in OmniNervous v0.5.0+.
+        pub async fn setup(&mut self, vip: &str, _port: u16, _private_key: &str) -> Result<()> {
+            self.vip = Some(vip.to_string());
+
+            // TODO: Implement actual TAP creation using OmniNervous L2 module
+            // When OmniNervous L2 module is available:
+            // 1. Create TAP device via omninervous::l2::L2Transport::new()
+            // 2. Configure IP address
+            // 3. Set up L2Fragmenter for MTU handling
+            // 4. Initialize L2Metrics for monitoring
+
+            info!(
+                "L2 TAP interface {} configured with VIP {} (stub - full L2 pending OmniNervous integration)",
+                self.ifname, vip
+            );
+
+            // For now, return error indicating L2 is not fully implemented
+            Err(anyhow::anyhow!(
+                "L2 TAP mode is not yet fully implemented. \
+                OmniNervous L2 module integration is pending. \
+                Please use L3 mode (--transport-mode l3) for now."
+            ))
+        }
+
+        /// Get the interface name
+        pub fn interface_name(&self) -> &str {
+            &self.ifname
+        }
+
+        /// Get the configured VIP (if any)
+        pub fn vip(&self) -> Option<&str> {
+            self.vip.as_deref()
+        }
+
+        /// Shutdown the TAP interface
+        pub async fn shutdown(&self) {
+            info!("Shutting down L2 TAP interface: {}", self.ifname);
+            // TODO: Cleanup TAP device
+        }
+    }
+}
+
+/// Stub L2 module for non-Linux platforms or when l2-vpn feature is disabled
+#[cfg(not(all(feature = "l2-vpn", target_os = "linux")))]
+pub mod l2 {
+    use anyhow::Result;
+
+    /// Stub OmniTapTun for platforms that don't support L2 mode.
+    ///
+    /// L2 TAP mode is only supported on Linux. On other platforms,
+    /// this stub will return an error when attempting to use L2 mode.
+    #[derive(Clone)]
+    pub struct OmniTapTun {
+        _ifname: String,
+    }
+
+    impl OmniTapTun {
+        /// Create a new L2 TAP interface (stub - always fails on non-Linux).
+        pub fn new(ifname: &str) -> Result<Self> {
+            #[cfg(not(target_os = "linux"))]
+            {
+                let _ = ifname; // Suppress unused warning
+                return Err(anyhow::anyhow!(
+                    "L2 TAP mode is only supported on Linux. \
+                    TAP devices require Linux kernel support. \
+                    Please use L3 mode (--transport-mode l3) on this platform."
+                ));
+            }
+
+            #[cfg(all(target_os = "linux", not(feature = "l2-vpn")))]
+            {
+                let _ = ifname; // Suppress unused warning
+                return Err(anyhow::anyhow!(
+                    "L2 TAP mode requires the 'l2-vpn' feature. \
+                    Rebuild with: cargo build --features l2-vpn"
+                ));
+            }
+
+            #[allow(unreachable_code)]
+            Ok(Self {
+                _ifname: ifname.to_string(),
+            })
+        }
+
+        /// Setup stub (always fails on non-Linux)
+        pub async fn setup(&mut self, _vip: &str, _port: u16, _private_key: &str) -> Result<()> {
+            Err(anyhow::anyhow!(
+                "L2 TAP mode is not available on this platform"
+            ))
+        }
+
+        /// Shutdown stub
+        pub async fn shutdown(&self) {}
+    }
+}

@@ -155,6 +155,63 @@ pub enum RunMode {
     Dual,
 }
 
+/// Transport mode for VPN tunnel
+///
+/// L3 (TUN) mode operates at the IP layer (Layer 3) - this is the default and works
+/// on all platforms. L2 (TAP) mode operates at the Ethernet layer (Layer 2), enabling
+/// bridging and non-IP protocols - this is only available on Linux with the l2-vpn feature.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default, serde::Serialize, serde::Deserialize,
+)]
+pub enum TransportMode {
+    /// Layer 3 TUN mode (IP packets) - Default, works on all platforms
+    #[default]
+    L3,
+    /// Layer 2 TAP mode (Ethernet frames) - Linux only, requires --features l2-vpn
+    L2,
+}
+
+impl TransportMode {
+    /// Check if this transport mode is supported on the current platform
+    pub fn is_supported(&self) -> bool {
+        match self {
+            TransportMode::L3 => true,
+            TransportMode::L2 => {
+                // L2 mode requires Linux AND the l2-vpn feature
+                #[cfg(all(feature = "l2-vpn", target_os = "linux"))]
+                {
+                    true
+                }
+                #[cfg(not(all(feature = "l2-vpn", target_os = "linux")))]
+                {
+                    false
+                }
+            }
+        }
+    }
+
+    /// Get the reason why this transport mode is not supported (if any)
+    pub fn unsupported_reason(&self) -> Option<&'static str> {
+        match self {
+            TransportMode::L3 => None,
+            TransportMode::L2 => {
+                #[cfg(all(feature = "l2-vpn", target_os = "linux"))]
+                {
+                    None
+                }
+                #[cfg(all(not(feature = "l2-vpn"), target_os = "linux"))]
+                {
+                    Some("L2 mode requires the 'l2-vpn' feature. Rebuild with: cargo build --features l2-vpn")
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    Some("L2 mode is only supported on Linux (TAP devices require Linux kernel)")
+                }
+            }
+        }
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(
     name = "omniedge",
@@ -211,6 +268,15 @@ enum Commands {
         ///   dual    - Both client and server (advanced)
         #[arg(short = 'm', long, value_enum, default_value = "edge")]
         mode: RunMode,
+
+        /// Transport mode for VPN tunnel:
+        ///   l3 - Layer 3 TUN (IP packets) - default, all platforms
+        ///   l2 - Layer 2 TAP (Ethernet frames) - Linux only
+        ///
+        /// L2 mode enables Ethernet bridging and non-IP protocols.
+        /// Only available on Linux with --features l2-vpn
+        #[arg(short = 't', long, value_enum, default_value = "l3")]
+        transport_mode: TransportMode,
 
         /// The virtual network ID to join (required for edge/dual modes)
         #[arg(short = 'n', long)]
@@ -517,6 +583,7 @@ async fn async_main() -> Result<()> {
     match cli.command {
         Commands::Start {
             mode,
+            transport_mode,
             network_id,
             daemon,
             as_exit_node,
@@ -527,6 +594,18 @@ async fn async_main() -> Result<()> {
             secret,
             security_key,
         } => {
+            // Validate transport mode is supported on this platform
+            if !transport_mode.is_supported() {
+                if let Some(reason) = transport_mode.unsupported_reason() {
+                    eprintln!(
+                        "Error: {:?} transport mode is not available.",
+                        transport_mode
+                    );
+                    eprintln!("{}", reason);
+                    std::process::exit(exit_codes::INVALID_INPUT);
+                }
+            }
+
             // Check if already connected
             let current_status =
                 service::get_service_status(config.last_run_mode.as_deref(), config.nucleus_port)
@@ -669,6 +748,7 @@ async fn async_main() -> Result<()> {
                             &base_url,
                             &vn_id,
                             mode,
+                            transport_mode,
                             as_exit_node,
                             exit_node,
                             exit_node_v6,
@@ -846,6 +926,7 @@ async fn async_main() -> Result<()> {
                 &base_url,
                 &vn_id,
                 mode,
+                transport_mode,
                 effective_as_exit_node,
                 effective_exit_node.as_deref(),
                 effective_exit_node_v6.as_deref(),
@@ -862,18 +943,23 @@ async fn async_main() -> Result<()> {
                 RunMode::Dual => "dual (edge + nucleus)",
                 RunMode::Nucleus => "nucleus",
             };
+            let transport_str = match transport_mode {
+                TransportMode::L3 => "L3 (TUN)",
+                TransportMode::L2 => "L2 (TAP)",
+            };
             println!("✓ OmniEdge connected!");
             println!();
-            println!("  Network: {}", vn_id);
-            println!("  Mode:    {}", mode_str);
+            println!("  Network:   {}", vn_id);
+            println!("  Mode:      {}", mode_str);
+            println!("  Transport: {}", transport_str);
             if effective_as_exit_node {
-                println!("  Role:    Exit node (routing traffic for peers)");
+                println!("  Role:      Exit node (routing traffic for peers)");
             }
             if let Some(ref exit_ip) = effective_exit_node {
-                println!("  Exit:    Routing through {}", exit_ip);
+                println!("  Exit:      Routing through {}", exit_ip);
             }
             if let Some(ref exit_ip_v6) = effective_exit_node_v6 {
-                println!("  Exit v6: Routing through {}", exit_ip_v6);
+                println!("  Exit v6:   Routing through {}", exit_ip_v6);
             }
             println!();
             println!("Run 'omniedge status' to see connection details.");
@@ -1724,6 +1810,7 @@ async fn service_main_res(base_url: &str) -> Result<()> {
     match cli.command {
         Commands::Start {
             mode,
+            transport_mode,
             network_id,
             daemon,
             as_exit_node,
@@ -1751,9 +1838,10 @@ async fn service_main_res(base_url: &str) -> Result<()> {
             RunMode::Edge | RunMode::Dual => {
                 let vn_id = network_id.context("Network ID required")?;
                 log::info!(
-                    "Starting background worker for network {} in {:?} mode",
+                    "Starting background worker for network {} in {:?} mode (transport: {:?})",
                     vn_id,
-                    mode
+                    mode,
+                    transport_mode
                 );
                 // Run worker with shutdown signal
                 tokio::select! {
@@ -1761,6 +1849,7 @@ async fn service_main_res(base_url: &str) -> Result<()> {
                         base_url,
                         &vn_id,
                         mode,
+                        transport_mode,
                         as_exit_node,
                         exit_node,
                         exit_node_v6,
