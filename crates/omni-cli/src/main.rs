@@ -468,9 +468,11 @@ async fn main() -> Result<()> {
 
     // Root check moved to start/stop commands only
 
+    let is_daemon_start = matches!(&cli.command, Commands::Start { daemon: true, .. });
+
     // On Windows, if we are started by SCM, dispatcher will take over
     #[cfg(windows)]
-    {
+    if is_daemon_start {
         log::info!("Attempting service dispatcher start...");
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(parent) = exe_path.parent() {
@@ -509,9 +511,6 @@ async fn main() -> Result<()> {
             secret,
             security_key,
         } => {
-            // Require root/admin for TUN creation
-            require_root_privileges();
-
             // Check if already connected
             let current_status =
                 service::get_service_status(config.last_run_mode.as_deref(), config.nucleus_port)
@@ -667,6 +666,9 @@ async fn main() -> Result<()> {
 
             // Handle nucleus-only mode (no network/auth needed)
             if mode == RunMode::Nucleus {
+                // Require root/admin for service installation
+                require_root_privileges();
+
                 // Save nucleus config before starting
                 config.last_run_mode = Some("nucleus".to_string());
                 config.nucleus_port = Some(port);
@@ -795,6 +797,9 @@ async fn main() -> Result<()> {
                 let first = &networks[0];
                 first.id.clone()
             };
+
+            // Require root/admin for TUN creation and daemon setup
+            require_root_privileges();
 
             // 4. Sync custom user server for nucleus/dual mode
             if mode == RunMode::Nucleus || mode == RunMode::Dual {
