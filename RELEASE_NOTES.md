@@ -1,6 +1,17 @@
 # OmniEdge Release Notes
 
+## v2.4.0 (2026-02-05)
+
+### CLI Custom Server Sync
+
+- **Nucleus/Dual Auto-Registration**: CLI now registers or updates a custom user server when running in nucleus or dual mode.
+- **Public IP Detection**: Uses `curl ifconfig.me` to determine the public IP and publishes `<ip>:<port>` as the server host.
+- **Safe Fallbacks**: Skips sync when auth is missing or IP lookup fails, continuing normal startup.
+
+---
+
 ## v2.3.0 (2026-02-03)
+
 
 ### OpenWrt Package Support
 
