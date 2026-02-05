@@ -86,7 +86,12 @@ sudo omniedge start
 # That's it. Your devices can now reach each other by virtual IP.
 ```
 
+## Nucleus Mode Custom Server
+
+When running `omniedge start --mode nucleus` or `--mode dual`, the CLI can auto-register a custom user server using the public IP and chosen port. This requires an auth token; if auth is missing or public IP lookup fails, it skips registration and continues.
+
 ### OpenWrt Installation
+
 
 ```bash
 # Download the package for your architecture (example: aarch64, OpenWrt 24.10)
