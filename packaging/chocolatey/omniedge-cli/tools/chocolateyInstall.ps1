@@ -1,9 +1,9 @@
 $ErrorActionPreference = 'Stop'
 
 $packageName = 'omniedge-cli'
-$version = '2.0.0'
+$version = '2.3.0'
 $url64 = "https://github.com/omniedgeio/omniedge/releases/download/v$version/omniedge-cli-$version-windows-x64.zip"
-$checksum64 = 'PLACEHOLDER_SHA256'
+$checksum64 = '07A1641D76C92CC9237F1E807026389FE3D758A98AA8D4635CEA9D7F77943ECD'
 $checksumType64 = 'sha256'
 
 $toolsDir = "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)"

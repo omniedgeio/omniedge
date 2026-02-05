@@ -1,11 +1,11 @@
 name: omniedge
 base: core22
-version: '2.0.0'
-summary: Peer-to-peer VPN CLI for edge computing
+version: '2.3.0'
+summary: Zero-Config P2P Mesh VPN for AI, Robotics, and Edge Computing
 description: |
   OmniEdge CLI is a command-line tool for creating secure, peer-to-peer mesh 
-  VPN connections. It enables devices to communicate directly across networks 
-  with minimal latency and maximum security.
+  VPN connections for AI, robotics, and edge computing. It enables devices to 
+  communicate directly across networks with minimal latency and maximum security.
 
   Features:
   - Peer-to-peer connections without central relay

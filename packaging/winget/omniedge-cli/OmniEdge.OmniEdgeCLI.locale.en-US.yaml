@@ -1,33 +1,31 @@
-# Created using winget-create
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.locale.1.6.0.schema.json
+# Created using wingetcreate 1.6.1.0
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
 
 PackageIdentifier: OmniEdge.OmniEdgeCLI
-PackageVersion: 2.0.0
+PackageVersion: 2.3.0
 PackageLocale: en-US
 Publisher: OmniEdge
-PublisherUrl: https://omniedge.io
-PublisherSupportUrl: https://github.com/omniedgeio/omniedge/issues
-PrivacyUrl: https://omniedge.io/privacy
-Author: OmniEdge Team
-PackageName: OmniEdge CLI
-PackageUrl: https://github.com/omniedgeio/omniedge
-License: Apache-2.0 OR MIT
-LicenseUrl: https://github.com/omniedgeio/omniedge/blob/main/LICENSE
-Copyright: Copyright (c) 2024 OmniEdge
-ShortDescription: Peer-to-peer VPN CLI for edge computing
-Description: |-
-  OmniEdge CLI is a command-line tool for creating secure, peer-to-peer mesh VPN
-  connections. It enables devices to communicate directly across networks with
-  minimal latency and maximum security, without requiring a central server for
-  data relay.
+PublisherUrl: https://connect.omniedge.io
+PublisherSupportUrl: https://connect.omniedge.io
+PrivacyUrl: https://connect.omniedge.io/privacy
+Author: OmniEdge
+PackageName: OmniEdgeCLI
+PackageUrl: https://connect.omniedge.io/download/linuxcli
+License: MIT/Apache2
+LicenseUrl: https://github.com/omniedgeio/omniedge/blob/dev/LICENSING.md
+Copyright: OmniEdge
+CopyrightUrl: https://omniedge.io
+ShortDescription: Zero-Config P2P Mesh VPN for AI, Robotics, and Edge Computing
+Description: Zero-Config P2P Mesh VPN for AI, Robotics, and Edge Computing]
+Moniker: omniedge
 Tags:
-  - cli
-  - mesh
-  - network
-  - p2p
-  - peer-to-peer
-  - vpn
-  - wireguard
-ReleaseNotesUrl: https://github.com/omniedgeio/omniedge/releases/tag/v2.0.0
+- omniedge
+Agreements:
+- AgreementLabel: Agreement
+  AgreementUrl: https://connect.omniedge.io/terms
+ReleaseNotes: https://connect.omniedge.io/docs/article/Release-Notes
+ReleaseNotesUrl: https://connect.omniedge.io/docs/article/Release-Notes
+PurchaseUrl: https://connect.omniedge.io
+InstallationNotes: https://connect.omniedge.io/docs/article/install/cli
 ManifestType: defaultLocale
 ManifestVersion: 1.6.0

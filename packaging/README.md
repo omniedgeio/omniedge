@@ -22,10 +22,11 @@ packaging/
 │   └── Casks/
 │       └── omniedge-desktop.rb  # Homebrew cask for Desktop
 ├── aur/
-│   ├── omniedge-cli-bin/
+│   ├── omniedge-cli/
 │   │   └── PKGBUILD             # AUR package for CLI
-│   └── omniedge-desktop-bin/
+│   └── omniedge-desktop/
 │       └── PKGBUILD             # AUR package for Desktop
+
 ├── winget/
 │   ├── omniedge-cli/
 │   │   ├── OmniEdge.OmniEdgeCLI.yaml
@@ -90,32 +91,52 @@ The `publish-packages.yml` workflow automatically updates and publishes packages
 2. Add SSH key to profile
 3. Clone and push:
    ```bash
-   git clone ssh://aur@aur.archlinux.org/omniedge-cli-bin.git
-   cp packaging/aur/omniedge-cli-bin/PKGBUILD omniedge-cli-bin/
-   cd omniedge-cli-bin
+   git clone ssh://aur@aur.archlinux.org/omniedge-cli.git
+   cp packaging/aur/omniedge-cli/PKGBUILD omniedge-cli/
+   cd omniedge-cli
+   makepkg --printsrcinfo > .SRCINFO
+   git add PKGBUILD .SRCINFO
+   git commit -m "Update to version X.Y.Z"
+   git push
+   ```
+4. Repeat for Desktop:
+   ```bash
+   git clone ssh://aur@aur.archlinux.org/omniedge-desktop.git
+   cp packaging/aur/omniedge-desktop/PKGBUILD omniedge-desktop/
+   cd omniedge-desktop
    makepkg --printsrcinfo > .SRCINFO
    git add PKGBUILD .SRCINFO
    git commit -m "Update to version X.Y.Z"
    git push
    ```
 
+
+
 ### Winget
 
 1. Fork https://github.com/microsoft/winget-pkgs
 2. Copy manifests to `manifests/o/OmniEdge/OmniEdgeCLI/<version>/`
-3. Update version and checksums
+3. Update version, installer URL, and checksums
 4. Submit PR
+
 
 ### Chocolatey
 
 1. Register at https://chocolatey.org
 2. Get API key from account
-3. Build and push:
+3. Build and push CLI:
    ```powershell
    cd packaging/chocolatey/omniedge-cli
    choco pack
    choco push omniedge-cli.X.Y.Z.nupkg --source https://push.chocolatey.org/ --api-key YOUR_API_KEY
    ```
+4. Build and push Desktop:
+   ```powershell
+   cd packaging/chocolatey/omniedge-desktop
+   choco pack
+   choco push omniedge-desktop.X.Y.Z.nupkg --source https://push.chocolatey.org/ --api-key YOUR_API_KEY
+   ```
+
 
 ### Snap
 
