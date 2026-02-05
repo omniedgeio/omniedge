@@ -212,6 +212,29 @@ impl TransportMode {
     }
 }
 
+/// Version from git tag (set by build.rs), falls back to Cargo.toml version
+const VERSION: &str = env!("GIT_VERSION");
+/// Git commit hash (set by build.rs)
+const GIT_COMMIT: Option<&str> = option_env!("GIT_COMMIT");
+/// Build date (set by build.rs)
+const BUILD_DATE: Option<&str> = option_env!("BUILD_DATE");
+
+/// Generate long version string with git info (for --version)
+fn long_version() -> &'static str {
+    // Use a static to cache the version string
+    use std::sync::OnceLock;
+    static VERSION_STRING: OnceLock<String> = OnceLock::new();
+    VERSION_STRING
+        .get_or_init(|| match (GIT_COMMIT, BUILD_DATE) {
+            (Some(commit), Some(date)) => {
+                format!("{}\ncommit: {}\nbuilt:  {}", VERSION, commit, date)
+            }
+            (Some(commit), None) => format!("{}\ncommit: {}", VERSION, commit),
+            _ => VERSION.to_string(),
+        })
+        .as_str()
+}
+
 #[derive(Parser, Debug)]
 #[command(
     name = "omniedge",
@@ -232,7 +255,8 @@ EXAMPLES:
   omniedge scan --cidr 192.168.1.0/24
 
 For more help: https://omniedge.io/docs/cli"#,
-    version,
+    version = VERSION,
+    long_version = long_version(),
     after_help = "Use 'omniedge <command> --help' for more information about a command.",
     arg_required_else_help = true
 )]
