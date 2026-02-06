@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "OmniEdge",
@@ -23,7 +24,7 @@
         "alwaysOnTop": true,
         "visible": true,
         "skipTaskbar": true,
-        "shadow": true,
+        "shadow": false,
         "resizable": false,
         "transparent": true
       }
