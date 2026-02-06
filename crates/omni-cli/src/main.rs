@@ -493,6 +493,61 @@ enum Commands {
         #[arg(short, long, default_value = "22")]
         port: u16,
     },
+
+    /// Start a standalone SSH server (no OmniEdge backend required)
+    ///
+    /// Run an SSH server that accepts connections without requiring the full
+    /// OmniEdge backend. Useful for testing, development, or standalone deployments.
+    ///
+    /// EXAMPLES:
+    ///   omniedge ssh-server                       Start on default port 2222
+    ///   omniedge ssh-server -p 22                 Start on port 22
+    ///   omniedge ssh-server --permissive          Accept connections from any IP
+    ///   omniedge ssh-server --allow-network 10.0.0.0/8   Only allow this network
+    #[cfg(feature = "ssh")]
+    SshServer {
+        /// Port to listen on
+        #[arg(short, long, default_value = "2222")]
+        port: u16,
+
+        /// Bind address
+        #[arg(short, long, default_value = "0.0.0.0")]
+        bind: String,
+
+        /// Accept connections from any IP (permissive mode)
+        #[arg(long)]
+        permissive: bool,
+
+        /// Allow connections only from localhost
+        #[arg(long, conflicts_with = "permissive")]
+        localhost_only: bool,
+
+        /// Allow connections from specific network (CIDR notation)
+        /// Can be specified multiple times
+        #[arg(long = "allow-network", value_name = "CIDR")]
+        allow_networks: Vec<String>,
+
+        /// Device ID for this server
+        #[arg(long, default_value = "standalone-server")]
+        device_id: String,
+
+        /// Map SSH user to local user (format: ssh_user:local_user)
+        /// Can be specified multiple times
+        #[arg(long = "user-map", value_name = "SSH:LOCAL")]
+        user_maps: Vec<String>,
+
+        /// Default local user if no mapping found
+        #[arg(long)]
+        default_user: Option<String>,
+
+        /// Path to store/load host keys (generates if not present)
+        #[arg(long)]
+        host_key_path: Option<String>,
+
+        /// Disable event logging
+        #[arg(long)]
+        quiet: bool,
+    },
 }
 
 /// Network configuration subcommands
@@ -1423,6 +1478,33 @@ async fn async_main() -> Result<()> {
         } => {
             handle_scp_command(&source, &destination, recursive, port, &config).await?;
         }
+        #[cfg(feature = "ssh")]
+        Commands::SshServer {
+            port,
+            bind,
+            permissive,
+            localhost_only,
+            allow_networks,
+            device_id,
+            user_maps,
+            default_user,
+            host_key_path,
+            quiet,
+        } => {
+            handle_ssh_server_command(
+                port,
+                &bind,
+                permissive,
+                localhost_only,
+                allow_networks,
+                &device_id,
+                user_maps,
+                default_user,
+                host_key_path,
+                quiet,
+            )
+            .await?;
+        }
     }
 
     Ok(())
@@ -1652,6 +1734,109 @@ async fn handle_scp_command(
     sftp.close().await?;
     session.close().await?;
 
+    Ok(())
+}
+
+/// Handle standalone SSH server command
+#[cfg(feature = "ssh")]
+async fn handle_ssh_server_command(
+    port: u16,
+    bind: &str,
+    permissive: bool,
+    localhost_only: bool,
+    allow_networks: Vec<String>,
+    device_id: &str,
+    user_maps: Vec<String>,
+    default_user: Option<String>,
+    host_key_path: Option<String>,
+    quiet: bool,
+) -> Result<()> {
+    use omni_ssh::server::{SshServer, SshServerConfig};
+    use omni_ssh::standalone::{StandaloneConfig, StandaloneSshBackend};
+
+    // Build configuration based on mode
+    let mut config = if permissive {
+        println!("Mode: Permissive (accepting connections from any IP)");
+        StandaloneConfig::permissive()
+    } else if localhost_only {
+        println!("Mode: Localhost only (127.0.0.0/8)");
+        StandaloneConfig::localhost_only()
+    } else {
+        println!("Mode: Private networks (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)");
+        StandaloneConfig::default()
+    };
+
+    config.device_id = device_id.to_string();
+    config.log_events = !quiet;
+
+    // Add custom allowed networks
+    for network in &allow_networks {
+        let net: ipnet::IpNet = network
+            .parse()
+            .map_err(|e| anyhow::anyhow!("Invalid network '{}': {}", network, e))?;
+        config.allowed_networks.push(net);
+        println!("  Added allowed network: {}", net);
+    }
+
+    // Add user mappings
+    for mapping in &user_maps {
+        let parts: Vec<&str> = mapping.split(':').collect();
+        if parts.len() != 2 {
+            anyhow::bail!(
+                "Invalid user mapping '{}'. Format: ssh_user:local_user",
+                mapping
+            );
+        }
+        config
+            .user_mapping
+            .insert(parts[0].to_string(), parts[1].to_string());
+        println!("  User mapping: {} -> {}", parts[0], parts[1]);
+    }
+
+    if let Some(ref user) = default_user {
+        config.default_local_user = Some(user.clone());
+        println!("  Default local user: {}", user);
+    }
+
+    if let Some(ref path) = host_key_path {
+        config.host_key_path = Some(std::path::PathBuf::from(path));
+        println!("  Host key path: {}", path);
+    }
+
+    // Create backend
+    let backend = std::sync::Arc::new(
+        StandaloneSshBackend::new(config)
+            .map_err(|e| anyhow::anyhow!("Failed to create backend: {}", e))?,
+    );
+
+    // Create server with default config
+    let server_config = SshServerConfig::default();
+    let server = SshServer::new(server_config, backend)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to create SSH server: {}", e))?;
+
+    // Parse bind address
+    let bind_addr: std::net::SocketAddr = format!("{}:{}", bind, port)
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Invalid bind address '{}:{}': {}", bind, port, e))?;
+
+    println!();
+    println!("========================================");
+    println!("  OmniEdge Standalone SSH Server");
+    println!("========================================");
+    println!("  Listening on: {}", bind_addr);
+    println!("  Device ID:    {}", device_id);
+    println!();
+    println!("Press Ctrl+C to stop the server.");
+    println!();
+
+    // Start the server (blocks until shutdown)
+    server
+        .start(bind_addr)
+        .await
+        .map_err(|e| anyhow::anyhow!("SSH server error: {}", e))?;
+
+    println!("SSH server stopped.");
     Ok(())
 }
 

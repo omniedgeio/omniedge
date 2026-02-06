@@ -14,6 +14,7 @@
 //! - **Fleet Operations**: Batch command execution across multiple devices
 //! - **Command Filtering**: Allowlist/blocklist for command-level security
 //! - **Connection Health**: Real-time monitoring and auto-disconnect
+//! - **Standalone Mode**: Run SSH server without OmniEdge backend
 //!
 //! ## Quick Start
 //!
@@ -28,6 +29,31 @@
 //!     // Server will use OmniEdge identity for authentication
 //!     // let server = SshServer::new(config, backend).await?;
 //!     // server.start("0.0.0.0:22".parse()?).await?;
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Standalone Mode
+//!
+//! Run SSH server without OmniEdge backend:
+//!
+//! ```rust,ignore
+//! use omni_ssh::standalone::{StandaloneSshBackend, StandaloneConfig};
+//! use omni_ssh::{SshServer, SshServerConfig};
+//! use std::sync::Arc;
+//!
+//! #[tokio::main]
+//! async fn main() -> anyhow::Result<()> {
+//!     // Create standalone backend (accepts private network IPs)
+//!     let backend = Arc::new(StandaloneSshBackend::new(StandaloneConfig::default())?);
+//!     
+//!     // Or use permissive mode (accepts all IPs)
+//!     // let backend = Arc::new(StandaloneSshBackend::permissive()?);
+//!     
+//!     let config = SshServerConfig::default();
+//!     let server = SshServer::new(config, backend).await?;
+//!     server.start("0.0.0.0:2222".parse()?).await?;
 //!     
 //!     Ok(())
 //! }
@@ -62,6 +88,10 @@ pub mod fleet;
 
 pub mod health;
 
+/// Standalone SSH backend for running without OmniEdge cloud
+#[cfg(feature = "server")]
+pub mod standalone;
+
 // Re-export main types
 pub use types::*;
 
@@ -82,6 +112,9 @@ pub use emergency::{
     EmergencyAccessConfig, EmergencyAccessGrant, EmergencyAccessManager, EmergencyAccessRequest,
     EmergencyAccessStatus, EmergencySeverity,
 };
+
+#[cfg(feature = "server")]
+pub use standalone::{StandaloneConfig, StandaloneSshBackend, StandaloneSshServerBuilder};
 
 // Re-export dependencies for external use
 pub use async_trait::async_trait;

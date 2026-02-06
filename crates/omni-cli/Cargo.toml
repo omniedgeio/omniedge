@@ -45,6 +45,7 @@ mac_address = "1.1"
 local-ip-address = "0.5"
 regex = "1.10"
 ipnetwork = "0.20"
+ipnet = "2"
 is_elevated = "0.1"
 indicatif = "0.17"
 
