@@ -422,7 +422,7 @@ impl Updater {
     ///
     /// This replaces the current executable with the downloaded update.
     /// The current executable is backed up first.
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(all(feature = "updater", not(target_os = "windows")))]
     pub async fn install_cli_update(&self, downloaded_path: &Path) -> Result<()> {
         use std::os::unix::fs::PermissionsExt;
 
@@ -470,7 +470,7 @@ impl Updater {
     }
 
     /// Install the update (CLI self-update) - Windows version
-    #[cfg(target_os = "windows")]
+    #[cfg(all(feature = "updater", target_os = "windows"))]
     pub async fn install_cli_update(&self, downloaded_path: &Path) -> Result<()> {
         let current_exe =
             std::env::current_exe().context("Failed to get current executable path")?;
@@ -520,7 +520,16 @@ impl Updater {
         Ok(())
     }
 
+    /// Install the update - stub when updater feature is disabled
+    #[cfg(not(feature = "updater"))]
+    pub async fn install_cli_update(&self, _downloaded_path: &Path) -> Result<()> {
+        Err(anyhow!(
+            "Self-update requires the 'updater' feature to be enabled"
+        ))
+    }
+
     /// Extract an archive and return path to the binary
+    #[cfg(feature = "updater")]
     async fn extract_archive(&self, archive_path: &Path) -> Result<PathBuf> {
         let extract_dir = archive_path.parent().unwrap().join("omniedge-extract");
         tokio::fs::create_dir_all(&extract_dir).await?;
