@@ -1,5 +1,227 @@
 # OmniEdge Release Notes
 
+## v2.7.0 (2026-02-05)
+
+### SSH Integration
+
+This release introduces **comprehensive SSH integration**, enabling secure remote access to any device in your OmniEdge mesh network without exposing ports to the internet.
+
+#### New Crate: `omni-ssh`
+
+A full-featured SSH implementation built on `russh`, providing:
+
+| Component | Description |
+|-----------|-------------|
+| `SshServer` | SSH server with OmniEdge backend integration |
+| `SshClient` | SSH client for connecting to mesh peers |
+| `SftpServer` / `SftpClient` | Secure file transfer protocol support |
+| `PortForwarder` | Local and remote port forwarding |
+| `SessionRecorder` | Audit logging and session recording |
+| `FleetOperations` | Parallel command execution across nodes |
+| `EmergencyAccess` | Break-glass mechanism for incident response |
+| `StandaloneSshBackend` | Run SSH server without OmniEdge backend |
+
+#### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `omniedge ssh user@peer` | SSH to peer by name or virtual IP |
+| `omniedge ssh user@peer command` | Execute remote command |
+| `omniedge sftp peer` | Interactive SFTP session |
+| `omniedge scp src dst` | Copy files to/from peers |
+| `omniedge ssh-server` | Start standalone SSH server |
+
+#### SSH Client Features
+
+```bash
+# Connect by peer name (resolved via OmniEdge API)
+omniedge ssh admin@my-robot
+
+# Connect by virtual IP
+omniedge ssh root@10.147.1.5
+
+# Execute command and exit
+omniedge ssh admin@peer "systemctl status myservice"
+
+# Custom port
+omniedge ssh -p 2222 user@peer
+```
+
+#### SFTP & SCP Support
+
+```bash
+# Interactive SFTP
+omniedge sftp my-server
+
+# Copy local to remote
+omniedge scp ./model.onnx peer:/opt/models/
+
+# Copy remote to local
+omniedge scp peer:/var/log/app.log ./
+
+# Recursive copy
+omniedge scp -r ./config/ peer:/etc/myapp/
+```
+
+#### Standalone SSH Server
+
+Run an SSH server without the full OmniEdge backend - ideal for testing, development, or lightweight deployments:
+
+```bash
+# Default mode: Accept from private networks only
+omniedge ssh-server
+
+# Permissive: Accept from any IP
+omniedge ssh-server --permissive
+
+# Localhost only
+omniedge ssh-server --localhost-only
+
+# Custom network allowlist
+omniedge ssh-server --allow-network 192.168.1.0/24 --allow-network 10.0.0.0/8
+
+# User mapping
+omniedge ssh-server --user-map git:admin --default-user guest
+
+# Custom configuration
+omniedge ssh-server -p 22 -b 0.0.0.0 --host-key-path /etc/omniedge/host_key
+```
+
+#### Standalone Server Options
+
+| Option | Description |
+|--------|-------------|
+| `-p, --port` | Port to listen on (default: 2222) |
+| `-b, --bind` | Bind address (default: 0.0.0.0) |
+| `--permissive` | Accept connections from any IP |
+| `--localhost-only` | Only accept from 127.0.0.0/8 |
+| `--allow-network <CIDR>` | Allow specific network (repeatable) |
+| `--device-id` | Device ID for this server |
+| `--user-map <SSH:LOCAL>` | Map SSH user to local user |
+| `--default-user` | Default local user if no mapping |
+| `--host-key-path` | Path to store/load host keys |
+| `--quiet` | Disable event logging |
+
+#### Fleet Operations
+
+Execute commands across multiple nodes in parallel:
+
+```rust
+use omni_ssh::fleet::{FleetExecutor, FleetTarget};
+
+let executor = FleetExecutor::new(backend);
+let targets = vec![
+    FleetTarget::new("robot-1", "10.147.1.1"),
+    FleetTarget::new("robot-2", "10.147.1.2"),
+    FleetTarget::new("robot-3", "10.147.1.3"),
+];
+
+// Execute on all nodes concurrently
+let results = executor.execute_parallel(&targets, "systemctl restart myservice").await?;
+```
+
+#### Emergency Access
+
+Break-glass mechanism for incident response with full audit logging:
+
+```rust
+use omni_ssh::emergency::{EmergencyAccess, EmergencyReason};
+
+let emergency = EmergencyAccess::new(backend, cloud_client);
+
+// Request emergency access (creates audit trail)
+let session = emergency.request_access(
+    "robot-fleet-1",
+    EmergencyReason::IncidentResponse { ticket: "INC-12345".into() },
+).await?;
+
+// Access is logged and time-limited
+let result = session.exec("cat /var/log/syslog").await?;
+```
+
+#### Session Recording
+
+Record SSH sessions for compliance and audit:
+
+```rust
+use omni_ssh::recording::{SessionRecorder, RecordingFormat};
+
+let recorder = SessionRecorder::new(RecordingFormat::Asciinema);
+recorder.start_recording(&session).await?;
+
+// ... session activity ...
+
+let recording = recorder.stop_recording().await?;
+recording.save_to_file("session-2026-02-05.cast")?;
+```
+
+#### Technical Details
+
+| Component | Description |
+|-----------|-------------|
+| `crates/omni-ssh/` | New SSH crate (~10,000+ lines) |
+| `russh` | Underlying SSH protocol implementation |
+| `russh-keys` | SSH key handling (ED25519, RSA) |
+| `ipnet` | CIDR network parsing for allowlists |
+| Feature: `ssh` | Compile-time opt-in for SSH support |
+| Feature: `sftp` | SFTP protocol support |
+| Feature: `recording` | Session recording support |
+| Feature: `fleet` | Fleet operations support |
+| Feature: `emergency` | Emergency access support |
+
+#### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    OmniEdge SSH Integration                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐        │
+│  │  SSH Client │     │  SSH Server │     │   Standalone │        │
+│  │  (omniedge  │     │  (built-in) │     │   SSH Server │        │
+│  │   ssh ...)  │     │             │     │              │        │
+│  └──────┬──────┘     └──────┬──────┘     └──────┬───────┘        │
+│         │                   │                   │                │
+│         └─────────┬─────────┴─────────┬─────────┘                │
+│                   │                   │                          │
+│         ┌─────────▼─────────┐ ┌───────▼────────┐                 │
+│         │   SshBackend      │ │ StandaloneSsh  │                 │
+│         │   (OmniEdge)      │ │    Backend     │                 │
+│         │                   │ │ (No backend)   │                 │
+│         │ - Peer resolution │ │ - IP allowlist │                 │
+│         │ - Policy from API │ │ - Auto hostkey │                 │
+│         │ - Event logging   │ │ - User mapping │                 │
+│         └───────────────────┘ └────────────────┘                 │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │                    SFTP / Port Forwarding                   │ │
+│  │   - File upload/download    - Local port forwarding         │ │
+│  │   - Directory operations    - Remote port forwarding        │ │
+│  │   - Recursive transfers     - Dynamic SOCKS proxy           │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Use Cases
+
+| Use Case | Description |
+|----------|-------------|
+| **Robot Fleet Management** | SSH into any robot without port forwarding |
+| **Edge ML Deployment** | Transfer models via SFTP to edge devices |
+| **Distributed Debugging** | Access logs and run diagnostics remotely |
+| **Fleet Commands** | Execute updates across all nodes in parallel |
+| **Incident Response** | Emergency access with full audit trail |
+| **Air-Gapped Testing** | Standalone SSH server for isolated networks |
+
+### Compatibility
+
+- **OmniNervous**: v0.5.0
+- **Existing Networks**: Fully backward compatible with v2.6.x networks
+- **SSH Feature**: Compile-time opt-in (`--features ssh`)
+- **Standalone Mode**: No OmniEdge backend required
+
+---
+
 ## v2.6.0 (2026-02-06)
 
 ### Version Check & Self-Update

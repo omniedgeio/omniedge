@@ -357,6 +357,76 @@ sudo omniedge start -n <network_id> --transport-mode l2
 
 **Note**: L2 mode is currently in preview. Full OmniNervous L2 module integration is in progress.
 
+## SSH Integration (v2.7.0)
+
+OmniEdge now includes a **built-in SSH server and client**, enabling secure remote access to any device in your mesh network without exposing ports to the internet.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Mesh SSH Client** | SSH to any peer by name or virtual IP |
+| **Built-in SSH Server** | Accept SSH connections over the mesh |
+| **SFTP Support** | Secure file transfer to/from peers |
+| **SCP Support** | Copy files with familiar scp syntax |
+| **Session Recording** | Record SSH sessions for audit/compliance |
+| **Fleet Operations** | Execute commands across multiple nodes |
+| **Emergency Access** | Break-glass mechanism for incident response |
+| **Standalone Mode** | Run SSH server without OmniEdge backend |
+
+### SSH Commands
+
+```bash
+# Connect to a peer (by name or virtual IP)
+omniedge ssh user@my-robot           # By peer name
+omniedge ssh user@10.147.1.5         # By virtual IP
+omniedge ssh -p 2222 user@peer       # Custom port
+
+# Execute remote commands
+omniedge ssh user@peer "uptime"
+omniedge ssh user@peer "systemctl status myservice"
+
+# Interactive SFTP
+omniedge sftp peer                   # Start SFTP session
+
+# Copy files (SCP)
+omniedge scp local.txt peer:/remote/path
+omniedge scp peer:/remote/file.txt ./local/
+omniedge scp -r ./folder peer:/path  # Recursive copy
+```
+
+### Standalone SSH Server
+
+Run an SSH server without the full OmniEdge backend - useful for testing, development, or lightweight deployments:
+
+```bash
+# Default: Private networks only (10.x, 172.16.x, 192.168.x)
+omniedge ssh-server
+
+# Accept from any IP (development/testing)
+omniedge ssh-server --permissive
+
+# Localhost only (127.0.0.0/8)
+omniedge ssh-server --localhost-only
+
+# Custom network allowlist
+omniedge ssh-server --allow-network 192.168.1.0/24
+
+# User mapping (map SSH user to local user)
+omniedge ssh-server --user-map git:admin --default-user guest
+
+# Custom port and host key
+omniedge ssh-server -p 22 --host-key-path /etc/omniedge/host_key
+```
+
+### Use Cases
+
+- **Remote Robot Debugging**: SSH into any robot in your fleet without port forwarding
+- **Secure File Deployment**: Transfer ML models to edge devices via SFTP
+- **Fleet Management**: Execute commands across all nodes simultaneously
+- **Incident Response**: Emergency access with audit logging
+- **Air-Gapped Operations**: Standalone SSH server for isolated networks
+
 ## Self-Hosted Mode (Air-Gapped Labs)
 
 Run completely offline with no cloud dependency:
@@ -418,6 +488,14 @@ omniedge version --releases       # Show recent release history
 omniedge upgrade                  # Self-update to latest version
 omniedge upgrade --check          # Check only, don't install
 omniedge upgrade --yes            # Skip confirmation prompt
+
+# SSH integration (v2.7.0)
+omniedge ssh user@peer            # SSH to peer by name or IP
+omniedge ssh user@peer command    # Execute remote command
+omniedge sftp peer                # Interactive SFTP session
+omniedge scp file.txt peer:/path  # Copy files to/from peers
+omniedge ssh-server               # Start standalone SSH server
+omniedge ssh-server --permissive  # Accept from any IP
 
 # Advanced modes
 omniedge start --mode nucleus --port 51821 --secret "..."  # Signaling server
