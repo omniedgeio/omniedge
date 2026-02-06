@@ -62,6 +62,15 @@ impl ApiClient {
         }
         let body_bytes = resp.bytes().await?;
 
+        // Log raw response for debugging device online status issues
+        if url.path().contains("/devices") {
+            debug!(
+                "Raw API response from {}: {}",
+                url,
+                String::from_utf8_lossy(&body_bytes)
+            );
+        }
+
         if status.is_success() {
             // First try parsing with SuccessResponse wrapper
             if let Ok(data) = serde_json::from_slice::<SuccessResponse<T>>(&body_bytes) {
