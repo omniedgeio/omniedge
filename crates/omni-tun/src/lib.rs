@@ -46,6 +46,11 @@ impl OmniTun {
         // First setup IPv4 (this creates the interface)
         self.setup(vip, port, private_key).await?;
 
+        // Setup subnet route (needed on macOS where tun crate doesn't do this automatically)
+        if let Err(e) = self.setup_subnet_route(vip, "255.255.255.0").await {
+            warn!("Failed to setup subnet route: {}. Connectivity may be affected.", e);
+        }
+
         // Then add IPv6 address if provided
         if let Some(ipv6) = vip_v6 {
             let prefix = prefix_v6.unwrap_or(120);
@@ -61,6 +66,74 @@ impl OmniTun {
                     vip, ipv6, prefix
                 );
             }
+        }
+
+        Ok(())
+    }
+
+    /// Setup the subnet route for the VPN network
+    /// On macOS, the tun crate doesn't automatically add the subnet route
+    async fn setup_subnet_route(&self, vip: &str, netmask: &str) -> anyhow::Result<()> {
+        let ifname = self.get_interface_name().await;
+        
+        // Calculate network address from VIP and netmask
+        let vip_addr: std::net::Ipv4Addr = vip.parse()
+            .map_err(|e| anyhow::anyhow!("Invalid VIP address: {}", e))?;
+        let mask_addr: std::net::Ipv4Addr = netmask.parse()
+            .map_err(|e| anyhow::anyhow!("Invalid netmask: {}", e))?;
+        
+        let vip_bits = u32::from(vip_addr);
+        let mask_bits = u32::from(mask_addr);
+        let network_bits = vip_bits & mask_bits;
+        let network_addr = std::net::Ipv4Addr::from(network_bits);
+        
+        // Calculate CIDR prefix length from netmask
+        let prefix_len = mask_bits.count_ones();
+        let network_cidr = format!("{}/{}", network_addr, prefix_len);
+
+        #[cfg(target_os = "macos")]
+        {
+            // macOS: route add -net <network>/<prefix> -interface <ifname>
+            info!("Adding subnet route {} via interface {}", network_cidr, ifname);
+            let output = std::process::Command::new("route")
+                .args(["-n", "add", "-net", &network_cidr, "-interface", &ifname])
+                .output()
+                .map_err(|e| anyhow::anyhow!("Failed to run route command: {}", e))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                // Ignore "already exists" error
+                if !stderr.contains("exists") {
+                    return Err(anyhow::anyhow!("route add failed: {}", stderr));
+                }
+            }
+            info!("Added subnet route {} to {}", network_cidr, ifname);
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            // Linux: ip route add <network>/<prefix> dev <ifname>
+            info!("Adding subnet route {} via interface {}", network_cidr, ifname);
+            let output = std::process::Command::new("ip")
+                .args(["route", "add", &network_cidr, "dev", &ifname])
+                .output()
+                .map_err(|e| anyhow::anyhow!("Failed to run ip route command: {}", e))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                // Ignore "already exists" error
+                if !stderr.contains("File exists") {
+                    return Err(anyhow::anyhow!("ip route add failed: {}", stderr));
+                }
+            }
+            info!("Added subnet route {} to {}", network_cidr, ifname);
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            // Windows typically handles this automatically, but add as fallback
+            // route add <network> mask <netmask> <gateway> IF <interface_index>
+            info!("Windows: Subnet route should be auto-configured");
         }
 
         Ok(())
