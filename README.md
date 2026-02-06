@@ -95,10 +95,10 @@ When running `omniedge start --mode nucleus` or `--mode dual`, the CLI can auto-
 
 ```bash
 # Download the package for your architecture (example: aarch64, OpenWrt 24.10)
-wget https://github.com/omniedgeio/omniedge/releases/download/v2.3.0/omniedge_2.3.0_aarch64_generic.ipk
+wget https://github.com/omniedgeio/omniedge/releases/download/v2.6.0/omniedge_2.6.0_aarch64_generic.ipk
 
 # Install the package
-opkg install omniedge_2.3.0_aarch64_generic.ipk
+opkg install omniedge_2.6.0_aarch64_generic.ipk
 
 # Configure via UCI
 uci set omniedge.main.enabled='1'
@@ -410,6 +410,14 @@ omniedge plugin disable <id>      # Disable a plugin
 omniedge plugin info <id>         # Show plugin details
 omniedge plugin reload <id>       # Reload a plugin
 omniedge plugin discover          # Discover plugins in directory
+
+# Version check and upgrade (v2.6.0)
+omniedge version                  # Display version with commit hash
+omniedge version --check          # Check GitHub for updates
+omniedge version --releases       # Show recent release history
+omniedge upgrade                  # Self-update to latest version
+omniedge upgrade --check          # Check only, don't install
+omniedge upgrade --yes            # Skip confirmation prompt
 
 # Advanced modes
 omniedge start --mode nucleus --port 51821 --secret "..."  # Signaling server
