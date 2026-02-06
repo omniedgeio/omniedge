@@ -835,6 +835,90 @@ body {
     margin: 12px 0;
 }
 
+/* Version in footer */
+.footer-item.version {
+    flex: 0 0 auto;
+    padding: 0 12px;
+    position: relative;
+    cursor: default;
+}
+
+.footer-item.version:hover {
+    background: transparent;
+}
+
+.version-text {
+    font-size: 10px;
+    opacity: 0.5;
+}
+
+.update-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent-blue);
+    border-radius: 50%;
+    margin-left: 4px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Update Banner */
+.update-banner {
+    background: rgba(0, 122, 255, 0.08);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    border-bottom: 0.5px solid var(--divider);
+    color: var(--accent-blue);
+}
+
+.update-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.update-banner-content svg {
+    stroke: var(--accent-blue);
+}
+
+.update-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.update-download {
+    color: var(--accent-blue);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.update-download:hover {
+    text-decoration: underline;
+}
+
+.update-dismiss {
+    opacity: 0.6;
+    cursor: pointer;
+}
+
+.update-dismiss:hover {
+    opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+    .update-banner {
+        background: rgba(0, 122, 255, 0.12);
+    }
+}
+
 .divider {
     height: 0.5px;
     background: var(--divider);

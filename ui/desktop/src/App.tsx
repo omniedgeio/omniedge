@@ -62,6 +62,10 @@ function App() {
   const [dataCollectionAvailable, setDataCollectionAvailable] = useState(false);
   const [dataCollectionEnabled, setDataCollectionEnabled] = useState(false);
 
+  // Version and update state
+  const [versionInfo, setVersionInfo] = useState<{version: string, commit?: string, build_date?: string} | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<{available: boolean, version?: string, url?: string, notes?: string} | null>(null);
+
   // Resize window to fit content
   // Track last height to avoid unnecessary resize calls
   const lastHeightRef = useRef<number>(0);
@@ -177,6 +181,9 @@ function App() {
             await handleSuccessfulLogin();
           }
         }
+
+        // Check for updates in background (non-blocking)
+        checkForUpdates();
       } catch (err) {
         console.error("Initialization failed", err);
       } finally {
@@ -184,6 +191,35 @@ function App() {
       }
     };
     init();
+
+    // Background update check function
+    const checkForUpdates = async () => {
+      try {
+        const version = await invoke('get_version_info') as {version: string, commit?: string, build_date?: string};
+        setVersionInfo(version);
+        
+        const update = await invoke('check_for_updates', { includePrerelease: false }) as {
+          current_version: string,
+          update_available: boolean,
+          latest_version?: string,
+          release_notes?: string,
+          download_url?: string,
+          release_url?: string,
+          published_at?: string
+        };
+        
+        if (update.update_available) {
+          setUpdateInfo({
+            available: true,
+            version: update.latest_version,
+            url: update.release_url,
+            notes: update.release_notes
+          });
+        }
+      } catch (e) {
+        console.log('Update check failed (non-critical):', e);
+      }
+    };
 
     const statusInterval = setInterval(async () => {
       try {
@@ -875,6 +911,23 @@ function App() {
             </div>
           )}
 
+          {updateInfo?.available && (
+            <div className="update-banner">
+              <div className="update-banner-content">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Update available: v{updateInfo.version}</span>
+              </div>
+              <div className="update-banner-actions">
+                <span className="update-download" onClick={() => invoke('open_download_page')}>Download</span>
+                <span className="update-dismiss" onClick={() => setUpdateInfo(null)}>Dismiss</span>
+              </div>
+            </div>
+          )}
+
           {showSetup ? (
             <div className="setup-view">
               <div className="setup-hero">
@@ -1467,6 +1520,11 @@ function App() {
       </div>
 
       <div className="app-footer-new">
+        <div className="footer-item version" title={versionInfo ? `Build: ${versionInfo.commit || 'dev'}` : ''}>
+          <span className="version-text">v{versionInfo?.version || '...'}</span>
+          {updateInfo?.available && <span className="update-dot" title="Update available"></span>}
+        </div>
+        <div className="footer-divider"></div>
         <div className="footer-item" onClick={() => openURL('https://connect.omniedge.io/dashboard')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
