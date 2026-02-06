@@ -46,6 +46,15 @@ impl OmniTun {
         // First setup IPv4 (this creates the interface)
         self.setup(vip, port, private_key).await?;
 
+        // Add network route for VIP subnet (critical for peer connectivity)
+        // This ensures packets to other peers (e.g., ping 100.100.0.198) are routed through TUN
+        if let Err(e) = self.add_vip_network_route(vip).await {
+            warn!(
+                "Failed to add VIP network route for {}: {}. Peer connectivity may be affected.",
+                vip, e
+            );
+        }
+
         // Then add IPv6 address if provided
         if let Some(ipv6) = vip_v6 {
             let prefix = prefix_v6.unwrap_or(120);
@@ -60,9 +69,391 @@ impl OmniTun {
                     "Dual-stack configured: IPv4={}, IPv6={}/{}",
                     vip, ipv6, prefix
                 );
+
+                // Add IPv6 network route for peer connectivity
+                if let Err(e) = self.add_ipv6_network_route(ipv6, prefix).await {
+                    warn!(
+                        "Failed to add IPv6 network route for {}/{}: {}. IPv6 peer connectivity may be affected.",
+                        ipv6, prefix, e
+                    );
+                }
             }
         }
 
+        Ok(())
+    }
+
+    /// Add network route for VIP subnet to enable peer connectivity
+    /// This is critical - without this route, packets to peer VIPs won't go through the TUN
+    async fn add_vip_network_route(&self, vip: &str) -> anyhow::Result<()> {
+        let ifname = self.get_interface_name().await;
+
+        // Validate and parse VIP to prevent command injection
+        // This ensures vip is a valid IPv4 address before using in shell commands
+        let vip_addr: std::net::Ipv4Addr = vip
+            .parse()
+            .map_err(|_| anyhow::anyhow!("Invalid VIP address format: {}", vip))?;
+
+        // Validate interface name to prevent command injection
+        Self::validate_interface_name(&ifname)?;
+
+        // Calculate network address (assumes /24 subnet, e.g., 100.100.0.0/24)
+        let octets = vip_addr.octets();
+        let network = format!("{}.{}.{}.0", octets[0], octets[1], octets[2]);
+
+        info!(
+            "Adding VIP network route: {}/24 via interface {}",
+            network, ifname
+        );
+
+        #[cfg(target_os = "linux")]
+        {
+            // Linux: ip route add <network>/24 dev <ifname>
+            let output = std::process::Command::new("ip")
+                .args(["route", "add", &format!("{}/24", network), "dev", &ifname])
+                .output()
+                .map_err(|e| anyhow::anyhow!("Failed to run ip route command: {}", e))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                // Ignore "already exists" error
+                if !stderr.contains("File exists")
+                    && !stderr.contains("RTNETLINK answers: File exists")
+                {
+                    return Err(anyhow::anyhow!("ip route add failed: {}", stderr));
+                }
+                debug!("VIP network route already exists (this is OK)");
+            }
+            info!("Added IPv4 network route {}/24 via {}", network, ifname);
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            // macOS: route -n add -net <network>/24 -interface <ifname>
+            let output = std::process::Command::new("route")
+                .args([
+                    "-n",
+                    "add",
+                    "-net",
+                    &format!("{}/24", network),
+                    "-interface",
+                    &ifname,
+                ])
+                .output()
+                .map_err(|e| anyhow::anyhow!("Failed to run route command: {}", e))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                // Ignore "already exists" error
+                if !stderr.contains("File exists") && !stderr.contains("exists") {
+                    return Err(anyhow::anyhow!("route add failed: {}", stderr));
+                }
+                debug!("VIP network route already exists (this is OK)");
+            }
+            info!("Added IPv4 network route {}/24 via {}", network, ifname);
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: route ADD <network> MASK 255.255.255.0 <vip> IF <iface_index>
+            // First, get interface index
+            let iface_idx = Self::get_windows_interface_index(&ifname);
+
+            let mut args = vec![
+                "ADD".to_string(),
+                network.clone(),
+                "MASK".to_string(),
+                "255.255.255.0".to_string(),
+                vip.to_string(), // Use VIP as gateway (on-link route)
+            ];
+
+            if let Some(idx) = iface_idx {
+                args.push("IF".to_string());
+                args.push(idx);
+            }
+
+            let output = std::process::Command::new("route")
+                .args(&args)
+                .output()
+                .map_err(|e| anyhow::anyhow!("Failed to run route command: {}", e))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                // Windows route command outputs to stdout, not stderr
+                let combined = format!("{}{}", stdout, stderr);
+                // Ignore "already exists" error
+                if !combined.contains("already exists")
+                    && !combined.contains("object already exists")
+                {
+                    // Try PowerShell as fallback
+                    let ps_result = Self::add_windows_route_powershell(&network, vip, &ifname);
+                    if ps_result.is_err() {
+                        return Err(anyhow::anyhow!("route add failed: {}", combined));
+                    }
+                }
+                debug!("VIP network route already exists (this is OK)");
+            }
+            info!("Added IPv4 network route {}/24 via {}", network, ifname);
+        }
+
+        Ok(())
+    }
+
+    /// Add IPv6 network route for peer connectivity
+    async fn add_ipv6_network_route(&self, ipv6: &str, prefix_len: u8) -> anyhow::Result<()> {
+        let ifname = self.get_interface_name().await;
+
+        // Validate IPv6 address to prevent command injection
+        let ipv6_addr: std::net::Ipv6Addr = ipv6
+            .parse()
+            .map_err(|_| anyhow::anyhow!("Invalid IPv6 address format: {}", ipv6))?;
+
+        // Validate prefix length (must be 0-128)
+        if prefix_len > 128 {
+            return Err(anyhow::anyhow!(
+                "Invalid IPv6 prefix length: {} (must be 0-128)",
+                prefix_len
+            ));
+        }
+
+        // Validate interface name to prevent command injection
+        Self::validate_interface_name(&ifname)?;
+
+        // Calculate the network address from the IPv6 address and prefix
+        info!(
+            "Adding IPv6 network route: {}/{} via interface {}",
+            ipv6_addr, prefix_len, ifname
+        );
+
+        #[cfg(target_os = "linux")]
+        {
+            // Linux: ip -6 route add <network>/<prefix> dev <ifname>
+            // Extract network portion based on prefix
+            let network = Self::ipv6_network_address(ipv6, prefix_len);
+            let output = std::process::Command::new("ip")
+                .args([
+                    "-6",
+                    "route",
+                    "add",
+                    &format!("{}/{}", network, prefix_len),
+                    "dev",
+                    &ifname,
+                ])
+                .output()
+                .map_err(|e| anyhow::anyhow!("Failed to run ip -6 route command: {}", e))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                if !stderr.contains("File exists")
+                    && !stderr.contains("RTNETLINK answers: File exists")
+                {
+                    return Err(anyhow::anyhow!("ip -6 route add failed: {}", stderr));
+                }
+            }
+            info!(
+                "Added IPv6 network route {}/{} via {}",
+                network, prefix_len, ifname
+            );
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            // macOS: route -n add -inet6 <network>/<prefix> -interface <ifname>
+            let network = Self::ipv6_network_address(ipv6, prefix_len);
+            let output = std::process::Command::new("route")
+                .args([
+                    "-n",
+                    "add",
+                    "-inet6",
+                    &format!("{}/{}", network, prefix_len),
+                    "-interface",
+                    &ifname,
+                ])
+                .output()
+                .map_err(|e| anyhow::anyhow!("Failed to run route command: {}", e))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                if !stderr.contains("exists") {
+                    return Err(anyhow::anyhow!("route -inet6 add failed: {}", stderr));
+                }
+            }
+            info!(
+                "Added IPv6 network route {}/{} via {}",
+                network, prefix_len, ifname
+            );
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: Use PowerShell New-NetRoute for IPv6
+            let network = Self::ipv6_network_address(ipv6, prefix_len);
+            let ps_cmd = format!(
+                "New-NetRoute -DestinationPrefix '{}/{}' -InterfaceAlias '{}' -NextHop '::' -PolicyStore ActiveStore -ErrorAction SilentlyContinue",
+                network, prefix_len, ifname
+            );
+            let output = std::process::Command::new("powershell")
+                .args(["-Command", &ps_cmd])
+                .output()
+                .map_err(|e| anyhow::anyhow!("Failed to run PowerShell command: {}", e))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                if !stderr.is_empty() && !stderr.contains("already exists") {
+                    // Try route command as fallback
+                    let route_result = std::process::Command::new("route")
+                        .args([
+                            "-6",
+                            "ADD",
+                            &format!("{}/{}", network, prefix_len),
+                            "::",
+                            "IF",
+                            &ifname,
+                        ])
+                        .output();
+
+                    match route_result {
+                        Ok(route_output) if route_output.status.success() => {
+                            // Fallback succeeded
+                        }
+                        Ok(route_output) => {
+                            let route_stderr = String::from_utf8_lossy(&route_output.stderr);
+                            return Err(anyhow::anyhow!(
+                                "Failed to add IPv6 route. PowerShell: {}. route cmd: {}",
+                                stderr,
+                                route_stderr
+                            ));
+                        }
+                        Err(e) => {
+                            return Err(anyhow::anyhow!(
+                                "Failed to add IPv6 route. PowerShell: {}. route cmd failed to execute: {}",
+                                stderr,
+                                e
+                            ));
+                        }
+                    }
+                }
+            }
+            info!(
+                "Added IPv6 network route {}/{} via {}",
+                network, prefix_len, ifname
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Get Windows interface index by name
+    #[cfg(target_os = "windows")]
+    fn get_windows_interface_index(ifname: &str) -> Option<String> {
+        let output = std::process::Command::new("powershell")
+            .args([
+                "-Command",
+                &format!(
+                    "Get-NetAdapter -Name '{}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ifIndex",
+                    ifname
+                ),
+            ])
+            .output()
+            .ok()?;
+
+        if output.status.success() {
+            let idx = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !idx.is_empty() && idx.parse::<u32>().is_ok() {
+                return Some(idx);
+            }
+        }
+        None
+    }
+
+    /// Add Windows route using PowerShell as fallback
+    #[cfg(target_os = "windows")]
+    fn add_windows_route_powershell(
+        network: &str,
+        gateway: &str,
+        ifname: &str,
+    ) -> anyhow::Result<()> {
+        let ps_cmd = format!(
+            "New-NetRoute -DestinationPrefix '{}/24' -InterfaceAlias '{}' -NextHop '{}' -PolicyStore ActiveStore -ErrorAction SilentlyContinue",
+            network, ifname, gateway
+        );
+        let output = std::process::Command::new("powershell")
+            .args(["-Command", &ps_cmd])
+            .output()
+            .map_err(|e| anyhow::anyhow!("PowerShell failed: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if !stderr.is_empty() && !stderr.contains("already exists") {
+                return Err(anyhow::anyhow!(
+                    "PowerShell New-NetRoute failed: {}",
+                    stderr
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Calculate IPv6 network address from IP and prefix length
+    fn ipv6_network_address(ipv6: &str, prefix_len: u8) -> String {
+        // Parse the IPv6 address
+        if let Ok(addr) = ipv6.parse::<std::net::Ipv6Addr>() {
+            let segments = addr.segments();
+            let mut network_segments = [0u16; 8];
+
+            // Calculate which segments to keep based on prefix length
+            let full_segments = (prefix_len / 16) as usize;
+            let remaining_bits = prefix_len % 16;
+
+            for i in 0..8 {
+                if i < full_segments {
+                    network_segments[i] = segments[i];
+                } else if i == full_segments && remaining_bits > 0 {
+                    // Mask the partial segment
+                    let mask = !((1u16 << (16 - remaining_bits)) - 1);
+                    network_segments[i] = segments[i] & mask;
+                }
+                // else: leave as 0
+            }
+
+            let network_addr = std::net::Ipv6Addr::new(
+                network_segments[0],
+                network_segments[1],
+                network_segments[2],
+                network_segments[3],
+                network_segments[4],
+                network_segments[5],
+                network_segments[6],
+                network_segments[7],
+            );
+            return network_addr.to_string();
+        }
+
+        // Fallback: return the original address if parsing fails
+        ipv6.to_string()
+    }
+
+    /// Validate interface name to prevent command injection
+    /// Only allows alphanumeric characters, hyphens, underscores, and spaces (for Windows)
+    fn validate_interface_name(name: &str) -> anyhow::Result<()> {
+        if name.is_empty() {
+            return Err(anyhow::anyhow!("Interface name cannot be empty"));
+        }
+        if name.len() > 256 {
+            return Err(anyhow::anyhow!("Interface name too long (max 256 chars)"));
+        }
+        // Allow alphanumeric, hyphen, underscore, and space (Windows interface names can have spaces)
+        // Reject shell metacharacters: ; | & $ ` " ' \ < > ( ) { } [ ] ! # * ? ~
+        let is_safe = name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' || c == '.');
+        if !is_safe {
+            return Err(anyhow::anyhow!(
+                "Invalid interface name '{}': contains unsafe characters",
+                name
+            ));
+        }
         Ok(())
     }
 
