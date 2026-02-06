@@ -48,7 +48,9 @@ impl OmniTun {
 
         // Add network route for VIP subnet (critical for peer connectivity)
         // This ensures packets to other peers (e.g., ping 100.100.0.198) are routed through TUN
-        if let Err(e) = self.add_vip_network_route(vip).await {
+        // Note: netmask is passed as None here - to support dynamic netmask from API,
+        // the caller (manager.rs) should pass subnet_mask to setup_dual_stack()
+        if let Err(e) = self.add_vip_network_route(vip, None).await {
             warn!(
                 "Failed to add VIP network route for {}: {}. Peer connectivity may be affected.",
                 vip, e
@@ -85,7 +87,11 @@ impl OmniTun {
 
     /// Add network route for VIP subnet to enable peer connectivity
     /// This is critical - without this route, packets to peer VIPs won't go through the TUN
-    async fn add_vip_network_route(&self, vip: &str) -> anyhow::Result<()> {
+    ///
+    /// # Arguments
+    /// * `vip` - Virtual IP address (e.g., "100.100.0.158")
+    /// * `netmask` - Subnet mask (e.g., "255.255.255.0"), defaults to /24 if None
+    async fn add_vip_network_route(&self, vip: &str, netmask: Option<&str>) -> anyhow::Result<()> {
         let ifname = self.get_interface_name().await;
 
         // Validate and parse VIP to prevent command injection
@@ -97,20 +103,39 @@ impl OmniTun {
         // Validate interface name to prevent command injection
         Self::validate_interface_name(&ifname)?;
 
-        // Calculate network address (assumes /24 subnet, e.g., 100.100.0.0/24)
-        let octets = vip_addr.octets();
-        let network = format!("{}.{}.{}.0", octets[0], octets[1], octets[2]);
+        // Parse netmask and calculate network address dynamically
+        let (network_addr, prefix_len, mask_str) = if let Some(mask) = netmask {
+            // Parse provided netmask
+            let mask_addr: std::net::Ipv4Addr = mask
+                .parse()
+                .map_err(|_| anyhow::anyhow!("Invalid netmask format: {}", mask))?;
+
+            let vip_bits = u32::from(vip_addr);
+            let mask_bits = u32::from(mask_addr);
+            let network_bits = vip_bits & mask_bits;
+            let network = std::net::Ipv4Addr::from(network_bits);
+            let prefix = mask_bits.count_ones() as u8;
+
+            (network, prefix, mask.to_string())
+        } else {
+            // Default to /24 subnet
+            let octets = vip_addr.octets();
+            let network = std::net::Ipv4Addr::new(octets[0], octets[1], octets[2], 0);
+            (network, 24u8, "255.255.255.0".to_string())
+        };
+
+        let network_cidr = format!("{}/{}", network_addr, prefix_len);
 
         info!(
-            "Adding VIP network route: {}/24 via interface {}",
-            network, ifname
+            "Adding VIP network route: {} via interface {}",
+            network_cidr, ifname
         );
 
         #[cfg(target_os = "linux")]
         {
-            // Linux: ip route add <network>/24 dev <ifname>
+            // Linux: ip route add <network>/<prefix> dev <ifname>
             let output = std::process::Command::new("ip")
-                .args(["route", "add", &format!("{}/24", network), "dev", &ifname])
+                .args(["route", "add", &network_cidr, "dev", &ifname])
                 .output()
                 .map_err(|e| anyhow::anyhow!("Failed to run ip route command: {}", e))?;
 
@@ -124,21 +149,14 @@ impl OmniTun {
                 }
                 debug!("VIP network route already exists (this is OK)");
             }
-            info!("Added IPv4 network route {}/24 via {}", network, ifname);
+            info!("Added IPv4 network route {} via {}", network_cidr, ifname);
         }
 
         #[cfg(target_os = "macos")]
         {
-            // macOS: route -n add -net <network>/24 -interface <ifname>
+            // macOS: route -n add -net <network>/<prefix> -interface <ifname>
             let output = std::process::Command::new("route")
-                .args([
-                    "-n",
-                    "add",
-                    "-net",
-                    &format!("{}/24", network),
-                    "-interface",
-                    &ifname,
-                ])
+                .args(["-n", "add", "-net", &network_cidr, "-interface", &ifname])
                 .output()
                 .map_err(|e| anyhow::anyhow!("Failed to run route command: {}", e))?;
 
@@ -150,20 +168,20 @@ impl OmniTun {
                 }
                 debug!("VIP network route already exists (this is OK)");
             }
-            info!("Added IPv4 network route {}/24 via {}", network, ifname);
+            info!("Added IPv4 network route {} via {}", network_cidr, ifname);
         }
 
         #[cfg(target_os = "windows")]
         {
-            // Windows: route ADD <network> MASK 255.255.255.0 <vip> IF <iface_index>
+            // Windows: route ADD <network> MASK <netmask> <vip> IF <iface_index>
             // First, get interface index
             let iface_idx = Self::get_windows_interface_index(&ifname);
 
             let mut args = vec![
                 "ADD".to_string(),
-                network.clone(),
+                network_addr.to_string(),
                 "MASK".to_string(),
-                "255.255.255.0".to_string(),
+                mask_str.clone(),
                 vip.to_string(), // Use VIP as gateway (on-link route)
             ];
 
@@ -187,14 +205,19 @@ impl OmniTun {
                     && !combined.contains("object already exists")
                 {
                     // Try PowerShell as fallback
-                    let ps_result = Self::add_windows_route_powershell(&network, vip, &ifname);
+                    let ps_result = Self::add_windows_route_powershell(
+                        &network_addr.to_string(),
+                        prefix_len,
+                        vip,
+                        &ifname,
+                    );
                     if ps_result.is_err() {
                         return Err(anyhow::anyhow!("route add failed: {}", combined));
                     }
                 }
                 debug!("VIP network route already exists (this is OK)");
             }
-            info!("Added IPv4 network route {}/24 via {}", network, ifname);
+            info!("Added IPv4 network route {} via {}", network_cidr, ifname);
         }
 
         Ok(())
@@ -371,12 +394,13 @@ impl OmniTun {
     #[cfg(target_os = "windows")]
     fn add_windows_route_powershell(
         network: &str,
+        prefix_len: u8,
         gateway: &str,
         ifname: &str,
     ) -> anyhow::Result<()> {
         let ps_cmd = format!(
-            "New-NetRoute -DestinationPrefix '{}/24' -InterfaceAlias '{}' -NextHop '{}' -PolicyStore ActiveStore -ErrorAction SilentlyContinue",
-            network, ifname, gateway
+            "New-NetRoute -DestinationPrefix '{}/{}' -InterfaceAlias '{}' -NextHop '{}' -PolicyStore ActiveStore -ErrorAction SilentlyContinue",
+            network, prefix_len, ifname, gateway
         );
         let output = std::process::Command::new("powershell")
             .args(["-Command", &ps_cmd])

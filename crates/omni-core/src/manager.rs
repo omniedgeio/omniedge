@@ -1161,9 +1161,12 @@ impl ConnectionManager {
         // IMPORTANT: Must send heartbeat FIRST to update device's is_exit_node status,
         // then call update_device() to allow it in the network
         let current_net_id = self.current_network_id.read().await.clone();
-        if let (Some(client), Some(net_id), Some(dev_id), Some(hw_id)) =
-            (&self.api_client, &current_net_id, &self.device_id, &self.hardware_id)
-        {
+        if let (Some(client), Some(net_id), Some(dev_id), Some(hw_id)) = (
+            &self.api_client,
+            &current_net_id,
+            &self.device_id,
+            &self.hardware_id,
+        ) {
             // Step 1: Send heartbeat with new is_exit_node status and wait for it
             // Use hardware_id for heartbeat, not device_id (API UUID)
             let dev_service = DeviceService::new(client);
