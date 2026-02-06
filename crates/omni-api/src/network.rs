@@ -56,14 +56,50 @@ impl<'a> NetworkService<'a> {
             .send::<crate::types::ListWrapper<Vec<VirtualNetworkDeviceResponse>>>(builder)
             .await
         {
-            Ok(wrapper) => Ok(wrapper.data),
+            Ok(wrapper) => {
+                log::debug!(
+                    "get_devices: Got {} devices for network {}",
+                    wrapper.data.len(),
+                    network_id
+                );
+                for dev in &wrapper.data {
+                    log::debug!(
+                        "  Device: {} ({}), online={}, is_exit_node={}",
+                        dev.name,
+                        dev.virtual_ip,
+                        dev.online,
+                        dev.is_exit_node
+                    );
+                }
+                Ok(wrapper.data)
+            }
             Err(e) => {
                 // Fallback for cases where it might return a direct array or fail with the wrapper
                 let builder = self.client.get(&path);
-                self.client
+                match self
+                    .client
                     .send::<Vec<VirtualNetworkDeviceResponse>>(builder)
                     .await
-                    .map_err(|_| e)
+                {
+                    Ok(devices) => {
+                        log::debug!(
+                            "get_devices (fallback): Got {} devices for network {}",
+                            devices.len(),
+                            network_id
+                        );
+                        for dev in &devices {
+                            log::debug!(
+                                "  Device: {} ({}), online={}, is_exit_node={}",
+                                dev.name,
+                                dev.virtual_ip,
+                                dev.online,
+                                dev.is_exit_node
+                            );
+                        }
+                        Ok(devices)
+                    }
+                    Err(_) => Err(e),
+                }
             }
         }
     }

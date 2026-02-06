@@ -219,7 +219,7 @@ pub struct VirtualNetworkDeviceResponse {
     pub virtual_ip_v6: Option<String>,
     #[serde(rename = "is_exit_node", alias = "isExitNode", default)]
     pub is_exit_node: bool,
-    #[serde(default)]
+    #[serde(alias = "isOnline", default)]
     pub online: bool,
     #[serde(rename = "exit_node_enabled", alias = "exitNodeEnabled", default)]
     pub exit_node_enabled: bool,
@@ -287,7 +287,11 @@ impl std::fmt::Debug for JoinVirtualNetworkResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ServerResponse {
+    #[serde(default)]
+    pub name: Option<String>,
     pub host: String,
+    #[serde(default)]
+    pub country: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
