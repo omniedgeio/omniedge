@@ -32,6 +32,7 @@ whoami = "1.5.0"
 dotenvy = "0.15"
 socket2 = { version = "0.5", features = ["all"] }
 futures = "0.3"
+rand = "0.8"  # For disco transaction ID generation
 # Updater dependencies
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "stream"] }
 # Optional dependencies for self-update

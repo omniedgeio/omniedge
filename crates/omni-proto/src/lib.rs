@@ -32,6 +32,22 @@ pub use omninervous::DualStackAddr;
 // Configuration
 pub use omninervous::NetworkConfig as NervousNetworkConfig;
 
+// ============================================================================
+// P2P Connection State Tracking (v0.3.2 - NAT Traversal Fix)
+// ============================================================================
+
+// Connection state management for disco protocol
+pub use omninervous::{ConnectionState as PeerConnectionState, EndpointSet, PeerConnection};
+
+// Disco ping/pong protocol
+pub use omninervous::signaling::{
+    encode_disco_ping, encode_disco_pong, parse_disco_ping, parse_disco_pong, DiscoPing, DiscoPong,
+    SIGNALING_DISCO_PING, SIGNALING_DISCO_PONG,
+};
+
+// Disco configuration and results
+pub use omninervous::{DiscoConfig, DiscoResult, PendingPing};
+
 pub struct PeerInfo {
     pub vip: Ipv4Addr,
     /// IPv6 virtual IP address (dual-stack support)

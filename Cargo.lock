@@ -4219,6 +4219,7 @@ dependencies = [
  "omni-proto",
  "omni-tun",
  "omninervous",
+ "rand 0.8.5",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
