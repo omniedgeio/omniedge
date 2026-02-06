@@ -1,5 +1,82 @@
 # OmniEdge Release Notes
 
+## v2.6.0 (2026-02-06)
+
+### Version Check & Self-Update
+
+This release adds **automatic update checking** and **self-update capabilities** to both CLI and Desktop applications.
+
+#### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `omniedge version` | Display version with commit hash and build date |
+| `omniedge version --check` | Check GitHub for available updates |
+| `omniedge version --releases` | Show recent release history |
+| `omniedge upgrade` | Download and install the latest version |
+| `omniedge upgrade --check` | Check only, don't install |
+| `omniedge upgrade --yes` | Skip confirmation prompt |
+| `omniedge upgrade --prerelease` | Include prerelease versions |
+
+#### CLI Self-Update Features
+
+- **Cross-platform support**: Windows, macOS, Linux (x86_64, aarch64)
+- **Automatic asset detection**: Selects correct binary for your platform
+- **Backup before update**: Creates `.backup` of current binary
+- **Archive extraction**: Handles `.tar.gz` and `.zip` formats
+- **Progress display**: Shows download progress with speed indicator
+- **Semver comparison**: Correctly handles version ordering including prereleases
+
+#### Desktop Update Notifications
+
+- **Background update check**: Checks GitHub on app startup (non-blocking)
+- **Update banner**: Blue notification banner when update available
+- **Version in footer**: Displays current version with commit hash tooltip
+- **Update indicator**: Pulsing blue dot in footer when update available
+- **One-click download**: Opens download page in browser (no auto-install)
+- **Dismissible**: User can dismiss the notification
+
+#### Technical Details
+
+| Component | Description |
+|-----------|-------------|
+| `crates/omni-core/src/updater.rs` | Core updater module with GitHub API integration |
+| `updater` feature flag | Compile-time opt-in for updater functionality |
+| New dependencies | `reqwest` (streaming), `zip`, `flate2`, `tar` |
+
+#### Tauri Backend Commands
+
+```typescript
+// Get current version info
+invoke('get_version_info') -> { version, commit, build_date }
+
+// Check for updates
+invoke('check_for_updates', { includePrerelease }) -> { update_available, latest_version, ... }
+
+// Get release history
+invoke('get_releases', { limit, includePrerelease }) -> [ReleaseInfo]
+
+// Open download page
+invoke('open_download_page')
+```
+
+### Build Improvements
+
+- **Git-based versioning**: Version injected at build time from git tags
+- **Consistent VERSION**: All crates now use the same version from workspace
+
+### CI Changes
+
+- Removed `omniedge-openwrt` repository dispatch trigger (repository consolidated)
+
+### Compatibility
+
+- **OmniNervous**: v0.5.0
+- **Existing Networks**: Fully backward compatible with v2.5.x networks
+- **Mixed Versions**: v2.6.0 clients work seamlessly with older clients
+
+---
+
 ## v2.5.0 (2026-02-05)
 
 ### OmniNervous v0.5.0 Upgrade
