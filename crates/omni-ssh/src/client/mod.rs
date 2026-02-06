@@ -143,9 +143,21 @@ impl SshClient {
             return Ok(SocketAddr::new(ip, target.port));
         }
 
-        // TODO: Look up peer by name via backend
-        // This would query the OmniEdge network for the peer
-        // For now, try DNS resolution
+        // Try to resolve via OmniEdge backend (peer name lookup)
+        if let Some(ip) = self.backend.resolve_peer_name(&target.host).await? {
+            debug!(
+                host = %target.host,
+                ip = %ip,
+                "Resolved peer name via OmniEdge"
+            );
+            return Ok(SocketAddr::new(ip, target.port));
+        }
+
+        // Fall back to DNS resolution
+        debug!(
+            host = %target.host,
+            "Peer not found in OmniEdge network, trying DNS"
+        );
         let addrs = tokio::net::lookup_host(format!("{}:{}", target.host, target.port)).await?;
 
         addrs
@@ -172,22 +184,62 @@ impl SshSession {
         debug!(command = %command, "Executing remote command");
 
         // Open a session channel
-        let channel = self.handle.channel_open_session().await?;
+        let mut channel = self.handle.channel_open_session().await?;
 
         // Execute command
         channel.exec(true, command).await?;
 
-        // Collect output
-        let stdout = Vec::new();
-        let stderr = Vec::new();
-        let exit_code = 0i32;
+        // Collect output by reading channel messages
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let mut exit_code: i32 = -1;
 
         // Read from channel until it closes
-        // Note: In a real implementation, we'd use the handler callbacks
-        // For now, this is a simplified version
-
-        // Close the channel
-        // channel.close().await?;
+        loop {
+            match channel.wait().await {
+                Some(msg) => match msg {
+                    russh::ChannelMsg::Data { data } => {
+                        stdout.extend_from_slice(&data);
+                    }
+                    russh::ChannelMsg::ExtendedData { data, ext } => {
+                        if ext == 1 {
+                            // stderr
+                            stderr.extend_from_slice(&data);
+                        }
+                    }
+                    russh::ChannelMsg::ExitStatus { exit_status } => {
+                        exit_code = exit_status as i32;
+                    }
+                    russh::ChannelMsg::ExitSignal {
+                        signal_name,
+                        core_dumped,
+                        error_message,
+                        ..
+                    } => {
+                        debug!(
+                            signal = ?signal_name,
+                            core_dumped = core_dumped,
+                            error = %error_message,
+                            "Process killed by signal"
+                        );
+                        // Signal 128 + signal number convention
+                        exit_code = 128;
+                    }
+                    russh::ChannelMsg::Eof => {
+                        debug!("Channel EOF received");
+                    }
+                    russh::ChannelMsg::Close => {
+                        debug!("Channel closed");
+                        break;
+                    }
+                    _ => {}
+                },
+                None => {
+                    // Channel closed
+                    break;
+                }
+            }
+        }
 
         Ok(ExecResult {
             exit_code,
@@ -228,7 +280,10 @@ impl SshSession {
         channel.request_subsystem(true, "sftp").await?;
 
         // Create SFTP client from channel
-        todo!("Implement SFTP client creation")
+        let client = crate::sftp::SftpClient::new(channel).await?;
+
+        info!("SFTP session opened");
+        Ok(client)
     }
 
     /// Close the session

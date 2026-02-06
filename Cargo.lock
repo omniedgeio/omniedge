@@ -4395,6 +4395,7 @@ dependencies = [
  "omni-core",
  "omni-plugin",
  "omni-proto",
+ "omni-ssh",
  "omni-tun",
  "regex",
  "serde",
