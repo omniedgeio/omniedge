@@ -64,6 +64,26 @@ pub trait SshBackend: Send + Sync {
 
     /// Get network ID for this node
     fn network_id(&self) -> &str;
+
+    /// Resolve a peer name to VPN IP address
+    ///
+    /// This is used by the SSH client to resolve peer names (e.g., "webserver", "db-primary")
+    /// to their VPN IP addresses for connection.
+    ///
+    /// Returns None if the peer is not found in the network.
+    async fn resolve_peer_name(&self, name: &str) -> anyhow::Result<Option<IpAddr>> {
+        // Default implementation: no resolution available
+        let _ = name;
+        Ok(None)
+    }
+
+    /// Get list of known peers in the network
+    ///
+    /// This is used for tab-completion and peer discovery in the CLI.
+    async fn list_peers(&self) -> anyhow::Result<Vec<PeerInfo>> {
+        // Default implementation: no peers available
+        Ok(Vec::new())
+    }
 }
 
 /// Peer identity from OmniEdge
@@ -73,6 +93,19 @@ pub struct PeerIdentity {
     pub node: NodeInfo,
     /// User information
     pub user: UserProfile,
+}
+
+/// Basic peer information for listing/discovery
+#[derive(Debug, Clone)]
+pub struct PeerInfo {
+    /// Peer name
+    pub name: String,
+    /// VPN IP address
+    pub vpn_ip: IpAddr,
+    /// Whether the peer is currently online
+    pub online: bool,
+    /// Device ID
+    pub device_id: Option<String>,
 }
 
 /// SSH events for logging/metrics

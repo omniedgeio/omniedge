@@ -74,5 +74,18 @@ pub use client::{SshClient, SshSession, SshTarget};
 pub use health::{ConnectionHealth, HealthMonitor, HealthThreshold};
 pub use policy::{PolicyCache, PolicyManager, PolicyValidity};
 
+#[cfg(feature = "fleet")]
+pub use fleet::{FleetExecutor, FleetOperation, FleetResults, FleetTargets, NodeResult};
+
+#[cfg(feature = "emergency")]
+pub use emergency::{
+    EmergencyAccessConfig, EmergencyAccessGrant, EmergencyAccessManager, EmergencyAccessRequest,
+    EmergencyAccessStatus, EmergencySeverity,
+};
+
+// Re-export dependencies for external use
+pub use async_trait::async_trait;
+pub use russh_keys;
+
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
