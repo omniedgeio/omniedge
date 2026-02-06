@@ -1087,8 +1087,19 @@ function App() {
                 <div className="card-bg-glow"></div>
                 <div className="card-content">
                   <div className="card-top-row">
-                    <span className="card-label">This Device</span>
-                    {status === 'connected' && <span className="network-badge">{networkName}</span>}
+                    <div className="card-label-group">
+                      <span className="card-label">This Device</span>
+                      {status === 'connected' && networkName && (
+                        <span className="connected-network-label">{networkName}</span>
+                      )}
+                    </div>
+                    <span
+                      className={`connection-status-badge ${
+                        status === 'connected' ? 'connected' : status === 'connecting' ? 'connecting' : 'disconnected'
+                      }`}
+                    >
+                      {status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Disconnected'}
+                    </span>
                   </div>
                   <div className="ip-display-large clickable-ip" onClick={() => handleCopyIP(virtualIP || myAPIIP)}>
                     <span className="ip-badge ip-badge-v4">IPv4</span>
