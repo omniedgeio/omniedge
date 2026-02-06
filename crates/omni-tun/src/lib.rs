@@ -35,9 +35,18 @@ impl OmniTun {
     }
 
     /// Setup the TUN interface with dual-stack (IPv4 + IPv6) support
+    ///
+    /// # Arguments
+    /// * `vip` - IPv4 virtual IP address (e.g., "100.100.0.158")
+    /// * `subnet_mask` - IPv4 subnet mask (e.g., "255.255.255.0"), defaults to /24 if None or empty
+    /// * `vip_v6` - IPv6 virtual IP address (optional)
+    /// * `prefix_v6` - IPv6 subnet prefix length (optional, defaults to 120)
+    /// * `port` - WireGuard listen port
+    /// * `private_key` - WireGuard private key (hex encoded)
     pub async fn setup_dual_stack(
         &mut self,
         vip: &str,
+        subnet_mask: Option<&str>,
         vip_v6: Option<&str>,
         prefix_v6: Option<u8>,
         port: u16,
@@ -48,9 +57,9 @@ impl OmniTun {
 
         // Add network route for VIP subnet (critical for peer connectivity)
         // This ensures packets to other peers (e.g., ping 100.100.0.198) are routed through TUN
-        // Note: netmask is passed as None here - to support dynamic netmask from API,
-        // the caller (manager.rs) should pass subnet_mask to setup_dual_stack()
-        if let Err(e) = self.add_vip_network_route(vip, None).await {
+        // Convert empty string to None for cleaner handling
+        let netmask = subnet_mask.filter(|s| !s.is_empty());
+        if let Err(e) = self.add_vip_network_route(vip, netmask).await {
             warn!(
                 "Failed to add VIP network route for {}: {}. Peer connectivity may be affected.",
                 vip, e
