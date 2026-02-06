@@ -427,6 +427,127 @@ enum Commands {
         #[arg(short = 'y', long)]
         yes: bool,
     },
+
+    /// SSH into an OmniEdge peer
+    ///
+    /// Connect to another device in your OmniEdge network via SSH.
+    /// Uses OmniEdge identity-based authentication (no SSH keys needed).
+    ///
+    /// EXAMPLES:
+    ///   omniedge ssh user@10.0.0.5           SSH to peer by VPN IP
+    ///   omniedge ssh admin@webserver         SSH to peer by name
+    ///   omniedge ssh user@host -p 2222       Use custom port
+    ///   omniedge ssh user@host -- ls -la     Execute command and exit
+    #[cfg(feature = "ssh")]
+    Ssh {
+        /// Target in format user@host[:port] (e.g., admin@10.0.0.5 or user@webserver:2222)
+        target: String,
+
+        /// Custom SSH port (default: 22)
+        #[arg(short, long, default_value = "22")]
+        port: u16,
+
+        /// Command to execute (non-interactive)
+        #[arg(last = true)]
+        command: Vec<String>,
+    },
+
+    /// Transfer files via SFTP
+    ///
+    /// Securely transfer files to/from OmniEdge peers using SFTP.
+    ///
+    /// EXAMPLES:
+    ///   omniedge sftp user@10.0.0.5          Start interactive SFTP session
+    ///   omniedge sftp user@webserver         SFTP to peer by name
+    #[cfg(feature = "ssh")]
+    Sftp {
+        /// Target in format user@host[:port]
+        target: String,
+
+        /// Custom SFTP port (default: 22)
+        #[arg(short, long, default_value = "22")]
+        port: u16,
+    },
+
+    /// Copy files between local and remote (SCP-like)
+    ///
+    /// Copy files to/from OmniEdge peers using secure file transfer.
+    ///
+    /// EXAMPLES:
+    ///   omniedge scp file.txt user@host:/path/     Upload file
+    ///   omniedge scp user@host:/path/file.txt .    Download file
+    ///   omniedge scp -r dir/ user@host:/path/      Upload directory
+    #[cfg(feature = "ssh")]
+    Scp {
+        /// Source file(s) - local path or user@host:path
+        source: String,
+
+        /// Destination - local path or user@host:path
+        destination: String,
+
+        /// Copy directories recursively
+        #[arg(short, long)]
+        recursive: bool,
+
+        /// Custom port (default: 22)
+        #[arg(short, long, default_value = "22")]
+        port: u16,
+    },
+
+    /// Start a standalone SSH server (no OmniEdge backend required)
+    ///
+    /// Run an SSH server that accepts connections without requiring the full
+    /// OmniEdge backend. Useful for testing, development, or standalone deployments.
+    ///
+    /// EXAMPLES:
+    ///   omniedge ssh-server                       Start on default port 2222
+    ///   omniedge ssh-server -p 22                 Start on port 22
+    ///   omniedge ssh-server --permissive          Accept connections from any IP
+    ///   omniedge ssh-server --allow-network 10.0.0.0/8   Only allow this network
+    #[cfg(feature = "ssh")]
+    SshServer {
+        /// Port to listen on
+        #[arg(short, long, default_value = "2222")]
+        port: u16,
+
+        /// Bind address
+        #[arg(short, long, default_value = "0.0.0.0")]
+        bind: String,
+
+        /// Accept connections from any IP (permissive mode)
+        #[arg(long)]
+        permissive: bool,
+
+        /// Allow connections only from localhost
+        #[arg(long, conflicts_with = "permissive")]
+        localhost_only: bool,
+
+        /// Allow connections from specific network (CIDR notation)
+        /// Can be specified multiple times
+        #[arg(long = "allow-network", value_name = "CIDR")]
+        allow_networks: Vec<String>,
+
+        /// Device ID for this server
+        #[arg(long, default_value = "standalone-server")]
+        device_id: String,
+
+        /// Map SSH user to local user (format: ssh_user:local_user)
+        /// Can be specified multiple times
+        #[arg(long = "user-map", value_name = "SSH:LOCAL")]
+        user_maps: Vec<String>,
+
+        /// Default local user if no mapping found
+        #[arg(long)]
+        default_user: Option<String>,
+
+        /// Path to store/load host keys (generates if not present)
+        #[arg(long)]
+        host_key_path: Option<String>,
+
+        /// Disable event logging
+        #[arg(long)]
+        quiet: bool,
+    },
 }
 
 /// Network configuration subcommands
@@ -1336,9 +1457,524 @@ async fn async_main() -> Result<()> {
         } => {
             handle_upgrade_command(check, prerelease, yes).await?;
         }
+        #[cfg(feature = "ssh")]
+        Commands::Ssh {
+            target,
+            port,
+            command,
+        } => {
+            handle_ssh_command(&target, port, command, &config).await?;
+        }
+        #[cfg(feature = "ssh")]
+        Commands::Sftp { target, port } => {
+            handle_sftp_command(&target, port, &config).await?;
+        }
+        #[cfg(feature = "ssh")]
+        Commands::Scp {
+            source,
+            destination,
+            recursive,
+            port,
+        } => {
+            handle_scp_command(&source, &destination, recursive, port, &config).await?;
+        }
+        #[cfg(feature = "ssh")]
+        Commands::SshServer {
+            port,
+            bind,
+            permissive,
+            localhost_only,
+            allow_networks,
+            device_id,
+            user_maps,
+            default_user,
+            host_key_path,
+            quiet,
+        } => {
+            handle_ssh_server_command(
+                port,
+                &bind,
+                permissive,
+                localhost_only,
+                allow_networks,
+                &device_id,
+                user_maps,
+                default_user,
+                host_key_path,
+                quiet,
+            )
+            .await?;
+        }
     }
 
     Ok(())
+}
+
+// ============================================================================
+// SSH Command Handlers
+// ============================================================================
+
+/// Handle SSH command
+#[cfg(feature = "ssh")]
+async fn handle_ssh_command(
+    target: &str,
+    port: u16,
+    command: Vec<String>,
+    config: &CliConfig,
+) -> Result<()> {
+    use omni_ssh::client::{SshClient, SshTarget};
+
+    // Parse target (user@host format)
+    let mut ssh_target = SshTarget::parse(target)
+        .map_err(|e| anyhow::anyhow!("Invalid target '{}': {}", target, e))?;
+
+    // Override port if specified via flag
+    if port != 22 {
+        ssh_target = ssh_target.with_port(port);
+    }
+
+    // Create backend with peer info from config
+    let device_id = config.device_uuid.clone().unwrap_or_default();
+    let network_id = config.last_network_id.clone().unwrap_or_default();
+    let backend = std::sync::Arc::new(CliSshBackend::new(device_id, network_id));
+
+    // Load peers from API if we have auth
+    if let (Some(auth), Some(net_id)) = (&config.auth_response, &config.last_network_id) {
+        let base_url = omni_core::config::get_api_base_url();
+        let client = omni_api::ApiClient::new(base_url, Some(auth.token.clone()));
+        let net_service = omni_api::NetworkService::new(&client);
+
+        if let Ok(peers) = net_service.get_devices(net_id).await {
+            backend.set_peers(peers);
+        }
+    }
+
+    println!(
+        "Connecting to {}@{}:{}...",
+        ssh_target.user, ssh_target.host, ssh_target.port
+    );
+
+    let client = SshClient::new(backend);
+    let mut session = client.connect(ssh_target.clone()).await?;
+
+    if command.is_empty() {
+        // Interactive shell
+        println!("Starting interactive shell...");
+        println!("(Note: Full interactive shell requires terminal handling)");
+        println!();
+
+        let shell = session.shell().await?;
+
+        // For now, just show that we connected
+        // Full terminal handling requires crossterm or similar
+        println!(
+            "Connected to {}. Type 'exit' to disconnect.",
+            ssh_target.host
+        );
+        println!("(Interactive shell not fully implemented yet)");
+
+        shell.close().await?;
+    } else {
+        // Execute command
+        let cmd_str = command.join(" ");
+        println!("Executing: {}", cmd_str);
+        println!();
+
+        let result = session.exec(&cmd_str).await?;
+
+        // Print stdout
+        if !result.stdout.is_empty() {
+            print!("{}", result.stdout_str());
+        }
+
+        // Print stderr
+        if !result.stderr.is_empty() {
+            eprint!("{}", result.stderr_str());
+        }
+
+        if !result.success() {
+            std::process::exit(result.exit_code);
+        }
+    }
+
+    session.close().await?;
+    Ok(())
+}
+
+/// Handle SFTP command
+#[cfg(feature = "ssh")]
+async fn handle_sftp_command(target: &str, port: u16, config: &CliConfig) -> Result<()> {
+    use omni_ssh::client::{SshClient, SshTarget};
+
+    // Parse target
+    let mut ssh_target = SshTarget::parse(target)
+        .map_err(|e| anyhow::anyhow!("Invalid target '{}': {}", target, e))?;
+
+    if port != 22 {
+        ssh_target = ssh_target.with_port(port);
+    }
+
+    // Create backend with peer info
+    let device_id = config.device_uuid.clone().unwrap_or_default();
+    let network_id = config.last_network_id.clone().unwrap_or_default();
+    let backend = std::sync::Arc::new(CliSshBackend::new(device_id, network_id));
+
+    // Load peers from API if we have auth
+    if let (Some(auth), Some(net_id)) = (&config.auth_response, &config.last_network_id) {
+        let base_url = omni_core::config::get_api_base_url();
+        let client = omni_api::ApiClient::new(base_url, Some(auth.token.clone()));
+        let net_service = omni_api::NetworkService::new(&client);
+
+        if let Ok(peers) = net_service.get_devices(net_id).await {
+            backend.set_peers(peers);
+        }
+    }
+
+    println!(
+        "Connecting to {}@{}:{} for SFTP...",
+        ssh_target.user, ssh_target.host, ssh_target.port
+    );
+
+    let client = SshClient::new(backend);
+    let mut session = client.connect(ssh_target.clone()).await?;
+    let sftp = session.sftp().await?;
+
+    println!("SFTP session established.");
+    println!("Interactive SFTP shell not yet implemented.");
+    println!();
+    println!("Available commands would be:");
+    println!("  ls <path>     - List directory");
+    println!("  get <remote> <local> - Download file");
+    println!("  put <local> <remote> - Upload file");
+    println!("  mkdir <path>  - Create directory");
+    println!("  rm <path>     - Remove file");
+    println!("  exit          - Close session");
+
+    sftp.close().await?;
+    session.close().await?;
+
+    Ok(())
+}
+
+/// Handle SCP command
+#[cfg(feature = "ssh")]
+async fn handle_scp_command(
+    source: &str,
+    destination: &str,
+    recursive: bool,
+    port: u16,
+    config: &CliConfig,
+) -> Result<()> {
+    use omni_ssh::client::{SshClient, SshTarget};
+
+    // Parse source and destination to determine direction
+    let (is_download, target_str, remote_path, local_path) = if source.contains('@') {
+        // Download: user@host:path -> local
+        let parts: Vec<&str> = source.splitn(2, ':').collect();
+        if parts.len() != 2 {
+            anyhow::bail!("Invalid remote source format. Use: user@host:path");
+        }
+        (true, parts[0], parts[1], destination)
+    } else if destination.contains('@') {
+        // Upload: local -> user@host:path
+        let parts: Vec<&str> = destination.splitn(2, ':').collect();
+        if parts.len() != 2 {
+            anyhow::bail!("Invalid remote destination format. Use: user@host:path");
+        }
+        (false, parts[0], parts[1], source)
+    } else {
+        anyhow::bail!("Either source or destination must be remote (user@host:path)");
+    };
+
+    let mut ssh_target = SshTarget::parse(target_str)
+        .map_err(|e| anyhow::anyhow!("Invalid target '{}': {}", target_str, e))?;
+
+    if port != 22 {
+        ssh_target = ssh_target.with_port(port);
+    }
+
+    // Create backend with peer info
+    let device_id = config.device_uuid.clone().unwrap_or_default();
+    let network_id = config.last_network_id.clone().unwrap_or_default();
+    let backend = std::sync::Arc::new(CliSshBackend::new(device_id, network_id));
+
+    // Load peers from API if we have auth
+    if let (Some(auth), Some(net_id)) = (&config.auth_response, &config.last_network_id) {
+        let base_url = omni_core::config::get_api_base_url();
+        let client = omni_api::ApiClient::new(base_url, Some(auth.token.clone()));
+        let net_service = omni_api::NetworkService::new(&client);
+
+        if let Ok(peers) = net_service.get_devices(net_id).await {
+            backend.set_peers(peers);
+        }
+    }
+
+    let client = SshClient::new(backend);
+
+    println!("Connecting to {}...", ssh_target.host);
+    let mut session = client.connect(ssh_target).await?;
+    let sftp = session.sftp().await?;
+
+    if is_download {
+        println!("Downloading {} -> {}", remote_path, local_path);
+        if recursive {
+            println!("(Recursive download not yet implemented)");
+        }
+        let bytes = sftp.get(remote_path, local_path).await?;
+        println!("Downloaded {} bytes", bytes);
+    } else {
+        println!("Uploading {} -> {}", local_path, remote_path);
+        if recursive {
+            println!("(Recursive upload not yet implemented)");
+        }
+        let bytes = sftp.put(local_path, remote_path).await?;
+        println!("Uploaded {} bytes", bytes);
+    }
+
+    sftp.close().await?;
+    session.close().await?;
+
+    Ok(())
+}
+
+/// Handle standalone SSH server command
+#[cfg(feature = "ssh")]
+async fn handle_ssh_server_command(
+    port: u16,
+    bind: &str,
+    permissive: bool,
+    localhost_only: bool,
+    allow_networks: Vec<String>,
+    device_id: &str,
+    user_maps: Vec<String>,
+    default_user: Option<String>,
+    host_key_path: Option<String>,
+    quiet: bool,
+) -> Result<()> {
+    use omni_ssh::server::{SshServer, SshServerConfig};
+    use omni_ssh::standalone::{StandaloneConfig, StandaloneSshBackend};
+
+    // Build configuration based on mode
+    let mut config = if permissive {
+        println!("Mode: Permissive (accepting connections from any IP)");
+        StandaloneConfig::permissive()
+    } else if localhost_only {
+        println!("Mode: Localhost only (127.0.0.0/8)");
+        StandaloneConfig::localhost_only()
+    } else {
+        println!("Mode: Private networks (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)");
+        StandaloneConfig::default()
+    };
+
+    config.device_id = device_id.to_string();
+    config.log_events = !quiet;
+
+    // Add custom allowed networks
+    for network in &allow_networks {
+        let net: ipnet::IpNet = network
+            .parse()
+            .map_err(|e| anyhow::anyhow!("Invalid network '{}': {}", network, e))?;
+        config.allowed_networks.push(net);
+        println!("  Added allowed network: {}", net);
+    }
+
+    // Add user mappings
+    for mapping in &user_maps {
+        let parts: Vec<&str> = mapping.split(':').collect();
+        if parts.len() != 2 {
+            anyhow::bail!(
+                "Invalid user mapping '{}'. Format: ssh_user:local_user",
+                mapping
+            );
+        }
+        config
+            .user_mapping
+            .insert(parts[0].to_string(), parts[1].to_string());
+        println!("  User mapping: {} -> {}", parts[0], parts[1]);
+    }
+
+    if let Some(ref user) = default_user {
+        config.default_local_user = Some(user.clone());
+        println!("  Default local user: {}", user);
+    }
+
+    if let Some(ref path) = host_key_path {
+        config.host_key_path = Some(std::path::PathBuf::from(path));
+        println!("  Host key path: {}", path);
+    }
+
+    // Create backend
+    let backend = std::sync::Arc::new(
+        StandaloneSshBackend::new(config)
+            .map_err(|e| anyhow::anyhow!("Failed to create backend: {}", e))?,
+    );
+
+    // Create server with default config
+    let server_config = SshServerConfig::default();
+    let server = SshServer::new(server_config, backend)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to create SSH server: {}", e))?;
+
+    // Parse bind address
+    let bind_addr: std::net::SocketAddr = format!("{}:{}", bind, port)
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Invalid bind address '{}:{}': {}", bind, port, e))?;
+
+    println!();
+    println!("========================================");
+    println!("  OmniEdge Standalone SSH Server");
+    println!("========================================");
+    println!("  Listening on: {}", bind_addr);
+    println!("  Device ID:    {}", device_id);
+    println!();
+    println!("Press Ctrl+C to stop the server.");
+    println!();
+
+    // Start the server (blocks until shutdown)
+    server
+        .start(bind_addr)
+        .await
+        .map_err(|e| anyhow::anyhow!("SSH server error: {}", e))?;
+
+    println!("SSH server stopped.");
+    Ok(())
+}
+
+/// CLI SSH backend that resolves peers via OmniEdge API
+#[cfg(feature = "ssh")]
+struct CliSshBackend {
+    /// Cached peers from last network join
+    peers: std::sync::Mutex<Vec<omni_api::types::VirtualNetworkDeviceResponse>>,
+    /// Our device ID
+    device_id: String,
+    /// Our network ID  
+    network_id: String,
+}
+
+#[cfg(feature = "ssh")]
+impl CliSshBackend {
+    fn new(device_id: String, network_id: String) -> Self {
+        Self {
+            peers: std::sync::Mutex::new(Vec::new()),
+            device_id,
+            network_id,
+        }
+    }
+
+    fn set_peers(&self, peers: Vec<omni_api::types::VirtualNetworkDeviceResponse>) {
+        let mut guard = self.peers.lock().unwrap();
+        *guard = peers;
+    }
+}
+
+#[cfg(feature = "ssh")]
+#[omni_ssh::async_trait]
+impl omni_ssh::server::SshBackend for CliSshBackend {
+    async fn get_host_keys(&self) -> anyhow::Result<Vec<omni_ssh::russh_keys::key::KeyPair>> {
+        // CLI client doesn't run SSH server, return empty
+        Ok(Vec::new())
+    }
+
+    fn ssh_enabled(&self) -> bool {
+        false // CLI is client-only
+    }
+
+    async fn who_is(
+        &self,
+        addr: std::net::IpAddr,
+    ) -> anyhow::Result<Option<omni_ssh::server::PeerIdentity>> {
+        let peers = self.peers.lock().unwrap();
+        for peer in peers.iter() {
+            if let Ok(peer_ip) = peer.virtual_ip.parse::<std::net::IpAddr>() {
+                if peer_ip == addr {
+                    return Ok(Some(omni_ssh::server::PeerIdentity {
+                        node: omni_ssh::types::NodeInfo {
+                            id: peer.id.clone(),
+                            name: peer.name.clone(),
+                            virtual_ip: peer.virtual_ip.clone(),
+                            tags: Vec::new(),
+                            online: peer.online,
+                            network_id: self.network_id.clone(),
+                        },
+                        user: omni_ssh::types::UserProfile {
+                            id: String::new(),
+                            email: String::new(),
+                            name: None,
+                        },
+                    }));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    async fn get_ssh_policy(&self) -> anyhow::Result<omni_ssh::types::SshPolicy> {
+        Ok(omni_ssh::types::SshPolicy::default())
+    }
+
+    async fn on_ssh_event(&self, _event: omni_ssh::server::SshEvent) {}
+
+    fn is_omniedge_ip(&self, addr: std::net::IpAddr) -> bool {
+        let peers = self.peers.lock().unwrap();
+        for peer in peers.iter() {
+            if let Ok(peer_ip) = peer.virtual_ip.parse::<std::net::IpAddr>() {
+                if peer_ip == addr {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn device_id(&self) -> &str {
+        &self.device_id
+    }
+
+    fn network_id(&self) -> &str {
+        &self.network_id
+    }
+
+    async fn resolve_peer_name(&self, name: &str) -> anyhow::Result<Option<std::net::IpAddr>> {
+        let peers = self.peers.lock().unwrap();
+
+        // Try exact name match first
+        for peer in peers.iter() {
+            if peer.name.eq_ignore_ascii_case(name) {
+                if let Ok(ip) = peer.virtual_ip.parse() {
+                    return Ok(Some(ip));
+                }
+            }
+        }
+
+        // Try partial match (contains)
+        for peer in peers.iter() {
+            if peer.name.to_lowercase().contains(&name.to_lowercase()) {
+                if let Ok(ip) = peer.virtual_ip.parse() {
+                    return Ok(Some(ip));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    async fn list_peers(&self) -> anyhow::Result<Vec<omni_ssh::server::PeerInfo>> {
+        let peers = self.peers.lock().unwrap();
+        let mut result = Vec::new();
+
+        for peer in peers.iter() {
+            if let Ok(ip) = peer.virtual_ip.parse() {
+                result.push(omni_ssh::server::PeerInfo {
+                    name: peer.name.clone(),
+                    vpn_ip: ip,
+                    online: peer.online,
+                    device_id: Some(peer.id.clone()),
+                });
+            }
+        }
+
+        Ok(result)
+    }
 }
 
 /// Handle network configuration subcommands
