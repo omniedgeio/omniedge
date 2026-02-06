@@ -41,6 +41,7 @@ use crate::types::{NodeInfo, SshAction, SshPolicy, SshPrincipal, SshRule, UserPr
 use async_trait::async_trait;
 use ipnet::IpNet;
 use russh_keys::key::KeyPair;
+use russh_keys::PublicKeyBase64;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::path::PathBuf;
@@ -314,8 +315,9 @@ impl StandaloneSshBackend {
             let ed25519_key = KeyPair::generate_ed25519()
                 .ok_or_else(|| anyhow::anyhow!("Failed to generate ED25519 key"))?;
 
-            // Note: russh_keys doesn't have a direct save function, so we'll just use the generated keys
-            // In a real implementation, you'd save the keys to disk
+            // Save the generated key to disk for persistence
+            Self::save_host_key(&ed25519_key, &ed25519_path)?;
+            info!("Saved ED25519 host key to {:?}", ed25519_path);
 
             Ok(vec![ed25519_key])
         } else {
@@ -327,6 +329,63 @@ impl StandaloneSshBackend {
 
             Ok(vec![ed25519_key])
         }
+    }
+
+    /// Save a host key to disk in OpenSSH format
+    fn save_host_key(key: &KeyPair, path: &std::path::Path) -> anyhow::Result<()> {
+        use std::io::Write;
+
+        // Ensure parent directory exists
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        // Encode the private key to PEM format
+        let mut pem_data = Vec::new();
+        russh_keys::encode_pkcs8_pem(key, &mut pem_data)?;
+
+        // Write to file
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)?;
+
+        file.write_all(&pem_data)?;
+        file.sync_all()?;
+
+        // Set restrictive permissions on Unix
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        }
+
+        // Also write the public key
+        let pub_path = path.with_extension("pub");
+        let public_key = key.clone_public_key()?;
+        let pub_encoded = public_key.public_key_base64();
+        let pub_line = format!("{} {} omniedge-host-key\n", public_key.name(), pub_encoded);
+
+        let mut pub_file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&pub_path)?;
+
+        pub_file.write_all(pub_line.as_bytes())?;
+        pub_file.sync_all()?;
+
+        // Set public key permissions on Unix
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&pub_path, std::fs::Permissions::from_mode(0o644))?;
+        }
+
+        debug!("Saved public key to {:?}", pub_path);
+
+        Ok(())
     }
 
     /// Check if an IP is allowed

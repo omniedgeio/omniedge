@@ -28,6 +28,8 @@ pub struct SshServerConfig {
     pub idle_timeout: Duration,
     /// TCP keepalive interval
     pub keepalive_interval: Duration,
+    /// SSH handshake timeout (protects against slowloris attacks)
+    pub handshake_timeout: Duration,
 }
 
 impl Default for SshServerConfig {
@@ -44,6 +46,7 @@ impl Default for SshServerConfig {
             max_concurrent: 100,
             idle_timeout: Duration::from_secs(30 * 60), // 30 minutes
             keepalive_interval: Duration::from_secs(60),
+            handshake_timeout: Duration::from_secs(30), // 30 seconds for handshake
         }
     }
 }

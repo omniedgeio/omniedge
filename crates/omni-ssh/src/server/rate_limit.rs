@@ -133,12 +133,9 @@ impl ConnectionRateLimiter {
     }
 
     /// Acquire concurrent connection permit, waiting if necessary
-    pub async fn acquire_permit(&self) -> tokio::sync::OwnedSemaphorePermit {
-        self.concurrent_semaphore
-            .clone()
-            .acquire_owned()
-            .await
-            .expect("Semaphore closed unexpectedly")
+    /// Returns None if the semaphore is closed (which shouldn't happen in normal operation)
+    pub async fn acquire_permit(&self) -> Option<tokio::sync::OwnedSemaphorePermit> {
+        self.concurrent_semaphore.clone().acquire_owned().await.ok()
     }
 
     /// Record failed authentication attempt
