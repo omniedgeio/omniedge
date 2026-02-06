@@ -28,6 +28,8 @@ pub struct ConnectionManager {
     exit_node_ip_v6: Option<String>,
     cluster_secret: Option<String>,
     device_id: Option<String>,
+    /// Hardware ID used for heartbeats (differs from device_id which is API-assigned UUID)
+    hardware_id: Option<String>,
     current_network_id: Arc<RwLock<Option<String>>>,
     virtual_ip: Arc<RwLock<Option<String>>>,
     /// IPv6 virtual IP address (dual-stack support)
@@ -67,6 +69,7 @@ impl ConnectionManager {
             exit_node_ip_v6: None,
             cluster_secret: None,
             device_id: None,
+            hardware_id: None,
             current_network_id: Arc::new(RwLock::new(None)),
             virtual_ip: Arc::new(RwLock::new(None)),
             virtual_ip_v6: Arc::new(RwLock::new(None)),
@@ -286,6 +289,8 @@ impl ConnectionManager {
 
         self.set_state(ConnectionState::Joining).await;
         self.device_id = Some(device_id.to_string());
+        // Store hardware_id for heartbeats - this is different from device_id (API UUID)
+        self.hardware_id = Some(hardware_id.to_string());
         {
             let mut nid = self.current_network_id.write().await;
             *nid = Some(network_id.to_string());
@@ -599,6 +604,7 @@ impl ConnectionManager {
             proto,
             tun,
             effective_device_id.to_string(),
+            hardware_id.to_string(),
             shutdown_tx,
             nucleus_state,
             nucleus_port,
@@ -634,7 +640,8 @@ impl ConnectionManager {
         socket: Arc<UdpSocket>,
         proto: Arc<OmniProto>,
         tun: OmniTun,
-        device_id: String,
+        _device_id: String,
+        hardware_id: String,
         shutdown_tx: broadcast::Sender<()>,
         nucleus_state: Option<Arc<Mutex<NucleusState>>>,
         nucleus_port: u16,
@@ -804,7 +811,8 @@ impl ConnectionManager {
         let socket_hb = socket.clone();
         let is_nucleus_hb = self.is_nucleus;
         let as_exit_node_hb = self.as_exit_node.clone();
-        let device_id_hb = device_id.clone();
+        // Use hardware_id for API heartbeats, not device_id (API UUID)
+        let hardware_id_hb = hardware_id.clone();
 
         // Heartbeat/Poll/Role Loop
         let mut shutdown_rx3 = shutdown_tx.subscribe();
@@ -822,7 +830,7 @@ impl ConnectionManager {
                         if let Some(ref client) = api_client {
                             let ds = DeviceService::new(client);
                             let is_exit = as_exit_node_hb.load(std::sync::atomic::Ordering::SeqCst);
-                            let _ = ds.heartbeat(&device_id_hb, is_exit).await;
+                            let _ = ds.heartbeat(&hardware_id_hb, is_exit).await;
                         }
                     }
                     _ = hb_rx.recv() => {
@@ -830,7 +838,7 @@ impl ConnectionManager {
                             info!("Triggering immediate heartbeat...");
                             let ds = DeviceService::new(client);
                             let is_exit = as_exit_node_hb.load(std::sync::atomic::Ordering::SeqCst);
-                            let _ = ds.heartbeat(&device_id_hb, is_exit).await;
+                            let _ = ds.heartbeat(&hardware_id_hb, is_exit).await;
                         }
                     }
                     _ = proto_interval.tick() => {
@@ -1153,12 +1161,13 @@ impl ConnectionManager {
         // IMPORTANT: Must send heartbeat FIRST to update device's is_exit_node status,
         // then call update_device() to allow it in the network
         let current_net_id = self.current_network_id.read().await.clone();
-        if let (Some(client), Some(net_id), Some(dev_id)) =
-            (&self.api_client, &current_net_id, &self.device_id)
+        if let (Some(client), Some(net_id), Some(dev_id), Some(hw_id)) =
+            (&self.api_client, &current_net_id, &self.device_id, &self.hardware_id)
         {
             // Step 1: Send heartbeat with new is_exit_node status and wait for it
+            // Use hardware_id for heartbeat, not device_id (API UUID)
             let dev_service = DeviceService::new(client);
-            match dev_service.heartbeat(dev_id, enabled).await {
+            match dev_service.heartbeat(hw_id, enabled).await {
                 Ok(_) => {
                     info!("Heartbeat sent with is_exit_node={}", enabled);
                 }
