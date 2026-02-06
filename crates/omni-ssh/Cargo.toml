@@ -64,6 +64,10 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "rus
 # Cryptography for recording integrity
 ring = "0.17"
 base64 = "0.21"
+sha2 = "0.10"
+
+# Directory utilities
+dirs = "5"
 
 # Cross-platform PTY
 portable-pty = "0.8"

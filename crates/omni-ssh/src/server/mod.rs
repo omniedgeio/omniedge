@@ -378,8 +378,29 @@ impl SshServer {
         let ssh_server = OmniEdgeSshServer::new(self.backend.clone(), self.config.clone());
         let handler = ssh_server.make_handler(peer_addr);
 
-        // Run the SSH protocol
-        let _session = russh::server::run_stream(russh_config, stream, handler).await?;
+        // Run the SSH protocol with handshake timeout to protect against slowloris
+        let handshake_timeout = self.config.handshake_timeout;
+        let run_session = russh::server::run_stream(russh_config, stream, handler);
+
+        match tokio::time::timeout(handshake_timeout, run_session).await {
+            Ok(result) => {
+                // Handshake completed (success or failure)
+                result?;
+            }
+            Err(_) => {
+                // Timeout - possible slowloris attack
+                self.backend
+                    .on_ssh_event(SshEvent::ConnectionRejected {
+                        src: peer_addr,
+                        reason: "SSH handshake timeout".to_string(),
+                    })
+                    .await;
+                return Err(anyhow::anyhow!(
+                    "SSH handshake timeout from {} (possible slowloris attack)",
+                    peer_addr
+                ));
+            }
+        }
 
         // Session is now running - it will handle its own lifecycle
         // The handler will emit events and manage the connection
@@ -526,8 +547,29 @@ impl SshServerRef {
         let ssh_server = OmniEdgeSshServer::new(self.backend.clone(), self.config.clone());
         let handler = ssh_server.make_handler(peer_addr);
 
-        // Run the SSH protocol
-        let _session = russh::server::run_stream(russh_config, stream, handler).await?;
+        // Run the SSH protocol with handshake timeout to protect against slowloris
+        let handshake_timeout = self.config.handshake_timeout;
+        let run_session = russh::server::run_stream(russh_config, stream, handler);
+
+        match tokio::time::timeout(handshake_timeout, run_session).await {
+            Ok(result) => {
+                // Handshake completed (success or failure)
+                result?;
+            }
+            Err(_) => {
+                // Timeout - possible slowloris attack
+                self.backend
+                    .on_ssh_event(SshEvent::ConnectionRejected {
+                        src: peer_addr,
+                        reason: "SSH handshake timeout".to_string(),
+                    })
+                    .await;
+                return Err(anyhow::anyhow!(
+                    "SSH handshake timeout from {} (possible slowloris attack)",
+                    peer_addr
+                ));
+            }
+        }
 
         // Session is now running - it will handle its own lifecycle
         // The handler will emit events and manage the connection

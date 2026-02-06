@@ -543,13 +543,13 @@ pub struct DefaultEmergencyHttpClient {
 
 impl DefaultEmergencyHttpClient {
     /// Create a new HTTP client
-    pub fn new(config: EmergencyAccessConfig) -> Self {
+    pub fn new(config: EmergencyAccessConfig) -> anyhow::Result<Self> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
-            .expect("Failed to create HTTP client");
+            .map_err(|e| anyhow::anyhow!("Failed to create HTTP client: {}", e))?;
 
-        Self { client, config }
+        Ok(Self { client, config })
     }
 }
 
@@ -719,9 +719,9 @@ pub struct EmergencyAccessManager {
 
 impl EmergencyAccessManager {
     /// Create a new emergency access manager with default HTTP client
-    pub fn new(config: EmergencyAccessConfig) -> Self {
-        let http_client = Arc::new(DefaultEmergencyHttpClient::new(config.clone()));
-        Self::with_http_client(config, http_client)
+    pub fn new(config: EmergencyAccessConfig) -> anyhow::Result<Self> {
+        let http_client = Arc::new(DefaultEmergencyHttpClient::new(config.clone())?);
+        Ok(Self::with_http_client(config, http_client))
     }
 
     /// Create with a custom HTTP client (for testing)

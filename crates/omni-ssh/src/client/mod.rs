@@ -2,21 +2,334 @@
 //!
 //! This module provides SSH client functionality for connecting to other
 //! nodes in the OmniEdge network using OmniEdge identity authentication.
+//!
+//! ## Host Key Verification
+//!
+//! The client supports multiple host key verification modes:
+//! - **TOFU (Trust On First Use)**: Accept and remember keys on first connection
+//! - **Strict**: Only accept keys in the known hosts store
+//! - **AcceptNew**: Accept new hosts but reject changed keys
+//! - **Insecure**: Accept all keys (not recommended for production)
 
 use crate::server::SshBackend;
 use async_trait::async_trait;
 use russh::client::{Config as ClientConfig, Handle, Msg};
 use russh::{Channel, ChannelId, Disconnect, Sig};
 use russh_keys::key::PublicKey;
+use russh_keys::PublicKeyBase64;
 use std::collections::HashMap;
+use std::io::{BufRead, Write};
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// SSH client for connecting to peers
 pub struct SshClient {
     backend: Arc<dyn SshBackend>,
+    /// Host key verification settings
+    host_key_config: HostKeyConfig,
+}
+
+/// Host key verification mode
+#[derive(Debug, Clone, Default)]
+pub enum HostKeyVerification {
+    /// Trust On First Use - accept and remember new keys, reject changed keys
+    #[default]
+    Tofu,
+    /// Only accept keys already in the known hosts store
+    Strict,
+    /// Accept new hosts but reject if key has changed
+    AcceptNew,
+    /// Accept all keys without verification (INSECURE - not recommended)
+    Insecure,
+}
+
+/// Configuration for host key verification
+#[derive(Debug, Clone)]
+pub struct HostKeyConfig {
+    /// Verification mode
+    pub mode: HostKeyVerification,
+    /// Path to known hosts file (defaults to ~/.omniedge/known_hosts)
+    pub known_hosts_path: Option<PathBuf>,
+}
+
+impl Default for HostKeyConfig {
+    fn default() -> Self {
+        Self {
+            mode: HostKeyVerification::Tofu,
+            known_hosts_path: None,
+        }
+    }
+}
+
+impl HostKeyConfig {
+    /// Create insecure config that accepts all keys (for testing only)
+    pub fn insecure() -> Self {
+        Self {
+            mode: HostKeyVerification::Insecure,
+            known_hosts_path: None,
+        }
+    }
+
+    /// Create strict config that only accepts known keys
+    pub fn strict() -> Self {
+        Self {
+            mode: HostKeyVerification::Strict,
+            known_hosts_path: None,
+        }
+    }
+
+    /// Set custom known hosts path
+    pub fn with_known_hosts_path(mut self, path: PathBuf) -> Self {
+        self.known_hosts_path = Some(path);
+        self
+    }
+}
+
+/// Known hosts store for host key verification
+#[derive(Debug)]
+pub struct KnownHostsStore {
+    path: PathBuf,
+    /// In-memory cache: host -> (key_type, fingerprint)
+    hosts: std::sync::RwLock<HashMap<String, KnownHostEntry>>,
+}
+
+/// Entry in known hosts store
+#[derive(Debug, Clone)]
+struct KnownHostEntry {
+    key_type: String,
+    fingerprint: String,
+    /// Base64-encoded public key
+    public_key_base64: String,
+}
+
+impl KnownHostsStore {
+    /// Create or load known hosts store
+    pub fn new(path: PathBuf) -> anyhow::Result<Self> {
+        let store = Self {
+            path: path.clone(),
+            hosts: std::sync::RwLock::new(HashMap::new()),
+        };
+
+        // Load existing entries if file exists
+        if path.exists() {
+            store.load()?;
+        }
+
+        Ok(store)
+    }
+
+    /// Get default path for known hosts file
+    pub fn default_path() -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".omniedge")
+            .join("known_hosts")
+    }
+
+    /// Load entries from file
+    fn load(&self) -> anyhow::Result<()> {
+        let file = std::fs::File::open(&self.path)?;
+        let reader = std::io::BufReader::new(file);
+        let mut hosts = self.hosts.write().unwrap();
+
+        for line in reader.lines() {
+            let line = line?;
+            let line = line.trim();
+
+            // Skip comments and empty lines
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            // Format: host key_type base64_key
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 3 {
+                let host = parts[0].to_string();
+                let key_type = parts[1].to_string();
+                let public_key_base64 = parts[2].to_string();
+
+                // Calculate fingerprint from base64 key
+                let fingerprint = if let Ok(key_bytes) = base64::Engine::decode(
+                    &base64::engine::general_purpose::STANDARD,
+                    &public_key_base64,
+                ) {
+                    use sha2::{Digest, Sha256};
+                    let hash = Sha256::digest(&key_bytes);
+                    format!(
+                        "SHA256:{}",
+                        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &hash)
+                    )
+                } else {
+                    continue;
+                };
+
+                hosts.insert(
+                    host,
+                    KnownHostEntry {
+                        key_type,
+                        fingerprint,
+                        public_key_base64,
+                    },
+                );
+            }
+        }
+
+        debug!("Loaded {} known hosts from {:?}", hosts.len(), self.path);
+        Ok(())
+    }
+
+    /// Check if a host key is known and matches
+    pub fn check(&self, host: &str, port: u16, key: &PublicKey) -> HostKeyCheckResult {
+        let host_key = if port == 22 {
+            host.to_string()
+        } else {
+            format!("[{}]:{}", host, port)
+        };
+
+        let hosts = self.hosts.read().unwrap();
+        let fingerprint = key.fingerprint();
+
+        if let Some(entry) = hosts.get(&host_key) {
+            if entry.fingerprint == fingerprint {
+                HostKeyCheckResult::Match
+            } else {
+                HostKeyCheckResult::Mismatch {
+                    expected: entry.fingerprint.clone(),
+                    actual: fingerprint,
+                }
+            }
+        } else {
+            HostKeyCheckResult::NotFound
+        }
+    }
+
+    /// Add a host key to the store
+    pub fn add(&self, host: &str, port: u16, key: &PublicKey) -> anyhow::Result<()> {
+        let host_key = if port == 22 {
+            host.to_string()
+        } else {
+            format!("[{}]:{}", host, port)
+        };
+
+        let key_type = key.name().to_string();
+        let fingerprint = key.fingerprint();
+
+        // Encode public key to base64
+        let public_key_base64 = key.public_key_base64();
+
+        // Add to memory
+        {
+            let mut hosts = self.hosts.write().unwrap();
+            hosts.insert(
+                host_key.clone(),
+                KnownHostEntry {
+                    key_type: key_type.clone(),
+                    fingerprint: fingerprint.clone(),
+                    public_key_base64: public_key_base64.clone(),
+                },
+            );
+        }
+
+        // Persist to file
+        self.save_entry(&host_key, &key_type, &public_key_base64)?;
+
+        info!(
+            host = %host_key,
+            key_type = %key_type,
+            fingerprint = %fingerprint,
+            "Added host key to known hosts"
+        );
+
+        Ok(())
+    }
+
+    /// Save a single entry to the known hosts file
+    fn save_entry(
+        &self,
+        host: &str,
+        key_type: &str,
+        public_key_base64: &str,
+    ) -> anyhow::Result<()> {
+        // Ensure directory exists
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        // Append to file
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)?;
+
+        writeln!(file, "{} {} {}", host, key_type, public_key_base64)?;
+
+        Ok(())
+    }
+
+    /// Remove a host from the store
+    pub fn remove(&self, host: &str, port: u16) -> anyhow::Result<bool> {
+        let host_key = if port == 22 {
+            host.to_string()
+        } else {
+            format!("[{}]:{}", host, port)
+        };
+
+        let removed = {
+            let mut hosts = self.hosts.write().unwrap();
+            hosts.remove(&host_key).is_some()
+        };
+
+        if removed {
+            // Rewrite file without the removed entry
+            self.rewrite_file()?;
+        }
+
+        Ok(removed)
+    }
+
+    /// Rewrite the entire known hosts file
+    fn rewrite_file(&self) -> anyhow::Result<()> {
+        let hosts = self.hosts.read().unwrap();
+
+        // Ensure directory exists
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let mut file = std::fs::File::create(&self.path)?;
+
+        writeln!(file, "# OmniEdge SSH known hosts")?;
+        writeln!(file, "# Format: host key_type base64_public_key")?;
+
+        for (host, entry) in hosts.iter() {
+            writeln!(
+                file,
+                "{} {} {}",
+                host, entry.key_type, entry.public_key_base64
+            )?;
+        }
+
+        Ok(())
+    }
+}
+
+/// Result of host key verification
+#[derive(Debug, Clone, PartialEq)]
+pub enum HostKeyCheckResult {
+    /// Key matches stored key
+    Match,
+    /// Key doesn't match stored key (possible MITM attack)
+    Mismatch {
+        /// The expected fingerprint from known hosts
+        expected: String,
+        /// The actual fingerprint received from server
+        actual: String,
+    },
+    /// Host not in known hosts
+    NotFound,
 }
 
 /// Target for SSH connection
@@ -91,9 +404,31 @@ enum ChannelType {
 }
 
 impl SshClient {
-    /// Create a new SSH client
+    /// Create a new SSH client with default TOFU host key verification
     pub fn new(backend: Arc<dyn SshBackend>) -> Self {
-        Self { backend }
+        Self::with_config(backend, HostKeyConfig::default())
+    }
+
+    /// Create a new SSH client with custom host key verification config
+    pub fn with_config(backend: Arc<dyn SshBackend>, host_key_config: HostKeyConfig) -> Self {
+        Self {
+            backend,
+            host_key_config,
+        }
+    }
+
+    /// Create a new SSH client with insecure mode (accepts all keys)
+    /// WARNING: Only use for testing or when other security layers exist
+    pub fn insecure(backend: Arc<dyn SshBackend>) -> Self {
+        Self::with_config(backend, HostKeyConfig::insecure())
+    }
+
+    /// Get the known hosts store path
+    fn known_hosts_path(&self) -> PathBuf {
+        self.host_key_config
+            .known_hosts_path
+            .clone()
+            .unwrap_or_else(KnownHostsStore::default_path)
     }
 
     /// Connect to peer via SSH over VPN tunnel
@@ -111,10 +446,19 @@ impl SshClient {
         // 2. Connect via VPN tunnel
         let stream = tokio::net::TcpStream::connect(peer_addr).await?;
 
-        // 3. Create client handler
-        let handler = OmniEdgeClientHandler::new(self.backend.clone());
+        // 3. Initialize known hosts store for host key verification
+        let known_hosts = Arc::new(KnownHostsStore::new(self.known_hosts_path())?);
 
-        // 4. SSH handshake
+        // 4. Create client handler with host key verification
+        let handler = OmniEdgeClientHandler::new(
+            self.backend.clone(),
+            known_hosts,
+            self.host_key_config.mode.clone(),
+            target.host.clone(),
+            target.port,
+        );
+
+        // 5. SSH handshake
         let config = Arc::new(ClientConfig::default());
         let mut handle = russh::client::connect_stream(config, stream, handler).await?;
 
@@ -421,6 +765,14 @@ pub struct OmniEdgeClientHandler {
     backend: Arc<dyn SshBackend>,
     /// Channel data receivers for collecting output
     channel_data: Arc<Mutex<HashMap<ChannelId, ChannelDataCollector>>>,
+    /// Known hosts store for host key verification
+    known_hosts: Arc<KnownHostsStore>,
+    /// Host key verification mode
+    host_key_mode: HostKeyVerification,
+    /// Target host being connected to
+    target_host: String,
+    /// Target port
+    target_port: u16,
 }
 
 /// Collects data from a channel
@@ -432,11 +784,21 @@ struct ChannelDataCollector {
 }
 
 impl OmniEdgeClientHandler {
-    /// Create a new client handler
-    pub fn new(backend: Arc<dyn SshBackend>) -> Self {
+    /// Create a new client handler with host key verification
+    pub fn new(
+        backend: Arc<dyn SshBackend>,
+        known_hosts: Arc<KnownHostsStore>,
+        host_key_mode: HostKeyVerification,
+        target_host: String,
+        target_port: u16,
+    ) -> Self {
         Self {
             backend,
             channel_data: Arc::new(Mutex::new(HashMap::new())),
+            known_hosts,
+            host_key_mode,
+            target_host,
+            target_port,
         }
     }
 }
@@ -450,19 +812,113 @@ impl russh::client::Handler for OmniEdgeClientHandler {
         &mut self,
         server_public_key: &PublicKey,
     ) -> Result<bool, Self::Error> {
-        // In OmniEdge, we trust peers in the same network
-        // The VPN tunnel already provides authentication
-        // Could add TOFU (Trust On First Use) or verify against known keys
+        let fingerprint = server_public_key.fingerprint();
+        let key_type = server_public_key.name();
 
         debug!(
-            "Server key received: {} ({})",
-            server_public_key.name(),
-            server_public_key.fingerprint()
+            host = %self.target_host,
+            port = %self.target_port,
+            key_type = %key_type,
+            fingerprint = %fingerprint,
+            "Verifying server host key"
         );
 
-        // TODO: Optionally verify against known host keys
-        // For now, trust all peers in the network
-        Ok(true)
+        // Check verification mode
+        match self.host_key_mode {
+            HostKeyVerification::Insecure => {
+                warn!(
+                    host = %self.target_host,
+                    "INSECURE: Accepting host key without verification"
+                );
+                return Ok(true);
+            }
+            HostKeyVerification::Tofu
+            | HostKeyVerification::Strict
+            | HostKeyVerification::AcceptNew => {
+                // Continue with verification below
+            }
+        }
+
+        // Check known hosts
+        let check_result =
+            self.known_hosts
+                .check(&self.target_host, self.target_port, server_public_key);
+
+        match check_result {
+            HostKeyCheckResult::Match => {
+                debug!(
+                    host = %self.target_host,
+                    "Host key verified - matches known host"
+                );
+                Ok(true)
+            }
+            HostKeyCheckResult::Mismatch { expected, actual } => {
+                // Key has changed - this is a potential MITM attack
+                warn!(
+                    host = %self.target_host,
+                    expected = %expected,
+                    actual = %actual,
+                    "HOST KEY MISMATCH - possible MITM attack!"
+                );
+
+                // All modes reject changed keys
+                Err(anyhow::anyhow!(
+                    "Host key verification failed for '{}': key has changed!\n\
+                     Expected: {}\n\
+                     Received: {}\n\
+                     This could indicate a man-in-the-middle attack.\n\
+                     If the server key was legitimately changed, remove the old key with:\n\
+                     omniedge ssh-keygen -R {}",
+                    self.target_host,
+                    expected,
+                    actual,
+                    self.target_host
+                ))
+            }
+            HostKeyCheckResult::NotFound => {
+                // New host - behavior depends on mode
+                match self.host_key_mode {
+                    HostKeyVerification::Strict => {
+                        // Strict mode rejects unknown hosts
+                        warn!(
+                            host = %self.target_host,
+                            "Host not in known hosts (strict mode)"
+                        );
+                        Err(anyhow::anyhow!(
+                            "Host key verification failed: '{}' not in known hosts.\n\
+                             To add this host, connect with TOFU mode first or manually add the key.",
+                            self.target_host
+                        ))
+                    }
+                    HostKeyVerification::Tofu | HostKeyVerification::AcceptNew => {
+                        // TOFU and AcceptNew modes accept and remember new keys
+                        info!(
+                            host = %self.target_host,
+                            key_type = %key_type,
+                            fingerprint = %fingerprint,
+                            "New host - adding to known hosts (TOFU)"
+                        );
+
+                        // Add to known hosts
+                        if let Err(e) = self.known_hosts.add(
+                            &self.target_host,
+                            self.target_port,
+                            server_public_key,
+                        ) {
+                            warn!(
+                                host = %self.target_host,
+                                error = %e,
+                                "Failed to save host key to known hosts"
+                            );
+                            // Continue anyway - verification passed
+                        }
+
+                        Ok(true)
+                    }
+                    HostKeyVerification::Insecure => unreachable!(),
+                }
+            }
+        }
     }
 
     /// Called when data is received on a channel
