@@ -884,15 +884,6 @@ jobs:
           event-type: cli-release
           client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
 
-      - name: Trigger omniedge-openwrt
-        if: steps.check_secret.outputs.has_token == 'true'
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
-          repository: omniedgeio/omniedge-openwrt
-          event-type: cli-release
-          client-payload: '{"version": "${{ steps.version.outputs.version }}", "tag": "${{ steps.version.outputs.tag }}"}'
-
       - name: Trigger omniedge-synology
         if: steps.check_secret.outputs.has_token == 'true'
         uses: peter-evans/repository-dispatch@v3
