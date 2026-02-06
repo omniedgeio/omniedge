@@ -499,6 +499,7 @@ impl ConnectionManager {
                         match tun
                             .setup_dual_stack(
                                 &join_resp.virtual_ip,
+                                Some(join_resp.subnet_mask.as_str()),
                                 join_resp.virtual_ip_v6.as_deref(),
                                 join_resp.subnet_prefix_v6,
                                 port,
@@ -553,6 +554,7 @@ impl ConnectionManager {
             let mut tun = OmniTun::new_userspace(ifname);
             tun.setup_dual_stack(
                 &join_resp.virtual_ip,
+                Some(join_resp.subnet_mask.as_str()),
                 join_resp.virtual_ip_v6.as_deref(),
                 join_resp.subnet_prefix_v6,
                 port,
