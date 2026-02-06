@@ -57,8 +57,8 @@ impl Default for PtyRequest {
     }
 }
 
-/// Spawn user process with proper privilege separation (Unix)
-#[cfg(unix)]
+/// Spawn user process with proper privilege separation (Unix - Linux)
+#[cfg(all(unix, not(target_os = "macos")))]
 pub async fn spawn_session(args: IncubatorArgs) -> anyhow::Result<tokio::process::Child> {
     use nix::unistd::{setgid, setgroups, setuid, Gid, Uid};
     use std::os::unix::process::CommandExt;
@@ -119,6 +119,97 @@ pub async fn spawn_session(args: IncubatorArgs) -> anyhow::Result<tokio::process
             // Set supplementary groups
             let gids: Vec<Gid> = groups.iter().map(|g| Gid::from_raw(*g)).collect();
             setgroups(&gids).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+            // Set GID (must be before setuid)
+            setgid(Gid::from_raw(gid))
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+            // Set UID (must be last - after this we can't regain privileges)
+            setuid(Uid::from_raw(uid))
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+            // Verify we can't regain root privileges
+            if uid != 0 && setuid(Uid::from_raw(0)).is_ok() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Failed to drop privileges permanently",
+                ));
+            }
+
+            Ok(())
+        });
+    }
+
+    let child = cmd.spawn()?;
+    Ok(child)
+}
+
+/// Spawn user process with proper privilege separation (Unix - macOS)
+/// Note: macOS uses different setgroups signature and nix doesn't expose it for Apple targets
+#[cfg(target_os = "macos")]
+pub async fn spawn_session(args: IncubatorArgs) -> anyhow::Result<tokio::process::Child> {
+    use nix::unistd::{setgid, setuid, Gid, Uid};
+    use std::os::unix::process::CommandExt;
+    use tokio::process::Command;
+
+    let shell = args.shell.clone();
+    let home = args.home_dir.clone();
+    let uid = args.uid;
+    let gid = args.gid;
+    let groups = args.groups.clone();
+    let env = args.env.clone();
+    let username = args.username.clone();
+
+    let mut cmd = match &args.command {
+        SessionCommand::Shell => {
+            let mut c = Command::new(&shell);
+            c.arg("-l"); // Login shell
+            c
+        }
+        SessionCommand::Exec(command) => {
+            let mut c = Command::new(&shell);
+            c.args(["-c", command]);
+            c
+        }
+        SessionCommand::Sftp => {
+            // SFTP is handled differently - in-process
+            return Err(anyhow::anyhow!("SFTP should be handled in-process"));
+        }
+    };
+
+    // Set environment
+    cmd.env_clear();
+    cmd.envs(env);
+    cmd.env("HOME", &home);
+    cmd.env("USER", &username);
+    cmd.env("LOGNAME", &username);
+    cmd.env("SHELL", &shell);
+    cmd.env(
+        "PATH",
+        "/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin",
+    );
+
+    // Set terminal type if PTY requested
+    if let Some(ref pty) = args.pty {
+        cmd.env("TERM", &pty.term);
+        cmd.env("COLUMNS", pty.width.to_string());
+        cmd.env("LINES", pty.height.to_string());
+    }
+
+    // Set working directory
+    cmd.current_dir(&home);
+
+    // Drop privileges before exec (in child process)
+    // SAFETY: pre_exec runs in the child after fork, before exec.
+    // We're only calling async-signal-safe functions (setgroups, setgid, setuid).
+    unsafe {
+        cmd.pre_exec(move || {
+            // Set supplementary groups using libc directly (macOS has different types)
+            // On macOS, gid_t is i32, not u32
+            let gids: Vec<libc::gid_t> = groups.iter().map(|g| *g as libc::gid_t).collect();
+            if libc::setgroups(gids.len() as libc::c_int, gids.as_ptr()) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
 
             // Set GID (must be before setuid)
             setgid(Gid::from_raw(gid))
@@ -223,8 +314,8 @@ pub fn lookup_user(username: &str) -> anyhow::Result<UserInfo> {
     }
 }
 
-/// Get supplementary groups for a user
-#[cfg(unix)]
+/// Get supplementary groups for a user (Linux)
+#[cfg(all(unix, not(target_os = "macos")))]
 fn get_user_groups(username: &str, primary_gid: u32) -> anyhow::Result<Vec<u32>> {
     use std::ffi::CString;
 
@@ -249,6 +340,44 @@ fn get_user_groups(username: &str, primary_gid: u32) -> anyhow::Result<Vec<u32>>
             libc::getgrouplist(
                 c_username.as_ptr(),
                 primary_gid as libc::gid_t,
+                groups.as_mut_ptr(),
+                &mut ngroups,
+            );
+        }
+
+        groups.truncate(ngroups as usize);
+        Ok(groups.into_iter().map(|g| g as u32).collect())
+    }
+}
+
+/// Get supplementary groups for a user (macOS)
+/// Note: On macOS, gid_t is i32 and getgrouplist uses different types
+#[cfg(target_os = "macos")]
+fn get_user_groups(username: &str, primary_gid: u32) -> anyhow::Result<Vec<u32>> {
+    use std::ffi::CString;
+
+    let c_username = CString::new(username)?;
+
+    // Start with a reasonable buffer size
+    let mut ngroups: libc::c_int = 32;
+    // On macOS, gid_t is i32
+    let mut groups: Vec<i32> = vec![0; ngroups as usize];
+
+    // SAFETY: getgrouplist is a standard POSIX function
+    unsafe {
+        let ret = libc::getgrouplist(
+            c_username.as_ptr(),
+            primary_gid as i32,
+            groups.as_mut_ptr(),
+            &mut ngroups,
+        );
+
+        if ret == -1 {
+            // Buffer was too small, resize and retry
+            groups.resize(ngroups as usize, 0);
+            libc::getgrouplist(
+                c_username.as_ptr(),
+                primary_gid as i32,
                 groups.as_mut_ptr(),
                 &mut ngroups,
             );
