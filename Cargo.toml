@@ -7,6 +7,7 @@ members = [
     "crates/omni-core",
     "crates/omni-plugin",
     "crates/omni-helper",
+    "crates/omni-ssh",
     "ui/desktop/src-tauri",
 ]
 resolver = "2"

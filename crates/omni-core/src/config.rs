@@ -155,6 +155,194 @@ impl NetworkConfig {
 }
 
 // ============================================================================
+// SSH Configuration
+// ============================================================================
+
+/// SSH server and client configuration
+///
+/// Controls SSH access features including:
+/// - Server listening port and authentication
+/// - Session recording
+/// - Command filtering
+/// - SFTP access
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SshConfig {
+    /// Enable SSH server (default: true)
+    ///
+    /// When enabled, other OmniEdge peers can SSH into this node.
+    #[serde(default = "default_true")]
+    pub server_enabled: bool,
+
+    /// SSH server port (default: 22)
+    ///
+    /// The port to listen on for SSH connections.
+    /// Only accepts connections from OmniEdge VPN addresses.
+    #[serde(default = "default_ssh_port")]
+    pub server_port: u16,
+
+    /// Enable SFTP subsystem (default: true)
+    ///
+    /// Allows file transfers via SFTP when SSH server is enabled.
+    #[serde(default = "default_true")]
+    pub sftp_enabled: bool,
+
+    /// Enable session recording (default: false)
+    ///
+    /// Records SSH sessions in asciinema format for audit purposes.
+    #[serde(default)]
+    pub recording_enabled: bool,
+
+    /// Recording storage path (default: ~/.omniedge/recordings/)
+    ///
+    /// Directory where session recordings are stored.
+    #[serde(default)]
+    pub recording_path: Option<String>,
+
+    /// Upload recordings to cloud (default: false)
+    ///
+    /// When enabled, recordings are uploaded to the OmniEdge cloud
+    /// for centralized audit and compliance.
+    #[serde(default)]
+    pub recording_cloud_upload: bool,
+
+    /// Enable command filtering (default: false)
+    ///
+    /// When enabled, commands are filtered against an allow/block list.
+    #[serde(default)]
+    pub command_filter_enabled: bool,
+
+    /// Blocked commands (executed when command_filter_enabled is true)
+    ///
+    /// List of command patterns to block (supports glob patterns).
+    /// Example: ["rm -rf *", "shutdown*", "reboot*"]
+    #[serde(default)]
+    pub blocked_commands: Vec<String>,
+
+    /// Allowed commands (when set, only these commands are allowed)
+    ///
+    /// If this list is non-empty, only these commands are permitted.
+    /// Takes precedence over blocked_commands.
+    #[serde(default)]
+    pub allowed_commands: Vec<String>,
+
+    /// Read-only mode (default: false)
+    ///
+    /// When enabled, only read operations are allowed.
+    /// Write commands and SFTP writes are blocked.
+    #[serde(default)]
+    pub read_only: bool,
+
+    /// Maximum concurrent SSH sessions (default: 10)
+    ///
+    /// Limits the number of simultaneous SSH sessions.
+    #[serde(default = "default_max_sessions")]
+    pub max_sessions: u32,
+
+    /// Session idle timeout in seconds (default: 3600 = 1 hour)
+    ///
+    /// Sessions inactive for this duration are automatically closed.
+    /// Set to 0 to disable timeout.
+    #[serde(default = "default_idle_timeout")]
+    pub idle_timeout_secs: u64,
+
+    /// Rate limit: max connections per minute per IP (default: 10)
+    ///
+    /// Limits connection attempts to prevent brute force attacks.
+    #[serde(default = "default_rate_limit")]
+    pub rate_limit_per_minute: u32,
+
+    /// Allowed SSH users (empty = all users allowed)
+    ///
+    /// List of OmniEdge user emails that can SSH to this node.
+    /// If empty, all users in the network can connect.
+    #[serde(default)]
+    pub allowed_users: Vec<String>,
+}
+
+fn default_ssh_port() -> u16 {
+    22
+}
+
+fn default_max_sessions() -> u32 {
+    10
+}
+
+fn default_idle_timeout() -> u64 {
+    3600 // 1 hour
+}
+
+fn default_rate_limit() -> u32 {
+    10
+}
+
+impl Default for SshConfig {
+    fn default() -> Self {
+        Self {
+            server_enabled: true,
+            server_port: 22,
+            sftp_enabled: true,
+            recording_enabled: false,
+            recording_path: None,
+            recording_cloud_upload: false,
+            command_filter_enabled: false,
+            blocked_commands: Vec::new(),
+            allowed_commands: Vec::new(),
+            read_only: false,
+            max_sessions: 10,
+            idle_timeout_secs: 3600,
+            rate_limit_per_minute: 10,
+            allowed_users: Vec::new(),
+        }
+    }
+}
+
+impl SshConfig {
+    /// Validate configuration values
+    pub fn validate(&self) -> Result<()> {
+        if self.server_port == 0 {
+            anyhow::bail!("SSH server port cannot be 0");
+        }
+
+        if self.max_sessions == 0 {
+            anyhow::bail!("max_sessions must be at least 1");
+        }
+
+        if self.rate_limit_per_minute == 0 {
+            anyhow::bail!("rate_limit_per_minute must be at least 1");
+        }
+
+        Ok(())
+    }
+
+    /// Get a summary of enabled features for display
+    pub fn feature_summary(&self) -> Vec<String> {
+        let mut features = Vec::new();
+
+        if self.server_enabled {
+            features.push(format!("SSH Server (port {})", self.server_port));
+        }
+        if self.sftp_enabled {
+            features.push("SFTP".to_string());
+        }
+        if self.recording_enabled {
+            features.push("Session Recording".to_string());
+        }
+        if self.command_filter_enabled {
+            features.push("Command Filtering".to_string());
+        }
+        if self.read_only {
+            features.push("Read-Only Mode".to_string());
+        }
+
+        if features.is_empty() {
+            features.push("SSH Disabled".to_string());
+        }
+
+        features
+    }
+}
+
+// ============================================================================
 // CLI Configuration
 // ============================================================================
 
@@ -228,6 +416,10 @@ pub struct CliConfig {
     /// Network configuration for NAT traversal (OmniNervous v0.3.0+)
     #[serde(default)]
     pub network_config: NetworkConfig,
+
+    /// SSH configuration for secure shell access
+    #[serde(default)]
+    pub ssh_config: SshConfig,
 }
 
 impl CliConfig {
