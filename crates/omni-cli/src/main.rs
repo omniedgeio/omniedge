@@ -1267,29 +1267,64 @@ async fn async_main() -> Result<()> {
                 if let Some(ref exit_ip_v6) = config.exit_node_ip_v6 {
                     println!("  Exit Node v6: {}", exit_ip_v6);
                 }
-                
+
                 // Show debug P2P connection info if requested
                 if debug {
                     println!();
                     println!("P2P Connection Debug");
                     println!("────────────────────");
-                    
+
                     // Note: In a real implementation, we'd query the running daemon
                     // For now, show info from NAT config
                     println!("  NAT Traversal Settings:");
-                    println!("    Relay:      {}", if config.network_config.relay_enabled { "Enabled" } else { "Disabled" });
-                    println!("    Port Map:   {}", if config.network_config.portmap_enabled { "Enabled" } else { "Disabled" });
-                    println!("    IPv6:       {}", if config.network_config.ipv6_enabled { "Enabled" } else { "Disabled" });
+                    println!(
+                        "    Relay:      {}",
+                        if config.network_config.relay_enabled {
+                            "Enabled"
+                        } else {
+                            "Disabled"
+                        }
+                    );
+                    println!(
+                        "    Port Map:   {}",
+                        if config.network_config.portmap_enabled {
+                            "Enabled"
+                        } else {
+                            "Disabled"
+                        }
+                    );
+                    println!(
+                        "    IPv6:       {}",
+                        if config.network_config.ipv6_enabled {
+                            "Enabled"
+                        } else {
+                            "Disabled"
+                        }
+                    );
                     if config.network_config.ipv6_enabled {
-                        println!("    Prefer IPv6: {}", if config.network_config.prefer_ipv6 { "Yes" } else { "No" });
+                        println!(
+                            "    Prefer IPv6: {}",
+                            if config.network_config.prefer_ipv6 {
+                                "Yes"
+                            } else {
+                                "No"
+                            }
+                        );
                     }
-                    println!("    Encrypted:  {}", if config.network_config.encrypt_signaling { "Yes" } else { "No" });
-                    
+                    println!(
+                        "    Encrypted:  {}",
+                        if config.network_config.encrypt_signaling {
+                            "Yes"
+                        } else {
+                            "No"
+                        }
+                    );
+
                     // Show relay server if configured
                     if let Some(ref relay) = config.network_config.relay_server {
                         println!("    Relay Server: {}", relay);
                     }
-                    
+
                     println!();
                     println!("  Note: For live P2P peer state, the daemon exposes this via");
                     println!("        internal APIs. Full debug output requires daemon query.");
@@ -1340,16 +1375,37 @@ async fn async_main() -> Result<()> {
 
                 println!();
                 println!("  Run 'omniedge start' to connect.");
-                
+
                 // Show debug info even when disconnected
                 if debug {
                     println!();
                     println!("P2P Connection Debug");
                     println!("────────────────────");
                     println!("  NAT Traversal Settings:");
-                    println!("    Relay:      {}", if config.network_config.relay_enabled { "Enabled" } else { "Disabled" });
-                    println!("    Port Map:   {}", if config.network_config.portmap_enabled { "Enabled" } else { "Disabled" });
-                    println!("    IPv6:       {}", if config.network_config.ipv6_enabled { "Enabled" } else { "Disabled" });
+                    println!(
+                        "    Relay:      {}",
+                        if config.network_config.relay_enabled {
+                            "Enabled"
+                        } else {
+                            "Disabled"
+                        }
+                    );
+                    println!(
+                        "    Port Map:   {}",
+                        if config.network_config.portmap_enabled {
+                            "Enabled"
+                        } else {
+                            "Disabled"
+                        }
+                    );
+                    println!(
+                        "    IPv6:       {}",
+                        if config.network_config.ipv6_enabled {
+                            "Enabled"
+                        } else {
+                            "Disabled"
+                        }
+                    );
                     println!();
                     println!("  No active connection - connect first to see P2P state.");
                 }

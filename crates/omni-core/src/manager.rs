@@ -4,18 +4,36 @@ use anyhow::{Context, Result};
 use log::{debug, error, info, warn};
 use omni_api::{types::*, ApiClient, AuthService, DeviceService, NetworkService};
 use omni_proto::{
-    encode_disco_ping, encode_disco_pong, handle_nucleus_message, parse_disco_ping,
-    parse_disco_pong, DiscoPing, DiscoPong, NucleusState, OmniProto, PeerConnectionState,
-    SIGNALING_DISCO_PING, SIGNALING_DISCO_PONG,
+    encode_disco_ping,
+    encode_disco_pong,
     // Relay protocol
-    encode_relay_bind, is_relay_message, parse_relay_bind_ack, parse_relay_data,
-    RelayClient, MSG_RELAY_BIND_ACK, MSG_RELAY_DATA,
+    encode_relay_bind,
+    handle_nucleus_message,
+    is_relay_message,
+    parse_disco_ping,
+    parse_disco_pong,
+    parse_relay_bind_ack,
+    parse_relay_data,
+    DiscoPing,
+    DiscoPong,
+    EndpointInfo,
+    // Multi-endpoint support
+    EndpointSet,
+    EndpointSource,
     // NAT type detection
     NatType,
-    // Multi-endpoint support
-    EndpointSet, EndpointSource, EndpointInfo,
+    NucleusState,
+    OmniProto,
+    PeerConnectionState,
+    PortMapCapabilities,
     // Port mapping
-    PortMapper, PortMapping, PortMapCapabilities,
+    PortMapper,
+    PortMapping,
+    RelayClient,
+    MSG_RELAY_BIND_ACK,
+    MSG_RELAY_DATA,
+    SIGNALING_DISCO_PING,
+    SIGNALING_DISCO_PONG,
 };
 use omni_tun::OmniTun;
 use omninervous::Identity;
@@ -33,7 +51,7 @@ use tokio::task::JoinHandle;
 // ============================================================================
 
 /// Connection strategy based on NAT type detection
-/// 
+///
 /// This determines how we attempt to establish a connection with a peer,
 /// based on both our NAT type and the peer's NAT type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -66,7 +84,7 @@ impl ConnectionStrategy {
 }
 
 /// Select the best connection strategy based on NAT types
-/// 
+///
 /// Strategy matrix:
 /// | Our NAT          | Peer NAT         | Strategy           |
 /// |------------------|------------------|--------------------|
@@ -86,15 +104,15 @@ pub fn select_connection_strategy(
         // If either side has no NAT or easy NAT, direct connection works
         (Some(NatType::Open), _) | (_, Some(NatType::Open)) => ConnectionStrategy::Direct,
         (Some(NatType::FullCone), _) | (_, Some(NatType::FullCone)) => ConnectionStrategy::Direct,
-        
+
         // Both sides are symmetric - relay is the only reliable option
         (Some(NatType::Symmetric), Some(NatType::Symmetric)) => ConnectionStrategy::RelayOnly,
-        
+
         // One side is symmetric - try port prediction
         (Some(NatType::Symmetric), _) | (_, Some(NatType::Symmetric)) => {
             ConnectionStrategy::PortPrediction
         }
-        
+
         // Both sides are restricted - simultaneous open can work
         (Some(NatType::RestrictedCone), Some(NatType::RestrictedCone)) => {
             ConnectionStrategy::SimultaneousOpen
@@ -102,13 +120,13 @@ pub fn select_connection_strategy(
         (Some(NatType::PortRestrictedCone), Some(NatType::PortRestrictedCone)) => {
             ConnectionStrategy::SimultaneousOpen
         }
-        
+
         // Mixed restricted types - simultaneous open is still worth trying
         (Some(NatType::RestrictedCone), Some(NatType::PortRestrictedCone))
         | (Some(NatType::PortRestrictedCone), Some(NatType::RestrictedCone)) => {
             ConnectionStrategy::SimultaneousOpen
         }
-        
+
         // Unknown NAT types - be optimistic and try direct
         _ => ConnectionStrategy::Direct,
     }
@@ -182,7 +200,7 @@ impl PeerState {
     }
 
     /// Create a new PeerState with NAT-aware strategy selection
-    /// 
+    ///
     /// This constructor calculates the optimal connection strategy based on
     /// our NAT type and the peer's NAT type (if known).
     pub fn with_nat_strategy(
@@ -213,7 +231,11 @@ impl PeerState {
     }
 
     /// Update connection strategy based on new NAT information
-    pub fn update_strategy(&mut self, our_nat_type: Option<NatType>, peer_nat_type: Option<NatType>) {
+    pub fn update_strategy(
+        &mut self,
+        our_nat_type: Option<NatType>,
+        peer_nat_type: Option<NatType>,
+    ) {
         self.peer_nat_type = peer_nat_type;
         self.connection_strategy = select_connection_strategy(our_nat_type, peer_nat_type);
     }
@@ -227,10 +249,15 @@ impl PeerState {
     pub fn record_pong(&mut self, addr: std::net::SocketAddr, rtt: Duration) {
         self.endpoints.record_pong(addr, rtt);
         self.last_seen = Some(Instant::now());
-        
+
         // Update connection state based on endpoint state
         if self.endpoints.has_working_connection() {
-            if self.endpoints.best().map(|e| e.source == EndpointSource::Relay).unwrap_or(false) {
+            if self
+                .endpoints
+                .best()
+                .map(|e| e.source == EndpointSource::Relay)
+                .unwrap_or(false)
+            {
                 self.state = PeerConnectionState::RelayOk;
                 self.using_relay = true;
             } else {
@@ -243,7 +270,7 @@ impl PeerState {
     /// Mark an endpoint as failed
     pub fn mark_endpoint_failed(&mut self, addr: std::net::SocketAddr) {
         self.endpoints.mark_failed(addr);
-        
+
         // Check if we need to fall back to relay
         if self.endpoints.needs_relay() {
             self.state = PeerConnectionState::RelayTry;
@@ -509,7 +536,10 @@ impl ConnectionManager {
     /// Get count of connected peers (successful disco handshake)
     pub async fn get_connected_peer_count(&self) -> usize {
         let peers = self.peer_states.read().await;
-        peers.values().filter(|p| p.state == PeerConnectionState::DirectOk).count()
+        peers
+            .values()
+            .filter(|p| p.state == PeerConnectionState::DirectOk)
+            .count()
     }
 
     /// Get count of peers using relay
@@ -528,33 +558,46 @@ impl ConnectionManager {
     pub async fn get_connection_debug_info(&self) -> ConnectionDebugInfo {
         let peers = self.peer_states.read().await;
         let pings = self.pending_pings.read().await;
-        
-        let mut peer_info: Vec<PeerDebugInfo> = peers.values().map(|p| {
-            let best_info = p.best_endpoint_info();
-            let responsive_timeout = Duration::from_secs(30);
-            PeerDebugInfo {
-                vip: p.vip.to_string(),
-                vip_v6: p.vip_v6.map(|v| v.to_string()),
-                state: format!("{:?}", p.state),
-                best_endpoint: p.best_endpoint().map(|e| e.to_string()),
-                best_latency_ms: best_info.and_then(|e| e.latency.map(|l| l.as_millis() as u64)),
-                endpoint_count: p.endpoint_count(),
-                working_endpoint_count: p.endpoints.responsive_count(responsive_timeout),
-                using_relay: p.using_relay,
-                last_seen_ago_secs: p.last_seen.map(|t| t.elapsed().as_secs()),
-                peer_nat_type: p.peer_nat_type.map(|n| format!("{:?}", n)),
-                connection_strategy: p.connection_strategy.description().to_string(),
-            }
-        }).collect();
-        
+
+        let mut peer_info: Vec<PeerDebugInfo> = peers
+            .values()
+            .map(|p| {
+                let best_info = p.best_endpoint_info();
+                let responsive_timeout = Duration::from_secs(30);
+                PeerDebugInfo {
+                    vip: p.vip.to_string(),
+                    vip_v6: p.vip_v6.map(|v| v.to_string()),
+                    state: format!("{:?}", p.state),
+                    best_endpoint: p.best_endpoint().map(|e| e.to_string()),
+                    best_latency_ms: best_info
+                        .and_then(|e| e.latency.map(|l| l.as_millis() as u64)),
+                    endpoint_count: p.endpoint_count(),
+                    working_endpoint_count: p.endpoints.responsive_count(responsive_timeout),
+                    using_relay: p.using_relay,
+                    last_seen_ago_secs: p.last_seen.map(|t| t.elapsed().as_secs()),
+                    peer_nat_type: p.peer_nat_type.map(|n| format!("{:?}", n)),
+                    connection_strategy: p.connection_strategy.description().to_string(),
+                }
+            })
+            .collect();
+
         // Sort by VIP for consistent output
         peer_info.sort_by(|a, b| a.vip.cmp(&b.vip));
-        
+
         ConnectionDebugInfo {
             total_peers: peers.len(),
-            connected_peers: peers.values().filter(|p| p.state == PeerConnectionState::DirectOk).count(),
-            probing_peers: peers.values().filter(|p| p.state == PeerConnectionState::DirectTry).count(),
-            failed_peers: peers.values().filter(|p| p.state == PeerConnectionState::Failed).count(),
+            connected_peers: peers
+                .values()
+                .filter(|p| p.state == PeerConnectionState::DirectOk)
+                .count(),
+            probing_peers: peers
+                .values()
+                .filter(|p| p.state == PeerConnectionState::DirectTry)
+                .count(),
+            failed_peers: peers
+                .values()
+                .filter(|p| p.state == PeerConnectionState::Failed)
+                .count(),
             relayed_peers: peers.values().filter(|p| p.using_relay).count(),
             pending_pings: pings.len(),
             peers: peer_info,
@@ -598,11 +641,15 @@ impl ConnectionManager {
 
     /// Get the external port if we have an active mapping
     pub async fn get_external_port(&self) -> Option<u16> {
-        self.port_mapping.read().await.as_ref().map(|m| m.external_port)
+        self.port_mapping
+            .read()
+            .await
+            .as_ref()
+            .map(|m| m.external_port)
     }
 
     /// Initialize port mapper and probe for capabilities
-    /// 
+    ///
     /// This should be called after binding the UDP socket to know the internal port.
     /// Returns the capabilities found (NAT-PMP, UPnP, PCP support).
     pub async fn init_port_mapper(&self, internal_port: u16) -> Result<PortMapCapabilities> {
@@ -610,11 +657,14 @@ impl ConnectionManager {
             return Ok(PortMapCapabilities::default());
         }
 
-        info!("Initializing port mapper for internal port {}", internal_port);
-        
+        info!(
+            "Initializing port mapper for internal port {}",
+            internal_port
+        );
+
         let mut mapper = PortMapper::new(internal_port);
         let caps = mapper.probe().await?;
-        
+
         info!(
             "Port mapping capabilities: NAT-PMP={}, UPnP={}, PCP={}, gateway={:?}, external={:?}",
             caps.nat_pmp, caps.upnp, caps.pcp, caps.gateway_addr, caps.external_addr
@@ -628,16 +678,17 @@ impl ConnectionManager {
     }
 
     /// Request a port mapping using the best available protocol
-    /// 
+    ///
     /// Returns the external port if successful.
     /// The mapping is stored and can be refreshed/released later.
     pub async fn request_port_mapping(&self, lifetime_secs: u32) -> Result<u16> {
         let mut mapper_guard = self.port_mapper.write().await;
-        let mapper = mapper_guard.as_mut()
+        let mapper = mapper_guard
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("Port mapper not initialized"))?;
 
         let external_port = mapper.request_mapping(lifetime_secs).await?;
-        
+
         // Store the mapping
         if let Some(mapping) = mapper.current_mapping() {
             info!(
@@ -658,7 +709,10 @@ impl ConnectionManager {
             let refreshed = mapper.check_and_refresh().await?;
             if refreshed {
                 if let Some(mapping) = mapper.current_mapping() {
-                    info!("Port mapping refreshed: external port {}", mapping.external_port);
+                    info!(
+                        "Port mapping refreshed: external port {}",
+                        mapping.external_port
+                    );
                     let mut pm = self.port_mapping.write().await;
                     *pm = Some(mapping.clone());
                 }
@@ -1157,7 +1211,9 @@ impl ConnectionManager {
                             Ok(ext_port) => {
                                 info!(
                                     "Port mapping established: {}:{} -> external:{}",
-                                    caps.external_addr.map(|a| a.to_string()).unwrap_or_else(|| "?".to_string()),
+                                    caps.external_addr
+                                        .map(|a| a.to_string())
+                                        .unwrap_or_else(|| "?".to_string()),
                                     port,
                                     ext_port
                                 );
@@ -1169,8 +1225,10 @@ impl ConnectionManager {
                             }
                         }
                     } else {
-                        debug!("No port mapping protocols available (NAT-PMP={}, UPnP={}, PCP={})",
-                            caps.nat_pmp, caps.upnp, caps.pcp);
+                        debug!(
+                            "No port mapping protocols available (NAT-PMP={}, UPnP={}, PCP={})",
+                            caps.nat_pmp, caps.upnp, caps.pcp
+                        );
                     }
                 }
                 Err(e) => {
@@ -1256,7 +1314,7 @@ impl ConnectionManager {
         let proto_ctrl = proto.clone();
         let socket_inner = socket.clone();
         let secret = self.cluster_secret.clone();
-        
+
         // Clone peer state tracking for dispatcher
         let peer_states = self.peer_states.clone();
         let pending_pings = self.pending_pings.clone();
@@ -1264,19 +1322,22 @@ impl ConnectionManager {
         let our_vip_str = self.virtual_ip.read().await.clone();
         let our_vip: Option<Ipv4Addr> = our_vip_str.as_ref().and_then(|s| s.parse().ok());
         let our_vip_v6_str = self.virtual_ip_v6.read().await.clone();
-        let our_vip_v6: Option<std::net::Ipv6Addr> = our_vip_v6_str.as_ref().and_then(|s| s.parse().ok());
+        let our_vip_v6: Option<std::net::Ipv6Addr> =
+            our_vip_v6_str.as_ref().and_then(|s| s.parse().ok());
         let disco_config = self.disco_config.clone();
-        
+
         // Clone relay state for dispatcher
         let relay_client = self.relay_client.clone();
         let relay_sessions = self.relay_sessions.clone();
-        
+
         // Get relay server address: prefer custom relay_server from config, fall back to nucleus
-        let relay_server_addr: Option<std::net::SocketAddr> = self.network_config.relay_server
+        let relay_server_addr: Option<std::net::SocketAddr> = self
+            .network_config
+            .relay_server
             .as_ref()
             .and_then(|s| s.parse().ok())
             .or_else(|| proto.get_nucleus_host().parse().ok());
-        
+
         if disco_config.relay_enabled {
             if let Some(addr) = relay_server_addr {
                 info!("Relay server configured: {}", addr);
@@ -1366,7 +1427,7 @@ impl ConnectionManager {
         // Master Dispatcher Loop - handles signaling, disco, relay, and WireGuard packets
         let mut shutdown_rx1 = shutdown_tx.subscribe();
         let socket_for_disco = socket_inner.clone();
-        
+
         // Initialize relay client if relay is enabled and we have a relay server address
         if disco_config.relay_enabled {
             if let Some(relay_addr) = relay_server_addr {
@@ -1379,12 +1440,13 @@ impl ConnectionManager {
                 warn!("Relay enabled but no relay server address available");
             }
         }
-        
+
         let dispatcher_handle = tokio::spawn(async move {
             let mut buf = [0u8; 4096];
             // Disco timeout check interval
-            let mut disco_check_interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
-            
+            let mut disco_check_interval =
+                tokio::time::interval(tokio::time::Duration::from_secs(1));
+
             loop {
                 tokio::select! {
                     res = socket_inner.recv_from(&mut buf) => {
@@ -1404,7 +1466,7 @@ impl ConnectionManager {
                                             "Received disco ping from {} (VIP: {}, tx: {:02x?})",
                                             src, ping.sender_vip, &ping.tx_id[..4]
                                         );
-                                        
+
                                         // Create and send pong response
                                         let pong = DiscoPong {
                                             tx_id: ping.tx_id,
@@ -1412,7 +1474,7 @@ impl ConnectionManager {
                                             responder_key: our_public_key,
                                             responder_vip_v6: our_vip_v6,
                                         };
-                                        
+
                                         if let Ok(pong_data) = encode_disco_pong(&pong) {
                                             if let Err(e) = socket_inner.send_to(&pong_data, src).await {
                                                 warn!("Failed to send disco pong to {}: {}", src, e);
@@ -1420,7 +1482,7 @@ impl ConnectionManager {
                                                 debug!("Sent disco pong to {} (tx: {:02x?})", src, &pong.tx_id[..4]);
                                             }
                                         }
-                                        
+
                                         // Update peer endpoint if we know this peer
                                         let mut peers = peer_states.write().await;
                                         if let Some(peer_state) = peers.get_mut(&ping.sender_vip) {
@@ -1436,7 +1498,7 @@ impl ConnectionManager {
                                                 );
                                                 continue;  // Reject the ping - possible spoofing attempt
                                             }
-                                            
+
                                             // Add endpoint from direct probe (highest priority source)
                                             peer_state.add_endpoint(src, EndpointSource::DirectProbe);
                                             peer_state.last_seen = Some(Instant::now());
@@ -1448,7 +1510,7 @@ impl ConnectionManager {
                                     }
                                     continue;
                                 }
-                                
+
                                 // Handle DISCO_PONG (0x1C)
                                 if first_byte == SIGNALING_DISCO_PONG {
                                     if let Ok(pong) = parse_disco_pong(pkt) {
@@ -1457,14 +1519,14 @@ impl ConnectionManager {
                                             let mut pings = pending_pings.write().await;
                                             pings.remove(&pong.tx_id)
                                         };
-                                        
+
                                         if let Some(pending) = pending {
                                             let rtt = pending.sent_at.elapsed();
                                             info!(
                                                 "Disco pong received from {} (VIP: {}, RTT: {:?}, observed: {})",
                                                 src, pending.target_vip, rtt, pong.observed_addr
                                             );
-                                            
+
                                             // Record the pong and update best endpoint
                                             let mut peers = peer_states.write().await;
                                             if let Some(peer_state) = peers.get_mut(&pending.target_vip) {
@@ -1480,25 +1542,25 @@ impl ConnectionManager {
                                                     );
                                                     continue;  // Reject the pong - possible impersonation attempt
                                                 }
-                                                
+
                                                 // Add endpoint from direct probe and record latency
                                                 peer_state.add_endpoint(src, EndpointSource::DirectProbe);
                                                 peer_state.record_pong(src, rtt);
-                                                
+
                                                 // Get the best endpoint (may have changed)
                                                 if let Some(best_ep) = peer_state.best_endpoint() {
                                                     let latency = peer_state.best_endpoint_info()
                                                         .and_then(|e| e.latency)
                                                         .map(|l| format!("{:?}", l))
                                                         .unwrap_or_else(|| "unknown".to_string());
-                                                    
+
                                                     // Configure WireGuard with the best endpoint
                                                     let pubkey = ::hex::encode(peer_state.public_key);
                                                     let mut allowed_ips = vec![format!("{}/32", peer_state.vip)];
                                                     if let Some(vip_v6) = peer_state.vip_v6 {
                                                         allowed_ips.push(format!("{}/128", vip_v6));
                                                     }
-                                                    
+
                                                     info!(
                                                         "Configuring WireGuard peer {} at {} (latency: {}, {} endpoints)",
                                                         peer_state.vip, best_ep, latency, peer_state.endpoint_count()
@@ -1529,7 +1591,7 @@ impl ConnectionManager {
                                                         "Relay session established: {:02x?}",
                                                         &session_id[..4]
                                                     );
-                                                    
+
                                                     // SECURITY: Use target_key to identify the correct peer
                                                     // This prevents session hijacking by associating the session
                                                     // with the correct peer based on cryptographic identity
@@ -1554,12 +1616,12 @@ impl ConnectionManager {
                                                             }
                                                         }
                                                     };
-                                                    
+
                                                     // Find peer by target_key and update
                                                     let mut peers = peer_states.write().await;
                                                     let peer_entry = peers.values_mut()
                                                         .find(|p| p.public_key == target_key);
-                                                    
+
                                                     if let Some(peer_state) = peer_entry {
                                                         // Verify peer is actually waiting for relay
                                                         if peer_state.state != PeerConnectionState::RelayTry {
@@ -1569,28 +1631,28 @@ impl ConnectionManager {
                                                             );
                                                             continue;
                                                         }
-                                                        
+
                                                         peer_state.mark_relayed();
-                                                        
+
                                                         // Store session ID
                                                         relay_sessions.write().await.insert(
                                                             peer_state.public_key,
                                                             session_id,
                                                         );
-                                                        
+
                                                         // Configure WireGuard with relay endpoint
                                                         let pubkey = ::hex::encode(peer_state.public_key);
                                                         let mut allowed_ips = vec![format!("{}/32", peer_state.vip)];
                                                         if let Some(v6) = peer_state.vip_v6 {
                                                             allowed_ips.push(format!("{}/128", v6));
                                                         }
-                                                        
+
                                                         // Use relay server as endpoint
                                                         let endpoint = ack.relay_endpoint
                                                             .as_ref()
                                                             .and_then(|s| s.parse().ok())
                                                             .or(relay_server_addr);
-                                                        
+
                                                         if let Some(ep) = endpoint {
                                                             info!(
                                                                 "Configuring WireGuard peer {} via relay {}",
@@ -1633,7 +1695,7 @@ impl ConnectionManager {
                                         }
                                         continue;
                                     }
-                                    
+
                                     // Handle RELAY_DATA (0x22) - Forward relayed packets to WireGuard
                                     if first_byte == MSG_RELAY_DATA {
                                         if let Ok((session_id, wg_packet)) = parse_relay_data(pkt) {
@@ -1646,7 +1708,7 @@ impl ConnectionManager {
                                         }
                                         continue;
                                     }
-                                    
+
                                     // Other relay messages (UNBIND, KEEPALIVE) - log and continue
                                     debug!("Received relay message type 0x{:02x} from {}", first_byte, src);
                                     continue;
@@ -1659,15 +1721,15 @@ impl ConnectionManager {
                                     {
                                         // Get our NAT type for strategy selection
                                         let our_nat_type = proto_ctrl.get_nat_type();
-                                        
+
                                         for peer in update.peers {
                                             let vip = peer.vip;
                                             let vip_v6 = peer.vip_v6;
-                                            
+
                                             // Create peer state with NAT-aware strategy
                                             // Extract peer NAT type from signaling (Phase 6)
                                             let peer_nat_type = peer.nat_type;
-                                            
+
                                             let mut peers = peer_states.write().await;
                                             let peer_state = peers.entry(vip).or_insert_with(|| {
                                                 let strategy = select_connection_strategy(our_nat_type, peer_nat_type);
@@ -1684,12 +1746,12 @@ impl ConnectionManager {
                                                     peer_nat_type,
                                                 )
                                             });
-                                            
+
                                             // Update peer info if already exists - add endpoint from signaling
                                             if let Some(endpoint) = peer.endpoint {
                                                 peer_state.add_endpoint(endpoint, EndpointSource::Nucleus);
                                             }
-                                            
+
                                             // Add port-mapped endpoint if available (higher priority)
                                             if let Some(mapped_ep) = peer.mapped_endpoint {
                                                 peer_state.add_endpoint(mapped_ep, EndpointSource::PortMap);
@@ -1699,7 +1761,7 @@ impl ConnectionManager {
                                                 );
                                             }
                                             peer_state.vip_v6 = vip_v6;
-                                            
+
                                             // Update strategy if NAT types changed
                                             if peer_state.peer_nat_type != peer_nat_type {
                                                 peer_state.update_strategy(our_nat_type, peer_nat_type);
@@ -1708,7 +1770,7 @@ impl ConnectionManager {
                                                     vip, peer_state.connection_strategy.description()
                                                 );
                                             }
-                                            
+
                                             // If peer already has working connection, just update WireGuard with best
                                             if peer_state.has_working_connection() {
                                                 if let Some(endpoint) = peer_state.best_endpoint() {
@@ -1723,7 +1785,7 @@ impl ConnectionManager {
                                                 }
                                                 continue;
                                             }
-                                            
+
                                             // Check connection strategy before attempting disco
                                             match peer_state.connection_strategy {
                                                 ConnectionStrategy::RelayOnly => {
@@ -1746,7 +1808,7 @@ impl ConnectionManager {
                                                     let endpoints: Vec<_> = peer_state.endpoints.endpoints.iter()
                                                         .map(|e| e.addr)
                                                         .collect();
-                                                    
+
                                                     for endpoint in endpoints {
                                                         let tx_id: [u8; 12] = rand::random();
                                                         let ping = DiscoPing {
@@ -1755,7 +1817,7 @@ impl ConnectionManager {
                                                             sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
                                                             sender_vip_v6: our_vip_v6,
                                                         };
-                                                        
+
                                                         if let Ok(ping_data) = encode_disco_ping(&ping) {
                                                             if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
                                                                 warn!("Failed to send disco ping to {}: {}", endpoint, e);
@@ -1789,7 +1851,7 @@ impl ConnectionManager {
                                                     let endpoints: Vec<_> = peer_state.endpoints.endpoints.iter()
                                                         .map(|e| e.addr)
                                                         .collect();
-                                                    
+
                                                     for endpoint in endpoints {
                                                         let tx_id: [u8; 12] = rand::random();
                                                         let ping = DiscoPing {
@@ -1798,7 +1860,7 @@ impl ConnectionManager {
                                                             sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
                                                             sender_vip_v6: our_vip_v6,
                                                         };
-                                                        
+
                                                         if let Ok(ping_data) = encode_disco_ping(&ping) {
                                                             if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
                                                                 warn!("Failed to send disco ping to {}: {}", endpoint, e);
@@ -1827,7 +1889,7 @@ impl ConnectionManager {
                                                     let endpoints: Vec<_> = peer_state.endpoints.endpoints.iter()
                                                         .map(|e| e.addr)
                                                         .collect();
-                                                    
+
                                                     if endpoints.is_empty() {
                                                         // No endpoints, configure WireGuard without endpoint
                                                         // (peer may initiate connection to us)
@@ -1852,7 +1914,7 @@ impl ConnectionManager {
                                                                 sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
                                                                 sender_vip_v6: our_vip_v6,
                                                             };
-                                                            
+
                                                             if let Ok(ping_data) = encode_disco_ping(&ping) {
                                                                 if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
                                                                     warn!("Failed to send disco ping to {}: {}", endpoint, e);
@@ -1898,28 +1960,28 @@ impl ConnectionManager {
                         let mut pings = pending_pings.write().await;
                         let mut peers = peer_states.write().await;
                         let mut timed_out: Vec<[u8; 12]> = Vec::new();
-                        
+
                         for (tx_id, pending) in pings.iter_mut() {
                             if now.duration_since(pending.sent_at) > disco_config.ping_timeout {
                                 if pending.retries < pending.max_retries {
                                     // Retry the ping
                                     pending.retries += 1;
                                     pending.sent_at = now;
-                                    
+
                                     let ping = DiscoPing {
                                         tx_id: *tx_id,
                                         sender_key: our_public_key,
                                         sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
                                         sender_vip_v6: our_vip_v6,
                                     };
-                                    
+
                                     if let Ok(ping_data) = encode_disco_ping(&ping) {
                                         if let Err(e) = socket_for_disco.try_send_to(&ping_data, pending.target) {
                                             warn!("Failed to retry disco ping to {}: {}", pending.target, e);
                                         } else {
                                             info!(
                                                 "Retrying disco ping to {} ({}) attempt {}/{}",
-                                                pending.target_vip, pending.target, 
+                                                pending.target_vip, pending.target,
                                                 pending.retries, pending.max_retries
                                             );
                                         }
@@ -1927,17 +1989,17 @@ impl ConnectionManager {
                                 } else {
                                     // Max retries exceeded - mark for removal
                                     timed_out.push(*tx_id);
-                                    
+
                                     // Mark endpoint as failed and check if we need relay
                                     if let Some(peer_state) = peers.get_mut(&pending.target_vip) {
                                         warn!(
                                             "Disco ping to {} ({}) timed out after {} retries",
                                             pending.target_vip, pending.target, pending.max_retries
                                         );
-                                        
+
                                         // Mark this specific endpoint as failed
                                         peer_state.mark_endpoint_failed(pending.target);
-                                        
+
                                         // Check if all endpoints have failed and we need relay
                                         if peer_state.endpoints.needs_relay() {
                                             if disco_config.relay_enabled {
@@ -1959,7 +2021,7 @@ impl ConnectionManager {
                                         } else {
                                             debug!(
                                                 "Endpoint {} failed for peer {}, but {} other endpoints available",
-                                                pending.target, pending.target_vip, 
+                                                pending.target, pending.target_vip,
                                                 peer_state.endpoint_count() - 1
                                             );
                                         }
@@ -1967,23 +2029,23 @@ impl ConnectionManager {
                                 }
                             }
                         }
-                        
+
                         // Remove timed out pings
                         for tx_id in timed_out {
                             pings.remove(&tx_id);
                         }
-                        
+
                         // Collect peers that need relay (outside the borrow scope)
                         let peers_needing_relay: Vec<(Ipv4Addr, [u8; 32])> = peers
                             .iter()
                             .filter(|(_, p)| p.state == PeerConnectionState::RelayTry)
                             .map(|(vip, p)| (*vip, p.public_key))
                             .collect();
-                        
+
                         // Drop the locks before async operations
                         drop(pings);
                         drop(peers);
-                        
+
                         // Send RELAY_BIND requests for peers needing relay
                         if !peers_needing_relay.is_empty() {
                             if let Some(relay_addr) = relay_server_addr {
@@ -1991,7 +2053,7 @@ impl ConnectionManager {
                                 if let Some(client) = relay.as_mut() {
                                     for (target_vip, target_key) in peers_needing_relay {
                                         let bind_req = client.create_bind_request(target_key, target_vip);
-                                        
+
                                         if let Ok(bind_data) = encode_relay_bind(&bind_req) {
                                             if let Err(e) = socket_for_disco.send_to(&bind_data, relay_addr).await {
                                                 warn!("Failed to send RELAY_BIND for {} to {}: {}", target_vip, relay_addr, e);
@@ -2093,13 +2155,14 @@ impl ConnectionManager {
             let port_mapper = self.port_mapper.clone();
             let port_mapping = self.port_mapping.clone();
             let mut shutdown_rx4 = shutdown_tx.subscribe();
-            
+
             let portmap_handle = tokio::spawn(async move {
                 // Check every 30 minutes (1800 seconds)
-                let mut refresh_interval = tokio::time::interval(tokio::time::Duration::from_secs(1800));
+                let mut refresh_interval =
+                    tokio::time::interval(tokio::time::Duration::from_secs(1800));
                 // Skip the first immediate tick
                 refresh_interval.tick().await;
-                
+
                 loop {
                     tokio::select! {
                         _ = refresh_interval.tick() => {
@@ -2597,7 +2660,7 @@ impl ConnectionManager {
             let mut vip_v6 = self.virtual_ip_v6.write().await;
             *vip_v6 = None;
         }
-        
+
         // Clear peer tracking state
         {
             let mut peers = self.peer_states.write().await;

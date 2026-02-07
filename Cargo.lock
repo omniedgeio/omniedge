@@ -4413,7 +4413,8 @@ dependencies = [
 
 [[package]]
 name = "omninervous"
-version = "0.4.0"
+version = "0.6.0"
+source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.6.0#e8a80dfa9b5597b9224cfe660af044efd73a0cae"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
