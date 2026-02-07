@@ -10,6 +10,8 @@ use omni_proto::{
     // Relay protocol
     encode_relay_bind, is_relay_message, parse_relay_bind_ack, parse_relay_data,
     RelayClient, MSG_RELAY_BIND_ACK, MSG_RELAY_DATA,
+    // NAT type detection
+    NatType,
 };
 use omni_tun::OmniTun;
 use omninervous::Identity;
@@ -25,6 +27,88 @@ use tokio::task::JoinHandle;
 // ============================================================================
 // P2P Connection State Tracking (NAT Traversal Fix v0.3.2)
 // ============================================================================
+
+/// Connection strategy based on NAT type detection
+/// 
+/// This determines how we attempt to establish a connection with a peer,
+/// based on both our NAT type and the peer's NAT type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ConnectionStrategy {
+    /// Standard direct connection attempt via disco ping/pong
+    /// Used when at least one side has favorable NAT (Open, FullCone, or RestrictedCone)
+    #[default]
+    Direct,
+    /// Both sides send disco pings simultaneously
+    /// Used for Restricted-Restricted or PortRestricted-PortRestricted NAT pairs
+    SimultaneousOpen,
+    /// Attempt port prediction for symmetric NAT
+    /// Used when one side is Symmetric but the other is not
+    PortPrediction,
+    /// Skip direct connection attempts, go straight to relay
+    /// Used for Symmetric-Symmetric NAT pairs where direct P2P is nearly impossible
+    RelayOnly,
+}
+
+impl ConnectionStrategy {
+    /// Get a human-readable description of the strategy
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::Direct => "Direct (standard disco)",
+            Self::SimultaneousOpen => "Simultaneous Open (both sides ping)",
+            Self::PortPrediction => "Port Prediction (symmetric NAT workaround)",
+            Self::RelayOnly => "Relay Only (skip direct attempts)",
+        }
+    }
+}
+
+/// Select the best connection strategy based on NAT types
+/// 
+/// Strategy matrix:
+/// | Our NAT          | Peer NAT         | Strategy           |
+/// |------------------|------------------|--------------------|
+/// | Open/FullCone    | Any              | Direct             |
+/// | Any              | Open/FullCone    | Direct             |
+/// | Restricted       | Restricted       | SimultaneousOpen   |
+/// | PortRestricted   | PortRestricted   | SimultaneousOpen   |
+/// | Symmetric        | Symmetric        | RelayOnly          |
+/// | Symmetric        | Other            | PortPrediction     |
+/// | Other            | Symmetric        | PortPrediction     |
+/// | Unknown          | Unknown          | Direct (optimistic)|
+pub fn select_connection_strategy(
+    our_nat: Option<NatType>,
+    peer_nat: Option<NatType>,
+) -> ConnectionStrategy {
+    match (our_nat, peer_nat) {
+        // If either side has no NAT or easy NAT, direct connection works
+        (Some(NatType::Open), _) | (_, Some(NatType::Open)) => ConnectionStrategy::Direct,
+        (Some(NatType::FullCone), _) | (_, Some(NatType::FullCone)) => ConnectionStrategy::Direct,
+        
+        // Both sides are symmetric - relay is the only reliable option
+        (Some(NatType::Symmetric), Some(NatType::Symmetric)) => ConnectionStrategy::RelayOnly,
+        
+        // One side is symmetric - try port prediction
+        (Some(NatType::Symmetric), _) | (_, Some(NatType::Symmetric)) => {
+            ConnectionStrategy::PortPrediction
+        }
+        
+        // Both sides are restricted - simultaneous open can work
+        (Some(NatType::RestrictedCone), Some(NatType::RestrictedCone)) => {
+            ConnectionStrategy::SimultaneousOpen
+        }
+        (Some(NatType::PortRestrictedCone), Some(NatType::PortRestrictedCone)) => {
+            ConnectionStrategy::SimultaneousOpen
+        }
+        
+        // Mixed restricted types - simultaneous open is still worth trying
+        (Some(NatType::RestrictedCone), Some(NatType::PortRestrictedCone))
+        | (Some(NatType::PortRestrictedCone), Some(NatType::RestrictedCone)) => {
+            ConnectionStrategy::SimultaneousOpen
+        }
+        
+        // Unknown NAT types - be optimistic and try direct
+        _ => ConnectionStrategy::Direct,
+    }
+}
 
 /// Tracks the state of a pending disco ping
 #[derive(Debug, Clone)]
@@ -66,6 +150,10 @@ pub struct PeerState {
     pub last_seen: Option<Instant>,
     /// Whether we're using relay for this peer
     pub using_relay: bool,
+    /// Peer's detected NAT type (if known from signaling)
+    pub peer_nat_type: Option<NatType>,
+    /// Connection strategy based on NAT types
+    pub connection_strategy: ConnectionStrategy,
 }
 
 impl PeerState {
@@ -86,7 +174,44 @@ impl PeerState {
             discovered_at: Instant::now(),
             last_seen: None,
             using_relay: false,
+            peer_nat_type: None,
+            connection_strategy: ConnectionStrategy::Direct,
         }
+    }
+
+    /// Create a new PeerState with NAT-aware strategy selection
+    /// 
+    /// This constructor calculates the optimal connection strategy based on
+    /// our NAT type and the peer's NAT type (if known).
+    pub fn with_nat_strategy(
+        vip: Ipv4Addr,
+        vip_v6: Option<std::net::Ipv6Addr>,
+        public_key: [u8; 32],
+        endpoint: Option<std::net::SocketAddr>,
+        our_nat_type: Option<NatType>,
+        peer_nat_type: Option<NatType>,
+    ) -> Self {
+        let strategy = select_connection_strategy(our_nat_type, peer_nat_type);
+        Self {
+            vip,
+            vip_v6,
+            public_key,
+            signaling_endpoint: endpoint,
+            confirmed_endpoint: None,
+            state: PeerConnectionState::Init,
+            last_rtt: None,
+            discovered_at: Instant::now(),
+            last_seen: None,
+            using_relay: false,
+            peer_nat_type,
+            connection_strategy: strategy,
+        }
+    }
+
+    /// Update connection strategy based on new NAT information
+    pub fn update_strategy(&mut self, our_nat_type: Option<NatType>, peer_nat_type: Option<NatType>) {
+        self.peer_nat_type = peer_nat_type;
+        self.connection_strategy = select_connection_strategy(our_nat_type, peer_nat_type);
     }
 
     /// Mark peer as connected with confirmed endpoint
@@ -143,6 +268,10 @@ pub struct PeerDebugInfo {
     pub last_rtt_ms: Option<u64>,
     pub using_relay: bool,
     pub last_seen_ago_secs: Option<u64>,
+    /// Peer's NAT type (if known)
+    pub peer_nat_type: Option<String>,
+    /// Connection strategy being used
+    pub connection_strategy: String,
 }
 
 /// Comprehensive connection debug information
@@ -343,6 +472,8 @@ impl ConnectionManager {
                 last_rtt_ms: p.last_rtt.map(|d| d.as_millis() as u64),
                 using_relay: p.using_relay,
                 last_seen_ago_secs: p.last_seen.map(|t| t.elapsed().as_secs()),
+                peer_nat_type: p.peer_nat_type.map(|n| format!("{:?}", n)),
+                connection_strategy: p.connection_strategy.description().to_string(),
             }
         }).collect();
         
@@ -1233,20 +1364,47 @@ impl ConnectionManager {
                                     if let Ok(Some(update)) =
                                         proto_ctrl.handle_packet(pkt, secret.as_deref())
                                     {
+                                        // Get our NAT type for strategy selection
+                                        let our_nat_type = proto_ctrl.get_nat_type();
+                                        
                                         for peer in update.peers {
                                             let vip = peer.vip;
                                             let vip_v6 = peer.vip_v6;
                                             
-                                            // Create peer state and initiate disco
+                                            // Create peer state with NAT-aware strategy
+                                            // Note: peer_nat_type is None until signaling provides it
+                                            // TODO: Extract peer NAT type from signaling when available
+                                            let peer_nat_type: Option<NatType> = None;
+                                            
                                             let mut peers = peer_states.write().await;
                                             let peer_state = peers.entry(vip).or_insert_with(|| {
-                                                info!("Discovered new peer {} (v6: {:?})", vip, vip_v6);
-                                                PeerState::new(vip, vip_v6, peer.public_key, peer.endpoint)
+                                                let strategy = select_connection_strategy(our_nat_type, peer_nat_type);
+                                                info!(
+                                                    "Discovered new peer {} (v6: {:?}) - strategy: {}",
+                                                    vip, vip_v6, strategy.description()
+                                                );
+                                                PeerState::with_nat_strategy(
+                                                    vip,
+                                                    vip_v6,
+                                                    peer.public_key,
+                                                    peer.endpoint,
+                                                    our_nat_type,
+                                                    peer_nat_type,
+                                                )
                                             });
                                             
                                             // Update peer info if already exists
                                             peer_state.signaling_endpoint = peer.endpoint;
                                             peer_state.vip_v6 = vip_v6;
+                                            
+                                            // Update strategy if NAT types changed
+                                            if peer_state.peer_nat_type != peer_nat_type {
+                                                peer_state.update_strategy(our_nat_type, peer_nat_type);
+                                                debug!(
+                                                    "Updated peer {} strategy: {}",
+                                                    vip, peer_state.connection_strategy.description()
+                                                );
+                                            }
                                             
                                             // If peer already has confirmed endpoint, just update WireGuard
                                             if peer_state.state == PeerConnectionState::DirectOk {
@@ -1263,55 +1421,138 @@ impl ConnectionManager {
                                                 continue;
                                             }
                                             
-                                            // Send disco ping to establish connectivity
-                                            if let Some(endpoint) = peer.endpoint {
-                                                // Generate transaction ID
-                                                let tx_id: [u8; 12] = rand::random();
-                                                
-                                                // Create disco ping
-                                                let ping = DiscoPing {
-                                                    tx_id,
-                                                    sender_key: our_public_key,
-                                                    sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
-                                                    sender_vip_v6: our_vip_v6,
-                                                };
-                                                
-                                                // Send ping
-                                                if let Ok(ping_data) = encode_disco_ping(&ping) {
-                                                    if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
-                                                        warn!("Failed to send disco ping to {}: {}", endpoint, e);
-                                                    } else {
-                                                        info!(
-                                                            "Sent disco ping to {} ({}) tx: {:02x?}",
-                                                            vip, endpoint, &tx_id[..4]
-                                                        );
-                                                        
-                                                        // Track pending ping
-                                                        let pending = PendingDiscoPing {
+                                            // Check connection strategy before attempting disco
+                                            match peer_state.connection_strategy {
+                                                ConnectionStrategy::RelayOnly => {
+                                                    // Skip disco, go straight to relay
+                                                    info!(
+                                                        "Peer {} using RelayOnly strategy (both symmetric NAT) - skipping disco",
+                                                        vip
+                                                    );
+                                                    peer_state.state = PeerConnectionState::RelayTry;
+                                                    // Relay bind will be sent in the disco timeout handler
+                                                }
+                                                ConnectionStrategy::PortPrediction => {
+                                                    // Try port prediction with multiple endpoints
+                                                    // For now, fall back to standard disco with relay fallback
+                                                    info!(
+                                                        "Peer {} using PortPrediction strategy - trying disco with relay fallback",
+                                                        vip
+                                                    );
+                                                    // Continue to standard disco below
+                                                    if let Some(endpoint) = peer.endpoint {
+                                                        let tx_id: [u8; 12] = rand::random();
+                                                        let ping = DiscoPing {
                                                             tx_id,
-                                                            target: endpoint,
-                                                            target_vip: vip,
-                                                            sent_at: Instant::now(),
-                                                            retries: 0,
-                                                            max_retries: disco_config.max_retries,
+                                                            sender_key: our_public_key,
+                                                            sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
+                                                            sender_vip_v6: our_vip_v6,
                                                         };
-                                                        pending_pings.write().await.insert(tx_id, pending);
                                                         
-                                                        // Update peer state
-                                                        peer_state.state = PeerConnectionState::DirectTry;
+                                                        if let Ok(ping_data) = encode_disco_ping(&ping) {
+                                                            if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
+                                                                warn!("Failed to send disco ping to {}: {}", endpoint, e);
+                                                            } else {
+                                                                info!(
+                                                                    "Sent disco ping to {} ({}) tx: {:02x?}",
+                                                                    vip, endpoint, &tx_id[..4]
+                                                                );
+                                                                let pending = PendingDiscoPing {
+                                                                    tx_id,
+                                                                    target: endpoint,
+                                                                    target_vip: vip,
+                                                                    sent_at: Instant::now(),
+                                                                    retries: 0,
+                                                                    max_retries: disco_config.max_retries,
+                                                                };
+                                                                pending_pings.write().await.insert(tx_id, pending);
+                                                                peer_state.state = PeerConnectionState::DirectTry;
+                                                            }
+                                                        }
                                                     }
                                                 }
-                                            } else {
-                                                // No endpoint from signaling, configure WireGuard anyway
-                                                // (peer may initiate connection to us)
-                                                let pubkey = ::hex::encode(peer_state.public_key);
-                                                let mut allowed_ips = vec![format!("{}/32", vip)];
-                                                if let Some(v6) = vip_v6 {
-                                                    allowed_ips.push(format!("{}/128", v6));
+                                                ConnectionStrategy::SimultaneousOpen => {
+                                                    // Both sides should send pings at the same time
+                                                    // The other peer will also be sending pings
+                                                    info!(
+                                                        "Peer {} using SimultaneousOpen strategy - sending disco ping",
+                                                        vip
+                                                    );
+                                                    if let Some(endpoint) = peer.endpoint {
+                                                        let tx_id: [u8; 12] = rand::random();
+                                                        let ping = DiscoPing {
+                                                            tx_id,
+                                                            sender_key: our_public_key,
+                                                            sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
+                                                            sender_vip_v6: our_vip_v6,
+                                                        };
+                                                        
+                                                        if let Ok(ping_data) = encode_disco_ping(&ping) {
+                                                            if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
+                                                                warn!("Failed to send disco ping to {}: {}", endpoint, e);
+                                                            } else {
+                                                                info!(
+                                                                    "Sent disco ping to {} ({}) tx: {:02x?}",
+                                                                    vip, endpoint, &tx_id[..4]
+                                                                );
+                                                                let pending = PendingDiscoPing {
+                                                                    tx_id,
+                                                                    target: endpoint,
+                                                                    target_vip: vip,
+                                                                    sent_at: Instant::now(),
+                                                                    retries: 0,
+                                                                    max_retries: disco_config.max_retries,
+                                                                };
+                                                                pending_pings.write().await.insert(tx_id, pending);
+                                                                peer_state.state = PeerConnectionState::DirectTry;
+                                                            }
+                                                        }
+                                                    }
                                                 }
-                                                let _ = tun_ctrl
-                                                    .add_peer(&pubkey, None, &allowed_ips)
-                                                    .await;
+                                                ConnectionStrategy::Direct => {
+                                                    // Standard disco ping
+                                                    if let Some(endpoint) = peer.endpoint {
+                                                        let tx_id: [u8; 12] = rand::random();
+                                                        let ping = DiscoPing {
+                                                            tx_id,
+                                                            sender_key: our_public_key,
+                                                            sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
+                                                            sender_vip_v6: our_vip_v6,
+                                                        };
+                                                        
+                                                        if let Ok(ping_data) = encode_disco_ping(&ping) {
+                                                            if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
+                                                                warn!("Failed to send disco ping to {}: {}", endpoint, e);
+                                                            } else {
+                                                                info!(
+                                                                    "Sent disco ping to {} ({}) tx: {:02x?}",
+                                                                    vip, endpoint, &tx_id[..4]
+                                                                );
+                                                                let pending = PendingDiscoPing {
+                                                                    tx_id,
+                                                                    target: endpoint,
+                                                                    target_vip: vip,
+                                                                    sent_at: Instant::now(),
+                                                                    retries: 0,
+                                                                    max_retries: disco_config.max_retries,
+                                                                };
+                                                                pending_pings.write().await.insert(tx_id, pending);
+                                                                peer_state.state = PeerConnectionState::DirectTry;
+                                                            }
+                                                        }
+                                                    } else {
+                                                        // No endpoint from signaling, configure WireGuard anyway
+                                                        // (peer may initiate connection to us)
+                                                        let pubkey = ::hex::encode(peer_state.public_key);
+                                                        let mut allowed_ips = vec![format!("{}/32", vip)];
+                                                        if let Some(v6) = vip_v6 {
+                                                            allowed_ips.push(format!("{}/128", v6));
+                                                        }
+                                                        let _ = tun_ctrl
+                                                            .add_peer(&pubkey, None, &allowed_ips)
+                                                            .await;
+                                                    }
+                                                }
                                             }
                                         }
                                     }
