@@ -62,6 +62,10 @@ pub struct PeerInfo {
     pub vip_v6: Option<Ipv6Addr>,
     pub endpoint: Option<SocketAddr>,
     pub public_key: [u8; 32],
+    /// NAT type of this peer (for connection strategy selection)
+    pub nat_type: Option<NatType>,
+    /// Port-mapped endpoint (from NAT-PMP/UPnP/PCP, may be more reachable)
+    pub mapped_endpoint: Option<SocketAddr>,
 }
 
 pub struct PeerUpdate {
@@ -143,6 +147,8 @@ impl OmniProto {
                         vip_v6: p.vip_v6,
                         endpoint: p.endpoint.parse().ok(),
                         public_key: p.public_key,
+                        nat_type: p.nat_type,
+                        mapped_endpoint: p.mapped_endpoint.as_ref().and_then(|s| s.parse().ok()),
                     });
                 }
             }
@@ -154,6 +160,8 @@ impl OmniProto {
                         vip_v6: p.vip_v6,
                         endpoint: p.endpoint.parse().ok(),
                         public_key: p.public_key,
+                        nat_type: p.nat_type,
+                        mapped_endpoint: p.mapped_endpoint.as_ref().and_then(|s| s.parse().ok()),
                     });
                 }
             }

@@ -1589,16 +1589,15 @@ impl ConnectionManager {
                                             let vip_v6 = peer.vip_v6;
                                             
                                             // Create peer state with NAT-aware strategy
-                                            // Note: peer_nat_type is None until signaling provides it
-                                            // TODO: Extract peer NAT type from signaling when available
-                                            let peer_nat_type: Option<NatType> = None;
+                                            // Extract peer NAT type from signaling (Phase 6)
+                                            let peer_nat_type = peer.nat_type;
                                             
                                             let mut peers = peer_states.write().await;
                                             let peer_state = peers.entry(vip).or_insert_with(|| {
                                                 let strategy = select_connection_strategy(our_nat_type, peer_nat_type);
                                                 info!(
-                                                    "Discovered new peer {} (v6: {:?}) - strategy: {}",
-                                                    vip, vip_v6, strategy.description()
+                                                    "Discovered new peer {} (v6: {:?}, nat: {:?}) - strategy: {}",
+                                                    vip, vip_v6, peer_nat_type, strategy.description()
                                                 );
                                                 PeerState::with_nat_strategy(
                                                     vip,
@@ -1613,6 +1612,15 @@ impl ConnectionManager {
                                             // Update peer info if already exists - add endpoint from signaling
                                             if let Some(endpoint) = peer.endpoint {
                                                 peer_state.add_endpoint(endpoint, EndpointSource::Nucleus);
+                                            }
+                                            
+                                            // Add port-mapped endpoint if available (higher priority)
+                                            if let Some(mapped_ep) = peer.mapped_endpoint {
+                                                peer_state.add_endpoint(mapped_ep, EndpointSource::PortMap);
+                                                debug!(
+                                                    "Added port-mapped endpoint {} for peer {}",
+                                                    mapped_ep, vip
+                                                );
                                             }
                                             peer_state.vip_v6 = vip_v6;
                                             

@@ -18,7 +18,10 @@ url = "2.4"
 futures-util = "0.3"
 omni-proto = { path = "../omni-proto" }
 omni-tun = { path = "../omni-tun" }
-omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "omninervous", tag = "v0.5.0" }
+# For development: use local OmniNervous
+omninervous = { path = "../../../OmniNervous/crates/daemon", package = "omninervous" }
+# For release: use git tag
+# omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "omninervous", tag = "v0.5.0" }
 anyhow = "1.0"
 tokio = { version = "1.0", features = ["full"] }
 log = "0.4"
