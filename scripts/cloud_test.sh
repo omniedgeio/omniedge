@@ -52,6 +52,9 @@ DEPLOY_METHOD="auto"
 # Virtual IPs are assigned by OmniEdge backend
 VIP_A=""
 VIP_B=""
+VIP6_A=""
+VIP6_B=""
+TEST_IPV6=true
 
 show_help() {
     cat << EOF
@@ -76,6 +79,7 @@ Options:
   --ssh-key       Path to SSH private key
   --ssh-user      SSH username (default: ubuntu)
   --duration      iperf3 test duration (default: 10s)
+  --no-ipv6       Skip IPv6 tests
   --use-installer Use remote install script instead of local binary
   --skip-deploy   Skip deployment (use existing installation)
   --help          Show this help
@@ -519,12 +523,75 @@ run_test() {
                 echo -e "  ❌ iperf3 test failed (tunnel may not be active)"
                 throughput_mbps="0"
             fi
+            
+            # ==================================================================
+            # IPv6 TUNNEL TESTS
+            # ==================================================================
+            if [[ "$TEST_IPV6" == "true" ]]; then
+                print_header "IPv6 VPN Tunnel Metrics (OmniEdge: A → B)"
+                echo "   Testing IPv6 connectivity over VPN tunnel."
+                echo ""
+                
+                # Get IPv6 VIPs from interface
+                VIP6_A=$(ssh_cmd "$NODE_A" "ip -6 addr show omni0 2>/dev/null | grep 'inet6' | grep -v 'fe80' | awk '{print \$2}' | cut -d/ -f1 | head -1" || echo "")
+                VIP6_B=$(ssh_cmd "$NODE_B" "ip -6 addr show omni0 2>/dev/null | grep 'inet6' | grep -v 'fe80' | awk '{print \$2}' | cut -d/ -f1 | head -1" || echo "")
+                
+                if [[ -n "$VIP6_A" && -n "$VIP6_B" ]]; then
+                    echo "Edge A IPv6: $VIP6_A"
+                    echo "Edge B IPv6: $VIP6_B"
+                    
+                    # IPv6 Ping test
+                    print_step "IPv6 Ping over tunnel ($VIP6_A → $VIP6_B)..."
+                    local ping6_output
+                    ping6_output=$(ssh_cmd "$NODE_A" "ping -6 -c 5 -W 5 $VIP6_B 2>&1" || echo "PING_FAILED")
+                    if echo "$ping6_output" | grep -q "rtt"; then
+                        avg_latency_v6=$(echo "$ping6_output" | grep "rtt" | awk -F'/' '{print $5}')
+                        echo -e "  ✅ IPv6 Ping: ${YELLOW}${avg_latency_v6} ms${NC}"
+                    else
+                        avg_latency_v6="N/A"
+                        echo -e "  ⚠️ IPv6 ping failed"
+                    fi
+                    
+                    # IPv6 iperf3 test
+                    print_step "Starting iperf3 server on Edge B (IPv6)..."
+                    ssh_cmd "$NODE_B" "pkill iperf3 2>/dev/null; nohup iperf3 -s -p 5202 > /tmp/iperf6_server.log 2>&1 &"
+                    sleep 3
+                    
+                    print_step "Running IPv6 iperf3 throughput test ($TEST_DURATION seconds)..."
+                    local iperf6_json
+                    iperf6_json=$(ssh_cmd "$NODE_A" "iperf3 -6 -c $VIP6_B -p 5202 -t $TEST_DURATION -M 1300 -P 2 --json 2>/dev/null" || echo "{}")
+                    
+                    local throughput6_bps
+                    throughput6_bps=$(echo "$iperf6_json" | jq '.end.sum_sent.bits_per_second // 0' 2>/dev/null || echo "0")
+                    throughput_mbps_v6=$(echo "scale=2; $throughput6_bps / 1000000" | bc 2>/dev/null || echo "N/A")
+                    
+                    if [[ "$throughput_mbps_v6" != "N/A" && "$throughput_mbps_v6" != "0" && "$throughput_mbps_v6" != ".00" ]]; then
+                        echo -e "  ✅ IPv6 Throughput: ${YELLOW}${throughput_mbps_v6} Mbps${NC}"
+                    else
+                        echo -e "  ⚠️ IPv6 iperf3 test failed"
+                        throughput_mbps_v6="N/A"
+                    fi
+                    
+                    ssh_cmd "$NODE_B" "pkill iperf3 2>/dev/null" || true
+                else
+                    echo -e "  ⚠️ IPv6 not configured on VPN interfaces, skipping IPv6 tests"
+                    avg_latency_v6="N/A"
+                    throughput_mbps_v6="N/A"
+                fi
+            else
+                avg_latency_v6="N/A"
+                throughput_mbps_v6="N/A"
+            fi
         else
             echo -e "  ⚠️ Skipping iperf3 test - VPN interfaces not ready"
             throughput_mbps="0"
+            avg_latency_v6="N/A"
+            throughput_mbps_v6="N/A"
         fi
     else
         echo -e "  ⚠️ Skipping VPN tests - VIPs not available"
+        avg_latency_v6="N/A"
+        throughput_mbps_v6="N/A"
     fi
     
     # Collect logs
@@ -538,17 +605,21 @@ run_test() {
   "timestamp": "$timestamp",
   "architecture": "2-node (OmniEdge P2P)",
   "network_id": "$NETWORK_ID",
-  "edge_a": {"public_ip": "$NODE_A", "vip": "$VIP_A"},
-  "edge_b": {"public_ip": "$NODE_B", "vip": "$VIP_B"},
+  "edge_a": {"public_ip": "$NODE_A", "vip": "$VIP_A", "vip6": "${VIP6_A:-N/A}"},
+  "edge_b": {"public_ip": "$NODE_B", "vip": "$VIP_B", "vip6": "${VIP6_B:-N/A}"},
   "test_duration_sec": $TEST_DURATION,
   "baseline": {
     "ping_ms": "$baseline_latency",
     "throughput_mbps": "$baseline_throughput_mbps"
   },
-   "vpn_tunnel": {
-     "ping_ms": "$avg_latency",
-     "throughput_mbps": "$throughput_mbps"
-   }
+  "vpn_tunnel_ipv4": {
+    "ping_ms": "$avg_latency",
+    "throughput_mbps": "$throughput_mbps"
+  },
+  "vpn_tunnel_ipv6": {
+    "ping_ms": "${avg_latency_v6:-N/A}",
+    "throughput_mbps": "${throughput_mbps_v6:-N/A}"
+  }
 }
 EOF
     
@@ -572,9 +643,13 @@ EOF
     echo -e "│    Latency:    ${YELLOW}${baseline_latency} ms${NC}"
     echo -e "│    Throughput: ${YELLOW}${baseline_throughput_mbps} Mbps${NC}"
     echo -e "├─────────────────────────────────────────────────────────┤"
-    echo -e "│  ${CYAN}OMNIEDGE VPN TUNNEL${NC}                                      │"
+    echo -e "│  ${CYAN}VPN TUNNEL (IPv4)${NC}                                       │"
     echo -e "│    Latency:    ${YELLOW}${avg_latency} ms${NC}"
     echo -e "│    Throughput: ${YELLOW}${throughput_mbps} Mbps${NC}"
+    echo -e "├─────────────────────────────────────────────────────────┤"
+    echo -e "│  ${CYAN}VPN TUNNEL (IPv6)${NC}                                       │"
+    echo -e "│    Latency:    ${YELLOW}${avg_latency_v6:-N/A} ms${NC}"
+    echo -e "│    Throughput: ${YELLOW}${throughput_mbps_v6:-N/A} Mbps${NC}"
     echo -e "└─────────────────────────────────────────────────────────┘"
     echo ""
     echo -e "Results saved to: ${CYAN}$result_file${NC}"
@@ -623,6 +698,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip-deploy)
             SKIP_DEPLOY=true
+            shift
+            ;;
+        --no-ipv6)
+            TEST_IPV6=false
             shift
             ;;
         --help|-h)

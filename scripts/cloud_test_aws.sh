@@ -65,6 +65,7 @@ SECURITY_KEY=""
 TEST_DURATION="${TEST_DURATION:-10}"
 USE_INSTALLER="${USE_INSTALLER:-true}"
 KEEP_INSTANCES=false
+NO_IPV6=false
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -91,6 +92,7 @@ Options:
   --ssh-key-name    Lightsail key pair name (default: default)
   --ssh-key-path    Path to SSH private key (default: ~/.ssh/lightsail_default.pem)
   --duration        iperf3 test duration in seconds (default: 10)
+  --no-ipv6         Skip IPv6 tests
   --use-binary      Use local binary instead of installer script
   --keep-instances  Don't delete instances after test (for debugging)
   --help            Show this help
@@ -216,6 +218,22 @@ open_all_ports() {
     echo -e "  ✅ All ports opened on $name"
 }
 
+enable_ipv6() {
+    local name="$1"
+    local region="$2"
+    
+    print_step "Enabling IPv6 on $name..."
+    
+    aws lightsail set-ip-address-type \
+        --region "$region" \
+        --resource-name "$name" \
+        --resource-type Instance \
+        --ip-address-type dualstack \
+        --output text >/dev/null 2>&1 || true
+    
+    echo -e "  ✅ IPv6 enabled on $name"
+}
+
 wait_for_ssh() {
     local ip="$1"
     local max_wait=120
@@ -321,6 +339,10 @@ while [[ $# -gt 0 ]]; do
             KEEP_INSTANCES=true
             shift
             ;;
+        --no-ipv6)
+            NO_IPV6=true
+            shift
+            ;;
         --help|-h)
             show_help
             exit 0
@@ -413,6 +435,13 @@ print_header "Configuring Firewalls"
 open_all_ports "$NODE_A_NAME" "$NODE_A_REGION"
 open_all_ports "$NODE_B_NAME" "$NODE_B_REGION"
 
+# Enable IPv6 (unless --no-ipv6 specified)
+if [[ "$NO_IPV6" != "true" ]]; then
+    print_header "Enabling IPv6 Networking"
+    enable_ipv6 "$NODE_A_NAME" "$NODE_A_REGION"
+    enable_ipv6 "$NODE_B_NAME" "$NODE_B_REGION"
+fi
+
 # Wait for SSH
 print_header "Waiting for SSH Access"
 wait_for_ssh "$NODE_A_IP"
@@ -434,6 +463,11 @@ if [[ "$USE_INSTALLER" == "true" ]]; then
     INSTALLER_FLAG="--use-installer"
 fi
 
+IPV6_FLAG=""
+if [[ "$NO_IPV6" == "true" ]]; then
+    IPV6_FLAG="--no-ipv6"
+fi
+
 "$SCRIPT_DIR/cloud_test.sh" \
     --node-a "$NODE_A_IP" \
     --node-b "$NODE_B_IP" \
@@ -442,7 +476,8 @@ fi
     --network "$NETWORK_ID" \
     --key "$SECURITY_KEY" \
     --duration "$TEST_DURATION" \
-    $INSTALLER_FLAG
+    $INSTALLER_FLAG \
+    $IPV6_FLAG
 
 # =============================================================================
 # Summary
