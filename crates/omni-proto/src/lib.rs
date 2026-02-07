@@ -32,7 +32,7 @@ pub use omninervous::relay::{
 pub use omninervous::{PortMapCapabilities, PortMapProtocol};
 
 // Endpoint Management
-pub use omninervous::{EndpointInfo, EndpointState, PathType};
+pub use omninervous::{EndpointInfo, EndpointSource, EndpointState, PathType};
 
 // Socket Utilities
 pub use omninervous::DualStackAddr;

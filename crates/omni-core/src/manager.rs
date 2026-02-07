@@ -12,6 +12,8 @@ use omni_proto::{
     RelayClient, MSG_RELAY_BIND_ACK, MSG_RELAY_DATA,
     // NAT type detection
     NatType,
+    // Multi-endpoint support
+    EndpointSet, EndpointSource, EndpointInfo,
 };
 use omni_tun::OmniTun;
 use omninervous::Identity;
@@ -136,14 +138,10 @@ pub struct PeerState {
     pub vip_v6: Option<std::net::Ipv6Addr>,
     /// Peer's public key
     pub public_key: [u8; 32],
-    /// Signaling endpoint from nucleus (before hole punching)
-    pub signaling_endpoint: Option<std::net::SocketAddr>,
-    /// Confirmed endpoint (after successful disco)
-    pub confirmed_endpoint: Option<std::net::SocketAddr>,
+    /// All known endpoints for this peer (multi-path support)
+    pub endpoints: EndpointSet,
     /// Connection state
     pub state: PeerConnectionState,
-    /// Last successful ping round-trip time
-    pub last_rtt: Option<Duration>,
     /// When the peer was discovered
     pub discovered_at: Instant,
     /// Last successful connectivity check
@@ -163,14 +161,16 @@ impl PeerState {
         public_key: [u8; 32],
         endpoint: Option<std::net::SocketAddr>,
     ) -> Self {
+        let mut endpoints = EndpointSet::new();
+        if let Some(addr) = endpoint {
+            endpoints.upsert(addr, EndpointSource::Nucleus);
+        }
         Self {
             vip,
             vip_v6,
             public_key,
-            signaling_endpoint: endpoint,
-            confirmed_endpoint: None,
+            endpoints,
             state: PeerConnectionState::Init,
-            last_rtt: None,
             discovered_at: Instant::now(),
             last_seen: None,
             using_relay: false,
@@ -192,14 +192,16 @@ impl PeerState {
         peer_nat_type: Option<NatType>,
     ) -> Self {
         let strategy = select_connection_strategy(our_nat_type, peer_nat_type);
+        let mut endpoints = EndpointSet::new();
+        if let Some(addr) = endpoint {
+            endpoints.upsert(addr, EndpointSource::Nucleus);
+        }
         Self {
             vip,
             vip_v6,
             public_key,
-            signaling_endpoint: endpoint,
-            confirmed_endpoint: None,
+            endpoints,
             state: PeerConnectionState::Init,
-            last_rtt: None,
             discovered_at: Instant::now(),
             last_seen: None,
             using_relay: false,
@@ -214,25 +216,73 @@ impl PeerState {
         self.connection_strategy = select_connection_strategy(our_nat_type, peer_nat_type);
     }
 
-    /// Mark peer as connected with confirmed endpoint
-    pub fn mark_connected(&mut self, endpoint: std::net::SocketAddr, rtt: Duration) {
-        self.confirmed_endpoint = Some(endpoint);
-        self.state = PeerConnectionState::DirectOk;
-        self.last_rtt = Some(rtt);
-        self.last_seen = Some(Instant::now());
-        self.using_relay = false;
+    /// Add an endpoint from a specific source
+    pub fn add_endpoint(&mut self, addr: std::net::SocketAddr, source: EndpointSource) {
+        self.endpoints.upsert(addr, source);
     }
 
-    /// Mark peer as using relay
+    /// Record a successful pong response and update best endpoint
+    pub fn record_pong(&mut self, addr: std::net::SocketAddr, rtt: Duration) {
+        self.endpoints.record_pong(addr, rtt);
+        self.last_seen = Some(Instant::now());
+        
+        // Update connection state based on endpoint state
+        if self.endpoints.has_working_connection() {
+            if self.endpoints.best().map(|e| e.source == EndpointSource::Relay).unwrap_or(false) {
+                self.state = PeerConnectionState::RelayOk;
+                self.using_relay = true;
+            } else {
+                self.state = PeerConnectionState::DirectOk;
+                self.using_relay = false;
+            }
+        }
+    }
+
+    /// Mark an endpoint as failed
+    pub fn mark_endpoint_failed(&mut self, addr: std::net::SocketAddr) {
+        self.endpoints.mark_failed(addr);
+        
+        // Check if we need to fall back to relay
+        if self.endpoints.needs_relay() {
+            self.state = PeerConnectionState::RelayTry;
+        }
+    }
+
+    /// Mark peer as using relay (legacy compatibility)
     pub fn mark_relayed(&mut self) {
         self.state = PeerConnectionState::RelayOk;
         self.using_relay = true;
         self.last_seen = Some(Instant::now());
     }
 
-    /// Get the best endpoint to use (confirmed > signaling)
+    /// Get the best endpoint to use
     pub fn best_endpoint(&self) -> Option<std::net::SocketAddr> {
-        self.confirmed_endpoint.or(self.signaling_endpoint)
+        self.endpoints.best_addr()
+    }
+
+    /// Get the best endpoint info (for latency display)
+    pub fn best_endpoint_info(&self) -> Option<&EndpointInfo> {
+        self.endpoints.best()
+    }
+
+    /// Get all endpoints that need probing
+    pub fn endpoints_needing_probe(&self, interval: Duration) -> Vec<std::net::SocketAddr> {
+        self.endpoints.endpoints_needing_probe(interval)
+    }
+
+    /// Mark an endpoint as being probed
+    pub fn mark_probing(&mut self, addr: std::net::SocketAddr) {
+        self.endpoints.mark_probing(addr);
+    }
+
+    /// Get endpoint count
+    pub fn endpoint_count(&self) -> usize {
+        self.endpoints.endpoints.len()
+    }
+
+    /// Check if peer has any working connection
+    pub fn has_working_connection(&self) -> bool {
+        self.endpoints.has_working_connection()
     }
 }
 
@@ -263,9 +313,14 @@ pub struct PeerDebugInfo {
     pub vip: String,
     pub vip_v6: Option<String>,
     pub state: String,
-    pub signaling_endpoint: Option<String>,
-    pub confirmed_endpoint: Option<String>,
-    pub last_rtt_ms: Option<u64>,
+    /// Best endpoint address
+    pub best_endpoint: Option<String>,
+    /// Best endpoint latency in ms
+    pub best_latency_ms: Option<u64>,
+    /// Total number of known endpoints
+    pub endpoint_count: usize,
+    /// Number of working endpoints
+    pub working_endpoint_count: usize,
     pub using_relay: bool,
     pub last_seen_ago_secs: Option<u64>,
     /// Peer's NAT type (if known)
@@ -463,13 +518,16 @@ impl ConnectionManager {
         let pings = self.pending_pings.read().await;
         
         let mut peer_info: Vec<PeerDebugInfo> = peers.values().map(|p| {
+            let best_info = p.best_endpoint_info();
+            let responsive_timeout = Duration::from_secs(30);
             PeerDebugInfo {
                 vip: p.vip.to_string(),
                 vip_v6: p.vip_v6.map(|v| v.to_string()),
                 state: format!("{:?}", p.state),
-                signaling_endpoint: p.signaling_endpoint.map(|e| e.to_string()),
-                confirmed_endpoint: p.confirmed_endpoint.map(|e| e.to_string()),
-                last_rtt_ms: p.last_rtt.map(|d| d.as_millis() as u64),
+                best_endpoint: p.best_endpoint().map(|e| e.to_string()),
+                best_latency_ms: best_info.and_then(|e| e.latency.map(|l| l.as_millis() as u64)),
+                endpoint_count: p.endpoint_count(),
+                working_endpoint_count: p.endpoints.responsive_count(responsive_timeout),
                 using_relay: p.using_relay,
                 last_seen_ago_secs: p.last_seen.map(|t| t.elapsed().as_secs()),
                 peer_nat_type: p.peer_nat_type.map(|n| format!("{:?}", n)),
@@ -1216,14 +1274,13 @@ impl ConnectionManager {
                                         // Update peer endpoint if we know this peer
                                         let mut peers = peer_states.write().await;
                                         if let Some(peer_state) = peers.get_mut(&ping.sender_vip) {
-                                            if peer_state.confirmed_endpoint != Some(src) {
-                                                info!(
-                                                    "Peer {} endpoint updated via disco ping: {:?} -> {}",
-                                                    ping.sender_vip, peer_state.confirmed_endpoint, src
-                                                );
-                                                peer_state.confirmed_endpoint = Some(src);
-                                                peer_state.last_seen = Some(Instant::now());
-                                            }
+                                            // Add endpoint from direct probe (highest priority source)
+                                            peer_state.add_endpoint(src, EndpointSource::DirectProbe);
+                                            peer_state.last_seen = Some(Instant::now());
+                                            info!(
+                                                "Peer {} endpoint added via disco ping: {} (total: {} endpoints)",
+                                                ping.sender_vip, src, peer_state.endpoint_count()
+                                            );
                                         }
                                     }
                                     continue;
@@ -1245,25 +1302,35 @@ impl ConnectionManager {
                                                 src, pending.target_vip, rtt, pong.observed_addr
                                             );
                                             
-                                            // Mark peer as connected and configure WireGuard
+                                            // Record the pong and update best endpoint
                                             let mut peers = peer_states.write().await;
                                             if let Some(peer_state) = peers.get_mut(&pending.target_vip) {
-                                                peer_state.mark_connected(src, rtt);
+                                                // Add endpoint from direct probe and record latency
+                                                peer_state.add_endpoint(src, EndpointSource::DirectProbe);
+                                                peer_state.record_pong(src, rtt);
                                                 
-                                                // NOW configure WireGuard with the confirmed endpoint
-                                                let pubkey = ::hex::encode(peer_state.public_key);
-                                                let mut allowed_ips = vec![format!("{}/32", peer_state.vip)];
-                                                if let Some(vip_v6) = peer_state.vip_v6 {
-                                                    allowed_ips.push(format!("{}/128", vip_v6));
+                                                // Get the best endpoint (may have changed)
+                                                if let Some(best_ep) = peer_state.best_endpoint() {
+                                                    let latency = peer_state.best_endpoint_info()
+                                                        .and_then(|e| e.latency)
+                                                        .map(|l| format!("{:?}", l))
+                                                        .unwrap_or_else(|| "unknown".to_string());
+                                                    
+                                                    // Configure WireGuard with the best endpoint
+                                                    let pubkey = ::hex::encode(peer_state.public_key);
+                                                    let mut allowed_ips = vec![format!("{}/32", peer_state.vip)];
+                                                    if let Some(vip_v6) = peer_state.vip_v6 {
+                                                        allowed_ips.push(format!("{}/128", vip_v6));
+                                                    }
+                                                    
+                                                    info!(
+                                                        "Configuring WireGuard peer {} at {} (latency: {}, {} endpoints)",
+                                                        peer_state.vip, best_ep, latency, peer_state.endpoint_count()
+                                                    );
+                                                    let _ = tun_ctrl
+                                                        .add_peer(&pubkey, Some(best_ep), &allowed_ips)
+                                                        .await;
                                                 }
-                                                
-                                                info!(
-                                                    "Configuring WireGuard peer {} at {} (RTT: {:?})",
-                                                    peer_state.vip, src, rtt
-                                                );
-                                                let _ = tun_ctrl
-                                                    .add_peer(&pubkey, Some(src), &allowed_ips)
-                                                    .await;
                                             }
                                         } else {
                                             debug!(
@@ -1393,8 +1460,10 @@ impl ConnectionManager {
                                                 )
                                             });
                                             
-                                            // Update peer info if already exists
-                                            peer_state.signaling_endpoint = peer.endpoint;
+                                            // Update peer info if already exists - add endpoint from signaling
+                                            if let Some(endpoint) = peer.endpoint {
+                                                peer_state.add_endpoint(endpoint, EndpointSource::Nucleus);
+                                            }
                                             peer_state.vip_v6 = vip_v6;
                                             
                                             // Update strategy if NAT types changed
@@ -1406,8 +1475,8 @@ impl ConnectionManager {
                                                 );
                                             }
                                             
-                                            // If peer already has confirmed endpoint, just update WireGuard
-                                            if peer_state.state == PeerConnectionState::DirectOk {
+                                            // If peer already has working connection, just update WireGuard with best
+                                            if peer_state.has_working_connection() {
                                                 if let Some(endpoint) = peer_state.best_endpoint() {
                                                     let pubkey = ::hex::encode(peer_state.public_key);
                                                     let mut allowed_ips = vec![format!("{}/32", vip)];
@@ -1439,8 +1508,12 @@ impl ConnectionManager {
                                                         "Peer {} using PortPrediction strategy - trying disco with relay fallback",
                                                         vip
                                                     );
-                                                    // Continue to standard disco below
-                                                    if let Some(endpoint) = peer.endpoint {
+                                                    // Send disco pings to ALL known endpoints
+                                                    let endpoints: Vec<_> = peer_state.endpoints.endpoints.iter()
+                                                        .map(|e| e.addr)
+                                                        .collect();
+                                                    
+                                                    for endpoint in endpoints {
                                                         let tx_id: [u8; 12] = rand::random();
                                                         let ping = DiscoPing {
                                                             tx_id,
@@ -1453,10 +1526,11 @@ impl ConnectionManager {
                                                             if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
                                                                 warn!("Failed to send disco ping to {}: {}", endpoint, e);
                                                             } else {
-                                                                info!(
+                                                                debug!(
                                                                     "Sent disco ping to {} ({}) tx: {:02x?}",
                                                                     vip, endpoint, &tx_id[..4]
                                                                 );
+                                                                peer_state.mark_probing(endpoint);
                                                                 let pending = PendingDiscoPing {
                                                                     tx_id,
                                                                     target: endpoint,
@@ -1466,19 +1540,23 @@ impl ConnectionManager {
                                                                     max_retries: disco_config.max_retries,
                                                                 };
                                                                 pending_pings.write().await.insert(tx_id, pending);
-                                                                peer_state.state = PeerConnectionState::DirectTry;
                                                             }
                                                         }
                                                     }
+                                                    peer_state.state = PeerConnectionState::DirectTry;
                                                 }
                                                 ConnectionStrategy::SimultaneousOpen => {
-                                                    // Both sides should send pings at the same time
-                                                    // The other peer will also be sending pings
+                                                    // Both sides should send pings simultaneously
                                                     info!(
-                                                        "Peer {} using SimultaneousOpen strategy - sending disco ping",
-                                                        vip
+                                                        "Peer {} using SimultaneousOpen strategy - sending disco pings to {} endpoints",
+                                                        vip, peer_state.endpoint_count()
                                                     );
-                                                    if let Some(endpoint) = peer.endpoint {
+                                                    // Send disco pings to ALL known endpoints
+                                                    let endpoints: Vec<_> = peer_state.endpoints.endpoints.iter()
+                                                        .map(|e| e.addr)
+                                                        .collect();
+                                                    
+                                                    for endpoint in endpoints {
                                                         let tx_id: [u8; 12] = rand::random();
                                                         let ping = DiscoPing {
                                                             tx_id,
@@ -1491,10 +1569,11 @@ impl ConnectionManager {
                                                             if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
                                                                 warn!("Failed to send disco ping to {}: {}", endpoint, e);
                                                             } else {
-                                                                info!(
+                                                                debug!(
                                                                     "Sent disco ping to {} ({}) tx: {:02x?}",
                                                                     vip, endpoint, &tx_id[..4]
                                                                 );
+                                                                peer_state.mark_probing(endpoint);
                                                                 let pending = PendingDiscoPing {
                                                                     tx_id,
                                                                     target: endpoint,
@@ -1504,44 +1583,19 @@ impl ConnectionManager {
                                                                     max_retries: disco_config.max_retries,
                                                                 };
                                                                 pending_pings.write().await.insert(tx_id, pending);
-                                                                peer_state.state = PeerConnectionState::DirectTry;
                                                             }
                                                         }
                                                     }
+                                                    peer_state.state = PeerConnectionState::DirectTry;
                                                 }
                                                 ConnectionStrategy::Direct => {
-                                                    // Standard disco ping
-                                                    if let Some(endpoint) = peer.endpoint {
-                                                        let tx_id: [u8; 12] = rand::random();
-                                                        let ping = DiscoPing {
-                                                            tx_id,
-                                                            sender_key: our_public_key,
-                                                            sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
-                                                            sender_vip_v6: our_vip_v6,
-                                                        };
-                                                        
-                                                        if let Ok(ping_data) = encode_disco_ping(&ping) {
-                                                            if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
-                                                                warn!("Failed to send disco ping to {}: {}", endpoint, e);
-                                                            } else {
-                                                                info!(
-                                                                    "Sent disco ping to {} ({}) tx: {:02x?}",
-                                                                    vip, endpoint, &tx_id[..4]
-                                                                );
-                                                                let pending = PendingDiscoPing {
-                                                                    tx_id,
-                                                                    target: endpoint,
-                                                                    target_vip: vip,
-                                                                    sent_at: Instant::now(),
-                                                                    retries: 0,
-                                                                    max_retries: disco_config.max_retries,
-                                                                };
-                                                                pending_pings.write().await.insert(tx_id, pending);
-                                                                peer_state.state = PeerConnectionState::DirectTry;
-                                                            }
-                                                        }
-                                                    } else {
-                                                        // No endpoint from signaling, configure WireGuard anyway
+                                                    // Standard disco ping - send to all known endpoints
+                                                    let endpoints: Vec<_> = peer_state.endpoints.endpoints.iter()
+                                                        .map(|e| e.addr)
+                                                        .collect();
+                                                    
+                                                    if endpoints.is_empty() {
+                                                        // No endpoints, configure WireGuard without endpoint
                                                         // (peer may initiate connection to us)
                                                         let pubkey = ::hex::encode(peer_state.public_key);
                                                         let mut allowed_ips = vec![format!("{}/32", vip)];
@@ -1551,6 +1605,42 @@ impl ConnectionManager {
                                                         let _ = tun_ctrl
                                                             .add_peer(&pubkey, None, &allowed_ips)
                                                             .await;
+                                                    } else {
+                                                        info!(
+                                                            "Peer {} using Direct strategy - sending disco pings to {} endpoints",
+                                                            vip, endpoints.len()
+                                                        );
+                                                        for endpoint in endpoints {
+                                                            let tx_id: [u8; 12] = rand::random();
+                                                            let ping = DiscoPing {
+                                                                tx_id,
+                                                                sender_key: our_public_key,
+                                                                sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
+                                                                sender_vip_v6: our_vip_v6,
+                                                            };
+                                                            
+                                                            if let Ok(ping_data) = encode_disco_ping(&ping) {
+                                                                if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
+                                                                    warn!("Failed to send disco ping to {}: {}", endpoint, e);
+                                                                } else {
+                                                                    debug!(
+                                                                        "Sent disco ping to {} ({}) tx: {:02x?}",
+                                                                        vip, endpoint, &tx_id[..4]
+                                                                    );
+                                                                    peer_state.mark_probing(endpoint);
+                                                                    let pending = PendingDiscoPing {
+                                                                        tx_id,
+                                                                        target: endpoint,
+                                                                        target_vip: vip,
+                                                                        sent_at: Instant::now(),
+                                                                        retries: 0,
+                                                                        max_retries: disco_config.max_retries,
+                                                                    };
+                                                                    pending_pings.write().await.insert(tx_id, pending);
+                                                                }
+                                                            }
+                                                        }
+                                                        peer_state.state = PeerConnectionState::DirectTry;
                                                     }
                                                 }
                                             }
@@ -1604,29 +1694,40 @@ impl ConnectionManager {
                                     // Max retries exceeded - mark for removal
                                     timed_out.push(*tx_id);
                                     
-                                    // Mark peer as failed/needs relay
+                                    // Mark endpoint as failed and check if we need relay
                                     if let Some(peer_state) = peers.get_mut(&pending.target_vip) {
                                         warn!(
-                                            "Disco ping to {} ({}) timed out after {} retries - peer unreachable via direct connection",
+                                            "Disco ping to {} ({}) timed out after {} retries",
                                             pending.target_vip, pending.target, pending.max_retries
                                         );
                                         
-                                        // Try relay fallback if enabled
-                                        if disco_config.relay_enabled {
-                                            peer_state.state = PeerConnectionState::RelayTry;
-                                            info!(
-                                                "Initiating relay fallback for peer {} (direct connection failed)",
-                                                pending.target_vip
-                                            );
-                                        } else {
-                                            peer_state.state = PeerConnectionState::Failed;
-                                            // Configure WireGuard with signaling endpoint as last resort
-                                            if let Some(endpoint) = peer_state.signaling_endpoint {
+                                        // Mark this specific endpoint as failed
+                                        peer_state.mark_endpoint_failed(pending.target);
+                                        
+                                        // Check if all endpoints have failed and we need relay
+                                        if peer_state.endpoints.needs_relay() {
+                                            if disco_config.relay_enabled {
+                                                peer_state.state = PeerConnectionState::RelayTry;
                                                 info!(
-                                                    "Configuring WireGuard peer {} with signaling endpoint {} (disco failed, relay disabled)",
-                                                    peer_state.vip, endpoint
+                                                    "All {} endpoints failed for peer {} - initiating relay fallback",
+                                                    peer_state.endpoint_count(), pending.target_vip
                                                 );
+                                            } else {
+                                                peer_state.state = PeerConnectionState::Failed;
+                                                // Configure WireGuard with best available endpoint as last resort
+                                                if let Some(endpoint) = peer_state.best_endpoint() {
+                                                    info!(
+                                                        "Configuring WireGuard peer {} with best endpoint {} (disco failed, relay disabled)",
+                                                        peer_state.vip, endpoint
+                                                    );
+                                                }
                                             }
+                                        } else {
+                                            debug!(
+                                                "Endpoint {} failed for peer {}, but {} other endpoints available",
+                                                pending.target, pending.target_vip, 
+                                                peer_state.endpoint_count() - 1
+                                            );
                                         }
                                     }
                                 }
