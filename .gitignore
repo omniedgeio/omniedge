@@ -55,4 +55,6 @@ app.yaml
 .gemini/
 .opencode/
 
+# --- Documentation (auto-generated / working drafts) ---
 doc
+docs/

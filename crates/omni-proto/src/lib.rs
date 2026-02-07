@@ -18,7 +18,15 @@ pub use omninervous::RuntimeState;
 pub use omninervous::{NatReport, NatType};
 
 // Relay Infrastructure
-pub use omninervous::{RelayConfig, RelayStats};
+pub use omninervous::{RelayClient, RelayClientState, RelayConfig, RelayStats, SessionId};
+
+// Relay Protocol Message Types and Encoding
+pub use omninervous::relay::{
+    encode_relay_bind, encode_relay_bind_ack, encode_relay_data, encode_relay_unbind,
+    is_relay_message, parse_relay_bind, parse_relay_bind_ack, parse_relay_data, parse_relay_unbind,
+    RelayBindAck, RelayBindRequest, MSG_RELAY_BIND, MSG_RELAY_BIND_ACK, MSG_RELAY_DATA,
+    MSG_RELAY_KEEPALIVE, MSG_RELAY_UNBIND,
+};
 
 // Port Mapping
 pub use omninervous::{PortMapCapabilities, PortMapProtocol};

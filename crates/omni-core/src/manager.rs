@@ -7,6 +7,9 @@ use omni_proto::{
     encode_disco_ping, encode_disco_pong, handle_nucleus_message, parse_disco_ping,
     parse_disco_pong, DiscoPing, DiscoPong, NucleusState, OmniProto, PeerConnectionState,
     SIGNALING_DISCO_PING, SIGNALING_DISCO_PONG,
+    // Relay protocol
+    encode_relay_bind, is_relay_message, parse_relay_bind_ack, parse_relay_data,
+    RelayClient, MSG_RELAY_BIND_ACK, MSG_RELAY_DATA,
 };
 use omni_tun::OmniTun;
 use omninervous::Identity;
@@ -190,6 +193,13 @@ pub struct ConnectionManager {
     pending_pings: Arc<RwLock<HashMap<[u8; 12], PendingDiscoPing>>>,
     /// Disco configuration
     disco_config: LocalDiscoConfig,
+    // ========================================================================
+    // Relay Fallback (NAT Traversal Fix v0.3.3)
+    // ========================================================================
+    /// Relay client for fallback when disco fails
+    relay_client: Arc<RwLock<Option<omni_proto::RelayClient>>>,
+    /// Active relay sessions by peer public key
+    relay_sessions: Arc<RwLock<HashMap<[u8; 32], omni_proto::SessionId>>>,
 }
 
 impl ConnectionManager {
@@ -204,6 +214,12 @@ impl ConnectionManager {
         let (is_exit_node, network_config) = CliConfig::load()
             .map(|c| (c.is_exit_node, c.network_config))
             .unwrap_or_else(|_| (false, NetworkConfig::default()));
+
+        // Initialize disco config from network config
+        let disco_config = LocalDiscoConfig {
+            relay_enabled: network_config.relay_enabled,
+            ..LocalDiscoConfig::default()
+        };
 
         Self {
             state: Arc::new(RwLock::new(ConnectionState::Disconnected)),
@@ -231,7 +247,10 @@ impl ConnectionManager {
             // P2P Connection State Tracking
             peer_states: Arc::new(RwLock::new(HashMap::new())),
             pending_pings: Arc::new(RwLock::new(HashMap::new())),
-            disco_config: LocalDiscoConfig::default(),
+            disco_config,
+            // Relay Fallback
+            relay_client: Arc::new(RwLock::new(None)),
+            relay_sessions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -339,6 +358,27 @@ impl ConnectionManager {
             pending_pings: pings.len(),
             peers: peer_info,
         }
+    }
+
+    // ========================================================================
+    // Relay State Queries (NAT Traversal Fix v0.3.3)
+    // ========================================================================
+
+    /// Check if relay is enabled in configuration
+    pub fn is_relay_enabled(&self) -> bool {
+        self.disco_config.relay_enabled
+    }
+
+    /// Get count of active relay sessions
+    pub async fn get_relay_session_count(&self) -> usize {
+        let sessions = self.relay_sessions.read().await;
+        sessions.len()
+    }
+
+    /// Check if a specific peer is using relay
+    pub async fn is_peer_using_relay(&self, vip: Ipv4Addr) -> bool {
+        let peers = self.peer_states.read().await;
+        peers.get(&vip).map(|p| p.using_relay).unwrap_or(false)
     }
 
     /// Update network configuration and persist to disk
@@ -887,6 +927,24 @@ impl ConnectionManager {
         let our_vip_v6_str = self.virtual_ip_v6.read().await.clone();
         let our_vip_v6: Option<std::net::Ipv6Addr> = our_vip_v6_str.as_ref().and_then(|s| s.parse().ok());
         let disco_config = self.disco_config.clone();
+        
+        // Clone relay state for dispatcher
+        let relay_client = self.relay_client.clone();
+        let relay_sessions = self.relay_sessions.clone();
+        
+        // Get relay server address: prefer custom relay_server from config, fall back to nucleus
+        let relay_server_addr: Option<std::net::SocketAddr> = self.network_config.relay_server
+            .as_ref()
+            .and_then(|s| s.parse().ok())
+            .or_else(|| proto.get_nucleus_host().parse().ok());
+        
+        if disco_config.relay_enabled {
+            if let Some(addr) = relay_server_addr {
+                info!("Relay server configured: {}", addr);
+            } else {
+                warn!("Relay enabled but no valid relay server address");
+            }
+        }
 
         // Clear any existing task handles
         self.task_handles.clear();
@@ -966,9 +1024,23 @@ impl ConnectionManager {
             }
         }
 
-        // Master Dispatcher Loop - handles signaling, disco, and WireGuard packets
+        // Master Dispatcher Loop - handles signaling, disco, relay, and WireGuard packets
         let mut shutdown_rx1 = shutdown_tx.subscribe();
         let socket_for_disco = socket_inner.clone();
+        
+        // Initialize relay client if relay is enabled and we have a relay server address
+        if disco_config.relay_enabled {
+            if let Some(relay_addr) = relay_server_addr {
+                if let Some(vip) = our_vip {
+                    let client = RelayClient::new(our_public_key, vip, relay_addr);
+                    *relay_client.write().await = Some(client);
+                    info!("Relay client initialized, server: {}", relay_addr);
+                }
+            } else {
+                warn!("Relay enabled but no relay server address available");
+            }
+        }
+        
         let dispatcher_handle = tokio::spawn(async move {
             let mut buf = [0u8; 4096];
             // Disco timeout check interval
@@ -1069,6 +1141,90 @@ impl ConnectionManager {
                                             );
                                         }
                                     }
+                                    continue;
+                                }
+
+                                // Handle Relay messages (0x20-0x24)
+                                if is_relay_message(pkt) {
+                                    // Handle RELAY_BIND_ACK (0x21)
+                                    if first_byte == MSG_RELAY_BIND_ACK {
+                                        if let Ok(ack) = parse_relay_bind_ack(pkt) {
+                                            if ack.success {
+                                                if let Some(session_id) = ack.session_id {
+                                                    info!(
+                                                        "Relay session established: {:02x?}",
+                                                        &session_id[..4]
+                                                    );
+                                                    
+                                                    // Find peer in RelayTry state and update
+                                                    let mut peers = peer_states.write().await;
+                                                    for peer_state in peers.values_mut() {
+                                                        if peer_state.state == PeerConnectionState::RelayTry {
+                                                            peer_state.mark_relayed();
+                                                            
+                                                            // Store session ID
+                                                            relay_sessions.write().await.insert(
+                                                                peer_state.public_key,
+                                                                session_id,
+                                                            );
+                                                            
+                                                            // Configure WireGuard with relay endpoint
+                                                            let pubkey = ::hex::encode(peer_state.public_key);
+                                                            let mut allowed_ips = vec![format!("{}/32", peer_state.vip)];
+                                                            if let Some(v6) = peer_state.vip_v6 {
+                                                                allowed_ips.push(format!("{}/128", v6));
+                                                            }
+                                                            
+                                                            // Use relay server as endpoint
+                                                            // The relay_endpoint from ACK might be the same as our relay server
+                                                            let endpoint = ack.relay_endpoint
+                                                                .as_ref()
+                                                                .and_then(|s| s.parse().ok())
+                                                                .or(relay_server_addr);
+                                                            
+                                                            if let Some(ep) = endpoint {
+                                                                info!(
+                                                                    "Configuring WireGuard peer {} via relay {}",
+                                                                    peer_state.vip, ep
+                                                                );
+                                                                let _ = tun_ctrl
+                                                                    .add_peer(&pubkey, Some(ep), &allowed_ips)
+                                                                    .await;
+                                                            }
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                warn!("Relay bind failed: {:?}", ack.error);
+                                                // Mark peer as failed
+                                                let mut peers = peer_states.write().await;
+                                                for peer_state in peers.values_mut() {
+                                                    if peer_state.state == PeerConnectionState::RelayTry {
+                                                        peer_state.state = PeerConnectionState::Failed;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        continue;
+                                    }
+                                    
+                                    // Handle RELAY_DATA (0x22) - Forward relayed packets to WireGuard
+                                    if first_byte == MSG_RELAY_DATA {
+                                        if let Ok((session_id, wg_packet)) = parse_relay_data(pkt) {
+                                            debug!(
+                                                "Received relayed packet: session {:02x?}, {} bytes",
+                                                &session_id[..4], wg_packet.len()
+                                            );
+                                            // Forward to WireGuard handler
+                                            let _ = tun_ctrl.handle_packet(wg_packet, src, &socket_inner).await;
+                                        }
+                                        continue;
+                                    }
+                                    
+                                    // Other relay messages (UNBIND, KEEPALIVE) - log and continue
+                                    debug!("Received relay message type 0x{:02x} from {}", first_byte, src);
                                     continue;
                                 }
 
@@ -1213,23 +1369,23 @@ impl ConnectionManager {
                                             "Disco ping to {} ({}) timed out after {} retries - peer unreachable via direct connection",
                                             pending.target_vip, pending.target, pending.max_retries
                                         );
-                                        peer_state.state = PeerConnectionState::Failed;
                                         
-                                        // TODO: Implement relay fallback here
-                                        // For now, just configure WireGuard with the signaling endpoint
-                                        // and hope NAT traversal works via WireGuard's own keep-alive
-                                        if let Some(endpoint) = peer_state.signaling_endpoint {
-                                            let pubkey = ::hex::encode(peer_state.public_key);
-                                            let mut allowed_ips = vec![format!("{}/32", peer_state.vip)];
-                                            if let Some(v6) = peer_state.vip_v6 {
-                                                allowed_ips.push(format!("{}/128", v6));
-                                            }
+                                        // Try relay fallback if enabled
+                                        if disco_config.relay_enabled {
+                                            peer_state.state = PeerConnectionState::RelayTry;
                                             info!(
-                                                "Configuring WireGuard peer {} with signaling endpoint {} (disco failed)",
-                                                peer_state.vip, endpoint
+                                                "Initiating relay fallback for peer {} (direct connection failed)",
+                                                pending.target_vip
                                             );
-                                            // Can't await inside this loop, so we'll skip this for now
-                                            // The peer will be configured on next signaling update
+                                        } else {
+                                            peer_state.state = PeerConnectionState::Failed;
+                                            // Configure WireGuard with signaling endpoint as last resort
+                                            if let Some(endpoint) = peer_state.signaling_endpoint {
+                                                info!(
+                                                    "Configuring WireGuard peer {} with signaling endpoint {} (disco failed, relay disabled)",
+                                                    peer_state.vip, endpoint
+                                                );
+                                            }
                                         }
                                     }
                                 }
@@ -1239,6 +1395,42 @@ impl ConnectionManager {
                         // Remove timed out pings
                         for tx_id in timed_out {
                             pings.remove(&tx_id);
+                        }
+                        
+                        // Collect peers that need relay (outside the borrow scope)
+                        let peers_needing_relay: Vec<(Ipv4Addr, [u8; 32])> = peers
+                            .iter()
+                            .filter(|(_, p)| p.state == PeerConnectionState::RelayTry)
+                            .map(|(vip, p)| (*vip, p.public_key))
+                            .collect();
+                        
+                        // Drop the locks before async operations
+                        drop(pings);
+                        drop(peers);
+                        
+                        // Send RELAY_BIND requests for peers needing relay
+                        if !peers_needing_relay.is_empty() {
+                            if let Some(relay_addr) = relay_server_addr {
+                                let mut relay = relay_client.write().await;
+                                if let Some(client) = relay.as_mut() {
+                                    for (target_vip, target_key) in peers_needing_relay {
+                                        let bind_req = client.create_bind_request(target_key, target_vip);
+                                        
+                                        if let Ok(bind_data) = encode_relay_bind(&bind_req) {
+                                            if let Err(e) = socket_for_disco.send_to(&bind_data, relay_addr).await {
+                                                warn!("Failed to send RELAY_BIND for {} to {}: {}", target_vip, relay_addr, e);
+                                            } else {
+                                                info!(
+                                                    "Sent RELAY_BIND for peer {} to relay server {}",
+                                                    target_vip, relay_addr
+                                                );
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    warn!("Relay client not initialized, cannot send RELAY_BIND");
+                                }
+                            }
                         }
                     }
                     _ = shutdown_rx1.recv() => {
