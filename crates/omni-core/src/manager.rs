@@ -14,6 +14,8 @@ use omni_proto::{
     NatType,
     // Multi-endpoint support
     EndpointSet, EndpointSource, EndpointInfo,
+    // Port mapping
+    PortMapper, PortMapping, PortMapCapabilities,
 };
 use omni_tun::OmniTun;
 use omninervous::Identity;
@@ -384,6 +386,13 @@ pub struct ConnectionManager {
     relay_client: Arc<RwLock<Option<omni_proto::RelayClient>>>,
     /// Active relay sessions by peer public key
     relay_sessions: Arc<RwLock<HashMap<[u8; 32], omni_proto::SessionId>>>,
+    // ========================================================================
+    // Port Mapping (NAT Traversal Fix v0.3.4)
+    // ========================================================================
+    /// Port mapper for NAT-PMP/UPnP/PCP
+    port_mapper: Arc<RwLock<Option<PortMapper>>>,
+    /// Current port mapping (if active)
+    port_mapping: Arc<RwLock<Option<PortMapping>>>,
 }
 
 impl ConnectionManager {
@@ -435,6 +444,9 @@ impl ConnectionManager {
             // Relay Fallback
             relay_client: Arc::new(RwLock::new(None)),
             relay_sessions: Arc::new(RwLock::new(HashMap::new())),
+            // Port Mapping
+            port_mapper: Arc::new(RwLock::new(None)),
+            port_mapping: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -568,6 +580,105 @@ impl ConnectionManager {
     pub async fn is_peer_using_relay(&self, vip: Ipv4Addr) -> bool {
         let peers = self.peer_states.read().await;
         peers.get(&vip).map(|p| p.using_relay).unwrap_or(false)
+    }
+
+    // ========================================================================
+    // Port Mapping (NAT Traversal Fix v0.3.4)
+    // ========================================================================
+
+    /// Check if port mapping is enabled in configuration
+    pub fn is_portmap_enabled(&self) -> bool {
+        self.network_config.portmap_enabled
+    }
+
+    /// Get current port mapping status
+    pub async fn get_port_mapping(&self) -> Option<PortMapping> {
+        self.port_mapping.read().await.clone()
+    }
+
+    /// Get the external port if we have an active mapping
+    pub async fn get_external_port(&self) -> Option<u16> {
+        self.port_mapping.read().await.as_ref().map(|m| m.external_port)
+    }
+
+    /// Initialize port mapper and probe for capabilities
+    /// 
+    /// This should be called after binding the UDP socket to know the internal port.
+    /// Returns the capabilities found (NAT-PMP, UPnP, PCP support).
+    pub async fn init_port_mapper(&self, internal_port: u16) -> Result<PortMapCapabilities> {
+        if !self.network_config.portmap_enabled {
+            return Ok(PortMapCapabilities::default());
+        }
+
+        info!("Initializing port mapper for internal port {}", internal_port);
+        
+        let mut mapper = PortMapper::new(internal_port);
+        let caps = mapper.probe().await?;
+        
+        info!(
+            "Port mapping capabilities: NAT-PMP={}, UPnP={}, PCP={}, gateway={:?}, external={:?}",
+            caps.nat_pmp, caps.upnp, caps.pcp, caps.gateway_addr, caps.external_addr
+        );
+
+        // Store the mapper
+        let mut pm = self.port_mapper.write().await;
+        *pm = Some(mapper);
+
+        Ok(caps)
+    }
+
+    /// Request a port mapping using the best available protocol
+    /// 
+    /// Returns the external port if successful.
+    /// The mapping is stored and can be refreshed/released later.
+    pub async fn request_port_mapping(&self, lifetime_secs: u32) -> Result<u16> {
+        let mut mapper_guard = self.port_mapper.write().await;
+        let mapper = mapper_guard.as_mut()
+            .ok_or_else(|| anyhow::anyhow!("Port mapper not initialized"))?;
+
+        let external_port = mapper.request_mapping(lifetime_secs).await?;
+        
+        // Store the mapping
+        if let Some(mapping) = mapper.current_mapping() {
+            info!(
+                "Port mapping established: internal {} -> external {} (gateway: {}, lifetime: {}s)",
+                mapping.internal_port, mapping.external_port, mapping.gateway, lifetime_secs
+            );
+            let mut pm = self.port_mapping.write().await;
+            *pm = Some(mapping.clone());
+        }
+
+        Ok(external_port)
+    }
+
+    /// Check and refresh port mapping if needed (at 50% of lifetime)
+    pub async fn check_and_refresh_port_mapping(&self) -> Result<bool> {
+        let mut mapper_guard = self.port_mapper.write().await;
+        if let Some(mapper) = mapper_guard.as_mut() {
+            let refreshed = mapper.check_and_refresh().await?;
+            if refreshed {
+                if let Some(mapping) = mapper.current_mapping() {
+                    info!("Port mapping refreshed: external port {}", mapping.external_port);
+                    let mut pm = self.port_mapping.write().await;
+                    *pm = Some(mapping.clone());
+                }
+            }
+            Ok(refreshed)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Release the current port mapping
+    pub async fn release_port_mapping(&self) -> Result<()> {
+        let mut mapper_guard = self.port_mapper.write().await;
+        if let Some(mapper) = mapper_guard.as_mut() {
+            mapper.release().await?;
+            info!("Port mapping released");
+            let mut pm = self.port_mapping.write().await;
+            *pm = None;
+        }
+        Ok(())
     }
 
     /// Update network configuration and persist to disk
@@ -1030,6 +1141,45 @@ impl ConnectionManager {
             }));
         port = socket.local_addr()?.port();
         debug!("Bound UDP socket to port: {}", port);
+
+        // ====================================================================
+        // Port Mapping Initialization (NAT Traversal Fix v0.3.4)
+        // ====================================================================
+        // Try to establish a port mapping via NAT-PMP/UPnP/PCP for better connectivity.
+        // This allows peers behind compatible NAT gateways to receive incoming connections.
+        if self.network_config.portmap_enabled {
+            info!("Initializing port mapping for local port {}...", port);
+            match self.init_port_mapper(port).await {
+                Ok(caps) => {
+                    if caps.nat_pmp || caps.upnp || caps.pcp {
+                        // Request a mapping with 2-hour lifetime (will be refreshed periodically)
+                        match self.request_port_mapping(7200).await {
+                            Ok(ext_port) => {
+                                info!(
+                                    "Port mapping established: {}:{} -> external:{}",
+                                    caps.external_addr.map(|a| a.to_string()).unwrap_or_else(|| "?".to_string()),
+                                    port,
+                                    ext_port
+                                );
+                                // The external port can be advertised to peers via signaling
+                                // Note: OmniNervous will pick this up via proto.get_external_addr()
+                            }
+                            Err(e) => {
+                                warn!("Failed to request port mapping: {}. Continuing without mapping.", e);
+                            }
+                        }
+                    } else {
+                        debug!("No port mapping protocols available (NAT-PMP={}, UPnP={}, PCP={})",
+                            caps.nat_pmp, caps.upnp, caps.pcp);
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to probe port mapping capabilities: {}. Continuing without mapping.", e);
+                }
+            }
+        } else {
+            debug!("Port mapping disabled in configuration");
+        }
 
         self.proto = Some(proto.clone());
         self.tun = Some(tun.clone());
@@ -1849,6 +1999,62 @@ impl ConnectionManager {
             }
         });
         self.task_handles.push(heartbeat_handle);
+
+        // ====================================================================
+        // Port Mapping Refresh Loop (NAT Traversal Fix v0.3.4)
+        // ====================================================================
+        // Periodically refresh port mappings before they expire.
+        // Check every 30 minutes; actual refresh happens at 50% of mapping lifetime.
+        if self.network_config.portmap_enabled {
+            let port_mapper = self.port_mapper.clone();
+            let port_mapping = self.port_mapping.clone();
+            let mut shutdown_rx4 = shutdown_tx.subscribe();
+            
+            let portmap_handle = tokio::spawn(async move {
+                // Check every 30 minutes (1800 seconds)
+                let mut refresh_interval = tokio::time::interval(tokio::time::Duration::from_secs(1800));
+                // Skip the first immediate tick
+                refresh_interval.tick().await;
+                
+                loop {
+                    tokio::select! {
+                        _ = refresh_interval.tick() => {
+                            let mut mapper_guard = port_mapper.write().await;
+                            if let Some(mapper) = mapper_guard.as_mut() {
+                                match mapper.check_and_refresh().await {
+                                    Ok(refreshed) => {
+                                        if refreshed {
+                                            if let Some(mapping) = mapper.current_mapping() {
+                                                info!(
+                                                    "Port mapping refreshed: external port {} (gateway: {})",
+                                                    mapping.external_port, mapping.gateway
+                                                );
+                                                let mut pm = port_mapping.write().await;
+                                                *pm = Some(mapping.clone());
+                                            }
+                                        } else {
+                                            debug!("Port mapping still valid, no refresh needed");
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!("Port mapping refresh failed: {}", e);
+                                        // Clear the mapping since it may have expired
+                                        let mut pm = port_mapping.write().await;
+                                        *pm = None;
+                                    }
+                                }
+                            }
+                        }
+                        _ = shutdown_rx4.recv() => {
+                            info!("Port Mapping Refresh Loop shutting down");
+                            break;
+                        }
+                    }
+                }
+            });
+            self.task_handles.push(portmap_handle);
+            debug!("Port mapping refresh loop started (30 min interval)");
+        }
     }
 
     pub async fn login_with_password(&mut self, email: &str, password: &str) -> Result<AuthResp> {
@@ -2316,6 +2522,25 @@ impl ConnectionManager {
         {
             let mut pings = self.pending_pings.write().await;
             pings.clear();
+        }
+
+        // ====================================================================
+        // Release Port Mapping (NAT Traversal Fix v0.3.4)
+        // ====================================================================
+        // Release the port mapping to free up resources on the NAT gateway.
+        // This is important for NAT-PMP which has a limited number of mappings.
+        if let Err(e) = self.release_port_mapping().await {
+            warn!("Failed to release port mapping during disconnect: {}", e);
+        }
+        // Clear relay sessions
+        {
+            let mut sessions = self.relay_sessions.write().await;
+            sessions.clear();
+        }
+        // Clear relay client
+        {
+            let mut client = self.relay_client.write().await;
+            *client = None;
         }
 
         // On Windows, don't run cleanup_adapters during normal disconnect

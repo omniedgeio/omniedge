@@ -29,7 +29,7 @@ pub use omninervous::relay::{
 };
 
 // Port Mapping
-pub use omninervous::{PortMapCapabilities, PortMapProtocol};
+pub use omninervous::{PortMapCapabilities, PortMapProtocol, PortMapper, PortMapping};
 
 // Endpoint Management
 pub use omninervous::{EndpointInfo, EndpointSource, EndpointState, PathType};
