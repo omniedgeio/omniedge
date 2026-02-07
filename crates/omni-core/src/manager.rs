@@ -1424,6 +1424,19 @@ impl ConnectionManager {
                                         // Update peer endpoint if we know this peer
                                         let mut peers = peer_states.write().await;
                                         if let Some(peer_state) = peers.get_mut(&ping.sender_vip) {
+                                            // SECURITY: Verify sender's public key matches expected peer
+                                            // This prevents an attacker from spoofing disco pings to
+                                            // inject malicious endpoints into our peer state
+                                            if ping.sender_key != peer_state.public_key {
+                                                warn!(
+                                                    "Disco ping key mismatch for VIP {}: expected {:02x?}..., got {:02x?}...",
+                                                    ping.sender_vip,
+                                                    &peer_state.public_key[..8],
+                                                    &ping.sender_key[..8]
+                                                );
+                                                continue;  // Reject the ping - possible spoofing attempt
+                                            }
+                                            
                                             // Add endpoint from direct probe (highest priority source)
                                             peer_state.add_endpoint(src, EndpointSource::DirectProbe);
                                             peer_state.last_seen = Some(Instant::now());
@@ -1455,6 +1468,19 @@ impl ConnectionManager {
                                             // Record the pong and update best endpoint
                                             let mut peers = peer_states.write().await;
                                             if let Some(peer_state) = peers.get_mut(&pending.target_vip) {
+                                                // SECURITY: Verify responder's public key matches expected peer
+                                                // This prevents an attacker from impersonating a peer by
+                                                // responding to disco pings with a fake public key
+                                                if pong.responder_key != peer_state.public_key {
+                                                    warn!(
+                                                        "Disco pong key mismatch for VIP {}: expected {:02x?}..., got {:02x?}...",
+                                                        pending.target_vip,
+                                                        &peer_state.public_key[..8],
+                                                        &pong.responder_key[..8]
+                                                    );
+                                                    continue;  // Reject the pong - possible impersonation attempt
+                                                }
+                                                
                                                 // Add endpoint from direct probe and record latency
                                                 peer_state.add_endpoint(src, EndpointSource::DirectProbe);
                                                 peer_state.record_pong(src, rtt);
@@ -1504,53 +1530,103 @@ impl ConnectionManager {
                                                         &session_id[..4]
                                                     );
                                                     
-                                                    // Find peer in RelayTry state and update
-                                                    let mut peers = peer_states.write().await;
-                                                    for peer_state in peers.values_mut() {
-                                                        if peer_state.state == PeerConnectionState::RelayTry {
-                                                            peer_state.mark_relayed();
-                                                            
-                                                            // Store session ID
-                                                            relay_sessions.write().await.insert(
-                                                                peer_state.public_key,
-                                                                session_id,
+                                                    // SECURITY: Use target_key to identify the correct peer
+                                                    // This prevents session hijacking by associating the session
+                                                    // with the correct peer based on cryptographic identity
+                                                    let target_key = match ack.target_key {
+                                                        Some(key) => key,
+                                                        None => {
+                                                            // Legacy server without target_key - fall back to finding
+                                                            // first peer in RelayTry state (less secure)
+                                                            warn!(
+                                                                "Relay ACK missing target_key - using legacy association"
                                                             );
-                                                            
-                                                            // Configure WireGuard with relay endpoint
-                                                            let pubkey = ::hex::encode(peer_state.public_key);
-                                                            let mut allowed_ips = vec![format!("{}/32", peer_state.vip)];
-                                                            if let Some(v6) = peer_state.vip_v6 {
-                                                                allowed_ips.push(format!("{}/128", v6));
+                                                            let peers = peer_states.read().await;
+                                                            let legacy_key = peers.values()
+                                                                .find(|p| p.state == PeerConnectionState::RelayTry)
+                                                                .map(|p| p.public_key);
+                                                            match legacy_key {
+                                                                Some(k) => k,
+                                                                None => {
+                                                                    warn!("No peer in RelayTry state for relay ACK");
+                                                                    continue;
+                                                                }
                                                             }
-                                                            
-                                                            // Use relay server as endpoint
-                                                            // The relay_endpoint from ACK might be the same as our relay server
-                                                            let endpoint = ack.relay_endpoint
-                                                                .as_ref()
-                                                                .and_then(|s| s.parse().ok())
-                                                                .or(relay_server_addr);
-                                                            
-                                                            if let Some(ep) = endpoint {
-                                                                info!(
-                                                                    "Configuring WireGuard peer {} via relay {}",
-                                                                    peer_state.vip, ep
-                                                                );
-                                                                let _ = tun_ctrl
-                                                                    .add_peer(&pubkey, Some(ep), &allowed_ips)
-                                                                    .await;
-                                                            }
-                                                            break;
                                                         }
+                                                    };
+                                                    
+                                                    // Find peer by target_key and update
+                                                    let mut peers = peer_states.write().await;
+                                                    let peer_entry = peers.values_mut()
+                                                        .find(|p| p.public_key == target_key);
+                                                    
+                                                    if let Some(peer_state) = peer_entry {
+                                                        // Verify peer is actually waiting for relay
+                                                        if peer_state.state != PeerConnectionState::RelayTry {
+                                                            warn!(
+                                                                "Received relay ACK for peer {} not in RelayTry state (state: {:?})",
+                                                                peer_state.vip, peer_state.state
+                                                            );
+                                                            continue;
+                                                        }
+                                                        
+                                                        peer_state.mark_relayed();
+                                                        
+                                                        // Store session ID
+                                                        relay_sessions.write().await.insert(
+                                                            peer_state.public_key,
+                                                            session_id,
+                                                        );
+                                                        
+                                                        // Configure WireGuard with relay endpoint
+                                                        let pubkey = ::hex::encode(peer_state.public_key);
+                                                        let mut allowed_ips = vec![format!("{}/32", peer_state.vip)];
+                                                        if let Some(v6) = peer_state.vip_v6 {
+                                                            allowed_ips.push(format!("{}/128", v6));
+                                                        }
+                                                        
+                                                        // Use relay server as endpoint
+                                                        let endpoint = ack.relay_endpoint
+                                                            .as_ref()
+                                                            .and_then(|s| s.parse().ok())
+                                                            .or(relay_server_addr);
+                                                        
+                                                        if let Some(ep) = endpoint {
+                                                            info!(
+                                                                "Configuring WireGuard peer {} via relay {}",
+                                                                peer_state.vip, ep
+                                                            );
+                                                            let _ = tun_ctrl
+                                                                .add_peer(&pubkey, Some(ep), &allowed_ips)
+                                                                .await;
+                                                        }
+                                                    } else {
+                                                        warn!(
+                                                            "Received relay ACK for unknown peer key {:02x?}...",
+                                                            &target_key[..8]
+                                                        );
                                                     }
                                                 }
                                             } else {
                                                 warn!("Relay bind failed: {:?}", ack.error);
-                                                // Mark peer as failed
-                                                let mut peers = peer_states.write().await;
-                                                for peer_state in peers.values_mut() {
-                                                    if peer_state.state == PeerConnectionState::RelayTry {
-                                                        peer_state.state = PeerConnectionState::Failed;
-                                                        break;
+                                                // SECURITY: Use target_key to mark the correct peer as failed
+                                                if let Some(target_key) = ack.target_key {
+                                                    let mut peers = peer_states.write().await;
+                                                    if let Some(peer_state) = peers.values_mut()
+                                                        .find(|p| p.public_key == target_key)
+                                                    {
+                                                        if peer_state.state == PeerConnectionState::RelayTry {
+                                                            peer_state.state = PeerConnectionState::Failed;
+                                                        }
+                                                    }
+                                                } else {
+                                                    // Legacy fallback - mark first RelayTry peer as failed
+                                                    let mut peers = peer_states.write().await;
+                                                    for peer_state in peers.values_mut() {
+                                                        if peer_state.state == PeerConnectionState::RelayTry {
+                                                            peer_state.state = PeerConnectionState::Failed;
+                                                            break;
+                                                        }
                                                     }
                                                 }
                                             }
