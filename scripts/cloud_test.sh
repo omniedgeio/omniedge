@@ -261,7 +261,12 @@ scp_to() {
 ensure_local_docker() {
     if [[ "$LOCAL_DOCKER" != "true" ]]; then return 0; fi
     
-    if ! docker ps --format '{{.Names}}' | grep -q "^$LOCAL_DOCKER_NAME$"; then
+    local container_exists=false
+    if docker ps --format '{{.Names}}' | grep -q "^$LOCAL_DOCKER_NAME$"; then
+        container_exists=true
+    fi
+
+    if [[ "$container_exists" == "false" ]]; then
         print_step "Setting up local Docker environment ($LOCAL_DOCKER_NAME)..."
         docker rm -f "$LOCAL_DOCKER_NAME" 2>/dev/null || true
         
@@ -274,27 +279,29 @@ ensure_local_docker() {
             
         print_step "Installing dependencies in local Docker container..."
         docker exec "$LOCAL_DOCKER_NAME" apt-get update -qq
-        # Added ca-certificates for curl to work with HTTPS
         docker exec "$LOCAL_DOCKER_NAME" apt-get install -y -qq iperf3 wireguard-tools iproute2 jq bc psmisc curl ca-certificates sudo iputils-ping procps
-        
-        # Create root config directory
-        docker exec "$LOCAL_DOCKER_NAME" mkdir -p /root/.omniedge
-        
-        # Verify TUN device is available in container
-        print_step "Verifying TUN device in container..."
+    else
+        # If container exists, ensure curl and certificates are actually there
+        if ! docker exec "$LOCAL_DOCKER_NAME" which curl &>/dev/null; then
+            print_step "Repairing missing dependencies in existing Docker container..."
+            docker exec "$LOCAL_DOCKER_NAME" apt-get update -qq
+            docker exec "$LOCAL_DOCKER_NAME" apt-get install -y -qq curl ca-certificates sudo
+        fi
+    fi
+    
+    # Always ensure root config directory and TUN
+    docker exec "$LOCAL_DOCKER_NAME" mkdir -p /root/.omniedge
+    
+    # Verify TUN device is available in container
+    if ! docker exec "$LOCAL_DOCKER_NAME" ls -la /dev/net/tun &>/dev/null; then
+        print_step "Verifying/Creating TUN device in container..."
+        docker exec "$LOCAL_DOCKER_NAME" mkdir -p /dev/net 2>/dev/null || true
+        docker exec "$LOCAL_DOCKER_NAME" mknod /dev/net/tun c 10 200 2>/dev/null || true
+        docker exec "$LOCAL_DOCKER_NAME" chmod 600 /dev/net/tun 2>/dev/null || true
         if docker exec "$LOCAL_DOCKER_NAME" ls -la /dev/net/tun &>/dev/null; then
             echo -e "  ✅ TUN device available"
         else
-            # Try to create TUN device if it doesn't exist
-            echo -e "  ⚠️ TUN device not found, attempting to create..."
-            docker exec "$LOCAL_DOCKER_NAME" mkdir -p /dev/net
-            docker exec "$LOCAL_DOCKER_NAME" mknod /dev/net/tun c 10 200
-            docker exec "$LOCAL_DOCKER_NAME" chmod 600 /dev/net/tun
-            if docker exec "$LOCAL_DOCKER_NAME" ls -la /dev/net/tun &>/dev/null; then
-                echo -e "  ✅ TUN device created successfully"
-            else
-                print_error "Failed to create TUN device - VPN may not work"
-            fi
+            print_error "Failed to create TUN device - VPN may not work"
         fi
     fi
 }
