@@ -145,6 +145,24 @@ impl NetworkConfig {
         Ok(())
     }
 
+    /// Get the effective MTU, taking auto-detection into account
+    ///
+    /// When `mtu_auto_detect` is true, this checks for existing VPN interfaces
+    /// and returns 1280 for VPN-over-VPN scenarios, otherwise returns the configured MTU.
+    pub fn effective_mtu(&self) -> u16 {
+        if self.mtu_auto_detect {
+            if detect_vpn_active() {
+                log::info!("Auto-MTU: Active VPN detected, using safety MTU 1280");
+                1280
+            } else {
+                log::debug!("Auto-MTU: No VPN detected, using standard MTU {}", self.mtu);
+                self.mtu
+            }
+        } else {
+            self.mtu
+        }
+    }
+
     /// Get a summary of enabled features for display
     pub fn feature_summary(&self) -> Vec<String> {
         let mut features = Vec::new();
@@ -165,6 +183,9 @@ impl NetworkConfig {
                 "IPv6 (Available)".to_string()
             });
         }
+        if self.mtu_auto_detect {
+            features.push("Auto-MTU Detection".to_string());
+        }
 
         if features.is_empty() {
             features.push("Basic Mode".to_string());
@@ -172,6 +193,58 @@ impl NetworkConfig {
 
         features
     }
+}
+
+/// Detect if the system is running behind an existing VPN
+///
+/// Checks for common VPN interface prefixes:
+/// - Linux: tun, wg, tap, ppp in /sys/class/net
+/// - macOS: utun, ppp via ifconfig
+fn detect_vpn_active() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(entries) = std::fs::read_dir("/sys/class/net") {
+            for entry in entries.flatten() {
+                if let Ok(name) = entry.file_name().into_string() {
+                    // Detect common VPN interface prefixes
+                    if name.starts_with("tun")
+                        || name.starts_with("wg")
+                        || name.starts_with("tap")
+                        || name.starts_with("ppp")
+                    {
+                        log::debug!("VPN interface detected: {}", name);
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // On macOS, check for utun or ppp interfaces via ifconfig
+        use std::process::Command;
+        if let Ok(output) = Command::new("ifconfig").output() {
+            let s = String::from_utf8_lossy(&output.stdout);
+            // Search for utun (standard) or ppp (legacy)
+            // Note: We check lines for interface declarations, not just any mention
+            for line in s.lines() {
+                if (line.starts_with("utun") || line.starts_with("ppp")) && line.contains(':') {
+                    log::debug!("VPN interface detected in ifconfig output");
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Windows VPN detection could be added in the future
+    #[cfg(target_os = "windows")]
+    {
+        // TODO: Implement Windows VPN detection via Get-NetAdapter or similar
+        log::debug!("Windows VPN detection not yet implemented");
+    }
+
+    false
 }
 
 // ============================================================================
