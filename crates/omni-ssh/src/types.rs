@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-/// SSH connection info (for OmniEdge peer connections)
+/// SSH connection info for OmniEdge peer connections
 #[derive(Debug, Clone)]
 pub struct SshConnInfo {
     /// Connection unique identifier

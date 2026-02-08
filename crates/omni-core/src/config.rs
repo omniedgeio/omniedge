@@ -83,7 +83,7 @@ fn default_true() -> bool {
 }
 
 fn default_ipv6_threshold() -> u32 {
-    5 // 5ms is industry proven default
+    5 // 5ms is a proven industry default for IPv6 preference
 }
 
 fn default_happy_eyeballs_delay() -> u32 {
