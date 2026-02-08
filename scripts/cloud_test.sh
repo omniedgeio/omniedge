@@ -51,11 +51,6 @@ SECURITY_KEY=""
 TEST_DURATION=${TEST_DURATION:-10}
 RESULTS_DIR="./test_results"
 
-# Local Docker settings
-LOCAL_DOCKER=false
-LOCAL_DOCKER_NAME_A="omni-edge-a-local"
-LOCAL_DOCKER_NAME_B="omni-edge-b-local"
-
 # Virtual IPs are assigned by OmniEdge backend
 VIP_A=""
 VIP_B=""
@@ -63,8 +58,10 @@ VIP6_A=""
 VIP6_B=""
 TEST_IPV6=true
 
-# Installer URL
-INSTALLER_URL="https://raw.githubusercontent.com/omniedgeio/omniedge/main/scripts/omniedge-install.sh"
+# Installer URL (default)
+INSTALLER_URL="${INSTALLER_URL:-https://raw.githubusercontent.com/omniedgeio/omniedge/main/scripts/omniedge-install.sh}"
+LOCAL_DOCKER=false
+LOCAL_DOCKER_NAME="omni-node-local"
 
 show_help() {
     cat << EOF
@@ -217,23 +214,8 @@ ssh_cmd() {
     shift
     if is_local "$host"; then
         if [[ "$LOCAL_DOCKER" == "true" ]]; then
-            # Run in local Docker container
-            local container_name="$LOCAL_DOCKER_NAME_A"
-            # If we are doing things on Node B, use its container
-            # This is a bit of a hack but works for 2-node testing
-            # We check the context of what we're doing by looking at the calling code's node variable
-            # but since we don't have that, we'll try to guess based on the 'node' variable in the parent scope if available
-            # or just use host comparison.
-            if [[ "$host" == "$NODE_B" && "$NODE_A" != "$NODE_B" ]]; then
-                container_name="$LOCAL_DOCKER_NAME_B"
-            fi
-            
-            # Special case for when we are indeed targeting NODE_B in a loop
-            if [[ -n "$CURRENT_TARGET_NODE" && "$CURRENT_TARGET_NODE" == "$NODE_B" ]]; then
-                container_name="$LOCAL_DOCKER_NAME_B"
-            fi
-
-            docker exec -t "$container_name" sh -c "$*"
+            # Run in local Docker container (single container like OmniNervous)
+            docker exec -t "$LOCAL_DOCKER_NAME" sh -c "$*"
         else
             # Native local execution
             sudo sh -c "$*"
@@ -251,19 +233,10 @@ scp_to() {
     local dest="$3"
     if is_local "$host"; then
         if [[ "$LOCAL_DOCKER" == "true" ]]; then
-            # Copy to local Docker container
-            local container_name="$LOCAL_DOCKER_NAME_A"
-            if [[ "$host" == "$NODE_B" && "$NODE_A" != "$NODE_B" ]]; then
-                container_name="$LOCAL_DOCKER_NAME_B"
-            fi
-            if [[ -n "$CURRENT_TARGET_NODE" && "$CURRENT_TARGET_NODE" == "$NODE_B" ]]; then
-                container_name="$LOCAL_DOCKER_NAME_B"
-            fi
-
             # Resolve ~/ to /root inside the container
             local container_dest="${dest/#\~//root}"
-            docker exec "$container_name" mkdir -p "$(dirname "$container_dest")"
-            docker cp "$src" "$container_name:$container_dest"
+            docker exec "$LOCAL_DOCKER_NAME" mkdir -p "$(dirname "$container_dest")"
+            docker cp "$src" "$LOCAL_DOCKER_NAME:$container_dest"
         else
             # Native local copy
             local real_dest="${dest/#\~/$HOME}"
@@ -280,55 +253,41 @@ scp_to() {
 ensure_local_docker() {
     if [[ "$LOCAL_DOCKER" != "true" ]]; then return 0; fi
     
-    for name in "$LOCAL_DOCKER_NAME_A" "$LOCAL_DOCKER_NAME_B"; do
-        # Only create if the corresponding node is local
-        local is_needed=false
-        if [[ "$name" == "$LOCAL_DOCKER_NAME_A" ]] && is_local "$NODE_A"; then is_needed=true; fi
-        if [[ "$name" == "$LOCAL_DOCKER_NAME_B" ]] && is_local "$NODE_B"; then is_needed=true; fi
+    if ! docker ps --format '{{.Names}}' | grep -q "^$LOCAL_DOCKER_NAME$"; then
+        print_step "Setting up local Docker environment ($LOCAL_DOCKER_NAME)..."
+        docker rm -f "$LOCAL_DOCKER_NAME" 2>/dev/null || true
         
-        if [[ "$is_needed" == "true" ]]; then
-            if ! docker ps --format '{{.Names}}' | grep -q "^$name$"; then
-                print_step "Setting up local Docker environment ($name)..."
-                docker rm -f "$name" 2>/dev/null || true
-                
-                # Use a lightweight ubuntu image with necessary tools
-                docker run -d --name "$name" \
-                    --privileged \
-                    --cap-add=NET_ADMIN \
-                    --device /dev/net/tun:/dev/net/tun \
-                    ubuntu:24.04 sleep infinity
-                    
-                print_step "Installing dependencies in local Docker container ($name)..."
-                docker exec "$name" apt-get update -qq
-                docker exec "$name" apt-get install -y -qq iperf3 iproute2 jq bc psmisc curl sudo iputils-ping >/dev/null 2>&1
-                
-                # Verify TUN device is available in container
-                print_step "Verifying TUN device in container ($name)..."
-                if docker exec "$name" ls -la /dev/net/tun &>/dev/null; then
-                    echo -e "  ✅ TUN device available in $name"
-                else
-                    # Try to create TUN device if it doesn't exist
-                    echo -e "  ⚠️ TUN device not found, attempting to create..."
-                    docker exec "$name" mkdir -p /dev/net
-                    docker exec "$name" mknod /dev/net/tun c 10 200
-                    docker exec "$name" chmod 600 /dev/net/tun
-                    if docker exec "$name" ls -la /dev/net/tun &>/dev/null; then
-                        echo -e "  ✅ TUN device created successfully in $name"
-                    else
-                        print_error "Failed to create TUN device in $name - VPN may not work"
-                    fi
-                fi
+        # Use a lightweight ubuntu image with necessary tools
+        docker run -d --name "$LOCAL_DOCKER_NAME" \
+            --privileged \
+            --cap-add=NET_ADMIN \
+            --device /dev/net/tun:/dev/net/tun \
+            ubuntu:24.04 sleep infinity
+            
+        print_step "Installing dependencies in local Docker container..."
+        docker exec "$LOCAL_DOCKER_NAME" apt-get update -qq
+        docker exec "$LOCAL_DOCKER_NAME" apt-get install -y -qq iperf3 wireguard-tools iproute2 jq bc psmisc curl sudo iputils-ping procps >/dev/null 2>&1
+        
+        # Create root config directory
+        docker exec "$LOCAL_DOCKER_NAME" mkdir -p /root/.omniedge
+        
+        # Verify TUN device is available in container
+        print_step "Verifying TUN device in container..."
+        if docker exec "$LOCAL_DOCKER_NAME" ls -la /dev/net/tun &>/dev/null; then
+            echo -e "  ✅ TUN device available"
+        else
+            # Try to create TUN device if it doesn't exist
+            echo -e "  ⚠️ TUN device not found, attempting to create..."
+            docker exec "$LOCAL_DOCKER_NAME" mkdir -p /dev/net
+            docker exec "$LOCAL_DOCKER_NAME" mknod /dev/net/tun c 10 200
+            docker exec "$LOCAL_DOCKER_NAME" chmod 600 /dev/net/tun
+            if docker exec "$LOCAL_DOCKER_NAME" ls -la /dev/net/tun &>/dev/null; then
+                echo -e "  ✅ TUN device created successfully"
             else
-                # Container already exists, still verify TUN device
-                if ! docker exec "$name" ls -la /dev/net/tun &>/dev/null; then
-                    echo -e "  ⚠️ TUN device not found in existing container $name, attempting to create..."
-                    docker exec "$name" mkdir -p /dev/net 2>/dev/null || true
-                    docker exec "$name" mknod /dev/net/tun c 10 200 2>/dev/null || true
-                    docker exec "$name" chmod 600 /dev/net/tun 2>/dev/null || true
-                fi
+                print_error "Failed to create TUN device - VPN may not work"
             fi
         fi
-    done
+    fi
 }
 
 # =============================================================================
@@ -460,21 +419,21 @@ install_dependencies() {
             ssh_cmd "$node" "sudo apt-get update -qq" || true
         fi
         
-        # Install iperf3
-        if ! ssh_cmd "$node" "which iperf3" &>/dev/null; then
-            echo -e "  📥 Installing iperf3..."
+        # Install netperf (optional, for latency testing)
+        if ! ssh_cmd "$node" "which netperf" &>/dev/null; then
+            echo -e "  📥 Installing netperf..."
             case $pkg_manager in
                 apt)
-                    ssh_cmd "$node" "sudo apt-get install -y -qq iperf3"
+                    ssh_cmd "$node" "sudo apt-get install -y -qq netperf" || echo "  ⚠️ netperf not available"
                     ;;
                 dnf|yum)
-                    ssh_cmd "$node" "sudo $pkg_manager install -y iperf3"
+                    ssh_cmd "$node" "sudo $pkg_manager install -y netperf" || echo "  ⚠️ netperf not available"
                     ;;
             esac
         else
-            echo -e "  ✅ iperf3 already installed"
+            echo -e "  ✅ netperf already installed"
         fi
-        
+
         # Install iproute2, jq, bc, psmisc (for fuser)
         echo -e "  📥 Installing utility tools..."
         ssh_cmd "$node" "which ip &>/dev/null || (sudo $pkg_manager install -y iproute2 || sudo $pkg_manager install -y iproute || true)" || true
@@ -502,7 +461,6 @@ deploy_omniedge() {
     echo -e "   ${CYAN}$INSTALLER_URL${NC}"
     
     for node in "$NODE_A" "$NODE_B"; do
-        export CURRENT_TARGET_NODE="$node"
         print_step "Installing OmniEdge on $node..."
         
         # Check if already installed
@@ -525,7 +483,6 @@ deploy_omniedge() {
             print_error "Installation failed on $node"
             exit 1
         fi
-        unset CURRENT_TARGET_NODE
     done
     
     echo -e "\n${GREEN}OmniEdge installation complete!${NC}"
@@ -622,11 +579,23 @@ run_test() {
     echo "--- Edge A log ---"
     export CURRENT_TARGET_NODE="$NODE_A"
     ssh_cmd "$NODE_A" "tail -15 /tmp/omni-edge-a.log 2>/dev/null || echo 'No log available'"
+    
+    # Check for P2P connection success (like OmniNervous)
+    if ssh_cmd "$NODE_A" "grep -i 'p2p' /tmp/omni-edge-a.log | grep -i 'established' &>/dev/null"; then
+        echo -e "  ✅ ${GREEN}Direct P2P Link Established${NC} on Edge A"
+    elif ssh_cmd "$NODE_A" "grep -i 'relay' /tmp/omni-edge-a.log | grep -i 'active' &>/dev/null"; then
+        echo -e "  ⚠️ ${YELLOW}Relay Fallback Active${NC} on Edge A"
+    fi
     unset CURRENT_TARGET_NODE
+
     echo ""
     echo "--- Edge B log ---"
     export CURRENT_TARGET_NODE="$NODE_B"
     ssh_cmd "$NODE_B" "tail -15 /tmp/omni-edge-b.log 2>/dev/null || echo 'No log available'"
+    
+    if ssh_cmd "$NODE_B" "grep -i 'p2p' /tmp/omni-edge-b.log | grep -i 'established' &>/dev/null"; then
+        echo -e "  ✅ ${GREEN}Direct P2P Link Established${NC} on Edge B"
+    fi
     unset CURRENT_TARGET_NODE
     echo ""
     
@@ -820,17 +789,38 @@ run_test() {
 }
 EOF
     
-    # Cleanup
+    # Summary
+    print_header "Test Complete"
+    
+    echo -e "┌─────────────────────────────────────────────────────────┐"
+    echo -e "│  ${GREEN}2-NODE OMNIEDGE TEST RESULTS${NC}                            │"
+    echo -e "├─────────────────────────────────────────────────────────┤"
+    echo -e "│  Edge A:      $NODE_A → ${VIP_A:-N/A}"
+    echo -e "│  Edge B:      $NODE_B → ${VIP_B:-N/A}"
+    echo -e "├─────────────────────────────────────────────────────────┤"
+    echo -e "│  ${CYAN}BASELINE (Public IP)${NC}                                    │"
+    echo -e "│    Latency:    ${YELLOW}${baseline_latency} ms${NC}"
+    echo -e "│    Throughput: ${YELLOW}${baseline_throughput_mbps} Mbps${NC}"
+    echo -e "├─────────────────────────────────────────────────────────┤"
+    echo -e "│  ${CYAN}VPN TUNNEL (IPv4)${NC}                                       │"
+    echo -e "│    Latency:    ${YELLOW}${avg_latency} ms${NC}"
+    echo -e "│    Throughput: ${YELLOW}${throughput_mbps} Mbps${NC}"
+    echo -e "├─────────────────────────────────────────────────────────┤"
+    echo -e "│  ${CYAN}VPN TUNNEL (IPv6)${NC}                                       │"
+    echo -e "│    Latency:    ${YELLOW}${avg_latency_v6:-N/A} ms${NC}"
+    echo -e "│    Throughput: ${YELLOW}${throughput_mbps_v6:-N/A} Mbps${NC}"
+    echo -e "└─────────────────────────────────────────────────────────┘"
+    echo ""
+    echo -e "Results saved to: ${CYAN}$result_file${NC}"
+    echo -e "Logs saved to:    ${CYAN}$RESULTS_DIR/*.log${NC}"
+
+    # Cleanup remote processes (if not debugging)
     print_step "Cleaning up remote processes..."
     for node in "$NODE_A" "$NODE_B"; do
         export CURRENT_TARGET_NODE="$node"
-        ssh_cmd "$node" "sudo pkill -f omniedge || true; pkill -f iperf3 || true" 2>/dev/null || true
+        ssh_cmd "$node" "sudo pkill -f omniedge || true; sudo pkill -f iperf3 || true" 2>/dev/null || true
         unset CURRENT_TARGET_NODE
     done
-    
-    # Summary
-    print_header "Test Complete"
-    echo -e "Results saved to: ${CYAN}$result_file${NC}"
 }
 
 # =============================================================================
