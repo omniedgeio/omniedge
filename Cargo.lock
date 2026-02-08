@@ -4413,13 +4413,14 @@ dependencies = [
 
 [[package]]
 name = "omninervous"
-version = "0.6.0"
-source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.6.0#e8a80dfa9b5597b9224cfe660af044efd73a0cae"
+version = "0.8.7"
+source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.8.8#1ab7be243bf498c6ebe9af469c511b10902b5bfb"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
  "boringtun",
  "clap",
+ "crossbeam-channel",
  "crypto_box",
  "dirs 5.0.1",
  "env_logger",
@@ -4431,6 +4432,7 @@ dependencies = [
  "hyper-util",
  "log",
  "lru",
+ "parking_lot",
  "rand 0.8.5",
  "serde",
  "serde_cbor",

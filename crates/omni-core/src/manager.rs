@@ -1119,6 +1119,7 @@ impl ConnectionManager {
                                 join_resp.subnet_prefix_v6,
                                 port,
                                 &::hex::encode(self.identity.private_key_bytes()),
+                                self.network_config.mtu,
                             )
                             .await
                         {
@@ -1174,6 +1175,7 @@ impl ConnectionManager {
                 join_resp.subnet_prefix_v6,
                 port,
                 &::hex::encode(self.identity.private_key_bytes()),
+                self.network_config.mtu,
             )
             .await?;
             tun_instance = Some(tun);

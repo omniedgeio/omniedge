@@ -30,7 +30,27 @@ impl OmniTun {
     pub async fn setup(&mut self, vip: &str, port: u16, private_key: &str) -> anyhow::Result<()> {
         // Store the VIP for later interface detection (needed on macOS)
         self.vip = Some(vip.to_string());
-        let res: Result<(), String> = self.interface.setup_interface(vip, port, private_key).await;
+        // Use default MTU of 1420 for backward compatibility
+        let res: Result<(), String> = self.interface.setup_interface(vip, None, port, private_key, 1420).await;
+        res.map_err(|e| anyhow::anyhow!("TUN Setup failed: {}", e))
+    }
+
+    /// Setup the TUN interface with custom MTU
+    ///
+    /// # Arguments
+    /// * `vip` - IPv4 virtual IP address
+    /// * `port` - WireGuard listen port
+    /// * `private_key` - WireGuard private key
+    /// * `mtu` - Interface MTU (use 1420 for standard, 1280 for VPN-over-VPN)
+    pub async fn setup_with_mtu(
+        &mut self,
+        vip: &str,
+        port: u16,
+        private_key: &str,
+        mtu: u16,
+    ) -> anyhow::Result<()> {
+        self.vip = Some(vip.to_string());
+        let res: Result<(), String> = self.interface.setup_interface(vip, None, port, private_key, mtu).await;
         res.map_err(|e| anyhow::anyhow!("TUN Setup failed: {}", e))
     }
 
@@ -43,6 +63,7 @@ impl OmniTun {
     /// * `prefix_v6` - IPv6 subnet prefix length (optional, defaults to 120)
     /// * `port` - WireGuard listen port
     /// * `private_key` - WireGuard private key (hex encoded)
+    /// * `mtu` - Interface MTU (use 1420 for standard, 1280 for VPN-over-VPN)
     pub async fn setup_dual_stack(
         &mut self,
         vip: &str,
@@ -51,9 +72,14 @@ impl OmniTun {
         prefix_v6: Option<u8>,
         port: u16,
         private_key: &str,
+        mtu: u16,
     ) -> anyhow::Result<()> {
-        // First setup IPv4 (this creates the interface)
-        self.setup(vip, port, private_key).await?;
+        // Store the VIP for later interface detection (needed on macOS)
+        self.vip = Some(vip.to_string());
+        
+        // Setup IPv4 (this creates the interface) with MTU
+        let res: Result<(), String> = self.interface.setup_interface(vip, vip_v6, port, private_key, mtu).await;
+        res.map_err(|e| anyhow::anyhow!("TUN Setup failed: {}", e))?;
 
         // Add network route for VIP subnet (critical for peer connectivity)
         // This ensures packets to other peers (e.g., ping 100.100.0.198) are routed through TUN

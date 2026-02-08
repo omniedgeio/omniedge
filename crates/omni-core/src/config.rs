@@ -75,6 +75,20 @@ pub struct NetworkConfig {
     /// Per RFC 8305, optimizes for IPv6 without delaying fallback.
     #[serde(default = "default_happy_eyeballs_delay")]
     pub happy_eyeballs_delay_ms: u32,
+
+    /// WireGuard interface MTU (default: 1420)
+    ///
+    /// Standard WireGuard MTU is 1420. Use 1280 when running behind
+    /// another VPN to prevent fragmentation issues.
+    #[serde(default = "default_mtu")]
+    pub mtu: u16,
+
+    /// Enable automatic MTU detection (default: false)
+    ///
+    /// When enabled, automatically detects if running behind another VPN
+    /// (utun, tun, wg interfaces) and reduces MTU to 1280 for compatibility.
+    #[serde(default)]
+    pub mtu_auto_detect: bool,
 }
 
 // Serde default value helpers
@@ -90,6 +104,10 @@ fn default_happy_eyeballs_delay() -> u32 {
     250 // RFC 8305 recommendation
 }
 
+fn default_mtu() -> u16 {
+    1420 // Standard WireGuard MTU
+}
+
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
@@ -101,6 +119,8 @@ impl Default for NetworkConfig {
             prefer_ipv6: true,
             ipv6_preference_threshold_ms: 5,
             happy_eyeballs_delay_ms: 250,
+            mtu: 1420,
+            mtu_auto_detect: false,
         }
     }
 }

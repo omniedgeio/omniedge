@@ -1,6 +1,6 @@
 # OmniNervous Integration Guide
 
-> **Version**: v0.8.7 (February 2026)  
+> **Version**: v0.8.8 (February 2026)  
 > **Status**: Production Ready
 
 This document outlines the key changes and integration points for OmniNervous since v0.8.0, providing guidance for implementing and leveraging the new features in the OmniEdge ecosystem.
@@ -24,6 +24,7 @@ This document outlines the key changes and integration points for OmniNervous si
 
 | Version | Release Date | Key Changes |
 |:--------|:-------------|:------------|
+| **v0.8.8** | 2026-02-08 | Windows build fix (MTU parameter) |
 | **v0.8.7** | 2026-02-08 | Automatic MTU heuristic, daemon state fixes |
 | **v0.8.6** | 2026-02-08 | Relay fallback improvements, cloud_test.sh --local-docker |
 | **v0.8.5** | 2026-02-08 | High-efficiency zero-copy release (147.6% efficiency) |
@@ -327,9 +328,9 @@ omninervous --mtu 1420 ...
 
 ## Migration Checklist
 
-When upgrading from v0.8.0 to v0.8.7:
+When upgrading from v0.8.0 to v0.8.8:
 
-- [ ] Update binary to v0.8.7
+- [ ] Update binary to v0.8.8
 - [ ] Review logs for "Auto-MTU" messages
 - [ ] Add `--mtu auto` to startup scripts if behind VPN
 - [ ] Verify P2P connections establish (not just relay)
