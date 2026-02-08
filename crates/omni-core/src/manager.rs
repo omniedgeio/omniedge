@@ -894,13 +894,8 @@ impl ConnectionManager {
         );
         info!("Using API base URL: {}", self.base_url);
 
-        // If already connected, disconnect first to clean up existing TUN
-        if self.is_connected() {
-            info!("Already connected, disconnecting first to prevent duplicate TUN interfaces...");
-            let _ = self.disconnect().await;
-            // Give OS time to clean up the interface
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-        }
+        // Redundant disconnect check removed - connect_with_token already handles this
+
 
         self.set_state(ConnectionState::Joining).await;
         self.device_id = Some(device_id.to_string());
@@ -2610,10 +2605,14 @@ impl ConnectionManager {
                 self.task_handles.len()
             );
             let handles = std::mem::take(&mut self.task_handles);
-            for handle in handles {
-                // Give each task up to 2 seconds to complete
-                let _ = tokio::time::timeout(tokio::time::Duration::from_secs(2), handle).await;
-            }
+            
+            // Wait for all tasks in parallel with a single 3-second timeout
+            // This is much faster than waiting for each serially
+            let _ = tokio::time::timeout(
+                tokio::time::Duration::from_secs(3),
+                futures::future::join_all(handles)
+            ).await;
+            
             info!("All background tasks completed or timed out");
         }
 

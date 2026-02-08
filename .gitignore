@@ -41,6 +41,7 @@ pnpm-debug.log*
 *.tmp
 doc/exit_node.md
 doc/openapi.yaml
+test_results/
 
 # --- Environment & Local Config ---
 .env

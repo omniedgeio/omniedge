@@ -160,7 +160,7 @@ async fn call_helper(req: &HelperRequest) -> Result<HelperResponse, String> {
         }
     };
 
-    match timeout(Duration::from_secs(10), call_future).await {
+    match timeout(Duration::from_secs(30), call_future).await {
         Ok(res) => res,
         Err(_) => {
             error!("Helper request timed out for command: {}", req.command);
