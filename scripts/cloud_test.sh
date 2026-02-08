@@ -215,7 +215,15 @@ ssh_cmd() {
     if is_local "$host"; then
         if [[ "$LOCAL_DOCKER" == "true" ]]; then
             # Run in local Docker container (single container like OmniNervous)
-            docker exec -t "$LOCAL_DOCKER_NAME" sh -c "$*"
+            # Strip 'sudo ' prefix if present, as we are already root in Docker
+            local cmd="$*"
+            if [[ "$cmd" == sudo\ * ]]; then
+                cmd="${cmd#sudo }"
+            fi
+            # Also handle the case where sudo is used in a pipe, e.g., "curl ... | sudo bash"
+            # This is a bit more complex, but we can replace "sudo " with "" globally for simple cases
+            cmd=$(echo "$cmd" | sed 's/\bsudo //g')
+            docker exec -t "$LOCAL_DOCKER_NAME" sh -c "$cmd"
         else
             # Native local execution
             sudo sh -c "$*"
@@ -266,7 +274,8 @@ ensure_local_docker() {
             
         print_step "Installing dependencies in local Docker container..."
         docker exec "$LOCAL_DOCKER_NAME" apt-get update -qq
-        docker exec "$LOCAL_DOCKER_NAME" apt-get install -y -qq iperf3 wireguard-tools iproute2 jq bc psmisc curl sudo iputils-ping procps >/dev/null 2>&1
+        # Added ca-certificates for curl to work with HTTPS
+        docker exec "$LOCAL_DOCKER_NAME" apt-get install -y -qq iperf3 wireguard-tools iproute2 jq bc psmisc curl ca-certificates sudo iputils-ping procps
         
         # Create root config directory
         docker exec "$LOCAL_DOCKER_NAME" mkdir -p /root/.omniedge
