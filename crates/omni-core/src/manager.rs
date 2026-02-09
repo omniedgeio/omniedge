@@ -986,7 +986,79 @@ impl ConnectionManager {
         }
 
         self.cluster_secret = Some(join_resp.secret_key.clone());
-        info!("Initializing OmniProto for VIP: {}", vip_addr);
+
+        // ====================================================================
+        // 2. Create UDP Socket FIRST (needed for port info)
+        // ====================================================================
+        // Create dual-stack UDP socket for IPv6 support
+        // Try binding to [::]:0 first (dual-stack), fall back to 0.0.0.0:0 (IPv4-only)
+        let socket: Arc<UdpSocket> =
+            Arc::new(Self::create_dual_stack_socket().await.unwrap_or_else(|e| {
+                warn!(
+                    "Failed to create dual-stack socket: {}. Falling back to IPv4-only.",
+                    e
+                );
+                // This should not fail, but handle it gracefully
+                futures::executor::block_on(UdpSocket::bind("0.0.0.0:0"))
+                    .expect("Failed to bind IPv4 socket")
+            }));
+        let port = socket.local_addr()?.port();
+        debug!("Bound UDP socket to port: {}", port);
+
+        // ====================================================================
+        // 3. Port Mapping (NAT Traversal Fix v0.3.5)
+        // ====================================================================
+        // Try to establish a port mapping via NAT-PMP/UPnP/PCP for better connectivity.
+        // This allows peers behind compatible NAT gateways to receive incoming connections.
+        let mut external_port: Option<u16> = None;
+        let mut external_addr: Option<String> = None;
+        
+        if self.network_config.portmap_enabled {
+            info!("Initializing port mapping for local port {}...", port);
+            match self.init_port_mapper(port).await {
+                Ok(caps) => {
+                    if caps.nat_pmp || caps.upnp || caps.pcp {
+                        // Request a mapping with 2-hour lifetime (will be refreshed periodically)
+                        match self.request_port_mapping(7200).await {
+                            Ok(ext_port) => {
+                                external_port = Some(ext_port);
+                                if let Some(ext_addr) = caps.external_addr {
+                                    let full_addr = format!("{}:{}", ext_addr, ext_port);
+                                    external_addr = Some(full_addr.clone());
+                                    info!(
+                                        "Port mapping established: {}:{} -> {}",
+                                        ext_addr, port, full_addr
+                                    );
+                                } else {
+                                    info!(
+                                        "Port mapping established: internal:{} -> external:{}",
+                                        port, ext_port
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Failed to request port mapping: {}. Continuing without mapping.", e);
+                            }
+                        }
+                    } else {
+                        debug!(
+                            "No port mapping protocols available (NAT-PMP={}, UPnP={}, PCP={})",
+                            caps.nat_pmp, caps.upnp, caps.pcp
+                        );
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to probe port mapping capabilities: {}. Continuing without mapping.", e);
+                }
+            }
+        } else {
+            debug!("Port mapping disabled in configuration");
+        }
+
+        // ====================================================================
+        // 4. Initialize OmniProto with correct port info
+        // ====================================================================
+        info!("Initializing OmniProto for VIP: {} (listen_port: {})", vip_addr, port);
 
         let proto = Arc::new(
             OmniProto::new(
@@ -995,11 +1067,32 @@ impl ConnectionManager {
                 join_resp.secret_key.clone(),
                 vip_addr,
                 vip_v6_addr,
-                0,
+                port,  // Use actual socket port now!
                 self.identity.public_key_bytes(),
             )
             .await?,
         );
+
+        // Set external port/addr if port mapping succeeded
+        if let Some(ext_port) = external_port {
+            proto.set_external_port(ext_port).await;
+            info!("Advertising external port {} to Nucleus", ext_port);
+        }
+        if let Some(ref ext_addr) = external_addr {
+            proto.set_external_addr(ext_addr.clone()).await;
+            info!("Advertising external endpoint {} to Nucleus for NAT traversal", ext_addr);
+        }
+
+        // ====================================================================
+        // CRITICAL: Send initial REGISTER with external port/addr to Nucleus
+        // ====================================================================
+        // This must happen AFTER setting external_port/external_addr so Nucleus
+        // knows our port-mapped endpoint immediately. Otherwise peers won't know
+        // our reachable address until the first heartbeat (up to 30 seconds).
+        info!("Sending initial REGISTER to Nucleus with port mapping info...");
+        if let Err(e) = proto.register(&socket).await {
+            warn!("Initial REGISTER failed: {}. Will retry on heartbeat.", e);
+        }
 
         // Pass IPv6 configuration to protocol layer
         // Note: These are currently no-ops until OmniNervous adds full IPv6 support,
@@ -1028,7 +1121,9 @@ impl ConnectionManager {
         // Note: relay_server and encrypt_signaling are set via OmniNervous config file,
         // not through runtime API. See OmniNervous crates/daemon/src/config.rs
 
-        // 2. Setup TUN
+        // ====================================================================
+        // 5. Setup TUN
+        // ====================================================================
         // First, check if an interface with this IP already exists
         // On Windows, skip this check if we're reusing our existing TUN
         #[cfg(target_os = "windows")]
@@ -1049,7 +1144,7 @@ impl ConnectionManager {
 
         #[allow(unused_assignments)]
         let mut tun_instance: Option<OmniTun> = None;
-        let mut port = 51820;
+        // Note: 'port' is already defined from socket.local_addr() above
         #[allow(unused_mut)]
         let mut tun_loop_already_active = false;
 
@@ -1177,64 +1272,6 @@ impl ConnectionManager {
         }
 
         let tun = tun_instance.context("TUN instance not created")?;
-
-        // Create dual-stack UDP socket for IPv6 support
-        // Try binding to [::]:0 first (dual-stack), fall back to 0.0.0.0:0 (IPv4-only)
-        let socket: Arc<UdpSocket> =
-            Arc::new(Self::create_dual_stack_socket().await.unwrap_or_else(|e| {
-                warn!(
-                    "Failed to create dual-stack socket: {}. Falling back to IPv4-only.",
-                    e
-                );
-                // This should not fail, but handle it gracefully
-                futures::executor::block_on(UdpSocket::bind("0.0.0.0:0"))
-                    .expect("Failed to bind IPv4 socket")
-            }));
-        port = socket.local_addr()?.port();
-        debug!("Bound UDP socket to port: {}", port);
-
-        // ====================================================================
-        // Port Mapping Initialization (NAT Traversal Fix v0.3.4)
-        // ====================================================================
-        // Try to establish a port mapping via NAT-PMP/UPnP/PCP for better connectivity.
-        // This allows peers behind compatible NAT gateways to receive incoming connections.
-        if self.network_config.portmap_enabled {
-            info!("Initializing port mapping for local port {}...", port);
-            match self.init_port_mapper(port).await {
-                Ok(caps) => {
-                    if caps.nat_pmp || caps.upnp || caps.pcp {
-                        // Request a mapping with 2-hour lifetime (will be refreshed periodically)
-                        match self.request_port_mapping(7200).await {
-                            Ok(ext_port) => {
-                                info!(
-                                    "Port mapping established: {}:{} -> external:{}",
-                                    caps.external_addr
-                                        .map(|a| a.to_string())
-                                        .unwrap_or_else(|| "?".to_string()),
-                                    port,
-                                    ext_port
-                                );
-                                // The external port can be advertised to peers via signaling
-                                // Note: OmniNervous will pick this up via proto.get_external_addr()
-                            }
-                            Err(e) => {
-                                warn!("Failed to request port mapping: {}. Continuing without mapping.", e);
-                            }
-                        }
-                    } else {
-                        debug!(
-                            "No port mapping protocols available (NAT-PMP={}, UPnP={}, PCP={})",
-                            caps.nat_pmp, caps.upnp, caps.pcp
-                        );
-                    }
-                }
-                Err(e) => {
-                    warn!("Failed to probe port mapping capabilities: {}. Continuing without mapping.", e);
-                }
-            }
-        } else {
-            debug!("Port mapping disabled in configuration");
-        }
 
         self.proto = Some(proto.clone());
         self.tun = Some(tun.clone());
@@ -1714,10 +1751,10 @@ impl ConnectionManager {
                                 // Handle other signaling messages (0x11-0x1F, excluding disco)
                                 if first_byte >= 0x11 && first_byte != SIGNALING_DISCO_PING && first_byte != SIGNALING_DISCO_PONG {
                                     if let Ok(Some(update)) =
-                                        proto_ctrl.handle_packet(pkt, secret.as_deref())
+                                        proto_ctrl.handle_packet(pkt, secret.as_deref()).await
                                     {
                                         // Get our NAT type for strategy selection
-                                        let our_nat_type = proto_ctrl.get_nat_type();
+                                        let our_nat_type = proto_ctrl.get_nat_type().await;
 
                                         for peer in update.peers {
                                             let vip = peer.vip;
@@ -1726,6 +1763,12 @@ impl ConnectionManager {
                                             // Create peer state with NAT-aware strategy
                                             // Extract peer NAT type from signaling (Phase 6)
                                             let peer_nat_type = peer.nat_type;
+
+                                            // DEBUG: Log all peer info received from Nucleus
+                                            info!(
+                                                "Peer info from Nucleus: VIP={}, endpoint={:?}, mapped_endpoint={:?}, nat_type={:?}, pubkey={:02x?}...",
+                                                vip, peer.endpoint, peer.mapped_endpoint, peer_nat_type, &peer.public_key[..8]
+                                            );
 
                                             let mut peers = peer_states.write().await;
                                             let peer_state = peers.entry(vip).or_insert_with(|| {
@@ -1747,6 +1790,15 @@ impl ConnectionManager {
                                             // Update peer info if already exists - add endpoint from signaling
                                             if let Some(endpoint) = peer.endpoint {
                                                 peer_state.add_endpoint(endpoint, EndpointSource::Nucleus);
+                                                info!(
+                                                    "Added Nucleus endpoint {} for peer {} (total: {} endpoints)",
+                                                    endpoint, vip, peer_state.endpoint_count()
+                                                );
+                                            } else {
+                                                warn!(
+                                                    "No endpoint received from Nucleus for peer {} - cannot send disco pings",
+                                                    vip
+                                                );
                                             }
 
                                             // Add port-mapped endpoint if available (higher priority)
@@ -2103,6 +2155,7 @@ impl ConnectionManager {
         let as_exit_node_hb = self.as_exit_node.clone();
         // Use hardware_id for API heartbeats, not device_id (API UUID)
         let hardware_id_hb = hardware_id.clone();
+        let peer_states_hb = self.peer_states.clone();
 
         // Heartbeat/Poll/Role Loop
         let mut shutdown_rx3 = shutdown_tx.subscribe();
@@ -2132,7 +2185,9 @@ impl ConnectionManager {
                         }
                     }
                     _ = proto_interval.tick() => {
-                        let _ = proto_hb.heartbeat(&socket_hb, 0).await;
+                        // Pass actual peer count to Nucleus for better peer discovery
+                        let peer_count = peer_states_hb.read().await.len() as u32;
+                        let _ = proto_hb.heartbeat(&socket_hb, peer_count).await;
                     }
                     _ = shutdown_rx3.recv() => {
                         info!("Heartbeat Loop shutting down");
@@ -2148,9 +2203,12 @@ impl ConnectionManager {
         // ====================================================================
         // Periodically refresh port mappings before they expire.
         // Check every 30 minutes; actual refresh happens at 50% of mapping lifetime.
+        // CRITICAL: When external port changes, update proto and send REGISTER to Nucleus!
         if self.network_config.portmap_enabled {
             let port_mapper = self.port_mapper.clone();
             let port_mapping = self.port_mapping.clone();
+            let proto_pm = proto.clone();
+            let socket_pm = socket.clone();
             let mut shutdown_rx4 = shutdown_tx.subscribe();
 
             let portmap_handle = tokio::spawn(async move {
@@ -2165,6 +2223,9 @@ impl ConnectionManager {
                         _ = refresh_interval.tick() => {
                             let mut mapper_guard = port_mapper.write().await;
                             if let Some(mapper) = mapper_guard.as_mut() {
+                                // Get old external port before refresh
+                                let old_ext_port = proto_pm.get_external_port().await;
+
                                 match mapper.check_and_refresh().await {
                                     Ok(refreshed) => {
                                         if refreshed {
@@ -2175,6 +2236,26 @@ impl ConnectionManager {
                                                 );
                                                 let mut pm = port_mapping.write().await;
                                                 *pm = Some(mapping.clone());
+
+                                                // Check if external port changed
+                                                if old_ext_port != Some(mapping.external_port) {
+                                                    info!(
+                                                        "External port changed: {:?} -> {}, updating Nucleus",
+                                                        old_ext_port, mapping.external_port
+                                                    );
+
+                                                    // Update proto with new external port/addr
+                                                    proto_pm.set_external_port(mapping.external_port).await;
+                                                    let ext_addr = format!("{}:{}", mapping.gateway, mapping.external_port);
+                                                    proto_pm.set_external_addr(ext_addr.clone()).await;
+
+                                                    // Send REGISTER to notify Nucleus of new endpoint
+                                                    if let Err(e) = proto_pm.register(&socket_pm).await {
+                                                        warn!("Failed to send REGISTER after port mapping refresh: {}", e);
+                                                    } else {
+                                                        info!("Sent REGISTER with new external endpoint: {}", ext_addr);
+                                                    }
+                                                }
                                             }
                                         } else {
                                             debug!("Port mapping still valid, no refresh needed");
@@ -2185,6 +2266,17 @@ impl ConnectionManager {
                                         // Clear the mapping since it may have expired
                                         let mut pm = port_mapping.write().await;
                                         *pm = None;
+
+                                        // Also clear external port/addr in proto so Nucleus knows
+                                        // we no longer have a port mapping
+                                        let old_port = proto_pm.get_external_port().await;
+                                        if old_port.is_some() {
+                                            warn!("Port mapping lost, clearing external endpoint from Nucleus");
+                                            proto_pm.set_external_port(0).await;
+                                            proto_pm.set_external_addr(String::new()).await;
+                                            // Notify Nucleus
+                                            let _ = proto_pm.register(&socket_pm).await;
+                                        }
                                     }
                                 }
                             }
