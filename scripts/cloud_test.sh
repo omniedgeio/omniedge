@@ -161,6 +161,33 @@ EOF
 # Host Helper Functions
 # =============================================================================
 
+# Parse ping output to extract average latency (cross-platform: macOS uses "round-trip", Linux uses "rtt")
+parse_ping_latency() {
+    local ping_output="$1"
+    local latency=""
+    
+    # Try Linux format first: "rtt min/avg/max/mdev = ..."
+    if echo "$ping_output" | grep -q "rtt"; then
+        latency=$(echo "$ping_output" | grep "rtt" | awk -F'/' '{print $5}')
+    # Try macOS format: "round-trip min/avg/max/stddev = ..."
+    elif echo "$ping_output" | grep -q "round-trip"; then
+        latency=$(echo "$ping_output" | grep "round-trip" | awk -F'/' '{print $5}' | awk '{print $1}')
+    fi
+    
+    echo "$latency"
+}
+
+# Check if ping was successful (cross-platform)
+ping_successful() {
+    local ping_output="$1"
+    
+    # Check for either Linux "rtt" or macOS "round-trip" in output
+    if echo "$ping_output" | grep -qE "rtt|round-trip"; then
+        return 0
+    fi
+    return 1
+}
+
 # Get VIP with retry logic - uses omniedge status --json (cross-platform)
 get_vip_with_retry() {
     local node="$1"
@@ -1041,8 +1068,8 @@ run_test() {
     local baseline_ping_output
     baseline_ping_output=$(ssh_cmd "$NODE_A" "ping -c 5 -W 5 $NODE_B 2>&1" || echo "PING_FAILED")
     local baseline_latency="N/A"
-    if echo "$baseline_ping_output" | grep -q "rtt"; then
-        baseline_latency=$(echo "$baseline_ping_output" | grep "rtt" | awk -F'/' '{print $5}')
+    if ping_successful "$baseline_ping_output"; then
+        baseline_latency=$(parse_ping_latency "$baseline_ping_output")
         echo -e "  ✅ Baseline Ping: ${YELLOW}${baseline_latency} ms${NC}"
     else
         echo -e "  ⚠️ Baseline ping failed"
@@ -1094,8 +1121,8 @@ run_test() {
         for attempt in 1 2 3; do
             echo "   Attempt $attempt/3..."
             local ping_output=$(ssh_cmd "$NODE_A" "ping -c 5 -W 5 $VIP_B 2>&1" || echo "PING_FAILED")
-            if echo "$ping_output" | grep -q "rtt"; then
-                avg_latency=$(echo "$ping_output" | grep "rtt" | awk -F'/' '{print $5}')
+            if ping_successful "$ping_output"; then
+                avg_latency=$(parse_ping_latency "$ping_output")
                 echo -e "  ✅ Ping: ${YELLOW}${avg_latency} ms${NC}"
                 ping_success=true
                 break
@@ -1155,8 +1182,8 @@ run_test() {
             print_step "IPv6 Ping over tunnel ($VIP6_A → $VIP6_B)..."
             export CURRENT_TARGET_NODE="$NODE_A"
             local ping6_output=$(ssh_cmd "$NODE_A" "ping -6 -c 5 -W 5 $VIP6_B 2>&1" || echo "PING_FAILED")
-            if echo "$ping6_output" | grep -q "rtt"; then
-                avg_latency_v6=$(echo "$ping6_output" | grep "rtt" | awk -F'/' '{print $5}')
+            if ping_successful "$ping6_output"; then
+                avg_latency_v6=$(parse_ping_latency "$ping6_output")
                 echo -e "  ✅ IPv6 Ping: ${YELLOW}${avg_latency_v6} ms${NC}"
                 
                 print_step "Starting iperf3 server on Edge B (IPv6)..."
