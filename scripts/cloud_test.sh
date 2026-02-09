@@ -991,8 +991,9 @@ run_test() {
     # Note: Run daemon with log output. For proper backgrounding and log permissions,
     # we touch the log file first, then run the daemon.
     # Use -v for verbose/debug logging to capture all signaling and disco messages
+    # Also set RUST_LOG=info to ensure daemon subprocess logs properly
     ssh_cmd "$NODE_A" "sudo touch /tmp/omni-edge-a.log && sudo chmod 666 /tmp/omni-edge-a.log"
-    ssh_cmd "$NODE_A" "sudo nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-a.log 2>&1 &"
+    ssh_cmd "$NODE_A" "sudo RUST_LOG=info nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-a.log 2>&1 &"
     unset CURRENT_TARGET_NODE
     sleep 3
 
@@ -1000,7 +1001,7 @@ run_test() {
     print_step "Starting Edge B on $NODE_B..."
     export CURRENT_TARGET_NODE="$NODE_B"
     ssh_cmd "$NODE_B" "sudo touch /tmp/omni-edge-b.log && sudo chmod 666 /tmp/omni-edge-b.log"
-    ssh_cmd "$NODE_B" "sudo nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-b.log 2>&1 &"
+    ssh_cmd "$NODE_B" "sudo RUST_LOG=info nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-b.log 2>&1 &"
     unset CURRENT_TARGET_NODE
     sleep 3
     
@@ -1058,14 +1059,29 @@ run_test() {
     echo "--- Edge A daemon log (signaling/disco) ---"
     ssh_cmd "$NODE_A" "sudo cat /root/.omniedge/logs/omniedge.log 2>/dev/null | tail -50 || sudo cat ~/.omniedge/logs/omniedge.log 2>/dev/null | tail -50 || echo 'No daemon log available'"
     
-    # Check for P2P connection success (like OmniNervous)
-    if ssh_cmd "$NODE_A" "grep -i 'Configuring WireGuard peer' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Configuring WireGuard peer' ~/.omniedge/logs/omniedge.log 2>/dev/null"; then
-        echo -e "  ✅ ${GREEN}WireGuard Peer Configured${NC} on Edge A"
+    # Check for P2P connection diagnostics
+    echo ""
+    echo "--- Edge A P2P Status ---"
+    # Check REGISTER sent with external port info
+    if ssh_cmd "$NODE_A" "sudo grep -i 'Sending REGISTER.*external_port' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Sending REGISTER.*external_port' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ✅ ${GREEN}REGISTER sent with port mapping${NC}"
     fi
-    if ssh_cmd "$NODE_A" "grep -i 'Disco pong received' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Disco pong received' ~/.omniedge/logs/omniedge.log 2>/dev/null"; then
-        echo -e "  ✅ ${GREEN}Disco Handshake Complete${NC} on Edge A"
-    elif ssh_cmd "$NODE_A" "grep -i 'Relay session established' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Relay session established' ~/.omniedge/logs/omniedge.log 2>/dev/null"; then
-        echo -e "  ⚠️ ${YELLOW}Relay Fallback Active${NC} on Edge A"
+    # Check for peer info received from Nucleus
+    if ssh_cmd "$NODE_A" "sudo grep -i 'HEARTBEAT_ACK.*mapped_endpoint' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'HEARTBEAT_ACK.*mapped_endpoint' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ✅ ${GREEN}Peer endpoint info received${NC}"
+    fi
+    # Check for disco pings sent
+    if ssh_cmd "$NODE_A" "sudo grep -i 'Disco ping sent' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Disco ping sent' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ✅ ${GREEN}Disco pings sent${NC}"
+    fi
+    # Check for P2P connection success
+    if ssh_cmd "$NODE_A" "sudo grep -i 'Configuring WireGuard peer' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Configuring WireGuard peer' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ✅ ${GREEN}WireGuard Peer Configured${NC}"
+    fi
+    if ssh_cmd "$NODE_A" "sudo grep -i 'Disco pong received' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Disco pong received' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ✅ ${GREEN}Disco Handshake Complete${NC}"
+    elif ssh_cmd "$NODE_A" "sudo grep -i 'Relay session established' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Relay session established' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ⚠️ ${YELLOW}Relay Fallback Active${NC}"
     fi
     unset CURRENT_TARGET_NODE
 
@@ -1078,11 +1094,25 @@ run_test() {
     echo "--- Edge B daemon log (signaling/disco) ---"
     ssh_cmd "$NODE_B" "sudo cat /root/.omniedge/logs/omniedge.log 2>/dev/null | tail -50 || sudo cat ~/.omniedge/logs/omniedge.log 2>/dev/null | tail -50 || echo 'No daemon log available'"
     
-    if ssh_cmd "$NODE_B" "grep -i 'Configuring WireGuard peer' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Configuring WireGuard peer' ~/.omniedge/logs/omniedge.log 2>/dev/null"; then
-        echo -e "  ✅ ${GREEN}WireGuard Peer Configured${NC} on Edge B"
+    # Check for P2P connection diagnostics
+    echo ""
+    echo "--- Edge B P2P Status ---"
+    if ssh_cmd "$NODE_B" "sudo grep -i 'Sending REGISTER.*external_port' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Sending REGISTER.*external_port' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ✅ ${GREEN}REGISTER sent with port mapping${NC}"
     fi
-    if ssh_cmd "$NODE_B" "grep -i 'Disco pong received' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Disco pong received' ~/.omniedge/logs/omniedge.log 2>/dev/null"; then
-        echo -e "  ✅ ${GREEN}Disco Handshake Complete${NC} on Edge B"
+    if ssh_cmd "$NODE_B" "sudo grep -i 'HEARTBEAT_ACK.*mapped_endpoint' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'HEARTBEAT_ACK.*mapped_endpoint' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ✅ ${GREEN}Peer endpoint info received${NC}"
+    fi
+    if ssh_cmd "$NODE_B" "sudo grep -i 'Disco ping sent' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Disco ping sent' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ✅ ${GREEN}Disco pings sent${NC}"
+    fi
+    if ssh_cmd "$NODE_B" "sudo grep -i 'Configuring WireGuard peer' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Configuring WireGuard peer' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ✅ ${GREEN}WireGuard Peer Configured${NC}"
+    fi
+    if ssh_cmd "$NODE_B" "sudo grep -i 'Disco pong received' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Disco pong received' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ✅ ${GREEN}Disco Handshake Complete${NC}"
+    elif ssh_cmd "$NODE_B" "sudo grep -i 'Relay session established' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Relay session established' ~/.omniedge/logs/omniedge.log 2>/dev/null" | head -1; then
+        echo -e "  ⚠️ ${YELLOW}Relay Fallback Active${NC}"
     fi
     unset CURRENT_TARGET_NODE
     echo ""

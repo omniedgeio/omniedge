@@ -486,6 +486,7 @@ pub async fn setup_and_start_service(
     exit_node_v6: Option<&str>,
     nucleus_port: u16,
     cluster_secret: Option<&str>,
+    verbose: bool,
 ) -> Result<()> {
     info!("Starting standalone background service...");
 
@@ -525,6 +526,7 @@ pub async fn setup_and_start_service(
             exit_node_v6,
             nucleus_port,
             cluster_secret,
+            verbose,
         )?;
     }
 
@@ -539,6 +541,7 @@ pub async fn setup_and_start_service(
             exit_node_v6,
             nucleus_port,
             cluster_secret,
+            verbose,
         )?;
     }
 
@@ -792,6 +795,7 @@ fn setup_linux_service(
     exit_node_v6: Option<&str>,
     nucleus_port: u16,
     cluster_secret: Option<&str>,
+    verbose: bool,
 ) -> Result<()> {
     use std::fs;
     use std::process::Command;
@@ -829,6 +833,7 @@ fn setup_linux_service(
         // Use systemd service management
         info!("systemd detected, setting up systemd service...");
         
+        let verbose_flag = if verbose { "-v" } else { "" };
         let as_exit_flag = if as_exit_node { "--as-exit-node" } else { "" };
         let exit_node_flag = if let Some(ip) = exit_node {
             format!("--exit-node {}", ip)
@@ -850,10 +855,12 @@ fn setup_linux_service(
             "".to_string()
         };
 
-        let mut env_line = String::new();
+        let mut env_lines = String::new();
         if let Some(home) = crate::utils::get_real_user_home() {
-            env_line = format!("Environment=HOME={}", home.display());
+            env_lines.push_str(&format!("Environment=HOME={}\n", home.display()));
         }
+        // Always set RUST_LOG to info for daemon to ensure logs are captured
+        env_lines.push_str("Environment=RUST_LOG=info");
 
         let service_content = format!(
             r#"[Unit]
@@ -861,7 +868,7 @@ Description=OmniEdge Service
 After=network.target
 
 [Service]
-ExecStart={} start -n {} --mode {} --transport-mode {} {} {} {} {} --daemon
+ExecStart={} start {} -n {} --mode {} --transport-mode {} {} {} {} {} --daemon
 {}
 Restart=always
 RestartSec=5
@@ -870,6 +877,7 @@ RestartSec=5
 WantedBy=multi-user.target
 "#,
             exe_path.display(),
+            verbose_flag,
             network_id,
             mode_str,
             transport_str,
@@ -877,7 +885,7 @@ WantedBy=multi-user.target
             as_exit_flag,
             exit_node_flag,
             exit_node_v6_flag,
-            env_line
+            env_lines
         );
 
         fs::write("/tmp/omniedge.service", &service_content)?;
@@ -905,13 +913,19 @@ WantedBy=multi-user.target
         // Build command arguments
         let mut args = vec![
             "start".to_string(),
-            "-n".to_string(),
-            network_id.to_string(),
-            "--mode".to_string(),
-            mode_str.to_string(),
-            "--transport-mode".to_string(),
-            transport_str.to_string(),
         ];
+        
+        // Add verbose flag if enabled
+        if verbose {
+            args.push("-v".to_string());
+        }
+        
+        args.push("-n".to_string());
+        args.push(network_id.to_string());
+        args.push("--mode".to_string());
+        args.push(mode_str.to_string());
+        args.push("--transport-mode".to_string());
+        args.push(transport_str.to_string());
 
         if mode == RunMode::Dual {
             args.push("--port".to_string());
@@ -942,8 +956,10 @@ WantedBy=multi-user.target
         );
 
         // Fork the daemon process to background
+        // Set RUST_LOG=info to ensure daemon logs are captured
         let child = Command::new(&exe_path)
             .args(&args)
+            .env("RUST_LOG", "info")
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -1085,6 +1101,7 @@ fn setup_macos_service(
     exit_node_v6: Option<&str>,
     nucleus_port: u16,
     cluster_secret: Option<&str>,
+    verbose: bool,
 ) -> Result<()> {
     use std::process::Command;
 
@@ -1115,13 +1132,19 @@ fn setup_macos_service(
     // Build command arguments
     let mut args = vec![
         "start".to_string(),
-        "-n".to_string(),
-        network_id.to_string(),
-        "--mode".to_string(),
-        mode_str.to_string(),
-        "--transport-mode".to_string(),
-        transport_str.to_string(),
     ];
+    
+    // Add verbose flag if enabled
+    if verbose {
+        args.push("-v".to_string());
+    }
+    
+    args.push("-n".to_string());
+    args.push(network_id.to_string());
+    args.push("--mode".to_string());
+    args.push(mode_str.to_string());
+    args.push("--transport-mode".to_string());
+    args.push(transport_str.to_string());
 
     if mode == RunMode::Dual {
         args.push("--port".to_string());
@@ -1153,8 +1176,10 @@ fn setup_macos_service(
 
     // Fork the daemon process to background
     // We're already running as root (checked in main.rs), so just spawn directly
+    // Set RUST_LOG=info to ensure daemon logs are captured
     let child = Command::new(&exe_path)
         .args(&args)
+        .env("RUST_LOG", "info")
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())

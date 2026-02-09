@@ -1116,6 +1116,7 @@ async fn async_main() -> Result<()> {
                 effective_exit_node_v6.as_deref(),
                 port,
                 secret.as_deref(),
+                cli.verbose,
             )
             .await?;
 
