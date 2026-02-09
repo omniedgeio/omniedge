@@ -161,7 +161,7 @@ EOF
 # Host Helper Functions
 # =============================================================================
 
-# Get VIP with retry logic - tries omniedge status first, then falls back to ip addr
+# Get VIP with retry logic - uses omniedge status --json (cross-platform)
 get_vip_with_retry() {
     local node="$1"
     local ip_version="${2:-4}"  # 4 or 6
@@ -171,30 +171,44 @@ get_vip_with_retry() {
     
     export CURRENT_TARGET_NODE="$node"
     
+    # Detect OS for fallback method
+    local node_os=""
+    node_os=$(ssh_cmd "$node" "uname -s" 2>/dev/null | tr -d '\r\n')
+    
     while [[ $attempt -le $max_attempts && -z "$vip" ]]; do
-        # Method 1: Try omniedge status --json first (most reliable)
-        # Note: We use 2>/dev/null to silence errors if jq is missing or command fails
+        # Method 1: Try omniedge status --json first (most reliable, cross-platform)
         if [[ "$ip_version" == "4" ]]; then
             vip=$(ssh_cmd "$node" "omniedge status --json 2>/dev/null | jq -r '.vip // empty'" 2>/dev/null | tr -d '\r\n' || echo "")
         else
             vip=$(ssh_cmd "$node" "omniedge status --json 2>/dev/null | jq -r '.vip6 // empty'" 2>/dev/null | tr -d '\r\n' || echo "")
         fi
         
-        # Method 2: Fall back to ip addr if omniedge status doesn't work
+        # Method 2: Fall back to interface inspection if omniedge status doesn't work
         if [[ -z "$vip" || "$vip" == "null" ]]; then
-            # First check if interface exists (try both omniedge0 and omni0 for compatibility)
-            local iface_name=""
-            if ssh_cmd "$node" "ip link show omniedge0" &>/dev/null; then
-                iface_name="omniedge0"
-            elif ssh_cmd "$node" "ip link show omni0" &>/dev/null; then
-                iface_name="omni0"
-            fi
-            
-            if [[ -n "$iface_name" ]]; then
+            if [[ "$node_os" == "Darwin" ]]; then
+                # macOS: uses utun* interface, use ifconfig
+                # Find utun interface with OmniEdge IP range (100.x.x.x for IPv4)
                 if [[ "$ip_version" == "4" ]]; then
-                    vip=$(ssh_cmd "$node" "ip addr show $iface_name 2>/dev/null | grep 'inet ' | awk '{print \$2}' | cut -d/ -f1 | head -1" || echo "")
+                    vip=$(ssh_cmd "$node" "ifconfig 2>/dev/null | grep -A5 '^utun' | grep 'inet ' | grep '100\\.' | awk '{print \$2}' | head -1" || echo "")
                 else
-                    vip=$(ssh_cmd "$node" "ip -6 addr show $iface_name 2>/dev/null | grep 'inet6' | grep -v 'fe80' | awk '{print \$2}' | cut -d/ -f1 | head -1" || echo "")
+                    # IPv6 on utun - look for non-link-local addresses
+                    vip=$(ssh_cmd "$node" "ifconfig 2>/dev/null | grep -A5 '^utun' | grep 'inet6' | grep -v 'fe80' | awk '{print \$2}' | cut -d% -f1 | head -1" || echo "")
+                fi
+            else
+                # Linux: uses omniedge0 or omni0 interface
+                local iface_name=""
+                if ssh_cmd "$node" "ip link show omniedge0" &>/dev/null; then
+                    iface_name="omniedge0"
+                elif ssh_cmd "$node" "ip link show omni0" &>/dev/null; then
+                    iface_name="omni0"
+                fi
+                
+                if [[ -n "$iface_name" ]]; then
+                    if [[ "$ip_version" == "4" ]]; then
+                        vip=$(ssh_cmd "$node" "ip addr show $iface_name 2>/dev/null | grep 'inet ' | awk '{print \$2}' | cut -d/ -f1 | head -1" || echo "")
+                    else
+                        vip=$(ssh_cmd "$node" "ip -6 addr show $iface_name 2>/dev/null | grep 'inet6' | grep -v 'fe80' | awk '{print \$2}' | cut -d/ -f1 | head -1" || echo "")
+                    fi
                 fi
             fi
         fi
@@ -216,27 +230,57 @@ get_vip_with_retry() {
     fi
 }
 
-# Verify omni0 interface exists and has IP
+# Verify OmniEdge interface exists and has IP (cross-platform)
 verify_omniedge_interface() {
     local node="$1"
     export CURRENT_TARGET_NODE="$node"
     
-    # Check if interface exists (try both omniedge0 and omni0 for compatibility)
+    # Detect OS
+    local node_os=""
+    node_os=$(ssh_cmd "$node" "uname -s" 2>/dev/null | tr -d '\r\n')
+    
     local iface_name=""
-    if ssh_cmd "$node" "ip link show omniedge0" &>/dev/null; then
-        iface_name="omniedge0"
-    elif ssh_cmd "$node" "ip link show omni0" &>/dev/null; then
-        iface_name="omni0"
+    local has_ip="0"
+    
+    if [[ "$node_os" == "Darwin" ]]; then
+        # macOS: uses utun* interface
+        # Check for utun with OmniEdge IP (100.x.x.x range)
+        local utun_with_ip=""
+        utun_with_ip=$(ssh_cmd "$node" "ifconfig 2>/dev/null | grep -B5 'inet 100\\.' | grep '^utun' | awk -F: '{print \$1}' | head -1" || echo "")
+        
+        if [[ -n "$utun_with_ip" ]]; then
+            iface_name="$utun_with_ip"
+            has_ip="1"
+        else
+            # Try omniedge status --json to get interface name
+            iface_name=$(ssh_cmd "$node" "omniedge status --json 2>/dev/null | jq -r '.interface // empty'" 2>/dev/null | tr -d '\r\n' || echo "")
+            if [[ -n "$iface_name" && "$iface_name" != "null" ]]; then
+                has_ip=$(ssh_cmd "$node" "ifconfig $iface_name 2>/dev/null | grep -c 'inet '" || echo "0")
+            fi
+        fi
+        
+        if [[ -z "$iface_name" ]]; then
+            echo "  ❌ OmniEdge interface (utun*) does not exist on $node" >&2
+            unset CURRENT_TARGET_NODE
+            return 1
+        fi
+    else
+        # Linux: uses omniedge0 or omni0 interface
+        if ssh_cmd "$node" "ip link show omniedge0" &>/dev/null; then
+            iface_name="omniedge0"
+        elif ssh_cmd "$node" "ip link show omni0" &>/dev/null; then
+            iface_name="omni0"
+        fi
+        
+        if [[ -z "$iface_name" ]]; then
+            echo "  ❌ OmniEdge interface (omniedge0/omni0) does not exist on $node" >&2
+            unset CURRENT_TARGET_NODE
+            return 1
+        fi
+        
+        has_ip=$(ssh_cmd "$node" "ip addr show $iface_name 2>/dev/null | grep -c 'inet '" || echo "0")
     fi
     
-    if [[ -z "$iface_name" ]]; then
-        echo "  ❌ OmniEdge interface (omniedge0/omni0) does not exist on $node" >&2
-        unset CURRENT_TARGET_NODE
-        return 1
-    fi
-    
-    # Check if interface has an IP
-    local has_ip=$(ssh_cmd "$node" "ip addr show $iface_name 2>/dev/null | grep -c 'inet '" || echo "0")
     if [[ "$has_ip" == "0" ]]; then
         echo "  ⚠️ $iface_name interface exists but has no IP on $node" >&2
         unset CURRENT_TARGET_NODE
