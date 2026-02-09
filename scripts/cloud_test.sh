@@ -135,10 +135,11 @@ get_vip_with_retry() {
     
     while [[ $attempt -le $max_attempts && -z "$vip" ]]; do
         # Method 1: Try omniedge status --json first (most reliable)
+        # Note: We use 2>/dev/null to silence errors if jq is missing or command fails
         if [[ "$ip_version" == "4" ]]; then
-            vip=$(ssh_cmd "$node" "omniedge status --json 2>/dev/null | jq -r '.vip // empty'" 2>/dev/null || echo "")
+            vip=$(ssh_cmd "$node" "omniedge status --json 2>/dev/null | jq -r '.vip // empty'" 2>/dev/null | tr -d '\r\n' || echo "")
         else
-            vip=$(ssh_cmd "$node" "omniedge status --json 2>/dev/null | jq -r '.vip6 // empty'" 2>/dev/null || echo "")
+            vip=$(ssh_cmd "$node" "omniedge status --json 2>/dev/null | jq -r '.vip6 // empty'" 2>/dev/null | tr -d '\r\n' || echo "")
         fi
         
         # Method 2: Fall back to ip addr if omniedge status doesn't work
@@ -197,14 +198,15 @@ verify_omniedge_interface() {
 
 is_local() {
     local host="$1"
-    if [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]]; then
+    if [[ "$host" == "localhost" || "$host" == "127.0.0.1" || "$host" == "::1" ]]; then
         return 0
     fi
     # Check if host is one of our local IPs (macOS/Linux compatible)
+    # Using -w and -x for exact matching to avoid partial matches with other IPs or MACs
     if command -v ifconfig &>/dev/null; then
-        if ifconfig | grep -q "$host"; then return 0; fi
+        if ifconfig | grep -w "inet" | awk '{print $2}' | grep -qx "$host"; then return 0; fi
     elif command -v ip &>/dev/null; then
-        if ip addr | grep -q "$host"; then return 0; fi
+        if ip addr | grep -w "inet" | awk '{print $2}' | cut -d/ -f1 | grep -qx "$host"; then return 0; fi
     fi
     return 1
 }
@@ -221,14 +223,17 @@ ssh_cmd() {
                 cmd="${cmd#sudo }"
             fi
             # Also handle the case where sudo is used in a pipe, e.g., "curl ... | sudo bash"
-            # This is a bit more complex, but we can replace "sudo " with "" globally for simple cases
             cmd=$(echo "$cmd" | sed 's/\bsudo //g')
-            docker exec -t "$LOCAL_DOCKER_NAME" sh -c "$cmd"
+            # Tracer for debugging routing
+            # echo "   [DOCKER] $host: $cmd" >&2
+            docker exec "$LOCAL_DOCKER_NAME" sh -c "$cmd"
         else
             # Native local execution
+            # echo "   [NATIVE] $host: $*" >&2
             sudo sh -c "$*"
         fi
     else
+        # echo "   [SSH] $host: $*" >&2
         ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
             ${SSH_KEY:+-i "$SSH_KEY"} \
             "$SSH_USER@$host" "$@"
@@ -281,16 +286,23 @@ ensure_local_docker() {
         docker exec "$LOCAL_DOCKER_NAME" apt-get update -qq
         docker exec "$LOCAL_DOCKER_NAME" apt-get install -y -qq iperf3 wireguard-tools iproute2 jq bc psmisc curl ca-certificates sudo iputils-ping procps
     else
-        # If container exists, ensure curl and certificates are actually there
-        if ! docker exec "$LOCAL_DOCKER_NAME" which curl &>/dev/null; then
+        # If container exists, ensure all dependencies are actually there
+        if ! docker exec "$LOCAL_DOCKER_NAME" which curl &>/dev/null || \
+           ! docker exec "$LOCAL_DOCKER_NAME" which jq &>/dev/null || \
+           ! docker exec "$LOCAL_DOCKER_NAME" which bc &>/dev/null; then
             print_step "Repairing missing dependencies in existing Docker container..."
             docker exec "$LOCAL_DOCKER_NAME" apt-get update -qq
-            docker exec "$LOCAL_DOCKER_NAME" apt-get install -y -qq curl ca-certificates sudo
+            docker exec "$LOCAL_DOCKER_NAME" apt-get install -y -qq iperf3 wireguard-tools iproute2 jq bc psmisc curl ca-certificates sudo iputils-ping procps
         fi
     fi
     
     # Always ensure root config directory and TUN
     docker exec "$LOCAL_DOCKER_NAME" mkdir -p /root/.omniedge
+    
+    # Clean up any lingering OmniNervous state inside Docker if it exists
+    if [[ "$container_exists" == "true" ]]; then
+        docker exec "$LOCAL_DOCKER_NAME" rm -rf /root/.omniedge/* 2>/dev/null || true
+    fi
     
     # Verify TUN device is available in container
     if ! docker exec "$LOCAL_DOCKER_NAME" ls -la /dev/net/tun &>/dev/null; then
@@ -535,9 +547,13 @@ run_test() {
     print_step "Cleaning up old processes and logs..."
     for node in "$NODE_A" "$NODE_B"; do
         export CURRENT_TARGET_NODE="$node"
-        ssh_cmd "$node" "sudo pkill -9 -f omniedge 2>/dev/null; \
-                         sudo pkill -9 -f iperf3 2>/dev/null; \
-                         if command -v fuser &>/dev/null; then sudo fuser -k 51820/udp 2>/dev/null; fi; \
+        # Kill both omniedge and omninervous to avoid stale settings interference
+        # Also explicitly remove the omni0 interface to force a fresh backend assignment
+        ssh_cmd "$node" "sudo pkill -9 -f omniedge || true; \
+                         sudo pkill -9 -f omninervous || true; \
+                         sudo pkill -9 -f iperf3 || true; \
+                         if command -v fuser &>/dev/null; then sudo fuser -k 51820/udp 2>/dev/null || true; fi; \
+                         sudo ip link delete omni0 2>/dev/null || true; \
                          sudo rm -f /tmp/omni-*.log" || true
         unset CURRENT_TARGET_NODE
     done

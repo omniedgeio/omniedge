@@ -63,11 +63,11 @@ impl<'a> AuthService<'a> {
         self.client.send_quiet(builder).await
     }
 
-    pub async fn refresh_token(&self, refresh_token: &str) -> Result<AuthResp> {
+    pub async fn refresh_token(&self, client_id: &str, refresh_token: &str) -> Result<AuthResp> {
         let builder = self.client.post("/oauth/token").json(&json!({
             "refresh_token": refresh_token,
             "grant_type": "refresh_token",
-            "client_id": "omniedge-desktop"
+            "client_id": client_id
         }));
         self.client.send(builder).await
     }

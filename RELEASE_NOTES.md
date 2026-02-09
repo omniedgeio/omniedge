@@ -1,37 +1,5 @@
 # OmniEdge Release Notes
 
-## OmniNervous v0.8.8 Upgrade (2026-02-08)
-
-This update upgrades the core networking library **OmniNervous from v0.8.0 to v0.8.8**, bringing automatic MTU detection and improved reliability.
-
-### Key Changes
-
-| Feature | Description |
-|---------|-------------|
-| **Automatic MTU Detection** | Detects VPN-over-VPN scenarios and adjusts MTU automatically |
-| **Windows Build Fix** | Fixed MTU parameter passing for Windows TUN setup |
-| **Daemon State Persistence** | Fixed state reset bug preventing proper P2P discovery |
-| **MTU Configuration** | New `mtu` and `mtu_auto_detect` fields in NetworkConfig |
-
-### New Configuration Options
-
-```rust
-// In NetworkConfig
-pub mtu: u16,           // Default: 1420, use 1280 for VPN-over-VPN
-pub mtu_auto_detect: bool,  // Auto-detect VPN and reduce MTU
-```
-
-### Integration
-
-The OmniNervous dependency has been updated in:
-- `crates/omni-core/Cargo.toml`
-- `crates/omni-tun/Cargo.toml`
-- `crates/omni-proto/Cargo.toml`
-
-See `docs/omninervous_integration_guide.md` for detailed integration guidance.
-
----
-
 ## v2.7.0 (2026-02-05)
 
 ### SSH Integration

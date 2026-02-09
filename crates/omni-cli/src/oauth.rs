@@ -1,14 +1,16 @@
-use anyhow::Result;
-use log::info;
+use anyhow::{anyhow, Result};
+use log::{info, warn};
 use omni_api::{types::AuthResp, ApiClient, AuthService};
 use omni_core::CliConfig;
+use std::io::IsTerminal;
 
 /// Attempt to refresh the token using the refresh_token
 async fn try_refresh_token(base_url: &str, refresh_token: &str) -> Result<AuthResp> {
     info!("Attempting to refresh access token...");
     let client = ApiClient::new(base_url.to_string(), None);
     let auth_service = AuthService::new(&client);
-    auth_service.refresh_token(refresh_token).await
+    // Use CLI-specific client_id to match initial login
+    auth_service.refresh_token("omniedge-cli", refresh_token).await
 }
 
 pub async fn ensure_auth(base_url: &str, config: &mut CliConfig) -> Result<AuthResp> {
@@ -55,6 +57,12 @@ pub async fn ensure_auth(base_url: &str, config: &mut CliConfig) -> Result<AuthR
             // Token is still valid
             return Ok(auth.clone());
         }
+    }
+
+    // Fallback to interactive device flow
+    if !std::io::stdin().is_terminal() {
+        warn!("Authentication required but running in non-interactive environment.");
+        return Err(anyhow!("Authentication required. Please run 'omniedge start -s YOUR_SECURITY_KEY' for headless environments or login manually in an interactive terminal."));
     }
 
     println!("No saved credentials found. Starting device flow authentication...");
