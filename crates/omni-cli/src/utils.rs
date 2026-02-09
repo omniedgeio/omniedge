@@ -271,3 +271,11 @@ pub fn get_real_user_home() -> Option<std::path::PathBuf> {
     }
     None
 }
+
+/// Get the real user's home directory on Windows
+/// On Windows, elevation doesn't change the user context like sudo does on Unix,
+/// so we just return the standard user profile directory.
+#[cfg(windows)]
+pub fn get_real_user_home() -> Option<std::path::PathBuf> {
+    dirs::home_dir()
+}
