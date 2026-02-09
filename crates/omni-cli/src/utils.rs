@@ -244,3 +244,30 @@ pub async fn sync_custom_server(
 
     Ok(())
 }
+
+/// Get the real user's home directory, even when running with sudo
+#[cfg(not(windows))]
+pub fn get_real_user_home() -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+    // First check SUDO_USER (set when running with sudo)
+    if let Ok(sudo_user) = std::env::var("SUDO_USER") {
+        if !sudo_user.is_empty() && sudo_user != "root" {
+            // Try to get the user's home from /etc/passwd or expand ~user
+            if let Ok(output) = std::process::Command::new("sh")
+                .args(["-c", &format!("eval echo ~{}", sudo_user)])
+                .output()
+            {
+                let home = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !home.is_empty() && home != "~" && std::path::Path::new(&home).exists() {
+                    return Some(PathBuf::from(home));
+                }
+            }
+            // Fallback: try common home paths
+            let home_path = PathBuf::from(format!("/home/{}", sudo_user));
+            if home_path.exists() {
+                return Some(home_path);
+            }
+        }
+    }
+    None
+}

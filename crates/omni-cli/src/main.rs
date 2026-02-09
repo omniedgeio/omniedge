@@ -14,34 +14,8 @@ mod service;
 mod utils;
 
 use regex::Regex;
-use utils::{get_hardware_id, sync_custom_server};
+use utils::{get_hardware_id, get_real_user_home, sync_custom_server};
 
-/// Get the real user's home directory, even when running with sudo
-#[cfg(not(windows))]
-fn get_real_user_home() -> Option<std::path::PathBuf> {
-    use std::path::PathBuf;
-    // First check SUDO_USER (set when running with sudo)
-    if let Ok(sudo_user) = std::env::var("SUDO_USER") {
-        if !sudo_user.is_empty() && sudo_user != "root" {
-            // Try to get the user's home from /etc/passwd or expand ~user
-            if let Ok(output) = std::process::Command::new("sh")
-                .args(["-c", &format!("eval echo ~{}", sudo_user)])
-                .output()
-            {
-                let home = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                if !home.is_empty() && home != "~" && std::path::Path::new(&home).exists() {
-                    return Some(PathBuf::from(home));
-                }
-            }
-            // Fallback: try common home paths
-            let home_path = PathBuf::from(format!("/home/{}", sudo_user));
-            if home_path.exists() {
-                return Some(home_path);
-            }
-        }
-    }
-    None
-}
 
 /// Check if running with elevated privileges (root on Unix, admin on Windows)
 /// If not elevated, re-exec with sudo (Unix) or elevate via UAC (Windows)
@@ -752,15 +726,24 @@ async fn async_main() -> Result<()> {
         flexi_logger::Duplicate::Warn // Only show warnings and errors to stderr by default
     };
 
-    let _logger = flexi_logger::Logger::try_with_str(log_level)?
+    let logger = flexi_logger::Logger::try_with_str(log_level)?
         .log_to_file(
             flexi_logger::FileSpec::default()
                 .directory(&log_dir)
                 .basename("omniedge")
                 .suffix("log"),
         )
-        .duplicate_to_stderr(duplicate_level)
-        .start()?;
+        .duplicate_to_stderr(duplicate_level);
+
+    let _logger_handle = match logger.start() {
+        Ok(handle) => handle,
+        Err(e) => {
+            // Fallback to stderr-only logging if file logging fails (e.g. Permission Denied)
+            let handle = flexi_logger::Logger::try_with_str(log_level)?.start()?;
+            log::warn!("File logging disabled due to error: {}. Logging to stderr only.", e);
+            handle
+        }
+    };
 
     log::info!(
         "OmniEdge CLI starting. Version: {}. Args: {:?}",

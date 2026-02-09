@@ -735,6 +735,11 @@ fn setup_linux_nucleus_service(port: u16, secret: &str) -> Result<()> {
         format!("--secret {}", secret)
     };
 
+    let mut env_line = String::new();
+    if let Some(home) = crate::utils::get_real_user_home() {
+        env_line = format!("Environment=HOME={}", home.display());
+    }
+
     let service_content = format!(
         r#"[Unit]
 Description=OmniEdge Nucleus Signaling Server
@@ -742,6 +747,7 @@ After=network.target
 
 [Service]
 ExecStart={} start --mode nucleus --port {} {} --daemon
+{}
 Restart=always
 RestartSec=5
 
@@ -750,7 +756,8 @@ WantedBy=multi-user.target
 "#,
         exe_path.display(),
         port,
-        secret_flag
+        secret_flag,
+        env_line
     );
 
     fs::write("/tmp/omniedge.service", &service_content)?;
@@ -832,6 +839,11 @@ fn setup_linux_service(
         "".to_string()
     };
 
+    let mut env_line = String::new();
+    if let Some(home) = crate::utils::get_real_user_home() {
+        env_line = format!("Environment=HOME={}", home.display());
+    }
+
     let service_content = format!(
         r#"[Unit]
 Description=OmniEdge Service
@@ -839,6 +851,7 @@ After=network.target
 
 [Service]
 ExecStart={} start -n {} --mode {} --transport-mode {} {} {} {} {} --daemon
+{}
 Restart=always
 RestartSec=5
 
@@ -852,7 +865,8 @@ WantedBy=multi-user.target
         nucleus_flags,
         as_exit_flag,
         exit_node_flag,
-        exit_node_v6_flag
+        exit_node_v6_flag,
+        env_line
     );
 
     fs::write("/tmp/omniedge.service", &service_content)?;
@@ -892,7 +906,9 @@ fn setup_macos_nucleus_service(port: u16, secret: &str) -> Result<()> {
     }
 
     let exe_path = std::env::current_exe()?;
-    let home_dir = dirs::home_dir().context("Failed to get home directory")?;
+    let home_dir = crate::utils::get_real_user_home()
+        .or_else(dirs::home_dir)
+        .context("Failed to get home directory")?;
 
     // Use system LaunchDaemon for root privileges
     let plist_path = std::path::PathBuf::from("/Library/LaunchDaemons/io.omniedge.daemon.plist");
