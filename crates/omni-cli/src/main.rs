@@ -1015,7 +1015,10 @@ async fn async_main() -> Result<()> {
                 .or_else(|| config.exit_node_ip_v6.clone());
             config.save()?;
 
-            // Create progress spinner
+            // Require root/admin before starting the connection process
+            // This avoids redundant authentication and network fetching when re-execing with sudo
+            require_root_privileges();
+
             let spinner = ProgressBar::new_spinner();
             spinner.set_style(
                 ProgressStyle::default_spinner()
@@ -1089,10 +1092,6 @@ async fn async_main() -> Result<()> {
                 first.id.clone()
             };
 
-            // Require root/admin for TUN creation and daemon setup
-            require_root_privileges();
-
-            // 4. Sync custom user server for nucleus/dual mode
             if mode == RunMode::Nucleus || mode == RunMode::Dual {
                 if let Err(e) = sync_custom_server(&user_server_service, &token, mode, port).await {
                     log::info!("Custom server sync skipped: {}", e);

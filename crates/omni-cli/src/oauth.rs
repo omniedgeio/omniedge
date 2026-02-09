@@ -120,6 +120,14 @@ pub async fn login_with_security_key(
     security_key: &str,
     config: &mut CliConfig,
 ) -> Result<AuthResp> {
+    // Check if we already have a valid token to avoid redundant logins (e.g. on sudo re-exec)
+    if let Some(auth) = &config.auth_response {
+        if !config.is_token_expired() {
+            info!("Using existing valid session.");
+            return Ok(auth.clone());
+        }
+    }
+
     println!("Logging in with security key...");
     let client = ApiClient::new(base_url.to_string(), None);
     let auth_service = AuthService::new(&client);
