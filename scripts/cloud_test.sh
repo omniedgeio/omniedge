@@ -993,7 +993,7 @@ run_test() {
     # Use -v for verbose/debug logging to capture all signaling and disco messages
     # Also set RUST_LOG=info to ensure daemon subprocess logs properly
     ssh_cmd "$NODE_A" "sudo touch /tmp/omni-edge-a.log && sudo chmod 666 /tmp/omni-edge-a.log"
-    ssh_cmd "$NODE_A" "sudo RUST_LOG=info nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-a.log 2>&1 &"
+    ssh_cmd "$NODE_A" "sudo RUST_LOG=debug nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-a.log 2>&1 &"
     unset CURRENT_TARGET_NODE
     sleep 3
 
@@ -1001,7 +1001,7 @@ run_test() {
     print_step "Starting Edge B on $NODE_B..."
     export CURRENT_TARGET_NODE="$NODE_B"
     ssh_cmd "$NODE_B" "sudo touch /tmp/omni-edge-b.log && sudo chmod 666 /tmp/omni-edge-b.log"
-    ssh_cmd "$NODE_B" "sudo RUST_LOG=info nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-b.log 2>&1 &"
+    ssh_cmd "$NODE_B" "sudo RUST_LOG=debug nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-b.log 2>&1 &"
     unset CURRENT_TARGET_NODE
     sleep 3
     

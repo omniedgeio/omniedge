@@ -120,7 +120,7 @@ impl Default for NetworkConfig {
             ipv6_preference_threshold_ms: 5,
             happy_eyeballs_delay_ms: 250,
             mtu: 1420,
-            mtu_auto_detect: false,
+            mtu_auto_detect: true,
         }
     }
 }

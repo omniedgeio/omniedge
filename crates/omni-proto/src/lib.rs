@@ -161,14 +161,21 @@ impl OmniProto {
         let mut decrypted_buf = None;
         let mut msg_type = get_signaling_type(buf).context("Empty signaling packet")?;
 
+        debug!(
+            "Signaling packet received: len={}, type=0x{:02x}",
+            buf.len(), msg_type
+        );
+
         // Handle encrypted signaling packets
         if msg_type == MSG_ENCRYPTED {
             let mut enc = self.encryption.write().await;
             match enc.decrypt(buf) {
                 Ok(plaintext) => {
+                    debug!("Signaling decryption successful, payload len={}", plaintext.len());
                     decrypted_buf = Some(plaintext);
                     if let Some(p) = decrypted_buf.as_ref() {
                         msg_type = get_signaling_type(p).context("Empty signaling packet after decryption")?;
+                        debug!("Decrypted signaling type: 0x{:02x}", msg_type);
                     }
                 }
                 Err(e) => {

@@ -1493,6 +1493,7 @@ impl ConnectionManager {
                                 }
 
                                 let first_byte = pkt[0];
+                                debug!("UDP packet received: len={}, from={}, first_byte=0x{:02x}", len, src, first_byte);
 
                                 // Handle DISCO_PING (0x1B)
                                 if first_byte == SIGNALING_DISCO_PING {
@@ -2008,6 +2009,7 @@ impl ConnectionManager {
                             }
                                 if (0x01..=0x04).contains(&first_byte) {
                                     // WireGuard
+                                    debug!("WireGuard packet (type 0x{:02x}) from {}", first_byte, src);
                                     let _ = tun_ctrl.handle_packet(pkt, src, &socket_inner).await;
                                 } else {
                                     debug!("Ignored unknown packet type {} from {}", first_byte, src);
