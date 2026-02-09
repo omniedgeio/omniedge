@@ -91,6 +91,7 @@ impl OmniProto {
         virtual_ip_v6: Option<Ipv6Addr>,
         listen_port: u16,
         public_key: [u8; 32],
+        private_key: [u8; 32],
     ) -> Result<Self> {
         // Map legacy secret_key to psk
         let psk = if secret_key.is_empty() {
@@ -111,25 +112,11 @@ impl OmniProto {
         )
         .await?;
 
-        // Initialize signaling encryption
-        let mut encryption_enabled = false;
-        let mut secret_bytes = [0u8; 32];
-        if !secret_key.is_empty() {
-            // Decode hex secret key to 32 bytes for SignalingEncryption
-            if let Ok(bytes) = (0..secret_key.len())
-                .step_by(2)
-                .map(|i| u8::from_str_radix(&secret_key[i..i + 2], 16))
-                .collect::<Result<Vec<u8>, _>>()
-            {
-                if bytes.len() == 32 {
-                    secret_bytes.copy_from_slice(&bytes);
-                    encryption_enabled = true;
-                }
-            }
-        }
-
-        let encryption = if encryption_enabled {
-            omninervous::signaling::SignalingEncryption::from_secret_key(secret_bytes, true)
+        // Initialize signaling encryption using our identity private key
+        let encryption = if !secret_key.is_empty() {
+            // Enable signaling encryption if secret_key (cluster PSK) is present
+            // We use our individual identity private key for the NaCl box
+            omninervous::signaling::SignalingEncryption::from_secret_key(private_key, true)
         } else {
             omninervous::signaling::SignalingEncryption::new(false)
         };
@@ -167,8 +154,8 @@ impl OmniProto {
 
     pub async fn handle_packet(&self, buf: &[u8], secret: Option<&str>) -> Result<Option<PeerUpdate>> {
         use omninervous::signaling::{
-            get_signaling_type, parse_heartbeat_ack, parse_register_ack, SIGNALING_HEARTBEAT_ACK,
-            SIGNALING_REGISTER_ACK, MSG_ENCRYPTED,
+            get_signaling_type, parse_heartbeat_ack, parse_register_ack, parse_peer_info,
+            SIGNALING_HEARTBEAT_ACK, SIGNALING_REGISTER_ACK, MSG_ENCRYPTED, SIGNALING_PEER_INFO,
         };
 
         let mut decrypted_buf = None;
@@ -238,6 +225,21 @@ impl OmniProto {
                         mapped_endpoint: p.mapped_endpoint.as_ref().and_then(|s| s.parse().ok()),
                     });
                 }
+            }
+            SIGNALING_PEER_INFO => {
+                let info = parse_peer_info(effective_buf, secret)?;
+                info!(
+                    "Received PEER_INFO from Nucleus: vip={}, endpoint={}, mapped_endpoint={:?}, nat_type={:?}",
+                    info.vip, info.endpoint, info.mapped_endpoint, info.nat_type
+                );
+                peers.push(PeerInfo {
+                    vip: info.vip,
+                    vip_v6: info.vip_v6,
+                    endpoint: info.endpoint.parse().ok(),
+                    public_key: info.public_key,
+                    nat_type: info.nat_type,
+                    mapped_endpoint: info.mapped_endpoint.as_ref().and_then(|s| s.parse().ok()),
+                });
             }
             _ => return Ok(None),
         }

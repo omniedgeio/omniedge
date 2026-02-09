@@ -1069,6 +1069,7 @@ impl ConnectionManager {
                 vip_v6_addr,
                 port,  // Use actual socket port now!
                 self.identity.public_key_bytes(),
+                self.identity.private_key_bytes(),
             )
             .await?,
         );
@@ -1991,7 +1992,7 @@ impl ConnectionManager {
                                         }
                                     }
                                     Ok(None) => {
-                                        debug!(
+                                        warn!(
                                             "Received unhandled signaling message type 0x{:02x} from {}",
                                             first_byte, src
                                         );
