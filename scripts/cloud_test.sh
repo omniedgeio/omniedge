@@ -274,11 +274,53 @@ detect_node_arch() {
     echo "$arch:$os"
 }
 
-# Build local CLI for a specific target
+# Build local CLI for a specific target (or use existing binary if found)
 build_local_cli() {
     local target="$1"
     local output_dir="$SCRIPT_DIR"
     
+    # Determine output filename based on target
+    local output_name=""
+    local search_pattern=""
+    case "$target" in
+        x86_64-unknown-linux-gnu)
+            output_name="omniedge-cli-local-linux-x64"
+            search_pattern="omniedge-cli-*-linux-x64"
+            ;;
+        aarch64-unknown-linux-gnu)
+            output_name="omniedge-cli-local-linux-arm64"
+            search_pattern="omniedge-cli-*-linux-arm64"
+            ;;
+        armv7-unknown-linux-gnueabihf)
+            output_name="omniedge-cli-local-linux-armv7"
+            search_pattern="omniedge-cli-*-linux-armv7"
+            ;;
+        x86_64-apple-darwin)
+            output_name="omniedge-cli-local-macos-x64"
+            search_pattern="omniedge-cli-*-macos-x64"
+            ;;
+        aarch64-apple-darwin)
+            output_name="omniedge-cli-local-macos-arm64"
+            search_pattern="omniedge-cli-*-macos-arm64"
+            ;;
+        *)
+            output_name="omniedge-cli-local-$target"
+            search_pattern="omniedge-cli-*"
+            ;;
+    esac
+    
+    # Check for existing binary in scripts/ folder (versioned or local build)
+    # Priority: 1) versioned binaries (sorted, latest first), 2) local build
+    local existing_bin=""
+    existing_bin=$(ls -1 "$output_dir"/$search_pattern 2>/dev/null | sort -V | tail -1)
+    
+    if [[ -n "$existing_bin" && -f "$existing_bin" ]]; then
+        echo "  ✅ Found existing binary: $(basename "$existing_bin")"
+        echo "$existing_bin"
+        return 0
+    fi
+    
+    # No existing binary found, need to build
     print_step "Building OmniEdge CLI for target: $target"
     
     # Check if cargo is available
@@ -339,16 +381,6 @@ build_local_cli() {
         return 1
     fi
     
-    # Create output filename based on target
-    local output_name="omniedge-cli-local"
-    case "$target" in
-        x86_64-unknown-linux-gnu) output_name="omniedge-cli-local-linux-x64" ;;
-        aarch64-unknown-linux-gnu) output_name="omniedge-cli-local-linux-arm64" ;;
-        armv7-unknown-linux-gnueabihf) output_name="omniedge-cli-local-linux-armv7" ;;
-        x86_64-apple-darwin) output_name="omniedge-cli-local-macos-x64" ;;
-        aarch64-apple-darwin) output_name="omniedge-cli-local-macos-arm64" ;;
-    esac
-    
     # Copy to scripts directory
     cp "$binary_path" "$output_dir/$output_name"
     chmod +x "$output_dir/$output_name"
@@ -372,25 +404,8 @@ get_binary_for_node() {
         return 1
     fi
     
-    # Check for existing local build
-    local output_name=""
-    case "$target" in
-        x86_64-unknown-linux-gnu) output_name="omniedge-cli-local-linux-x64" ;;
-        aarch64-unknown-linux-gnu) output_name="omniedge-cli-local-linux-arm64" ;;
-        armv7-unknown-linux-gnueabihf) output_name="omniedge-cli-local-linux-armv7" ;;
-        x86_64-apple-darwin) output_name="omniedge-cli-local-macos-x64" ;;
-        aarch64-apple-darwin) output_name="omniedge-cli-local-macos-arm64" ;;
-    esac
-    
-    local binary_path="$SCRIPT_DIR/$output_name"
-    
-    # Build if not exists
-    if [[ ! -f "$binary_path" ]]; then
-        binary_path=$(build_local_cli "$target") || return 1
-    else
-        echo "  Using existing build: $binary_path" >&2
-    fi
-    
+    # build_local_cli will check for existing binaries first, then build if needed
+    local binary_path=$(build_local_cli "$target") || return 1
     echo "$binary_path"
 }
 
