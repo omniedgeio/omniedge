@@ -990,8 +990,9 @@ run_test() {
     export CURRENT_TARGET_NODE="$NODE_A"
     # Note: Run daemon with log output. For proper backgrounding and log permissions,
     # we touch the log file first, then run the daemon.
+    # Use -v for verbose/debug logging to capture all signaling and disco messages
     ssh_cmd "$NODE_A" "sudo touch /tmp/omni-edge-a.log && sudo chmod 666 /tmp/omni-edge-a.log"
-    ssh_cmd "$NODE_A" "sudo nohup omniedge start -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-a.log 2>&1 &"
+    ssh_cmd "$NODE_A" "sudo nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-a.log 2>&1 &"
     unset CURRENT_TARGET_NODE
     sleep 3
 
@@ -999,7 +1000,7 @@ run_test() {
     print_step "Starting Edge B on $NODE_B..."
     export CURRENT_TARGET_NODE="$NODE_B"
     ssh_cmd "$NODE_B" "sudo touch /tmp/omni-edge-b.log && sudo chmod 666 /tmp/omni-edge-b.log"
-    ssh_cmd "$NODE_B" "sudo nohup omniedge start -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-b.log 2>&1 &"
+    ssh_cmd "$NODE_B" "sudo nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} > /tmp/omni-edge-b.log 2>&1 &"
     unset CURRENT_TARGET_NODE
     sleep 3
     
@@ -1047,26 +1048,41 @@ run_test() {
     echo ""
     
     # Show logs for debugging
-    print_step "Daemon logs (last 15 lines)..."
-    echo "--- Edge A log ---"
+    print_step "Daemon logs (last 30 lines)..."
+    echo "--- Edge A stdout/stderr log ---"
     export CURRENT_TARGET_NODE="$NODE_A"
     ssh_cmd "$NODE_A" "tail -15 /tmp/omni-edge-a.log 2>/dev/null || echo 'No log available'"
     
+    # Also show internal daemon log (has more detail including signaling)
+    echo ""
+    echo "--- Edge A daemon log (signaling/disco) ---"
+    ssh_cmd "$NODE_A" "sudo cat /root/.omniedge/logs/omniedge.log 2>/dev/null | tail -50 || sudo cat ~/.omniedge/logs/omniedge.log 2>/dev/null | tail -50 || echo 'No daemon log available'"
+    
     # Check for P2P connection success (like OmniNervous)
-    if ssh_cmd "$NODE_A" "grep -i 'p2p' /tmp/omni-edge-a.log | grep -i 'established' &>/dev/null"; then
-        echo -e "  ✅ ${GREEN}Direct P2P Link Established${NC} on Edge A"
-    elif ssh_cmd "$NODE_A" "grep -i 'relay' /tmp/omni-edge-a.log | grep -i 'active' &>/dev/null"; then
+    if ssh_cmd "$NODE_A" "grep -i 'Configuring WireGuard peer' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Configuring WireGuard peer' ~/.omniedge/logs/omniedge.log 2>/dev/null"; then
+        echo -e "  ✅ ${GREEN}WireGuard Peer Configured${NC} on Edge A"
+    fi
+    if ssh_cmd "$NODE_A" "grep -i 'Disco pong received' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Disco pong received' ~/.omniedge/logs/omniedge.log 2>/dev/null"; then
+        echo -e "  ✅ ${GREEN}Disco Handshake Complete${NC} on Edge A"
+    elif ssh_cmd "$NODE_A" "grep -i 'Relay session established' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Relay session established' ~/.omniedge/logs/omniedge.log 2>/dev/null"; then
         echo -e "  ⚠️ ${YELLOW}Relay Fallback Active${NC} on Edge A"
     fi
     unset CURRENT_TARGET_NODE
 
     echo ""
-    echo "--- Edge B log ---"
+    echo "--- Edge B stdout/stderr log ---"
     export CURRENT_TARGET_NODE="$NODE_B"
     ssh_cmd "$NODE_B" "tail -15 /tmp/omni-edge-b.log 2>/dev/null || echo 'No log available'"
     
-    if ssh_cmd "$NODE_B" "grep -i 'p2p' /tmp/omni-edge-b.log | grep -i 'established' &>/dev/null"; then
-        echo -e "  ✅ ${GREEN}Direct P2P Link Established${NC} on Edge B"
+    echo ""
+    echo "--- Edge B daemon log (signaling/disco) ---"
+    ssh_cmd "$NODE_B" "sudo cat /root/.omniedge/logs/omniedge.log 2>/dev/null | tail -50 || sudo cat ~/.omniedge/logs/omniedge.log 2>/dev/null | tail -50 || echo 'No daemon log available'"
+    
+    if ssh_cmd "$NODE_B" "grep -i 'Configuring WireGuard peer' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Configuring WireGuard peer' ~/.omniedge/logs/omniedge.log 2>/dev/null"; then
+        echo -e "  ✅ ${GREEN}WireGuard Peer Configured${NC} on Edge B"
+    fi
+    if ssh_cmd "$NODE_B" "grep -i 'Disco pong received' /root/.omniedge/logs/omniedge.log 2>/dev/null || grep -i 'Disco pong received' ~/.omniedge/logs/omniedge.log 2>/dev/null"; then
+        echo -e "  ✅ ${GREEN}Disco Handshake Complete${NC} on Edge B"
     fi
     unset CURRENT_TARGET_NODE
     echo ""
@@ -1233,9 +1249,12 @@ run_test() {
     print_step "Collecting logs..."
     export CURRENT_TARGET_NODE="$NODE_A"
     ssh_cmd "$NODE_A" "cat /tmp/omni-edge-a.log" > "$RESULTS_DIR/edge_a.log" 2>/dev/null || true
+    # Also collect daemon's internal log file (has signaling/disco details)
+    ssh_cmd "$NODE_A" "sudo cat /root/.omniedge/logs/omniedge.log 2>/dev/null || cat ~/.omniedge/logs/omniedge.log 2>/dev/null" >> "$RESULTS_DIR/edge_a.log" 2>/dev/null || true
     unset CURRENT_TARGET_NODE
     export CURRENT_TARGET_NODE="$NODE_B"
     ssh_cmd "$NODE_B" "cat /tmp/omni-edge-b.log" > "$RESULTS_DIR/edge_b.log" 2>/dev/null || true
+    ssh_cmd "$NODE_B" "sudo cat /root/.omniedge/logs/omniedge.log 2>/dev/null || cat ~/.omniedge/logs/omniedge.log 2>/dev/null" >> "$RESULTS_DIR/edge_b.log" 2>/dev/null || true
     unset CURRENT_TARGET_NODE
     
     cat > "$result_file" << EOF

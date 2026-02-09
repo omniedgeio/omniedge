@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use log::debug;
+use log::{debug, info};
 use omninervous::signaling::NucleusClient;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::net::UdpSocket;
@@ -121,10 +121,21 @@ impl OmniProto {
     }
 
     pub async fn register(&self, socket: &UdpSocket) -> Result<()> {
-        self.client.read().await.register(socket).await
+        let client = self.client.read().await;
+        let ext_port = client.external_port();
+        let ext_addr = client.external_addr();
+        info!(
+            "Sending REGISTER to Nucleus: vip={}, listen_port={}, external_port={:?}, external_addr={:?}",
+            client.vip(),
+            socket.local_addr().map(|a| a.port()).unwrap_or(0),
+            ext_port,
+            ext_addr
+        );
+        client.register(socket).await
     }
 
     pub async fn heartbeat(&self, socket: &UdpSocket, known_peer_count: u32) -> Result<()> {
+        debug!("Sending HEARTBEAT to Nucleus: known_peer_count={}", known_peer_count);
         self.client.read().await.heartbeat(socket, known_peer_count).await
     }
 
@@ -141,7 +152,15 @@ impl OmniProto {
         match msg_type {
             SIGNALING_REGISTER_ACK => {
                 let ack = parse_register_ack(buf, secret)?;
+                info!(
+                    "Received REGISTER_ACK from Nucleus: success={}, {} recent peers",
+                    ack.success, ack.recent_peers.len()
+                );
                 for p in ack.recent_peers {
+                    info!(
+                        "  Peer from REGISTER_ACK: vip={}, endpoint={}, mapped_endpoint={:?}, nat_type={:?}",
+                        p.vip, p.endpoint, p.mapped_endpoint, p.nat_type
+                    );
                     peers.push(PeerInfo {
                         vip: p.vip,
                         vip_v6: p.vip_v6,
@@ -154,7 +173,17 @@ impl OmniProto {
             }
             SIGNALING_HEARTBEAT_ACK => {
                 let ack = parse_heartbeat_ack(buf, secret)?;
+                if !ack.new_peers.is_empty() || !ack.removed_vips.is_empty() {
+                    info!(
+                        "Received HEARTBEAT_ACK: {} new peers, {} removed",
+                        ack.new_peers.len(), ack.removed_vips.len()
+                    );
+                }
                 for p in ack.new_peers {
+                    info!(
+                        "  New peer from HEARTBEAT_ACK: vip={}, endpoint={}, mapped_endpoint={:?}, nat_type={:?}",
+                        p.vip, p.endpoint, p.mapped_endpoint, p.nat_type
+                    );
                     peers.push(PeerInfo {
                         vip: p.vip,
                         vip_v6: p.vip_v6,

@@ -1513,7 +1513,7 @@ impl ConnectionManager {
                                             if let Err(e) = socket_inner.send_to(&pong_data, src).await {
                                                 warn!("Failed to send disco pong to {}: {}", src, e);
                                             } else {
-                                                debug!("Sent disco pong to {} (tx: {:02x?})", src, &pong.tx_id[..4]);
+                                                info!("Sent disco pong to {} (VIP: {}, tx: {:02x?})", src, ping.sender_vip, &pong.tx_id[..4]);
                                             }
                                         }
 
@@ -1871,9 +1871,9 @@ impl ConnectionManager {
                                                             if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
                                                                 warn!("Failed to send disco ping to {}: {}", endpoint, e);
                                                             } else {
-                                                                debug!(
-                                                                    "Sent disco ping to {} ({}) tx: {:02x?}",
-                                                                    vip, endpoint, &tx_id[..4]
+                                                                info!(
+                                                                    "Sent disco ping to {} (VIP: {}, PortPrediction) tx: {:02x?}",
+                                                                    endpoint, vip, &tx_id[..4]
                                                                 );
                                                                 peer_state.mark_probing(endpoint);
                                                                 let pending = PendingDiscoPing {
@@ -1914,9 +1914,9 @@ impl ConnectionManager {
                                                             if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
                                                                 warn!("Failed to send disco ping to {}: {}", endpoint, e);
                                                             } else {
-                                                                debug!(
-                                                                    "Sent disco ping to {} ({}) tx: {:02x?}",
-                                                                    vip, endpoint, &tx_id[..4]
+                                                                info!(
+                                                                    "Sent disco ping to {} (VIP: {}, SimultaneousOpen) tx: {:02x?}",
+                                                                    endpoint, vip, &tx_id[..4]
                                                                 );
                                                                 peer_state.mark_probing(endpoint);
                                                                 let pending = PendingDiscoPing {
@@ -1968,9 +1968,9 @@ impl ConnectionManager {
                                                                 if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
                                                                     warn!("Failed to send disco ping to {}: {}", endpoint, e);
                                                                 } else {
-                                                                    debug!(
-                                                                        "Sent disco ping to {} ({}) tx: {:02x?}",
-                                                                        vip, endpoint, &tx_id[..4]
+                                                                    info!(
+                                                                        "Sent disco ping to {} (VIP: {}) tx: {:02x?}",
+                                                                        endpoint, vip, &tx_id[..4]
                                                                     );
                                                                     peer_state.mark_probing(endpoint);
                                                                     let pending = PendingDiscoPing {
