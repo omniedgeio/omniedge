@@ -77,6 +77,8 @@ pub struct OmniProto {
     nucleus_host: String,
     /// Local IPv6 virtual IP (dual-stack support)
     vip_v6: Option<Ipv6Addr>,
+    /// Encryption context for signaling (v0.3.5)
+    encryption: tokio::sync::RwLock<omninervous::signaling::SignalingEncryption>,
 }
 
 impl OmniProto {
@@ -94,7 +96,7 @@ impl OmniProto {
         let psk = if secret_key.is_empty() {
             None
         } else {
-            Some(secret_key)
+            Some(secret_key.clone())
         };
 
         // Use with_ipv6() constructor to properly pass IPv6 VIP to signaling
@@ -109,10 +111,34 @@ impl OmniProto {
         )
         .await?;
 
+        // Initialize signaling encryption
+        let mut encryption_enabled = false;
+        let mut secret_bytes = [0u8; 32];
+        if !secret_key.is_empty() {
+            // Decode hex secret key to 32 bytes for SignalingEncryption
+            if let Ok(bytes) = (0..secret_key.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&secret_key[i..i + 2], 16))
+                .collect::<Result<Vec<u8>, _>>()
+            {
+                if bytes.len() == 32 {
+                    secret_bytes.copy_from_slice(&bytes);
+                    encryption_enabled = true;
+                }
+            }
+        }
+
+        let encryption = if encryption_enabled {
+            omninervous::signaling::SignalingEncryption::from_secret_key(secret_bytes, true)
+        } else {
+            omninervous::signaling::SignalingEncryption::new(false)
+        };
+
         Ok(Self {
             client: tokio::sync::RwLock::new(client),
             nucleus_host: nucleus_host.to_string(),
             vip_v6: virtual_ip_v6,
+            encryption: tokio::sync::RwLock::new(encryption),
         })
     }
 
@@ -142,16 +168,35 @@ impl OmniProto {
     pub async fn handle_packet(&self, buf: &[u8], secret: Option<&str>) -> Result<Option<PeerUpdate>> {
         use omninervous::signaling::{
             get_signaling_type, parse_heartbeat_ack, parse_register_ack, SIGNALING_HEARTBEAT_ACK,
-            SIGNALING_REGISTER_ACK,
+            SIGNALING_REGISTER_ACK, MSG_ENCRYPTED,
         };
 
-        let msg_type = get_signaling_type(buf).context("Empty signaling packet")?;
+        let mut decrypted_buf = None;
+        let mut msg_type = get_signaling_type(buf).context("Empty signaling packet")?;
+
+        // Handle encrypted signaling packets
+        if msg_type == MSG_ENCRYPTED {
+            let mut enc = self.encryption.write().await;
+            match enc.decrypt(buf) {
+                Ok(plaintext) => {
+                    decrypted_buf = Some(plaintext);
+                    if let Some(p) = decrypted_buf.as_ref() {
+                        msg_type = get_signaling_type(p).context("Empty signaling packet after decryption")?;
+                    }
+                }
+                Err(e) => {
+                    anyhow::bail!("Failed to decrypt signaling message: {}", e);
+                }
+            }
+        }
+
+        let effective_buf = decrypted_buf.as_deref().unwrap_or(buf);
 
         let mut peers = Vec::new();
 
         match msg_type {
             SIGNALING_REGISTER_ACK => {
-                let ack = parse_register_ack(buf, secret)?;
+                let ack = parse_register_ack(effective_buf, secret)?;
                 info!(
                     "Received REGISTER_ACK from Nucleus: success={}, {} recent peers",
                     ack.success, ack.recent_peers.len()
@@ -172,7 +217,7 @@ impl OmniProto {
                 }
             }
             SIGNALING_HEARTBEAT_ACK => {
-                let ack = parse_heartbeat_ack(buf, secret)?;
+                let ack = parse_heartbeat_ack(effective_buf, secret)?;
                 if !ack.new_peers.is_empty() || !ack.removed_vips.is_empty() {
                     info!(
                         "Received HEARTBEAT_ACK: {} new peers, {} removed",

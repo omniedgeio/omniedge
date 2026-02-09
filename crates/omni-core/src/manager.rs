@@ -1750,11 +1750,10 @@ impl ConnectionManager {
 
                                 // Handle other signaling messages (0x11-0x1F, excluding disco)
                                 if first_byte >= 0x11 && first_byte != SIGNALING_DISCO_PING && first_byte != SIGNALING_DISCO_PONG {
-                                    if let Ok(Some(update)) =
-                                        proto_ctrl.handle_packet(pkt, secret.as_deref()).await
-                                    {
-                                        // Get our NAT type for strategy selection
-                                        let our_nat_type = proto_ctrl.get_nat_type().await;
+                                    match proto_ctrl.handle_packet(pkt, secret.as_deref()).await {
+                                        Ok(Some(update)) => {
+                                            // Get our NAT type for strategy selection
+                                            let our_nat_type = proto_ctrl.get_nat_type().await;
 
                                         for peer in update.peers {
                                             let vip = peer.vip;
@@ -1991,7 +1990,22 @@ impl ConnectionManager {
                                             }
                                         }
                                     }
-                                } else if (0x01..=0x04).contains(&first_byte) {
+                                    Ok(None) => {
+                                        debug!(
+                                            "Received unhandled signaling message type 0x{:02x} from {}",
+                                            first_byte, src
+                                        );
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            "Failed to handle signaling message 0x{:02x} from {}: {}",
+                                            first_byte, src, e
+                                        );
+                                    }
+                                }
+                                continue;
+                            }
+                                if (0x01..=0x04).contains(&first_byte) {
                                     // WireGuard
                                     let _ = tun_ctrl.handle_packet(pkt, src, &socket_inner).await;
                                 } else {
@@ -2036,7 +2050,7 @@ impl ConnectionManager {
                                         }
                                     }
                                 } else {
-                                    // Max retries exceeded - mark for removal
+                                // Max retries exceeded - mark for removal
                                     timed_out.push(*tx_id);
 
                                     // Mark endpoint as failed and check if we need relay
