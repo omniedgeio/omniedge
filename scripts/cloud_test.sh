@@ -96,6 +96,7 @@ Options:
   --duration      iperf3 test duration in seconds (default: 10)
   --no-ipv6       Skip IPv6 tests
   --skip-deploy   Skip OmniEdge installation (use existing)
+  --use-local-bin Use local binaries from ./scripts/ folder
   --local-docker  Run local nodes (localhost/127.0.0.1) in Docker containers
   --help          Show this help
 
@@ -144,18 +145,25 @@ get_vip_with_retry() {
         
         # Method 2: Fall back to ip addr if omniedge status doesn't work
         if [[ -z "$vip" || "$vip" == "null" ]]; then
-            # First check if interface exists
-            if ssh_cmd "$node" "ip link show omni0" &>/dev/null; then
+            # First check if interface exists (try both omniedge0 and omni0 for compatibility)
+            local iface_name=""
+            if ssh_cmd "$node" "ip link show omniedge0" &>/dev/null; then
+                iface_name="omniedge0"
+            elif ssh_cmd "$node" "ip link show omni0" &>/dev/null; then
+                iface_name="omni0"
+            fi
+            
+            if [[ -n "$iface_name" ]]; then
                 if [[ "$ip_version" == "4" ]]; then
-                    vip=$(ssh_cmd "$node" "ip addr show omni0 2>/dev/null | grep 'inet ' | awk '{print \$2}' | cut -d/ -f1 | head -1" || echo "")
+                    vip=$(ssh_cmd "$node" "ip addr show $iface_name 2>/dev/null | grep 'inet ' | awk '{print \$2}' | cut -d/ -f1 | head -1" || echo "")
                 else
-                    vip=$(ssh_cmd "$node" "ip -6 addr show omni0 2>/dev/null | grep 'inet6' | grep -v 'fe80' | awk '{print \$2}' | cut -d/ -f1 | head -1" || echo "")
+                    vip=$(ssh_cmd "$node" "ip -6 addr show $iface_name 2>/dev/null | grep 'inet6' | grep -v 'fe80' | awk '{print \$2}' | cut -d/ -f1 | head -1" || echo "")
                 fi
             fi
         fi
         
         if [[ -z "$vip" || "$vip" == "null" ]]; then
-            echo "   Attempt $attempt/$max_attempts: Waiting for omni0 interface on $node..." >&2
+            echo "   Attempt $attempt/$max_attempts: Waiting for OmniEdge interface on $node..." >&2
             sleep 5
         fi
         attempt=$((attempt + 1))
@@ -176,22 +184,29 @@ verify_omniedge_interface() {
     local node="$1"
     export CURRENT_TARGET_NODE="$node"
     
-    # Check if interface exists
-    if ! ssh_cmd "$node" "ip link show omni0" &>/dev/null; then
-        echo "  ❌ omni0 interface does not exist on $node" >&2
+    # Check if interface exists (try both omniedge0 and omni0 for compatibility)
+    local iface_name=""
+    if ssh_cmd "$node" "ip link show omniedge0" &>/dev/null; then
+        iface_name="omniedge0"
+    elif ssh_cmd "$node" "ip link show omni0" &>/dev/null; then
+        iface_name="omni0"
+    fi
+    
+    if [[ -z "$iface_name" ]]; then
+        echo "  ❌ OmniEdge interface (omniedge0/omni0) does not exist on $node" >&2
         unset CURRENT_TARGET_NODE
         return 1
     fi
     
     # Check if interface has an IP
-    local has_ip=$(ssh_cmd "$node" "ip addr show omni0 2>/dev/null | grep -c 'inet '" || echo "0")
+    local has_ip=$(ssh_cmd "$node" "ip addr show $iface_name 2>/dev/null | grep -c 'inet '" || echo "0")
     if [[ "$has_ip" == "0" ]]; then
-        echo "  ⚠️ omni0 interface exists but has no IP on $node" >&2
+        echo "  ⚠️ $iface_name interface exists but has no IP on $node" >&2
         unset CURRENT_TARGET_NODE
         return 1
     fi
     
-    echo "  ✅ omni0 interface verified on $node" >&2
+    echo "  ✅ $iface_name interface verified on $node" >&2
     unset CURRENT_TARGET_NODE
     return 0
 }
@@ -485,33 +500,65 @@ install_dependencies() {
 deploy_omniedge() {
     print_header "Deploying OmniEdge"
     
-    echo -e "📦 Installing OmniEdge via installer script..."
-    echo -e "   ${CYAN}$INSTALLER_URL${NC}"
-    
-    for node in "$NODE_A" "$NODE_B"; do
-        print_step "Installing OmniEdge on $node..."
-        
-        # Check if already installed
-        if ssh_cmd "$node" "which omniedge" &>/dev/null; then
-            local existing_version
-            existing_version=$(ssh_cmd "$node" "omniedge --version 2>/dev/null | head -1" || echo "unknown")
-            echo -e "  ℹ️ OmniEdge already installed: $existing_version"
-            echo -e "  🔄 Reinstalling to ensure latest version..."
-        fi
-        
-        # Run the install script on the remote node
-        ssh_cmd "$node" "curl -fsSL $INSTALLER_URL | sudo bash"
-        
-        # Verify installation
-        if ssh_cmd "$node" "which omniedge" &>/dev/null; then
+    if [[ "$USE_LOCAL_BIN" == "true" ]]; then
+        echo -e "📦 Deploying local binaries from ./scripts/ folder..."
+        for node in "$NODE_A" "$NODE_B"; do
+            print_step "Uploading and installing local binary on $node..."
+            
+            # Detect architecture
+            local arch=$(ssh_cmd "$node" "uname -m")
+            local bin_name=""
+            
+            case "$arch" in
+                x86_64) bin_name="omniedge-cli-2.7.2-linux-x64" ;;
+                aarch64|arm64) bin_name="omniedge-cli-2.7.2-linux-arm64" ;;
+                *) print_error "Unsupported architecture $arch on $node"; exit 1 ;;
+            esac
+            
+            # Binary is expected to be in the same folder as this script (scripts/)
+            local bin_path="$(dirname "$0")/$bin_name"
+            if [[ ! -f "$bin_path" ]]; then
+                print_error "Local binary not found: $bin_path"
+                exit 1
+            fi
+            
+            echo -e "  🚀 Uploading $bin_name to $node..."
+            scp_to "$bin_path" "$node" "/tmp/omniedge"
+            ssh_cmd "$node" "sudo mv /tmp/omniedge /usr/local/bin/omniedge && sudo chmod +x /usr/local/bin/omniedge"
+            
             local version
             version=$(ssh_cmd "$node" "omniedge --version 2>/dev/null | head -1" || echo "unknown")
             echo -e "  ✅ OmniEdge installed on $node ($version)"
-        else
-            print_error "Installation failed on $node"
-            exit 1
-        fi
-    done
+        done
+    else
+        echo -e "📦 Installing OmniEdge via installer script..."
+        echo -e "   ${CYAN}$INSTALLER_URL${NC}"
+        
+        for node in "$NODE_A" "$NODE_B"; do
+            print_step "Installing OmniEdge on $node..."
+            
+            # Check if already installed
+            if ssh_cmd "$node" "which omniedge" &>/dev/null; then
+                local existing_version
+                existing_version=$(ssh_cmd "$node" "omniedge --version 2>/dev/null | head -1" || echo "unknown")
+                echo -e "  ℹ️ OmniEdge already installed: $existing_version"
+                echo -e "  🔄 Reinstalling to ensure latest version..."
+            fi
+            
+            # Run the install script on the remote node
+            ssh_cmd "$node" "curl -fsSL $INSTALLER_URL | sudo bash"
+            
+            # Verify installation
+            if ssh_cmd "$node" "which omniedge" &>/dev/null; then
+                local version
+                version=$(ssh_cmd "$node" "omniedge --version 2>/dev/null | head -1" || echo "unknown")
+                echo -e "  ✅ OmniEdge installed on $node ($version)"
+            else
+                print_error "Installation failed on $node"
+                exit 1
+            fi
+        done
+    fi
     
     echo -e "\n${GREEN}OmniEdge installation complete!${NC}"
 }
@@ -548,11 +595,13 @@ run_test() {
     for node in "$NODE_A" "$NODE_B"; do
         export CURRENT_TARGET_NODE="$node"
         # Kill both omniedge and omninervous to avoid stale settings interference
-        # Also explicitly remove the omni0 interface to force a fresh backend assignment
+        # Also explicitly remove the OmniEdge interface to force a fresh backend assignment
+        # Try both interface names for compatibility (omniedge0 is current, omni0 is legacy)
         ssh_cmd "$node" "sudo pkill -9 -f omniedge || true; \
                          sudo pkill -9 -f omninervous || true; \
                          sudo pkill -9 -f iperf3 || true; \
                          if command -v fuser &>/dev/null; then sudo fuser -k 51820/udp 2>/dev/null || true; fi; \
+                         sudo ip link delete omniedge0 2>/dev/null || true; \
                          sudo ip link delete omni0 2>/dev/null || true; \
                          sudo rm -f /tmp/omni-*.log" || true
         unset CURRENT_TARGET_NODE
@@ -860,6 +909,7 @@ EOF
 # =============================================================================
 
 SKIP_DEPLOY=false
+USE_LOCAL_BIN=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -871,6 +921,7 @@ while [[ $# -gt 0 ]]; do
         --key) SECURITY_KEY="$2"; shift 2 ;;
         --duration) TEST_DURATION="$2"; shift 2 ;;
         --skip-deploy) SKIP_DEPLOY=true; shift ;;
+        --use-local-bin) USE_LOCAL_BIN=true; shift ;;
         --local-docker) LOCAL_DOCKER=true; shift ;;
         --no-ipv6) TEST_IPV6=false; shift ;;
         --help|-h) show_help; exit 0 ;;

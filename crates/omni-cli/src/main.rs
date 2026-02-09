@@ -320,11 +320,15 @@ enum Commands {
     /// EXAMPLES:
     ///   omniedge status            Show basic connection status
     ///   omniedge status --debug    Show detailed P2P connection info
+    ///   omniedge status --json     Output status as JSON (for scripts)
     Status {
         /// Show detailed P2P connection debugging information
         /// Including disco ping/pong state, NAT traversal status, and per-peer RTT
         #[arg(short = 'd', long)]
         debug: bool,
+        /// Output status as JSON (useful for scripting and cloud_test.sh)
+        #[arg(short = 'j', long)]
+        json: bool,
     },
     /// Scan local subnet and upload results to OmniEdge
     ///
@@ -1163,10 +1167,48 @@ async fn async_main() -> Result<()> {
             spinner.finish_and_clear();
             println!("✓ OmniEdge stopped.");
         }
-        Commands::Status { debug } => {
+        Commands::Status { debug, json } => {
             let status =
                 service::get_service_status(config.last_run_mode.as_deref(), config.nucleus_port)
                     .await;
+
+            // JSON output mode for scripting (used by cloud_test.sh)
+            if json {
+                // Build JSON status object
+                let virtual_ip = status
+                    .virtual_ip
+                    .clone()
+                    .or_else(|| config.last_join_info.as_ref().map(|j| j.virtual_ip.clone()));
+                let virtual_ip_v6 = status.virtual_ip_v6.clone().or_else(|| {
+                    config
+                        .last_join_info
+                        .as_ref()
+                        .and_then(|j| j.virtual_ip_v6.clone())
+                });
+                let network_id = status.network_id.clone().or(config.last_network_id.clone());
+                let mode = status
+                    .mode
+                    .clone()
+                    .or(config.last_run_mode.clone())
+                    .unwrap_or_else(|| "edge".to_string());
+
+                let json_output = serde_json::json!({
+                    "connected": status.is_running,
+                    "vip": virtual_ip,
+                    "vip6": virtual_ip_v6,
+                    "network_id": network_id,
+                    "interface": status.interface_name,
+                    "mode": mode,
+                    "device_name": config.device_name,
+                    "is_exit_node": config.is_exit_node,
+                    "exit_node_ip": config.exit_node_ip,
+                    "exit_node_ip_v6": config.exit_node_ip_v6,
+                    "nucleus_port": status.nucleus_port.or(config.nucleus_port),
+                    "authenticated": config.auth_response.is_some() && !config.is_token_expired(),
+                });
+                println!("{}", serde_json::to_string_pretty(&json_output).unwrap_or_else(|_| "{}".to_string()));
+                std::process::exit(exit_codes::SUCCESS);
+            }
 
             println!();
             println!("OmniEdge Status");
