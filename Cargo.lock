@@ -4287,7 +4287,7 @@ version = "2.5.0"
 dependencies = [
  "anyhow",
  "log",
- "omninervous 0.8.9",
+ "omninervous 0.8.9 (git+https://github.com/omniedgeio/OmniNervous?tag=v0.9.0)",
  "serde",
  "serde_cbor",
  "tokio",
@@ -4414,6 +4414,7 @@ dependencies = [
 [[package]]
 name = "omninervous"
 version = "0.8.9"
+source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.8.9#52c348f22acaf13a58a042d44fb0a2ffb42d6b1a"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -4450,7 +4451,7 @@ dependencies = [
 [[package]]
 name = "omninervous"
 version = "0.8.9"
-source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.8.9#52c348f22acaf13a58a042d44fb0a2ffb42d6b1a"
+source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.9.0#98477cf80a93c89d3f6cfdcc3ca3cf8926aec70b"
 dependencies = [
  "anyhow",
  "base64 0.21.7",

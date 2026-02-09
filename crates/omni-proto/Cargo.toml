@@ -6,9 +6,9 @@ license = "Apache-2.0 OR MIT"
 
 [dependencies]
 # For development: use local OmniNervous
-omninervous = { path = "../../../OmniNervous/crates/daemon", package = "omninervous" }
+# omninervous = { path = "../../../OmniNervous/crates/daemon", package = "omninervous" }
 # For release: use git tag
-# omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "omninervous", tag = "v0.8.9" }
+omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "omninervous", tag = "v0.9.0" }
 anyhow = "1.0"
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }

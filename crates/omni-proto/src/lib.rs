@@ -228,18 +228,22 @@ impl OmniProto {
             }
             SIGNALING_PEER_INFO => {
                 let info = parse_peer_info(effective_buf, secret)?;
-                info!(
-                    "Received PEER_INFO from Nucleus: vip={}, endpoint={}, mapped_endpoint={:?}, nat_type={:?}",
-                    info.vip, info.endpoint, info.mapped_endpoint, info.nat_type
-                );
-                peers.push(PeerInfo {
-                    vip: info.vip,
-                    vip_v6: info.vip_v6,
-                    endpoint: info.endpoint.parse().ok(),
-                    public_key: info.public_key,
-                    nat_type: info.nat_type,
-                    mapped_endpoint: info.mapped_endpoint.as_ref().and_then(|s| s.parse().ok()),
-                });
+                if info.found {
+                    if let Some(p) = info.peer {
+                        info!(
+                            "Received PEER_INFO from Nucleus: vip={}, endpoint={}, mapped_endpoint={:?}, nat_type={:?}",
+                            p.vip, p.endpoint, p.mapped_endpoint, p.nat_type
+                        );
+                        peers.push(PeerInfo {
+                            vip: p.vip,
+                            vip_v6: p.vip_v6,
+                            endpoint: p.endpoint.parse().ok(),
+                            public_key: p.public_key,
+                            nat_type: p.nat_type,
+                            mapped_endpoint: p.mapped_endpoint.as_ref().and_then(|s| s.parse().ok()),
+                        });
+                    }
+                }
             }
             _ => return Ok(None),
         }
