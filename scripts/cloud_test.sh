@@ -241,7 +241,16 @@ ssh_cmd() {
             cmd=$(echo "$cmd" | sed 's/\bsudo //g')
             # Tracer for debugging routing
             # echo "   [DOCKER] $host: $cmd" >&2
-            docker exec "$LOCAL_DOCKER_NAME" sh -c "$cmd"
+            
+            # For backgrounded commands (ending with &), use docker exec -d for proper detachment
+            if [[ "$cmd" == *' &' || "$cmd" == *'&' ]]; then
+                # Remove trailing & and use docker exec -d for detached execution
+                cmd="${cmd% &}"
+                cmd="${cmd%&}"
+                docker exec -d "$LOCAL_DOCKER_NAME" sh -c "$cmd"
+            else
+                docker exec "$LOCAL_DOCKER_NAME" sh -c "$cmd"
+            fi
         else
             # Native local execution
             # echo "   [NATIVE] $host: $*" >&2
@@ -510,8 +519,8 @@ deploy_omniedge() {
             local bin_name=""
             
             case "$arch" in
-                x86_64) bin_name="omniedge-cli-2.7.2-linux-x64" ;;
-                aarch64|arm64) bin_name="omniedge-cli-2.7.2-linux-arm64" ;;
+                x86_64) bin_name="omniedge-cli-2.7.3-linux-x64" ;;
+                aarch64|arm64) bin_name="omniedge-cli-2.7.3-linux-arm64" ;;
                 *) print_error "Unsupported architecture $arch on $node"; exit 1 ;;
             esac
             
@@ -614,14 +623,15 @@ run_test() {
     # Start Edge A
     print_step "Starting Edge A on $NODE_A..."
     export CURRENT_TARGET_NODE="$NODE_A"
-    ssh_cmd "$NODE_A" "sudo sh -c \"nohup omniedge start -n $NETWORK_ID -s $SECURITY_KEY > /tmp/omni-edge-a.log 2>&1 &\" < /dev/null"
+    # Note: sudo is stripped automatically for Docker containers by ssh_cmd
+    ssh_cmd "$NODE_A" "sudo nohup omniedge start -n $NETWORK_ID -s $SECURITY_KEY > /tmp/omni-edge-a.log 2>&1 &"
     unset CURRENT_TARGET_NODE
     sleep 3
 
     # Start Edge B
     print_step "Starting Edge B on $NODE_B..."
     export CURRENT_TARGET_NODE="$NODE_B"
-    ssh_cmd "$NODE_B" "sudo sh -c \"nohup omniedge start -n $NETWORK_ID -s $SECURITY_KEY > /tmp/omni-edge-b.log 2>&1 &\" < /dev/null"
+    ssh_cmd "$NODE_B" "sudo nohup omniedge start -n $NETWORK_ID -s $SECURITY_KEY > /tmp/omni-edge-b.log 2>&1 &"
     unset CURRENT_TARGET_NODE
     sleep 3
     
