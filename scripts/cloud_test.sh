@@ -104,10 +104,22 @@ Options:
   --duration      iperf3 test duration in seconds (default: 10)
   --no-ipv6       Skip IPv6 tests
   --skip-deploy   Skip OmniEdge installation (use existing)
-  --use-local-bin Use pre-built binaries from ./scripts/ folder
-  --use-local-cli Build and use local CLI from cargo (auto-detects arch)
-  --local-docker  Run local nodes (localhost/127.0.0.1) in Docker containers
+  --use-local-bin Deploy pre-built binaries from ./scripts/ folder to nodes
+  --use-local-cli Run localhost natively (not Docker) using local cargo build
+  --local-docker  Run localhost nodes in Docker containers (default for localhost)
   --help          Show this help
+
+Localhost Execution Modes:
+  By default, localhost nodes run in Docker containers for isolation.
+  
+  --local-docker  (default) Run localhost in Docker container
+                  - Isolated environment, won't affect host system
+                  - Requires Docker installed
+                  
+  --use-local-cli Run localhost natively on host system
+                  - Uses cargo to build CLI from local source
+                  - Runs OmniEdge directly on host (requires sudo)
+                  - Good for testing local code changes quickly
 
 Environment Variables:
   SSH_USER                SSH username
@@ -116,16 +128,21 @@ Environment Variables:
   OMNIEDGE_SECURITY_KEY   Security Key (fallback)
 
 Example:
-  # Test with remote servers using installer
+  # Test with two remote servers using installer
   $0 --node-a 54.x.x.x --node-b 35.x.x.x \\
      --network abc123 --key sk_xxx --ssh-key ~/.ssh/cloud.pem
 
-  # Test with local Docker + remote server using local CLI build
+  # Test localhost (in Docker) + remote server
   $0 --node-a localhost --node-b 54.x.x.x \\
      --network abc123 --key sk_xxx \\
-     --local-docker --use-local-cli --ssh-key ~/.ssh/cloud.pem
+     --local-docker --ssh-key ~/.ssh/cloud.pem
 
-  # Test with pre-built binaries in scripts/ folder
+  # Test localhost natively using local cargo build
+  $0 --node-a localhost --node-b 54.x.x.x \\
+     --network abc123 --key sk_xxx \\
+     --use-local-cli --ssh-key ~/.ssh/cloud.pem
+
+  # Deploy pre-built binaries from scripts/ folder
   $0 --node-a localhost --node-b 54.x.x.x \\
      --network abc123 --key sk_xxx \\
      --local-docker --use-local-bin --ssh-key ~/.ssh/cloud.pem
@@ -265,6 +282,15 @@ get_rust_target() {
 # Detect node architecture and OS
 detect_node_arch() {
     local node="$1"
+    
+    # For local nodes when USE_LOCAL_CLI is enabled, use host system directly
+    if is_local "$node" && [[ "$USE_LOCAL_CLI" == "true" ]]; then
+        local arch=$(uname -m)
+        local os=$(uname -s)
+        echo "$arch:$os"
+        return 0
+    fi
+    
     export CURRENT_TARGET_NODE="$node"
     
     local arch=$(ssh_cmd "$node" "uname -m" 2>/dev/null | tr -d '\r\n')
@@ -486,6 +512,10 @@ scp_to() {
 }
 
 ensure_local_docker() {
+    # Skip Docker setup if --use-local-cli is enabled (native execution)
+    if [[ "$USE_LOCAL_CLI" == "true" ]]; then
+        return 0
+    fi
     if [[ "$LOCAL_DOCKER" != "true" ]]; then return 0; fi
     
     local container_exists=false
@@ -558,6 +588,9 @@ preflight_check() {
     if [[ "$LOCAL_DOCKER" == "true" ]]; then
         deps="$deps docker"
     fi
+    if [[ "$USE_LOCAL_CLI" == "true" ]]; then
+        deps="$deps cargo"
+    fi
     for cmd in $deps; do
         if which "$cmd" &>/dev/null; then
             echo -e "  ✅ Local $cmd found"
@@ -566,6 +599,16 @@ preflight_check() {
             errors=$((errors + 1))
         fi
     done
+    
+    # Additional check for --use-local-cli: verify project root has Cargo.toml
+    if [[ "$USE_LOCAL_CLI" == "true" ]]; then
+        if [[ -f "$PROJECT_ROOT/Cargo.toml" ]]; then
+            echo -e "  ✅ Project root found: $PROJECT_ROOT"
+        else
+            echo -e "  ❌ Cargo.toml not found at $PROJECT_ROOT"
+            errors=$((errors + 1))
+        fi
+    fi
     
     # Check connectivity
     for node in "$NODE_A" "$NODE_B"; do
@@ -708,45 +751,37 @@ deploy_omniedge() {
     print_header "Deploying OmniEdge"
     
     if [[ "$USE_LOCAL_CLI" == "true" ]]; then
-        # Build and deploy from local source
-        echo -e "📦 Building and deploying OmniEdge CLI from local source..."
+        # Build and deploy from local source (or use existing binaries in scripts/)
+        echo -e "📦 Deploying OmniEdge CLI (checking scripts/ folder first, then building if needed)..."
         echo -e "   Project root: ${CYAN}$PROJECT_ROOT${NC}"
         
-        # Collect unique architectures needed
-        declare -A targets_needed
+        # Deploy to each node - get_binary_for_node will check for existing binaries first
         for node in "$NODE_A" "$NODE_B"; do
-            local arch_os=$(detect_node_arch "$node")
-            local arch="${arch_os%%:*}"
-            local os="${arch_os##*:}"
-            local target=$(get_rust_target "$arch" "$os")
+            print_step "Deploying CLI to $node..."
             
-            if [[ -z "$target" ]]; then
-                print_error "Unsupported architecture/OS for $node: $arch / $os"
-                exit 1
+            # get_binary_for_node checks for existing binaries first, then builds if needed
+            local bin_path
+            bin_path=$(get_binary_for_node "$node") || exit 1
+            
+            if is_local "$node"; then
+                # Native localhost installation - direct copy
+                echo -e "  🚀 Installing $(basename "$bin_path") to local system..."
+                sudo cp "$bin_path" /usr/local/bin/omniedge
+                sudo chmod +x /usr/local/bin/omniedge
+                
+                local version
+                version=$(omniedge --version 2>/dev/null | head -1 || echo "unknown")
+                echo -e "  ✅ OmniEdge installed locally ($version)"
+            else
+                # Remote node - use scp/ssh
+                echo -e "  🚀 Uploading $(basename "$bin_path") to $node..."
+                scp_to "$bin_path" "$node" "/tmp/omniedge"
+                ssh_cmd "$node" "sudo mv /tmp/omniedge /usr/local/bin/omniedge && sudo chmod +x /usr/local/bin/omniedge"
+                
+                local version
+                version=$(ssh_cmd "$node" "omniedge --version 2>/dev/null | head -1" || echo "unknown")
+                echo -e "  ✅ OmniEdge installed on $node ($version)"
             fi
-            
-            targets_needed["$target"]=1
-            echo "  Node $node needs target: $target"
-        done
-        
-        # Build for each unique target
-        for target in "${!targets_needed[@]}"; do
-            build_local_cli "$target" || exit 1
-        done
-        
-        # Deploy to each node
-        for node in "$NODE_A" "$NODE_B"; do
-            print_step "Deploying local CLI to $node..."
-            
-            local bin_path=$(get_binary_for_node "$node") || exit 1
-            
-            echo -e "  🚀 Uploading $(basename "$bin_path") to $node..."
-            scp_to "$bin_path" "$node" "/tmp/omniedge"
-            ssh_cmd "$node" "sudo mv /tmp/omniedge /usr/local/bin/omniedge && sudo chmod +x /usr/local/bin/omniedge"
-            
-            local version
-            version=$(ssh_cmd "$node" "omniedge --version 2>/dev/null | head -1" || echo "unknown")
-            echo -e "  ✅ OmniEdge installed on $node ($version)"
         done
         
     elif [[ "$USE_LOCAL_BIN" == "true" ]]; then
@@ -1202,6 +1237,21 @@ done
 
 NETWORK_ID="${NETWORK_ID:-$OMNIEDGE_NETWORK_ID}"
 SECURITY_KEY="${SECURITY_KEY:-$OMNIEDGE_SECURITY_KEY}"
+
+# Validate mutual exclusivity of --use-local-cli and --local-docker
+if [[ "$USE_LOCAL_CLI" == "true" && "$LOCAL_DOCKER" == "true" ]]; then
+    print_error "--use-local-cli and --local-docker are mutually exclusive"
+    echo "  --use-local-cli: Run localhost natively using local cargo build"
+    echo "  --local-docker:  Run localhost in Docker container"
+    exit 1
+fi
+
+# If --use-local-cli is used with localhost, ensure LOCAL_DOCKER is false
+if [[ "$USE_LOCAL_CLI" == "true" ]]; then
+    if is_local "$NODE_A" || is_local "$NODE_B"; then
+        echo -e "${CYAN}Note: --use-local-cli mode enabled - localhost will run natively${NC}"
+    fi
+fi
 
 if [[ -z "$NODE_A" || -z "$NODE_B" || -z "$NETWORK_ID" || -z "$SECURITY_KEY" ]]; then
     print_error "Missing required arguments"
