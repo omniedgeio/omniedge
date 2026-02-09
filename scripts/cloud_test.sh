@@ -63,6 +63,14 @@ INSTALLER_URL="${INSTALLER_URL:-https://raw.githubusercontent.com/omniedgeio/omn
 LOCAL_DOCKER=false
 LOCAL_DOCKER_NAME="omni-node-local"
 
+# Local CLI build settings
+USE_LOCAL_CLI=false
+LOCAL_CLI_PATH=""
+
+# Get script and project directories
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 show_help() {
     cat << EOF
 OmniEdge 2-Node Cloud Test Orchestrator
@@ -96,7 +104,8 @@ Options:
   --duration      iperf3 test duration in seconds (default: 10)
   --no-ipv6       Skip IPv6 tests
   --skip-deploy   Skip OmniEdge installation (use existing)
-  --use-local-bin Use local binaries from ./scripts/ folder
+  --use-local-bin Use pre-built binaries from ./scripts/ folder
+  --use-local-cli Build and use local CLI from cargo (auto-detects arch)
   --local-docker  Run local nodes (localhost/127.0.0.1) in Docker containers
   --help          Show this help
 
@@ -107,9 +116,19 @@ Environment Variables:
   OMNIEDGE_SECURITY_KEY   Security Key (fallback)
 
 Example:
-  $0 --node-a 54.x.x.x --node-b localhost \\
+  # Test with remote servers using installer
+  $0 --node-a 54.x.x.x --node-b 35.x.x.x \\
+     --network abc123 --key sk_xxx --ssh-key ~/.ssh/cloud.pem
+
+  # Test with local Docker + remote server using local CLI build
+  $0 --node-a localhost --node-b 54.x.x.x \\
      --network abc123 --key sk_xxx \\
-     --local-docker --ssh-key ~/.ssh/cloud.pem
+     --local-docker --use-local-cli --ssh-key ~/.ssh/cloud.pem
+
+  # Test with pre-built binaries in scripts/ folder
+  $0 --node-a localhost --node-b 54.x.x.x \\
+     --network abc123 --key sk_xxx \\
+     --local-docker --use-local-bin --ssh-key ~/.ssh/cloud.pem
 
 Prerequisites:
    - SSH access with key authentication to cloud nodes
@@ -117,6 +136,7 @@ Prerequisites:
    - Root/sudo access for TUN interface creation
    - Ports: UDP 51820 (WireGuard), TCP 5201-5202 (iperf3)
    - OmniEdge Network ID and Security Key from dashboard
+   - Rust/Cargo installed (if using --use-local-cli)
 EOF
 }
 
@@ -209,6 +229,169 @@ verify_omniedge_interface() {
     echo "  ✅ $iface_name interface verified on $node" >&2
     unset CURRENT_TARGET_NODE
     return 0
+}
+
+# =============================================================================
+# Local CLI Build Functions
+# =============================================================================
+
+# Get the Rust target triple for a given architecture
+get_rust_target() {
+    local arch="$1"
+    local os="$2"
+    
+    case "$os" in
+        Linux|linux)
+            case "$arch" in
+                x86_64) echo "x86_64-unknown-linux-gnu" ;;
+                aarch64|arm64) echo "aarch64-unknown-linux-gnu" ;;
+                armv7l|armhf) echo "armv7-unknown-linux-gnueabihf" ;;
+                *) echo "" ;;
+            esac
+            ;;
+        Darwin|darwin)
+            case "$arch" in
+                x86_64) echo "x86_64-apple-darwin" ;;
+                arm64|aarch64) echo "aarch64-apple-darwin" ;;
+                *) echo "" ;;
+            esac
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+# Detect node architecture and OS
+detect_node_arch() {
+    local node="$1"
+    export CURRENT_TARGET_NODE="$node"
+    
+    local arch=$(ssh_cmd "$node" "uname -m" 2>/dev/null | tr -d '\r\n')
+    local os=$(ssh_cmd "$node" "uname -s" 2>/dev/null | tr -d '\r\n')
+    
+    unset CURRENT_TARGET_NODE
+    echo "$arch:$os"
+}
+
+# Build local CLI for a specific target
+build_local_cli() {
+    local target="$1"
+    local output_dir="$SCRIPT_DIR"
+    
+    print_step "Building OmniEdge CLI for target: $target"
+    
+    # Check if cargo is available
+    if ! command -v cargo &>/dev/null; then
+        print_error "Cargo not found. Please install Rust: https://rustup.rs"
+        return 1
+    fi
+    
+    # Check if we're in the project root or can find it
+    if [[ ! -f "$PROJECT_ROOT/Cargo.toml" ]]; then
+        print_error "Cannot find project root (Cargo.toml not found at $PROJECT_ROOT)"
+        return 1
+    fi
+    
+    # Determine if we need cross-compilation
+    local host_arch=$(uname -m)
+    local host_os=$(uname -s)
+    local host_target=$(get_rust_target "$host_arch" "$host_os")
+    
+    local build_cmd="cargo build -p omniedge-cli --release"
+    local binary_path="$PROJECT_ROOT/target/release/omniedge"
+    
+    if [[ "$target" != "$host_target" ]]; then
+        # Cross-compilation needed
+        echo "  Cross-compiling from $host_target to $target..."
+        
+        # Check if target is installed
+        if ! rustup target list --installed | grep -q "$target"; then
+            echo "  Installing target $target..."
+            rustup target add "$target" || {
+                print_error "Failed to add Rust target: $target"
+                return 1
+            }
+        fi
+        
+        # Check for cross or use cargo with target
+        if command -v cross &>/dev/null; then
+            build_cmd="cross build -p omniedge-cli --release --target $target"
+            binary_path="$PROJECT_ROOT/target/$target/release/omniedge"
+        else
+            # Try native cargo with target (may need linker setup)
+            build_cmd="cargo build -p omniedge-cli --release --target $target"
+            binary_path="$PROJECT_ROOT/target/$target/release/omniedge"
+            echo "  Note: Using cargo for cross-compilation. If this fails, install 'cross': cargo install cross"
+        fi
+    fi
+    
+    # Run the build
+    echo "  Running: $build_cmd"
+    (cd "$PROJECT_ROOT" && $build_cmd) || {
+        print_error "Build failed for target: $target"
+        return 1
+    }
+    
+    # Verify binary exists
+    if [[ ! -f "$binary_path" ]]; then
+        print_error "Binary not found at: $binary_path"
+        return 1
+    fi
+    
+    # Create output filename based on target
+    local output_name="omniedge-cli-local"
+    case "$target" in
+        x86_64-unknown-linux-gnu) output_name="omniedge-cli-local-linux-x64" ;;
+        aarch64-unknown-linux-gnu) output_name="omniedge-cli-local-linux-arm64" ;;
+        armv7-unknown-linux-gnueabihf) output_name="omniedge-cli-local-linux-armv7" ;;
+        x86_64-apple-darwin) output_name="omniedge-cli-local-macos-x64" ;;
+        aarch64-apple-darwin) output_name="omniedge-cli-local-macos-arm64" ;;
+    esac
+    
+    # Copy to scripts directory
+    cp "$binary_path" "$output_dir/$output_name"
+    chmod +x "$output_dir/$output_name"
+    
+    echo "  ✅ Built: $output_dir/$output_name"
+    echo "$output_dir/$output_name"
+}
+
+# Get or build the binary for a specific node
+get_binary_for_node() {
+    local node="$1"
+    local arch_os=$(detect_node_arch "$node")
+    local arch="${arch_os%%:*}"
+    local os="${arch_os##*:}"
+    
+    echo "  Detected $node: arch=$arch, os=$os" >&2
+    
+    local target=$(get_rust_target "$arch" "$os")
+    if [[ -z "$target" ]]; then
+        print_error "Unsupported architecture/OS: $arch / $os"
+        return 1
+    fi
+    
+    # Check for existing local build
+    local output_name=""
+    case "$target" in
+        x86_64-unknown-linux-gnu) output_name="omniedge-cli-local-linux-x64" ;;
+        aarch64-unknown-linux-gnu) output_name="omniedge-cli-local-linux-arm64" ;;
+        armv7-unknown-linux-gnueabihf) output_name="omniedge-cli-local-linux-armv7" ;;
+        x86_64-apple-darwin) output_name="omniedge-cli-local-macos-x64" ;;
+        aarch64-apple-darwin) output_name="omniedge-cli-local-macos-arm64" ;;
+    esac
+    
+    local binary_path="$SCRIPT_DIR/$output_name"
+    
+    # Build if not exists
+    if [[ ! -f "$binary_path" ]]; then
+        binary_path=$(build_local_cli "$target") || return 1
+    else
+        echo "  Using existing build: $binary_path" >&2
+    fi
+    
+    echo "$binary_path"
 }
 
 is_local() {
@@ -509,29 +692,40 @@ install_dependencies() {
 deploy_omniedge() {
     print_header "Deploying OmniEdge"
     
-    if [[ "$USE_LOCAL_BIN" == "true" ]]; then
-        echo -e "📦 Deploying local binaries from ./scripts/ folder..."
+    if [[ "$USE_LOCAL_CLI" == "true" ]]; then
+        # Build and deploy from local source
+        echo -e "📦 Building and deploying OmniEdge CLI from local source..."
+        echo -e "   Project root: ${CYAN}$PROJECT_ROOT${NC}"
+        
+        # Collect unique architectures needed
+        declare -A targets_needed
         for node in "$NODE_A" "$NODE_B"; do
-            print_step "Uploading and installing local binary on $node..."
+            local arch_os=$(detect_node_arch "$node")
+            local arch="${arch_os%%:*}"
+            local os="${arch_os##*:}"
+            local target=$(get_rust_target "$arch" "$os")
             
-            # Detect architecture
-            local arch=$(ssh_cmd "$node" "uname -m")
-            local bin_name=""
-            
-            case "$arch" in
-                x86_64) bin_name="omniedge-cli-2.7.3-linux-x64" ;;
-                aarch64|arm64) bin_name="omniedge-cli-2.7.3-linux-arm64" ;;
-                *) print_error "Unsupported architecture $arch on $node"; exit 1 ;;
-            esac
-            
-            # Binary is expected to be in the same folder as this script (scripts/)
-            local bin_path="$(dirname "$0")/$bin_name"
-            if [[ ! -f "$bin_path" ]]; then
-                print_error "Local binary not found: $bin_path"
+            if [[ -z "$target" ]]; then
+                print_error "Unsupported architecture/OS for $node: $arch / $os"
                 exit 1
             fi
             
-            echo -e "  🚀 Uploading $bin_name to $node..."
+            targets_needed["$target"]=1
+            echo "  Node $node needs target: $target"
+        done
+        
+        # Build for each unique target
+        for target in "${!targets_needed[@]}"; do
+            build_local_cli "$target" || exit 1
+        done
+        
+        # Deploy to each node
+        for node in "$NODE_A" "$NODE_B"; do
+            print_step "Deploying local CLI to $node..."
+            
+            local bin_path=$(get_binary_for_node "$node") || exit 1
+            
+            echo -e "  🚀 Uploading $(basename "$bin_path") to $node..."
             scp_to "$bin_path" "$node" "/tmp/omniedge"
             ssh_cmd "$node" "sudo mv /tmp/omniedge /usr/local/bin/omniedge && sudo chmod +x /usr/local/bin/omniedge"
             
@@ -539,7 +733,57 @@ deploy_omniedge() {
             version=$(ssh_cmd "$node" "omniedge --version 2>/dev/null | head -1" || echo "unknown")
             echo -e "  ✅ OmniEdge installed on $node ($version)"
         done
+        
+    elif [[ "$USE_LOCAL_BIN" == "true" ]]; then
+        # Use pre-built binaries from scripts/ folder
+        echo -e "📦 Deploying pre-built binaries from ./scripts/ folder..."
+        for node in "$NODE_A" "$NODE_B"; do
+            print_step "Uploading and installing local binary on $node..."
+            
+            # Detect architecture
+            local arch=$(ssh_cmd "$node" "uname -m")
+            local bin_name=""
+            
+            # Look for binaries matching pattern: omniedge-cli-*-linux-{x64,arm64}
+            case "$arch" in
+                x86_64)
+                    # Find the latest x64 binary
+                    bin_name=$(ls -1 "$SCRIPT_DIR"/omniedge-cli-*-linux-x64 2>/dev/null | sort -V | tail -1)
+                    if [[ -z "$bin_name" ]]; then
+                        bin_name="$SCRIPT_DIR/omniedge-cli-local-linux-x64"
+                    fi
+                    ;;
+                aarch64|arm64)
+                    bin_name=$(ls -1 "$SCRIPT_DIR"/omniedge-cli-*-linux-arm64 2>/dev/null | sort -V | tail -1)
+                    if [[ -z "$bin_name" ]]; then
+                        bin_name="$SCRIPT_DIR/omniedge-cli-local-linux-arm64"
+                    fi
+                    ;;
+                *)
+                    print_error "Unsupported architecture $arch on $node"
+                    exit 1
+                    ;;
+            esac
+            
+            if [[ ! -f "$bin_name" ]]; then
+                print_error "Local binary not found: $bin_name"
+                echo "  Available binaries in $SCRIPT_DIR:"
+                ls -1 "$SCRIPT_DIR"/omniedge-cli-* 2>/dev/null || echo "    (none)"
+                echo ""
+                echo "  Hint: Use --use-local-cli to build from source automatically"
+                exit 1
+            fi
+            
+            echo -e "  🚀 Uploading $(basename "$bin_name") to $node..."
+            scp_to "$bin_name" "$node" "/tmp/omniedge"
+            ssh_cmd "$node" "sudo mv /tmp/omniedge /usr/local/bin/omniedge && sudo chmod +x /usr/local/bin/omniedge"
+            
+            local version
+            version=$(ssh_cmd "$node" "omniedge --version 2>/dev/null | head -1" || echo "unknown")
+            echo -e "  ✅ OmniEdge installed on $node ($version)"
+        done
     else
+        # Use remote installer script
         echo -e "📦 Installing OmniEdge via installer script..."
         echo -e "   ${CYAN}$INSTALLER_URL${NC}"
         
@@ -920,6 +1164,7 @@ EOF
 
 SKIP_DEPLOY=false
 USE_LOCAL_BIN=false
+USE_LOCAL_CLI=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -932,6 +1177,7 @@ while [[ $# -gt 0 ]]; do
         --duration) TEST_DURATION="$2"; shift 2 ;;
         --skip-deploy) SKIP_DEPLOY=true; shift ;;
         --use-local-bin) USE_LOCAL_BIN=true; shift ;;
+        --use-local-cli) USE_LOCAL_CLI=true; shift ;;
         --local-docker) LOCAL_DOCKER=true; shift ;;
         --no-ipv6) TEST_IPV6=false; shift ;;
         --help|-h) show_help; exit 0 ;;
