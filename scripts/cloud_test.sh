@@ -988,15 +988,16 @@ run_test() {
     # Start Edge A
     print_step "Starting Edge A on $NODE_A..."
     export CURRENT_TARGET_NODE="$NODE_A"
-    # Note: sudo is stripped automatically for Docker containers by ssh_cmd
-    ssh_cmd "$NODE_A" "sudo nohup omniedge start -n $NETWORK_ID -s $SECURITY_KEY > /tmp/omni-edge-a.log 2>&1 &"
+    # Note: Use 'sudo sh -c' to ensure log redirection works with root permissions
+    # For Docker containers, sudo is stripped automatically by ssh_cmd
+    ssh_cmd "$NODE_A" "sudo sh -c 'nohup omniedge start -n $NETWORK_ID -s $SECURITY_KEY > /tmp/omni-edge-a.log 2>&1 &'"
     unset CURRENT_TARGET_NODE
     sleep 3
 
     # Start Edge B
     print_step "Starting Edge B on $NODE_B..."
     export CURRENT_TARGET_NODE="$NODE_B"
-    ssh_cmd "$NODE_B" "sudo nohup omniedge start -n $NETWORK_ID -s $SECURITY_KEY > /tmp/omni-edge-b.log 2>&1 &"
+    ssh_cmd "$NODE_B" "sudo sh -c 'nohup omniedge start -n $NETWORK_ID -s $SECURITY_KEY > /tmp/omni-edge-b.log 2>&1 &'"
     unset CURRENT_TARGET_NODE
     sleep 3
     
