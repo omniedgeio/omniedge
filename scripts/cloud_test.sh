@@ -1033,6 +1033,19 @@ run_test() {
     verify_omniedge_interface "$NODE_A" || true
     verify_omniedge_interface "$NODE_B" || true
     
+    # Show P2P connection status (debug info)
+    print_step "P2P Connection Status..."
+    echo "--- Edge A status ---"
+    export CURRENT_TARGET_NODE="$NODE_A"
+    ssh_cmd "$NODE_A" "omniedge status --debug 2>/dev/null || omniedge status 2>/dev/null || echo 'Status unavailable'"
+    unset CURRENT_TARGET_NODE
+    echo ""
+    echo "--- Edge B status ---"
+    export CURRENT_TARGET_NODE="$NODE_B"
+    ssh_cmd "$NODE_B" "omniedge status --debug 2>/dev/null || omniedge status 2>/dev/null || echo 'Status unavailable'"
+    unset CURRENT_TARGET_NODE
+    echo ""
+    
     # Show logs for debugging
     print_step "Daemon logs (last 15 lines)..."
     echo "--- Edge A log ---"
