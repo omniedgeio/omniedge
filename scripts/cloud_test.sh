@@ -341,7 +341,7 @@ build_local_cli() {
     existing_bin=$(ls -1 "$output_dir"/$search_pattern 2>/dev/null | sort -V | tail -1)
     
     if [[ -n "$existing_bin" && -f "$existing_bin" ]]; then
-        echo "  ✅ Found existing binary: $(basename "$existing_bin")"
+        echo "  ✅ Found existing binary: $(basename "$existing_bin")" >&2
         echo "$existing_bin"
         return 0
     fi
@@ -411,7 +411,7 @@ build_local_cli() {
     cp "$binary_path" "$output_dir/$output_name"
     chmod +x "$output_dir/$output_name"
     
-    echo "  ✅ Built: $output_dir/$output_name"
+    echo "  ✅ Built: $output_dir/$output_name" >&2
     echo "$output_dir/$output_name"
 }
 
