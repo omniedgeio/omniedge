@@ -139,7 +139,7 @@ impl OmniTun {
         Self::validate_interface_name(&ifname)?;
 
         // Parse netmask and calculate network address dynamically
-        let (network_addr, prefix_len, _mask_str) = if let Some(mask) = netmask {
+        let (network_addr, prefix_len, mask_str) = if let Some(mask) = netmask {
             // Parse provided netmask
             let mask_addr: std::net::Ipv4Addr = mask
                 .parse()
