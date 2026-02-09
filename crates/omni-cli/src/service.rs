@@ -818,34 +818,45 @@ fn setup_linux_service(
         TransportMode::L2 => "l2",
     };
 
-    let as_exit_flag = if as_exit_node { "--as-exit-node" } else { "" };
-    let exit_node_flag = if let Some(ip) = exit_node {
-        format!("--exit-node {}", ip)
-    } else {
-        "".to_string()
-    };
-    let exit_node_v6_flag = if let Some(ip) = exit_node_v6 {
-        format!("--exit-node-v6 {}", ip)
-    } else {
-        "".to_string()
-    };
+    // Check if systemd is available (PID 1 is systemd, or systemctl exists and works)
+    let systemd_available = Command::new("systemctl")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
 
-    let nucleus_flags = if mode == RunMode::Dual {
-        let secret_flag = cluster_secret
-            .map(|s| format!("--secret {}", s))
-            .unwrap_or_default();
-        format!("--port {} {}", nucleus_port, secret_flag)
-    } else {
-        "".to_string()
-    };
+    if systemd_available {
+        // Use systemd service management
+        info!("systemd detected, setting up systemd service...");
+        
+        let as_exit_flag = if as_exit_node { "--as-exit-node" } else { "" };
+        let exit_node_flag = if let Some(ip) = exit_node {
+            format!("--exit-node {}", ip)
+        } else {
+            "".to_string()
+        };
+        let exit_node_v6_flag = if let Some(ip) = exit_node_v6 {
+            format!("--exit-node-v6 {}", ip)
+        } else {
+            "".to_string()
+        };
 
-    let mut env_line = String::new();
-    if let Some(home) = crate::utils::get_real_user_home() {
-        env_line = format!("Environment=HOME={}", home.display());
-    }
+        let nucleus_flags = if mode == RunMode::Dual {
+            let secret_flag = cluster_secret
+                .map(|s| format!("--secret {}", s))
+                .unwrap_or_default();
+            format!("--port {} {}", nucleus_port, secret_flag)
+        } else {
+            "".to_string()
+        };
 
-    let service_content = format!(
-        r#"[Unit]
+        let mut env_line = String::new();
+        if let Some(home) = crate::utils::get_real_user_home() {
+            env_line = format!("Environment=HOME={}", home.display());
+        }
+
+        let service_content = format!(
+            r#"[Unit]
 Description=OmniEdge Service
 After=network.target
 
@@ -858,35 +869,95 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 "#,
-        exe_path.display(),
-        network_id,
-        mode_str,
-        transport_str,
-        nucleus_flags,
-        as_exit_flag,
-        exit_node_flag,
-        exit_node_v6_flag,
-        env_line
-    );
+            exe_path.display(),
+            network_id,
+            mode_str,
+            transport_str,
+            nucleus_flags,
+            as_exit_flag,
+            exit_node_flag,
+            exit_node_v6_flag,
+            env_line
+        );
 
-    fs::write("/tmp/omniedge.service", &service_content)?;
+        fs::write("/tmp/omniedge.service", &service_content)?;
 
-    let _ = Command::new("sudo")
-        .args([
-            "cp",
-            "/tmp/omniedge.service",
-            "/etc/systemd/system/omniedge.service",
-        ])
-        .output();
-    let _ = Command::new("sudo")
-        .args(["systemctl", "daemon-reload"])
-        .output();
-    let _ = Command::new("sudo")
-        .args(["systemctl", "enable", "omniedge"])
-        .output();
-    let _ = Command::new("sudo")
-        .args(["systemctl", "start", "omniedge"])
-        .output();
+        let _ = Command::new("sudo")
+            .args([
+                "cp",
+                "/tmp/omniedge.service",
+                "/etc/systemd/system/omniedge.service",
+            ])
+            .output();
+        let _ = Command::new("sudo")
+            .args(["systemctl", "daemon-reload"])
+            .output();
+        let _ = Command::new("sudo")
+            .args(["systemctl", "enable", "omniedge"])
+            .output();
+        let _ = Command::new("sudo")
+            .args(["systemctl", "start", "omniedge"])
+            .output();
+    } else {
+        // No systemd available (e.g., Docker container), start daemon directly
+        info!("systemd not available, starting daemon process directly...");
+        
+        // Build command arguments
+        let mut args = vec![
+            "start".to_string(),
+            "-n".to_string(),
+            network_id.to_string(),
+            "--mode".to_string(),
+            mode_str.to_string(),
+            "--transport-mode".to_string(),
+            transport_str.to_string(),
+        ];
+
+        if mode == RunMode::Dual {
+            args.push("--port".to_string());
+            args.push(nucleus_port.to_string());
+            if let Some(secret) = cluster_secret {
+                args.push("--secret".to_string());
+                args.push(secret.to_string());
+            }
+        }
+
+        if as_exit_node {
+            args.push("--as-exit-node".to_string());
+        }
+        if let Some(ip) = exit_node {
+            args.push("--exit-node".to_string());
+            args.push(ip.to_string());
+        }
+        if let Some(ip) = exit_node_v6 {
+            args.push("--exit-node-v6".to_string());
+            args.push(ip.to_string());
+        }
+        args.push("--daemon".to_string());
+
+        info!(
+            "Starting OmniEdge daemon process: {} {:?}",
+            exe_path.display(),
+            args
+        );
+
+        // Fork the daemon process to background
+        let child = Command::new(&exe_path)
+            .args(&args)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+
+        match child {
+            Ok(child) => {
+                info!("OmniEdge daemon started with PID: {}", child.id());
+                // Give the daemon a moment to start
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+            Err(e) => return Err(anyhow::anyhow!("Failed to start daemon process: {}", e)),
+        }
+    }
 
     Ok(())
 }
