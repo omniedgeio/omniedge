@@ -1859,6 +1859,23 @@ impl ConnectionManager {
                                                         .map(|e| e.addr)
                                                         .collect();
 
+                                                    // CRITICAL FIX: Pre-configure WireGuard with first endpoint
+                                                    // This allows traffic to flow while disco is in progress
+                                                    if let Some(&first_endpoint) = endpoints.first() {
+                                                        let pubkey = ::hex::encode(peer_state.public_key);
+                                                        let mut allowed_ips = vec![format!("{}/32", vip)];
+                                                        if let Some(v6) = vip_v6 {
+                                                            allowed_ips.push(format!("{}/128", v6));
+                                                        }
+                                                        info!(
+                                                            "Pre-configuring WireGuard peer {} with endpoint {} (PortPrediction, disco in progress)",
+                                                            vip, first_endpoint
+                                                        );
+                                                        let _ = tun_ctrl
+                                                            .add_peer(&pubkey, Some(first_endpoint), &allowed_ips)
+                                                            .await;
+                                                    }
+
                                                     for endpoint in endpoints {
                                                         let tx_id: [u8; 12] = rand::random();
                                                         let ping = DiscoPing {
@@ -1901,6 +1918,23 @@ impl ConnectionManager {
                                                     let endpoints: Vec<_> = peer_state.endpoints.endpoints.iter()
                                                         .map(|e| e.addr)
                                                         .collect();
+
+                                                    // CRITICAL FIX: Pre-configure WireGuard with first endpoint
+                                                    // For SimultaneousOpen, both sides configure each other proactively
+                                                    if let Some(&first_endpoint) = endpoints.first() {
+                                                        let pubkey = ::hex::encode(peer_state.public_key);
+                                                        let mut allowed_ips = vec![format!("{}/32", vip)];
+                                                        if let Some(v6) = vip_v6 {
+                                                            allowed_ips.push(format!("{}/128", v6));
+                                                        }
+                                                        info!(
+                                                            "Pre-configuring WireGuard peer {} with endpoint {} (SimultaneousOpen, disco in progress)",
+                                                            vip, first_endpoint
+                                                        );
+                                                        let _ = tun_ctrl
+                                                            .add_peer(&pubkey, Some(first_endpoint), &allowed_ips)
+                                                            .await;
+                                                    }
 
                                                     for endpoint in endpoints {
                                                         let tx_id: [u8; 12] = rand::random();
@@ -1956,6 +1990,31 @@ impl ConnectionManager {
                                                             "Peer {} using Direct strategy - sending disco pings to {} endpoints",
                                                             vip, endpoints.len()
                                                         );
+                                                        
+                                                        // CRITICAL FIX: Proactively configure WireGuard with the first
+                                                        // endpoint BEFORE waiting for disco pong. This ensures:
+                                                        // 1. If peer can reach us but we can't reach them (asymmetric NAT),
+                                                        //    at least incoming traffic will work
+                                                        // 2. WireGuard handshake can begin immediately, potentially
+                                                        //    establishing the tunnel before disco completes
+                                                        // 3. The peer will be updated with a better endpoint if disco
+                                                        //    pong confirms connectivity with lower latency
+                                                        let first_endpoint = endpoints.first().copied();
+                                                        {
+                                                            let pubkey = ::hex::encode(peer_state.public_key);
+                                                            let mut allowed_ips = vec![format!("{}/32", vip)];
+                                                            if let Some(v6) = vip_v6 {
+                                                                allowed_ips.push(format!("{}/128", v6));
+                                                            }
+                                                            info!(
+                                                                "Pre-configuring WireGuard peer {} with endpoint {:?} (disco in progress)",
+                                                                vip, first_endpoint
+                                                            );
+                                                            let _ = tun_ctrl
+                                                                .add_peer(&pubkey, first_endpoint, &allowed_ips)
+                                                                .await;
+                                                        }
+                                                        
                                                         for endpoint in endpoints {
                                                             let tx_id: [u8; 12] = rand::random();
                                                             let ping = DiscoPing {
@@ -2077,12 +2136,24 @@ impl ConnectionManager {
                                             } else {
                                                 peer_state.state = PeerConnectionState::Failed;
                                                 // Configure WireGuard with best available endpoint as last resort
-                                                if let Some(endpoint) = peer_state.best_endpoint() {
-                                                    info!(
-                                                        "Configuring WireGuard peer {} with best endpoint {} (disco failed, relay disabled)",
-                                                        peer_state.vip, endpoint
-                                                    );
+                                                // This is critical - even without disco confirmation, we should
+                                                // attempt to configure WireGuard so the tunnel can be established
+                                                // The peer may be able to reach us even if our disco pings failed
+                                                let pubkey = ::hex::encode(peer_state.public_key);
+                                                let mut allowed_ips = vec![format!("{}/32", peer_state.vip)];
+                                                if let Some(v6) = peer_state.vip_v6 {
+                                                    allowed_ips.push(format!("{}/128", v6));
                                                 }
+                                                
+                                                // Use best known endpoint, or None if all failed
+                                                let endpoint = peer_state.best_endpoint();
+                                                info!(
+                                                    "Configuring WireGuard peer {} with endpoint {:?} (disco failed, relay disabled)",
+                                                    peer_state.vip, endpoint
+                                                );
+                                                let _ = tun_ctrl
+                                                    .add_peer(&pubkey, endpoint, &allowed_ips)
+                                                    .await;
                                             }
                                         } else {
                                             debug!(
