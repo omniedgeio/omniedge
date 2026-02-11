@@ -89,6 +89,91 @@ pub struct NetworkConfig {
     /// (utun, tun, wg interfaces) and reduces MTU to 1280 for compatibility.
     #[serde(default)]
     pub mtu_auto_detect: bool,
+
+    /// WireGuard implementation mode (default: "auto")
+    ///
+    /// Controls which WireGuard implementation to use:
+    /// - "auto": Automatically choose based on platform and availability
+    ///           (kernel on Linux if available, userspace elsewhere)
+    /// - "kernel": Use kernel WireGuard module (Linux only, requires root)
+    ///           Better performance but requires kernel module
+    /// - "userspace": Use BoringTun userspace implementation
+    ///           Works everywhere, supports transparent relay fallback
+    ///
+    /// Note: Kernel mode has better performance but userspace mode has
+    /// better compatibility and supports relay encapsulation natively.
+    #[serde(default = "default_wireguard_mode")]
+    pub wireguard_mode: WireGuardMode,
+}
+
+/// WireGuard implementation mode
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum WireGuardMode {
+    /// Automatically choose based on platform and availability
+    #[default]
+    Auto,
+    /// Use kernel WireGuard module (Linux only)
+    Kernel,
+    /// Use BoringTun userspace implementation
+    Userspace,
+}
+
+impl WireGuardMode {
+    /// Check if this mode should use kernel WireGuard
+    pub fn should_use_kernel(&self) -> bool {
+        match self {
+            WireGuardMode::Auto => {
+                // On Linux, prefer kernel if available
+                #[cfg(target_os = "linux")]
+                {
+                    // Check if wireguard kernel module is available
+                    std::path::Path::new("/sys/module/wireguard").exists()
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    false // Userspace on other platforms
+                }
+            }
+            WireGuardMode::Kernel => true,
+            WireGuardMode::Userspace => false,
+        }
+    }
+
+    /// Get display name for this mode
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            WireGuardMode::Auto => "auto",
+            WireGuardMode::Kernel => "kernel",
+            WireGuardMode::Userspace => "userspace",
+        }
+    }
+}
+
+impl std::fmt::Display for WireGuardMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.display_name())
+    }
+}
+
+impl std::str::FromStr for WireGuardMode {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "auto" => Ok(WireGuardMode::Auto),
+            "kernel" => Ok(WireGuardMode::Kernel),
+            "userspace" => Ok(WireGuardMode::Userspace),
+            _ => anyhow::bail!(
+                "Invalid WireGuard mode: {}. Valid options: auto, kernel, userspace",
+                s
+            ),
+        }
+    }
+}
+
+fn default_wireguard_mode() -> WireGuardMode {
+    WireGuardMode::Auto
 }
 
 // Serde default value helpers
@@ -121,6 +206,7 @@ impl Default for NetworkConfig {
             happy_eyeballs_delay_ms: 250,
             mtu: 1420,
             mtu_auto_detect: true,
+            wireguard_mode: WireGuardMode::Auto,
         }
     }
 }
@@ -140,6 +226,12 @@ impl NetworkConfig {
             if !server.contains(':') {
                 anyhow::bail!("Relay server must include port (format: host:port)");
             }
+        }
+
+        // Validate WireGuard mode
+        #[cfg(not(target_os = "linux"))]
+        if self.wireguard_mode == WireGuardMode::Kernel {
+            anyhow::bail!("Kernel WireGuard mode is only supported on Linux");
         }
 
         Ok(())

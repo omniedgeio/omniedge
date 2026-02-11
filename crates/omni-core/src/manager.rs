@@ -35,7 +35,7 @@ use omni_proto::{
     SIGNALING_DISCO_PING,
     SIGNALING_DISCO_PONG,
 };
-use omni_tun::OmniTun;
+use omni_tun::{OmniTun, WgMode};
 use omninervous::Identity;
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
@@ -1200,7 +1200,13 @@ impl ConnectionManager {
 
                     for ifname in if_names {
                         debug!("Attempting TUN setup with interface name: {}", ifname);
-                        let mut tun = OmniTun::new_userspace(ifname);
+                        // Convert WireGuardMode to WgMode for OmniTun
+                        let wg_mode = match self.network_config.wireguard_mode {
+                            crate::config::WireGuardMode::Auto => WgMode::Auto,
+                            crate::config::WireGuardMode::Kernel => WgMode::Kernel,
+                            crate::config::WireGuardMode::Userspace => WgMode::Userspace,
+                        };
+                        let mut tun = OmniTun::new_with_mode(ifname, wg_mode);
 
                         match tun
                             .setup_dual_stack(
@@ -1251,14 +1257,21 @@ impl ConnectionManager {
             let ifname = "omniedge0";
 
             info!(
-                "Creating Userspace TUN: {}",
+                "Creating TUN: {} (WireGuard mode: {:?})",
                 if ifname.is_empty() {
                     "(auto-assign)"
                 } else {
                     ifname
-                }
+                },
+                self.network_config.wireguard_mode
             );
-            let mut tun = OmniTun::new_userspace(ifname);
+            // Convert WireGuardMode to WgMode for OmniTun
+            let wg_mode = match self.network_config.wireguard_mode {
+                crate::config::WireGuardMode::Auto => WgMode::Auto,
+                crate::config::WireGuardMode::Kernel => WgMode::Kernel,
+                crate::config::WireGuardMode::Userspace => WgMode::Userspace,
+            };
+            let mut tun = OmniTun::new_with_mode(ifname, wg_mode);
             tun.setup_dual_stack(
                 &join_resp.virtual_ip,
                 Some(join_resp.subnet_mask.as_str()),
@@ -1427,12 +1440,13 @@ impl ConnectionManager {
 
                                         // Handle nucleus signaling request
                                         let mut state = nucleus_state.lock().await;
-                                        if let Some(response) = handle_nucleus_message(
+                                        let result = handle_nucleus_message(
                                             &mut state,
                                             pkt,
                                             src,
                                             secret_clone.as_deref(),
-                                        ) {
+                                        );
+                                        if let Some(response) = result.response {
                                             if let Err(e) = nucleus_socket.send_to(&response, src).await {
                                                 warn!("Failed to send nucleus response to {}: {}", src, e);
                                             }
@@ -1509,6 +1523,7 @@ impl ConnectionManager {
                                             observed_addr: src.to_string(),
                                             responder_key: our_public_key,
                                             responder_vip_v6: our_vip_v6,
+                                            wg_port: None, // userspace mode - same port for signaling and WG
                                         };
 
                                         if let Ok(pong_data) = encode_disco_pong(&pong) {
@@ -1883,6 +1898,7 @@ impl ConnectionManager {
                                                             sender_key: our_public_key,
                                                             sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
                                                             sender_vip_v6: our_vip_v6,
+                                                            wg_port: None,
                                                         };
 
                                                         if let Ok(ping_data) = encode_disco_ping(&ping) {
@@ -1943,6 +1959,7 @@ impl ConnectionManager {
                                                             sender_key: our_public_key,
                                                             sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
                                                             sender_vip_v6: our_vip_v6,
+                                                            wg_port: None, // userspace mode - same port for signaling and WG
                                                         };
 
                                                         if let Ok(ping_data) = encode_disco_ping(&ping) {
@@ -2015,14 +2032,15 @@ impl ConnectionManager {
                                                                 .await;
                                                         }
                                                         
-                                                        for endpoint in endpoints {
-                                                            let tx_id: [u8; 12] = rand::random();
-                                                            let ping = DiscoPing {
-                                                                tx_id,
-                                                                sender_key: our_public_key,
-                                                                sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
-                                                                sender_vip_v6: our_vip_v6,
-                                                            };
+                                                    for endpoint in endpoints {
+                                                        let tx_id: [u8; 12] = rand::random();
+                                                        let ping = DiscoPing {
+                                                            tx_id,
+                                                            sender_key: our_public_key,
+                                                            sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
+                                                            sender_vip_v6: our_vip_v6,
+                                                            wg_port: None, // userspace mode - same port for signaling and WG
+                                                        };
 
                                                             if let Ok(ping_data) = encode_disco_ping(&ping) {
                                                                 if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
@@ -2098,6 +2116,7 @@ impl ConnectionManager {
                                         sender_key: our_public_key,
                                         sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
                                         sender_vip_v6: our_vip_v6,
+                                        wg_port: None, // userspace mode - same port for signaling and WG
                                     };
 
                                     if let Ok(ping_data) = encode_disco_ping(&ping) {

@@ -5,7 +5,7 @@ use omni_api::types::{
     AuthResp, DeviceCodeResp, DeviceResponse, ProfileResponse, SessionResponse,
     VirtualNetworkDeviceResponse, VirtualNetworkResponse,
 };
-use omni_core::{CliConfig, ConnectionManager, ConnectionState};
+use omni_core::{CliConfig, ConnectionManager, ConnectionState, WireGuardMode};
 use omni_plugin::{PluginConfig, PluginManager};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -2358,6 +2358,65 @@ async fn trigger_manual_recording(_reason: String) -> Result<serde_json::Value, 
 }
 
 // ============================================================================
+// WireGuard Mode Configuration Commands
+// ============================================================================
+
+/// Get current WireGuard mode setting
+#[tauri::command]
+async fn get_wireguard_mode() -> Result<String, String> {
+    let config = CliConfig::load().map_err(|e| e.to_string())?;
+    Ok(config.network_config.wireguard_mode.display_name().to_string())
+}
+
+/// Set WireGuard mode (auto, kernel, userspace)
+#[tauri::command]
+async fn set_wireguard_mode(mode: String) -> Result<(), String> {
+    let wg_mode: WireGuardMode = mode.parse().map_err(|e: anyhow::Error| e.to_string())?;
+
+    // Validate kernel mode is only allowed on Linux
+    #[cfg(not(target_os = "linux"))]
+    if wg_mode == WireGuardMode::Kernel {
+        return Err("Kernel WireGuard mode is only supported on Linux".to_string());
+    }
+
+    let mut config = CliConfig::load().map_err(|e| e.to_string())?;
+    config.network_config.wireguard_mode = wg_mode;
+    config.save().map_err(|e| e.to_string())?;
+
+    info!("WireGuard mode set to: {}", wg_mode);
+    Ok(())
+}
+
+/// Get WireGuard mode options available for this platform
+#[tauri::command]
+async fn get_wireguard_mode_options() -> Result<Vec<serde_json::Value>, String> {
+    let mut options = vec![
+        serde_json::json!({
+            "value": "auto",
+            "label": "Auto",
+            "description": "Automatically choose based on platform"
+        }),
+        serde_json::json!({
+            "value": "userspace",
+            "label": "Userspace (BoringTun)",
+            "description": "Works everywhere, supports relay fallback"
+        }),
+    ];
+
+    // Only show kernel option on Linux
+    #[cfg(target_os = "linux")]
+    {
+        options.insert(1, serde_json::json!({
+            "value": "kernel",
+            "label": "Kernel",
+            "description": "Better performance, requires wireguard kernel module"
+        }));
+    }
+
+    Ok(options)
+}
+
+// ============================================================================
 // Plugin Management Commands
 // ============================================================================
 
@@ -3049,6 +3108,10 @@ pub fn run() {
             install_helper,
             get_debug_info,
             quit,
+            // WireGuard mode commands
+            get_wireguard_mode,
+            set_wireguard_mode,
+            get_wireguard_mode_options,
             // Plugin management commands
             list_plugins,
             refresh_plugins,

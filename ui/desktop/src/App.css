@@ -3393,3 +3393,182 @@ body {
     backdrop-filter: blur(25px) saturate(190%);
     -webkit-backdrop-filter: blur(25px) saturate(190%);
 }
+
+/* ============================================
+   SETTINGS SECTION STYLES
+   ============================================ */
+
+/* Settings Section Header */
+.settings-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 18px 8px;
+    cursor: pointer;
+    border-top: 0.5px solid var(--divider);
+    margin-top: 8px;
+}
+
+.settings-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.settings-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Settings Pane */
+.settings-pane {
+    padding: 0 14px 14px;
+    animation: reveal 0.25s ease-out;
+}
+
+/* Setting Item */
+.setting-item {
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.3);
+    border: 0.5px solid var(--divider);
+    padding: 12px;
+    transition: 0.15s;
+}
+
+@media (prefers-color-scheme: dark) {
+    .setting-item {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}
+
+.setting-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.setting-label {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+    .setting-label {
+        color: var(--text-primary-dark);
+    }
+}
+
+.setting-value {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent-blue);
+    text-transform: capitalize;
+}
+
+.setting-description {
+    font-size: 10px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin-bottom: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .setting-description {
+        color: var(--text-secondary-dark);
+    }
+}
+
+/* Setting Options (Radio Group) */
+.setting-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.setting-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: 0.15s;
+}
+
+.setting-option:hover {
+    background: rgba(0, 122, 255, 0.05);
+}
+
+.setting-option.selected {
+    background: rgba(0, 122, 255, 0.08);
+    border-color: rgba(0, 122, 255, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+    .setting-option {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .setting-option:hover {
+        background: rgba(0, 122, 255, 0.1);
+    }
+
+    .setting-option.selected {
+        background: rgba(0, 122, 255, 0.15);
+        border-color: rgba(0, 122, 255, 0.4);
+    }
+}
+
+.setting-option input[type="radio"] {
+    margin-top: 2px;
+    accent-color: var(--accent-blue);
+    cursor: pointer;
+}
+
+.option-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.option-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+    .option-label {
+        color: var(--text-primary-dark);
+    }
+}
+
+.option-description {
+    font-size: 10px;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+
+@media (prefers-color-scheme: dark) {
+    .option-description {
+        color: var(--text-secondary-dark);
+    }
+}
+
+/* Setting Saving Indicator */
+.setting-saving {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 6px;
+    font-size: 10px;
+    color: var(--text-secondary);
+}

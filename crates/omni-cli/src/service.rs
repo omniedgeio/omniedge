@@ -306,12 +306,13 @@ pub async fn run_nucleus_only(port: u16, secret: &str) -> Result<()> {
                         }
 
                         let mut state = nucleus_state.lock().await;
-                        if let Some(response) = handle_nucleus_message(
+                        let result = handle_nucleus_message(
                             &mut state,
                             pkt,
                             src,
                             secret.as_deref(),
-                        ) {
+                        );
+                        if let Some(response) = result.response {
                             if let Err(e) = socket.send_to(&response, src).await {
                                 log::warn!("Failed to send nucleus response to {}: {}", src, e);
                             }

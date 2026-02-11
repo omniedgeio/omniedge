@@ -1,9 +1,45 @@
 use anyhow::Result;
 use log::{debug, info, warn};
+#[cfg(target_os = "linux")]
+use omninervous::wg::CliWgControl;
 use omninervous::wg::{UserspaceWgControl, WgInterface};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::UdpSocket;
+
+/// WireGuard implementation mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WgMode {
+    /// Automatically choose based on platform and availability
+    #[default]
+    Auto,
+    /// Use kernel WireGuard module (Linux only)
+    Kernel,
+    /// Use BoringTun userspace implementation
+    Userspace,
+}
+
+impl WgMode {
+    /// Check if this mode should use kernel WireGuard
+    pub fn should_use_kernel(&self) -> bool {
+        match self {
+            WgMode::Auto => {
+                // On Linux, prefer kernel if available
+                #[cfg(target_os = "linux")]
+                {
+                    // Check if wireguard kernel module is available
+                    std::path::Path::new("/sys/module/wireguard").exists()
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    false // Userspace on other platforms
+                }
+            }
+            WgMode::Kernel => true,
+            WgMode::Userspace => false,
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct OmniTun {
@@ -15,16 +51,76 @@ pub struct OmniTun {
     actual_ifname: Option<String>,
     /// Virtual IP address (used to detect the actual utun interface on macOS)
     vip: Option<String>,
+    /// WireGuard mode being used
+    wg_mode: WgMode,
 }
 
 impl OmniTun {
+    /// Create a new OmniTun with userspace WireGuard (default, works everywhere)
     pub fn new_userspace(ifname: &str) -> Self {
         Self {
             interface: WgInterface::Userspace(UserspaceWgControl::new(ifname)),
             ifname: ifname.to_string(),
             actual_ifname: None,
             vip: None,
+            wg_mode: WgMode::Userspace,
         }
+    }
+
+    /// Create a new OmniTun with the specified WireGuard mode
+    ///
+    /// # Arguments
+    /// * `ifname` - Interface name
+    /// * `mode` - WireGuard mode (Auto, Kernel, or Userspace)
+    ///
+    /// # Notes
+    /// - Kernel mode is only available on Linux
+    /// - Auto mode will use kernel if available on Linux, otherwise userspace
+    /// - On non-Linux platforms, Kernel mode will fall back to Userspace
+    pub fn new_with_mode(ifname: &str, mode: WgMode) -> Self {
+        let use_kernel = mode.should_use_kernel();
+        
+        #[cfg(target_os = "linux")]
+        let interface = if use_kernel {
+            info!("Using kernel WireGuard mode for interface '{}'", ifname);
+            WgInterface::Cli(CliWgControl::new(ifname))
+        } else {
+            info!("Using userspace WireGuard mode for interface '{}'", ifname);
+            WgInterface::Userspace(UserspaceWgControl::new(ifname))
+        };
+        
+        #[cfg(not(target_os = "linux"))]
+        let interface = {
+            if use_kernel {
+                warn!("Kernel WireGuard mode requested but not available on this platform, using userspace");
+            }
+            info!("Using userspace WireGuard mode for interface '{}'", ifname);
+            WgInterface::Userspace(UserspaceWgControl::new(ifname))
+        };
+        
+        let effective_mode = if use_kernel && cfg!(target_os = "linux") {
+            WgMode::Kernel
+        } else {
+            WgMode::Userspace
+        };
+        
+        Self {
+            interface,
+            ifname: ifname.to_string(),
+            actual_ifname: None,
+            vip: None,
+            wg_mode: effective_mode,
+        }
+    }
+
+    /// Get the current WireGuard mode
+    pub fn wg_mode(&self) -> WgMode {
+        self.wg_mode
+    }
+
+    /// Check if using kernel WireGuard
+    pub fn is_kernel_mode(&self) -> bool {
+        self.wg_mode == WgMode::Kernel
     }
 
     pub async fn setup(&mut self, vip: &str, port: u16, private_key: &str) -> anyhow::Result<()> {

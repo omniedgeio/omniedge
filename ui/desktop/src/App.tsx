@@ -66,6 +66,12 @@ function App() {
   const [versionInfo, setVersionInfo] = useState<{ version: string, commit?: string, build_date?: string } | null>(null);
   const [updateInfo, setUpdateInfo] = useState<{ available: boolean, version?: string, url?: string, notes?: string } | null>(null);
 
+  // Settings state
+  const [isSettingsExpanded, setIsSettingsExpanded] = useState(false);
+  const [wireguardMode, setWireguardMode] = useState<string>('auto');
+  const [wireguardModeOptions, setWireguardModeOptions] = useState<{ value: string, label: string, description: string }[]>([]);
+  const [isSavingWgMode, setIsSavingWgMode] = useState(false);
+
   // Resize window to fit content
   // Track last height to avoid unnecessary resize calls
   const lastHeightRef = useRef<number>(0);
@@ -128,7 +134,7 @@ function App() {
   useEffect(() => {
     const timer = setTimeout(resizeToContent, 50);
     return () => clearTimeout(timer);
-  }, [isLoggedIn, networks, expandedNetworks, isLoading, isConnecting, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode, error, networkDevices, status, virtualIP, showDebug, showSetup, isPluginsExpanded, expandedPluginId, showPluginSettings, plugins, dataCollectionEnabled]);
+  }, [isLoggedIn, networks, expandedNetworks, isLoading, isConnecting, resizeToContent, isWaitingForBrowser, isExitNodesExpanded, isBecomingExitNode, error, networkDevices, status, virtualIP, showDebug, showSetup, isPluginsExpanded, expandedPluginId, showPluginSettings, plugins, dataCollectionEnabled, isSettingsExpanded]);
 
   useEffect(() => {
     const init = async () => {
@@ -640,6 +646,37 @@ function App() {
       checkDataCollectionAvailable();
     }
   }, [isLoggedIn]);
+
+  // Load WireGuard mode settings when settings section is expanded
+  useEffect(() => {
+    const loadWgSettings = async () => {
+      try {
+        const options = await invoke('get_wireguard_mode_options') as { value: string, label: string, description: string }[];
+        setWireguardModeOptions(options);
+        const currentMode = await invoke('get_wireguard_mode') as string;
+        setWireguardMode(currentMode);
+      } catch (err) {
+        console.error('Failed to load WireGuard settings:', err);
+      }
+    };
+
+    if (isSettingsExpanded) {
+      loadWgSettings();
+    }
+  }, [isSettingsExpanded]);
+
+  // Handle WireGuard mode change
+  const handleWireguardModeChange = async (mode: string) => {
+    setIsSavingWgMode(true);
+    try {
+      await invoke('set_wireguard_mode', { mode });
+      setWireguardMode(mode);
+    } catch (err: any) {
+      setError(`Failed to set WireGuard mode: ${err.message || err.toString()}`);
+    } finally {
+      setIsSavingWgMode(false);
+    }
+  };
 
   // Robot Data Collection functions
   const checkDataCollectionAvailable = async () => {
@@ -1545,6 +1582,66 @@ function App() {
                         })}
                       </div>
                     )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Settings Section - Show only when logged in */}
+            {isLoggedIn && !showSetup && (
+              <>
+                <div className="settings-section-header" onClick={() => setIsSettingsExpanded(!isSettingsExpanded)}>
+                  <div className="settings-header-left">
+                    <div className="chevron-icon" style={{ transform: isSettingsExpanded ? 'rotate(90deg)' : 'none' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                      </svg>
+                    </div>
+                    <span className="section-title">Settings</span>
+                  </div>
+                  <div className="settings-header-right">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                  </div>
+                </div>
+
+                {isSettingsExpanded && (
+                  <div className="settings-pane">
+                    <div className="setting-item">
+                      <div className="setting-header">
+                        <span className="setting-label">WireGuard Mode</span>
+                        <span className="setting-value">{wireguardMode}</span>
+                      </div>
+                      <div className="setting-description">
+                        Choose how WireGuard handles network traffic. Changes take effect on next connection.
+                      </div>
+                      <div className="setting-options">
+                        {wireguardModeOptions.map(option => (
+                          <label key={option.value} className={`setting-option ${wireguardMode === option.value ? 'selected' : ''}`}>
+                            <input
+                              type="radio"
+                              name="wireguard-mode"
+                              value={option.value}
+                              checked={wireguardMode === option.value}
+                              onChange={() => handleWireguardModeChange(option.value)}
+                              disabled={isSavingWgMode}
+                            />
+                            <div className="option-content">
+                              <span className="option-label">{option.label}</span>
+                              <span className="option-description">{option.description}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                      {isSavingWgMode && (
+                        <div className="setting-saving">
+                          <div className="loader-mini" style={{ borderTopColor: 'var(--accent-blue)' }}></div>
+                          <span>Saving...</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </>

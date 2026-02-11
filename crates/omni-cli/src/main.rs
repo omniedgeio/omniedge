@@ -5,7 +5,7 @@ use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use omni_api::{ApiClient, DeviceService, NetworkService, UserServerService};
 
-use omni_core::{CliConfig, ConnectionManager};
+use omni_core::{CliConfig, ConnectionManager, WireGuardMode};
 #[cfg(feature = "wasm-plugins")]
 use omni_plugin::{PluginConfig, PluginManager};
 
@@ -143,6 +143,38 @@ pub enum TransportMode {
     L3,
     /// Layer 2 TAP mode (Ethernet frames) - Linux only, requires --features l2-vpn
     L2,
+}
+
+/// WireGuard implementation mode for CLI (wraps omni_core::WireGuardMode for clap)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+pub enum CliWireGuardMode {
+    /// Automatically choose based on platform (kernel on Linux if available)
+    #[default]
+    Auto,
+    /// Use kernel WireGuard module (Linux only, requires root)
+    Kernel,
+    /// Use BoringTun userspace implementation
+    Userspace,
+}
+
+impl From<CliWireGuardMode> for WireGuardMode {
+    fn from(cli_mode: CliWireGuardMode) -> Self {
+        match cli_mode {
+            CliWireGuardMode::Auto => WireGuardMode::Auto,
+            CliWireGuardMode::Kernel => WireGuardMode::Kernel,
+            CliWireGuardMode::Userspace => WireGuardMode::Userspace,
+        }
+    }
+}
+
+impl From<WireGuardMode> for CliWireGuardMode {
+    fn from(mode: WireGuardMode) -> Self {
+        match mode {
+            WireGuardMode::Auto => CliWireGuardMode::Auto,
+            WireGuardMode::Kernel => CliWireGuardMode::Kernel,
+            WireGuardMode::Userspace => CliWireGuardMode::Userspace,
+        }
+    }
 }
 
 impl TransportMode {
@@ -312,6 +344,16 @@ enum Commands {
         /// Use a security key for authentication (for CI/servers)
         #[arg(short = 's', long)]
         security_key: Option<String>,
+        
+        /// WireGuard implementation mode:
+        ///   auto      - Automatically choose (kernel on Linux if available)
+        ///   kernel    - Use kernel WireGuard module (Linux only, better performance)
+        ///   userspace - Use BoringTun userspace (works everywhere, supports relay)
+        ///
+        /// Kernel mode has better performance but userspace mode supports
+        /// relay encapsulation natively for symmetric NAT scenarios.
+        #[arg(short = 'w', long, value_enum, default_value = "auto")]
+        wireguard_mode: CliWireGuardMode,
     },
     /// Stop OmniEdge connection and background service
     Stop,
@@ -585,6 +627,17 @@ enum ConfigCommands {
         #[arg(value_name = "on|off")]
         action: String,
     },
+    /// Configure WireGuard implementation mode
+    ///
+    /// EXAMPLES:
+    ///   omniedge config wireguard auto       Automatically choose (kernel on Linux if available)
+    ///   omniedge config wireguard kernel     Use kernel WireGuard (Linux only, better performance)
+    ///   omniedge config wireguard userspace  Use BoringTun userspace (works everywhere)
+    Wireguard {
+        /// WireGuard mode: auto, kernel, userspace
+        #[arg(value_name = "auto|kernel|userspace")]
+        action: String,
+    },
     /// Reset network configuration to defaults
     Reset,
 }
@@ -778,6 +831,7 @@ async fn async_main() -> Result<()> {
             port,
             secret,
             security_key,
+            wireguard_mode,
         } => {
             // Validate transport mode is supported on this platform
             if !transport_mode.is_supported() {
@@ -790,6 +844,18 @@ async fn async_main() -> Result<()> {
                     std::process::exit(exit_codes::INVALID_INPUT);
                 }
             }
+            
+            // Validate WireGuard mode
+            let wg_mode: WireGuardMode = wireguard_mode.into();
+            #[cfg(not(target_os = "linux"))]
+            if wg_mode == WireGuardMode::Kernel {
+                eprintln!("Error: Kernel WireGuard mode is only supported on Linux.");
+                eprintln!("Use --wireguard-mode userspace or --wireguard-mode auto instead.");
+                std::process::exit(exit_codes::INVALID_INPUT);
+            }
+            
+            // Apply WireGuard mode to config
+            config.network_config.wireguard_mode = wg_mode;
 
             // Check if already connected
             let current_status =
@@ -2184,6 +2250,21 @@ fn handle_config_command(cmd: ConfigCommands, config: &mut CliConfig) -> Result<
             }
             println!();
 
+            // Show WireGuard mode
+            let wg_mode_str = match net_config.wireguard_mode {
+                WireGuardMode::Auto => {
+                    if net_config.wireguard_mode.should_use_kernel() {
+                        "Auto (kernel WireGuard available)"
+                    } else {
+                        "Auto (userspace/BoringTun)"
+                    }
+                }
+                WireGuardMode::Kernel => "Kernel (requires Linux + wireguard module)",
+                WireGuardMode::Userspace => "Userspace (BoringTun)",
+            };
+            println!("  WireGuard Mode:      {}", wg_mode_str);
+            println!();
+
             // Show feature summary
             let features = net_config.feature_summary();
             println!("  Active Features: {}", features.join(", "));
@@ -2310,6 +2391,54 @@ fn handle_config_command(cmd: ConfigCommands, config: &mut CliConfig) -> Result<
                 }
             }
         }
+        ConfigCommands::Wireguard { action } => {
+            let action_lower = action.to_lowercase();
+            match action_lower.as_str() {
+                "auto" => {
+                    config.network_config.wireguard_mode = WireGuardMode::Auto;
+                    config.save()?;
+                    println!("WireGuard mode set to 'auto'.");
+                    if config.network_config.wireguard_mode.should_use_kernel() {
+                        println!("On this system: Will use kernel WireGuard.");
+                    } else {
+                        println!("On this system: Will use userspace (BoringTun).");
+                    }
+                    println!("Restart the connection for changes to take effect.");
+                }
+                "kernel" => {
+                    #[cfg(not(target_os = "linux"))]
+                    {
+                        eprintln!("Error: Kernel WireGuard mode is only supported on Linux.");
+                        eprintln!("Use 'userspace' or 'auto' on this platform.");
+                        std::process::exit(exit_codes::INVALID_INPUT);
+                    }
+                    #[cfg(target_os = "linux")]
+                    {
+                        config.network_config.wireguard_mode = WireGuardMode::Kernel;
+                        config.save()?;
+                        println!("WireGuard mode set to 'kernel'.");
+                        println!("Will use kernel WireGuard module via 'wg' CLI.");
+                        println!("Note: Requires wireguard-tools and kernel module to be installed.");
+                        println!("Restart the connection for changes to take effect.");
+                    }
+                }
+                "userspace" | "boringtun" => {
+                    config.network_config.wireguard_mode = WireGuardMode::Userspace;
+                    config.save()?;
+                    println!("WireGuard mode set to 'userspace'.");
+                    println!("Will use BoringTun userspace implementation.");
+                    println!("Restart the connection for changes to take effect.");
+                }
+                _ => {
+                    eprintln!("Error: Invalid WireGuard mode '{}'.", action);
+                    eprintln!("Usage:");
+                    eprintln!("  omniedge config wireguard auto       Automatically choose");
+                    eprintln!("  omniedge config wireguard kernel     Use kernel WireGuard (Linux only)");
+                    eprintln!("  omniedge config wireguard userspace  Use BoringTun userspace");
+                    std::process::exit(exit_codes::INVALID_INPUT);
+                }
+            }
+        }
         ConfigCommands::Reset => {
             config.network_config = NetworkConfig::default();
             config.save()?;
@@ -2320,6 +2449,7 @@ fn handle_config_command(cmd: ConfigCommands, config: &mut CliConfig) -> Result<
             println!("  Port Mapping:        Enabled");
             println!("  Encrypted Signaling: Enabled");
             println!("  IPv6:                Enabled (Preferred)");
+            println!("  WireGuard Mode:      Auto");
             println!();
         }
     }
