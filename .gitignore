@@ -59,3 +59,6 @@ app.yaml
 # --- Documentation (auto-generated / working drafts) ---
 doc
 docs/
+
+# --- Scripts / Downloaded binaries ---
+scripts/omniedge-cli-*

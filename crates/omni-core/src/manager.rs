@@ -1798,6 +1798,7 @@ impl ConnectionManager {
                                         Ok(Some(update)) => {
                                             // Get our NAT type for strategy selection
                                             let our_nat_type = proto_ctrl.get_nat_type().await;
+                                            info!("Our NAT type: {:?} ({} peers in update)", our_nat_type, update.peers.len());
 
                                         for peer in update.peers {
                                             let vip = peer.vip;
@@ -2095,6 +2096,17 @@ impl ConnectionManager {
                                                 }
                                             }
                                         }
+                                        // Handle removed peers from heartbeat ACK
+                                        if !update.removed_vips.is_empty() {
+                                            let mut peers = peer_states.write().await;
+                                            for vip in &update.removed_vips {
+                                                if peers.remove(vip).is_some() {
+                                                    info!("Removed peer {} (departed from cluster)", vip);
+                                                } else {
+                                                    debug!("Ignoring removal of unknown peer {}", vip);
+                                                }
+                                            }
+                                        }
                                     }
                                     Ok(None) => {
                                         warn!(
@@ -2112,8 +2124,15 @@ impl ConnectionManager {
                                 continue;
                             }
                                 if (0x01..=0x04).contains(&first_byte) {
-                                    // WireGuard
-                                    debug!("WireGuard packet (type 0x{:02x}) from {}", first_byte, src);
+                                    // WireGuard packet type-specific logging (matching OmniNervous wg.rs)
+                                    let pkt_len = pkt.len();
+                                    match first_byte {
+                                        0x01 => info!("[WG-RX] HandshakeInit ({} bytes) from {}", pkt_len, src),
+                                        0x02 => info!("[WG-RX] HandshakeResponse ({} bytes) from {}", pkt_len, src),
+                                        0x03 => debug!("[WG-RX] CookieReply ({} bytes) from {}", pkt_len, src),
+                                        0x04 => debug!("[WG-RX] Data ({} bytes) from {}", pkt_len, src),
+                                        _ => {}
+                                    }
                                     let _ = tun_ctrl.handle_packet(pkt, src, &socket_inner).await;
                                 } else {
                                     debug!("Ignored unknown packet type {} from {}", first_byte, src);

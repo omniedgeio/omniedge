@@ -776,14 +776,21 @@ async fn async_main() -> Result<()> {
     let _ = std::fs::create_dir_all(&log_dir);
 
     // Set log level based on verbose flag
-    let log_level = if cli.verbose { "debug" } else { "info" };
+    // Always include omninervous library at debug level for connection diagnostics
+    let log_level = if cli.verbose {
+        "debug".to_string()
+    } else {
+        "info,omninervous=debug".to_string()
+    };
+    // Also respect RUST_LOG env var if explicitly set
+    let log_level = std::env::var("RUST_LOG").unwrap_or(log_level);
     let duplicate_level = if cli.verbose {
         flexi_logger::Duplicate::All
     } else {
         flexi_logger::Duplicate::Warn // Only show warnings and errors to stderr by default
     };
 
-    let logger = flexi_logger::Logger::try_with_str(log_level)?
+    let logger = flexi_logger::Logger::try_with_str(&log_level)?
         .log_to_file(
             flexi_logger::FileSpec::default()
                 .directory(&log_dir)

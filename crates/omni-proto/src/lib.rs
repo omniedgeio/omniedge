@@ -70,6 +70,7 @@ pub struct PeerInfo {
 
 pub struct PeerUpdate {
     pub peers: Vec<PeerInfo>,
+    pub removed_vips: Vec<Ipv4Addr>,
 }
 
 pub struct OmniProto {
@@ -187,6 +188,7 @@ impl OmniProto {
         let effective_buf = decrypted_buf.as_deref().unwrap_or(buf);
 
         let mut peers = Vec::new();
+        let mut removed_vips = Vec::new();
 
         match msg_type {
             SIGNALING_REGISTER_ACK => {
@@ -232,6 +234,10 @@ impl OmniProto {
                         mapped_endpoint: p.mapped_endpoint.as_ref().and_then(|s| s.parse().ok()),
                     });
                 }
+                for vip in &ack.removed_vips {
+                    info!("  Removed peer from HEARTBEAT_ACK: vip={}", vip);
+                }
+                removed_vips.extend(ack.removed_vips.iter().copied());
             }
             SIGNALING_PEER_INFO => {
                 let info = parse_peer_info(effective_buf, secret)?;
@@ -255,7 +261,7 @@ impl OmniProto {
             _ => return Ok(None),
         }
 
-        Ok(Some(PeerUpdate { peers }))
+        Ok(Some(PeerUpdate { peers, removed_vips }))
     }
 
     pub async fn cluster(&self) -> String {

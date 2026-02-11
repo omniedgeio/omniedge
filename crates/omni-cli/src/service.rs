@@ -957,10 +957,18 @@ WantedBy=multi-user.target
         );
 
         // Fork the daemon process to background
-        // Set RUST_LOG=info to ensure daemon logs are captured
+        // Inherit RUST_LOG from parent if set, otherwise default to info with omninervous debug
+        let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| {
+            if verbose {
+                "debug".to_string()
+            } else {
+                "info,omninervous=debug".to_string()
+            }
+        });
+        info!("Daemon RUST_LOG={}", rust_log);
         let child = Command::new(&exe_path)
             .args(&args)
-            .env("RUST_LOG", "info")
+            .env("RUST_LOG", &rust_log)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
