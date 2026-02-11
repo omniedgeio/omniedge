@@ -965,8 +965,8 @@ impl ConnectionManager {
         };
 
         info!(
-            "Join successful. Received VIP: {}, Cluster: {}",
-            join_resp.virtual_ip, join_resp.cluster
+            "Join successful. VIP: {}, Cluster: {}, Nucleus: {}",
+            join_resp.virtual_ip, join_resp.cluster, join_resp.server.host
         );
         debug!("Full Join response: {:?}", join_resp);
 
@@ -1717,15 +1717,24 @@ impl ConnectionManager {
                                                         }
 
                                                         // Use relay server as endpoint
-                                                        let endpoint = ack.relay_endpoint
-                                                            .as_ref()
-                                                            .and_then(|s| s.parse().ok())
-                                                            .or(relay_server_addr);
+                                                        // For transparent relay, use `src` (actual relay server address)
+                                                        // instead of `ack.relay_endpoint` which may be 0.0.0.0
+                                                        // from the relay server's local_addr()
+                                                        let endpoint = if ack.transparent {
+                                                            // Transparent relay: use source address of ACK
+                                                            Some(src)
+                                                        } else {
+                                                            // Standard relay: use relay_endpoint from ACK or fallback
+                                                            ack.relay_endpoint
+                                                                .as_ref()
+                                                                .and_then(|s| s.parse().ok())
+                                                                .or(relay_server_addr)
+                                                        };
 
                                                         if let Some(ep) = endpoint {
                                                             info!(
-                                                                "Configuring WireGuard peer {} via relay {}",
-                                                                peer_state.vip, ep
+                                                                "Configuring WireGuard peer {} via relay {} (transparent: {})",
+                                                                peer_state.vip, ep, ack.transparent
                                                             );
                                                             let _ = tun_ctrl
                                                                 .add_peer(&pubkey, Some(ep), &allowed_ips)
