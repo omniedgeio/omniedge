@@ -21,23 +21,14 @@ pub enum WgMode {
 
 impl WgMode {
     /// Check if this mode should use kernel WireGuard
+    ///
+    /// NOTE: For omniedge clients, we always use userspace WireGuard for better
+    /// compatibility with relay fallback. Kernel mode requires transparent relay
+    /// support which adds complexity. Userspace (BoringTun) works reliably across
+    /// all platforms with standard relay encapsulation.
     pub fn should_use_kernel(&self) -> bool {
-        match self {
-            WgMode::Auto => {
-                // On Linux, prefer kernel if available
-                #[cfg(target_os = "linux")]
-                {
-                    // Check if wireguard kernel module is available
-                    std::path::Path::new("/sys/module/wireguard").exists()
-                }
-                #[cfg(not(target_os = "linux"))]
-                {
-                    false // Userspace on other platforms
-                }
-            }
-            WgMode::Kernel => true,
-            WgMode::Userspace => false,
-        }
+        // Always use userspace for omniedge clients
+        false
     }
 }
 
