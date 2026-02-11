@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use log::{debug, info};
+use log::{debug, info, warn};
 use omninervous::signaling::NucleusClient;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::net::UdpSocket;
@@ -156,15 +156,17 @@ impl OmniProto {
     pub async fn handle_packet(&self, buf: &[u8], secret: Option<&str>) -> Result<Option<PeerUpdate>> {
         use omninervous::signaling::{
             get_signaling_type, parse_heartbeat_ack, parse_register_ack, parse_peer_info,
+            parse_peer_notify,
             SIGNALING_HEARTBEAT_ACK, SIGNALING_REGISTER_ACK, MSG_ENCRYPTED, SIGNALING_PEER_INFO,
+            SIGNALING_PEER_NOTIFY,
         };
 
         let mut decrypted_buf = None;
         let mut msg_type = get_signaling_type(buf).context("Empty signaling packet")?;
 
         debug!(
-            "Signaling packet received: len={}, type=0x{:02x}",
-            buf.len(), msg_type
+            "Signaling packet received: len={}, type=0x{:02x} (PEER_NOTIFY=0x{:02x}, HEARTBEAT_ACK=0x{:02x})",
+            buf.len(), msg_type, SIGNALING_PEER_NOTIFY, SIGNALING_HEARTBEAT_ACK
         );
 
         // Handle encrypted signaling packets
@@ -255,6 +257,28 @@ impl OmniProto {
                             nat_type: p.nat_type,
                             mapped_endpoint: p.mapped_endpoint.as_ref().and_then(|s| s.parse().ok()),
                         });
+                    }
+                }
+            }
+            SIGNALING_PEER_NOTIFY => {
+                match parse_peer_notify(effective_buf, secret) {
+                    Ok(notify) => {
+                        info!(
+                            "Received PEER_NOTIFY from Nucleus: new peer vip={}, endpoint={}, mapped_endpoint={:?}, nat_type={:?}",
+                            notify.peer.vip, notify.peer.endpoint, notify.peer.mapped_endpoint, notify.peer.nat_type
+                        );
+                        peers.push(PeerInfo {
+                            vip: notify.peer.vip,
+                            vip_v6: notify.peer.vip_v6,
+                            endpoint: notify.peer.endpoint.parse().ok(),
+                            public_key: notify.peer.public_key,
+                            nat_type: notify.peer.nat_type,
+                            mapped_endpoint: notify.peer.mapped_endpoint.as_ref().and_then(|s| s.parse().ok()),
+                        });
+                    }
+                    Err(e) => {
+                        warn!("Failed to parse PEER_NOTIFY: {}", e);
+                        return Ok(None);
                     }
                 }
             }

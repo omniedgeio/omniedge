@@ -1609,10 +1609,23 @@ impl ConnectionManager {
                                             // Add endpoint from direct probe (highest priority source)
                                             peer_state.add_endpoint(src, EndpointSource::DirectProbe);
                                             peer_state.last_seen = Some(Instant::now());
-                                            info!(
-                                                "Peer {} endpoint added via disco ping: {} (total: {} endpoints)",
-                                                ping.sender_vip, src, peer_state.endpoint_count()
-                                            );
+                                            // Trigger WireGuard update immediately if this is now the best endpoint
+                                            // This is crucial when the peer is behind NAT and its reported endpoint
+                                            // is different from the one it actually uses to send disco pings.
+                                            if let Some(best_ep) = peer_state.best_endpoint() {
+                                                let pubkey = ::hex::encode(peer_state.public_key);
+                                                let mut allowed_ips = vec![format!("{}/32", peer_state.vip)];
+                                                if let Some(v6) = peer_state.vip_v6 {
+                                                    allowed_ips.push(format!("{}/128", v6));
+                                                }
+                                                info!(
+                                                    "Updating WireGuard peer {} endpoint to {} (learned from verified disco ping)",
+                                                    peer_state.vip, best_ep
+                                                );
+                                                let _ = tun_ctrl
+                                                    .add_peer(&pubkey, Some(best_ep), &allowed_ips)
+                                                    .await;
+                                            }
                                         }
                                     }
                                     continue;
