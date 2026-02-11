@@ -2226,31 +2226,29 @@ impl ConnectionManager {
                                 let mut relay = relay_client.write().await;
                                 if let Some(client) = relay.as_mut() {
                                     for (target_vip, target_key) in peers_needing_relay {
-                                        // Use transparent relay for kernel WireGuard mode
-                                        // Transparent relay forwards raw WG packets without RELAY_DATA header
-                                        // which is required since kernel WG can't add/strip headers
-                                        let bind_req = if is_kernel_wg {
-                                            info!(
-                                                "Requesting TRANSPARENT relay for peer {} (kernel WG mode, port: {:?})",
-                                                target_vip, wg_listen_port
-                                            );
-                                            client.create_bind_request_with_mode(
-                                                target_key,
-                                                target_vip,
-                                                true,  // transparent mode
-                                                wg_listen_port,
-                                            )
-                                        } else {
-                                            client.create_bind_request(target_key, target_vip)
-                                        };
+                                        // Always use transparent relay for omniedge clients
+                                        // Both kernel and userspace WireGuard send raw WG packets,
+                                        // so transparent relay (which forwards raw packets by source address)
+                                        // is the correct mode. Standard relay expects RELAY_DATA encapsulation
+                                        // which neither kernel nor BoringTun userspace WG provides.
+                                        info!(
+                                            "Requesting TRANSPARENT relay for peer {} (port: {:?})",
+                                            target_vip, wg_listen_port
+                                        );
+                                        let bind_req = client.create_bind_request_with_mode(
+                                            target_key,
+                                            target_vip,
+                                            true,  // transparent mode - raw WG packet forwarding
+                                            wg_listen_port,
+                                        );
 
                                         if let Ok(bind_data) = encode_relay_bind(&bind_req) {
                                             if let Err(e) = socket_for_disco.send_to(&bind_data, relay_addr).await {
                                                 warn!("Failed to send RELAY_BIND for {} to {}: {}", target_vip, relay_addr, e);
                                             } else {
                                                 info!(
-                                                    "Sent RELAY_BIND for peer {} to relay server {} (transparent: {})",
-                                                    target_vip, relay_addr, is_kernel_wg
+                                                    "Sent RELAY_BIND for peer {} to relay server {} (transparent: true)",
+                                                    target_vip, relay_addr
                                                 );
                                             }
                                         }
