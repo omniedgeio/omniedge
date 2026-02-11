@@ -579,6 +579,14 @@ enum Commands {
     },
 }
 
+impl Commands {
+    /// Returns true for commands that don't need file logging or config loading.
+    /// These commands should work without root/sudo and without writing to disk.
+    fn is_lightweight(&self) -> bool {
+        matches!(self, Commands::Version { .. })
+    }
+}
+
 /// Network configuration subcommands
 #[derive(Subcommand, Debug)]
 enum ConfigCommands {
@@ -761,7 +769,11 @@ async fn async_main() -> Result<()> {
         }
     };
 
-    // Initialize unified logger for both interactive and background use
+    // For lightweight commands (version), skip file logging and config loading
+    // so they work without root/sudo and without writing to disk.
+    //
+    // Always compute log_dir (just path construction, no I/O) since it's referenced
+    // by other commands (e.g., config show).
     #[cfg(windows)]
     let log_dir = dirs::data_local_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("C:\\ProgramData"))
@@ -773,57 +785,71 @@ async fn async_main() -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?
         .join(".omniedge")
         .join("logs");
-    let _ = std::fs::create_dir_all(&log_dir);
 
-    // Set log level based on verbose flag
-    // Always include omninervous library at debug level for connection diagnostics
-    let log_level = if cli.verbose {
-        "debug".to_string()
+    let _logger_handle;
+    if cli.command.is_lightweight() {
+        // Stderr-only logger — no file I/O, no permission issues
+        _logger_handle = flexi_logger::Logger::try_with_str("warn")?.start()?;
     } else {
-        "info,omninervous=debug".to_string()
-    };
-    // Also respect RUST_LOG env var if explicitly set
-    let log_level = std::env::var("RUST_LOG").unwrap_or(log_level);
-    let duplicate_level = if cli.verbose {
-        flexi_logger::Duplicate::All
-    } else {
-        flexi_logger::Duplicate::Warn // Only show warnings and errors to stderr by default
-    };
+        // Full file logger for all other commands
+        let _ = std::fs::create_dir_all(&log_dir);
 
-    let logger = flexi_logger::Logger::try_with_str(&log_level)?
-        .log_to_file(
-            flexi_logger::FileSpec::default()
-                .directory(&log_dir)
-                .basename("omniedge")
-                .suffix("log"),
-        )
-        .duplicate_to_stderr(duplicate_level);
+        // Set log level based on verbose flag
+        // Always include omninervous library at debug level for connection diagnostics
+        let log_level = if cli.verbose {
+            "debug".to_string()
+        } else {
+            "info,omninervous=debug".to_string()
+        };
+        // Also respect RUST_LOG env var if explicitly set
+        let log_level = std::env::var("RUST_LOG").unwrap_or(log_level);
+        let duplicate_level = if cli.verbose {
+            flexi_logger::Duplicate::All
+        } else {
+            flexi_logger::Duplicate::Warn // Only show warnings and errors to stderr by default
+        };
 
-    let _logger_handle = match logger.start() {
-        Ok(handle) => handle,
-        Err(e) => {
-            // Fallback to stderr-only logging if file logging fails (e.g. Permission Denied)
-            let handle = flexi_logger::Logger::try_with_str(log_level)?.start()?;
-            log::warn!("File logging disabled due to error: {}. Logging to stderr only.", e);
-            handle
-        }
-    };
+        let logger = flexi_logger::Logger::try_with_str(&log_level)?
+            .log_to_file(
+                flexi_logger::FileSpec::default()
+                    .directory(&log_dir)
+                    .basename("omniedge")
+                    .suffix("log"),
+            )
+            .duplicate_to_stderr(duplicate_level);
 
-    log::info!(
-        "OmniEdge CLI starting. Version: {}. Args: {:?}",
-        VERSION,
-        std::env::args().collect::<Vec<_>>()
-    );
+        _logger_handle = match logger.start() {
+            Ok(handle) => handle,
+            Err(e) => {
+                // Fallback to stderr-only logging if file logging fails (e.g. Permission Denied)
+                let handle = flexi_logger::Logger::try_with_str(log_level)?.start()?;
+                log::warn!("File logging disabled due to error: {}. Logging to stderr only.", e);
+                handle
+            }
+        };
+
+        log::info!(
+            "OmniEdge CLI starting. Version: {}. Args: {:?}",
+            VERSION,
+            std::env::args().collect::<Vec<_>>()
+        );
+    }
 
     dotenvy::dotenv().ok();
 
-    log::info!("Parsing configuration...");
+    // Skip config loading for lightweight commands
     let base_url = omni_core::config::get_api_base_url();
-    log::info!("Using API base URL: {}", base_url);
+    let mut config = if cli.command.is_lightweight() {
+        CliConfig::default()
+    } else {
+        log::info!("Parsing configuration...");
+        log::info!("Using API base URL: {}", base_url);
 
-    log::info!("CLI parsed. Loading config...");
-    let mut config = CliConfig::load()?;
-    log::info!("Config loaded.");
+        log::info!("CLI parsed. Loading config...");
+        let c = CliConfig::load()?;
+        log::info!("Config loaded.");
+        c
+    };
 
     match cli.command {
         Commands::Start {
