@@ -44,6 +44,7 @@ print_error() {
 
 NODE_A=""
 NODE_B=""
+NUCLEUS=""
 SSH_KEY=""
 SSH_USER="${SSH_USER:-ubuntu}"
 NETWORK_ID=""
@@ -99,6 +100,7 @@ Required:
   --key           OmniEdge Security Key (from dashboard)
 
 Options:
+  --nucleus       IP address of the Nucleus server (for log collection)
   --ssh-key       Path to SSH private key
   --ssh-user      SSH username (default: ubuntu)
   --duration      iperf3 test duration in seconds (default: 10)
@@ -968,16 +970,24 @@ run_test() {
     print_step "Cleaning up old processes and logs..."
     for node in "$NODE_A" "$NODE_B"; do
         export CURRENT_TARGET_NODE="$node"
-        # Kill both omniedge and omninervous to avoid stale settings interference
+        # Stop systemd service first (if running) to prevent auto-restart
+        # Then kill both omniedge and omninervous to avoid stale settings interference
+        # Flush stale IPv6 addresses before deleting interface to avoid "address already assigned"
         # Also explicitly remove the OmniEdge interface to force a fresh backend assignment
         # Try both interface names for compatibility (omniedge0 is current, omni0 is legacy)
-        ssh_cmd "$node" "sudo pkill -9 -f omniedge || true; \
+        ssh_cmd "$node" "sudo systemctl stop omniedge 2>/dev/null || true; \
+                         sudo pkill -9 -f 'omniedge.*--daemon' || true; \
+                         sleep 1; \
+                         sudo pkill -9 -f omniedge || true; \
                          sudo pkill -9 -f omninervous || true; \
                          sudo pkill -9 -f iperf3 || true; \
                          if command -v fuser &>/dev/null; then sudo fuser -k 51820/udp 2>/dev/null || true; fi; \
+                         sudo ip -6 addr flush dev omniedge0 2>/dev/null || true; \
+                         sudo ip -6 addr flush dev omni0 2>/dev/null || true; \
                          sudo ip link delete omniedge0 2>/dev/null || true; \
                          sudo ip link delete omni0 2>/dev/null || true; \
-                         sudo rm -f /tmp/omni-*.log" || true
+                         sudo rm -f /tmp/omni-*.log; \
+                         sudo rm -f /root/.omniedge/logs/omniedge*.log" || true
         unset CURRENT_TARGET_NODE
     done
     
@@ -1275,23 +1285,46 @@ run_test() {
         fi
     fi
     
-    # Collect logs and store JSON
+    # Collect logs (CLI stdout + daemon file logs separately, then merge)
     print_step "Collecting logs..."
+    # Edge A: CLI output (nohup capture) + daemon log file + journal
     export CURRENT_TARGET_NODE="$NODE_A"
-    ssh_cmd "$NODE_A" "cat /tmp/omni-edge-a.log" > "$RESULTS_DIR/edge_a.log" 2>/dev/null || true
-    # Also collect daemon's internal log file (has signaling/disco details)
-    ssh_cmd "$NODE_A" "sudo cat /root/.omniedge/logs/omniedge.log 2>/dev/null || cat ~/.omniedge/logs/omniedge.log 2>/dev/null" >> "$RESULTS_DIR/edge_a.log" 2>/dev/null || true
+    ssh_cmd "$NODE_A" "cat /tmp/omni-edge-a.log" > "$RESULTS_DIR/edge_a_cli.log" 2>/dev/null || true
+    ssh_cmd "$NODE_A" "sudo cat /root/.omniedge/logs/omniedge*.log 2>/dev/null" > "$RESULTS_DIR/edge_a_daemon.log" 2>/dev/null || true
+    ssh_cmd "$NODE_A" "sudo journalctl -u omniedge -n 500 --no-pager 2>/dev/null" >> "$RESULTS_DIR/edge_a_daemon.log" || true
+    { echo "=== CLI OUTPUT ==="; cat "$RESULTS_DIR/edge_a_cli.log" 2>/dev/null; echo ""; echo "=== DAEMON LOG ==="; cat "$RESULTS_DIR/edge_a_daemon.log" 2>/dev/null; } > "$RESULTS_DIR/edge_a.log" 2>/dev/null || true
     unset CURRENT_TARGET_NODE
+
+    # Edge B: CLI output + daemon log file + journal
     export CURRENT_TARGET_NODE="$NODE_B"
-    ssh_cmd "$NODE_B" "cat /tmp/omni-edge-b.log" > "$RESULTS_DIR/edge_b.log" 2>/dev/null || true
-    ssh_cmd "$NODE_B" "sudo cat /root/.omniedge/logs/omniedge.log 2>/dev/null || cat ~/.omniedge/logs/omniedge.log 2>/dev/null" >> "$RESULTS_DIR/edge_b.log" 2>/dev/null || true
+    ssh_cmd "$NODE_B" "cat /tmp/omni-edge-b.log" > "$RESULTS_DIR/edge_b_cli.log" 2>/dev/null || true
+    ssh_cmd "$NODE_B" "sudo cat /root/.omniedge/logs/omniedge*.log 2>/dev/null" > "$RESULTS_DIR/edge_b_daemon.log" 2>/dev/null || true
+    ssh_cmd "$NODE_B" "sudo journalctl -u omniedge -n 500 --no-pager 2>/dev/null" >> "$RESULTS_DIR/edge_b_daemon.log" || true
+    { echo "=== CLI OUTPUT ==="; cat "$RESULTS_DIR/edge_b_cli.log" 2>/dev/null; echo ""; echo "=== DAEMON LOG ==="; cat "$RESULTS_DIR/edge_b_daemon.log" 2>/dev/null; } > "$RESULTS_DIR/edge_b.log" 2>/dev/null || true
     unset CURRENT_TARGET_NODE
+
+    # Nucleus: daemon log file + journal (if --nucleus was provided)
+    if [[ -n "$NUCLEUS" ]]; then
+        export CURRENT_TARGET_NODE="$NUCLEUS"
+        ssh_cmd "$NUCLEUS" "sudo cat /root/.omniedge/logs/omniedge*.log 2>/dev/null || tail -500 /tmp/omni-nucleus-cli.log 2>/dev/null" > "$RESULTS_DIR/nucleus.log" 2>/dev/null || true
+        ssh_cmd "$NUCLEUS" "sudo journalctl -u omniedge -n 500 --no-pager 2>/dev/null" >> "$RESULTS_DIR/nucleus.log" || true
+        unset CURRENT_TARGET_NODE
+    fi
+
+    # Report log sizes
+    echo "  Log sizes:"
+    for f in "$RESULTS_DIR"/edge_a_daemon.log "$RESULTS_DIR"/edge_b_daemon.log "$RESULTS_DIR"/nucleus.log; do
+        if [ -f "$f" ] && [ -s "$f" ]; then
+            echo "    $(basename "$f"): $(wc -c < "$f") bytes, $(wc -l < "$f") lines"
+        fi
+    done
     
     cat > "$result_file" << EOF
 {
   "timestamp": "$timestamp",
   "architecture": "2-node (OmniEdge P2P)",
   "network_id": "$NETWORK_ID",
+  "nucleus": "${NUCLEUS:-N/A}",
   "edge_a": {"public_ip": "$NODE_A", "vip": "$VIP_A", "vip6": "${VIP6_A:-N/A}"},
   "edge_b": {"public_ip": "$NODE_B", "vip": "$VIP_B", "vip6": "${VIP6_B:-N/A}"},
   "test_duration_sec": $TEST_DURATION,
@@ -1339,7 +1372,11 @@ EOF
     print_step "Cleaning up remote processes..."
     for node in "$NODE_A" "$NODE_B"; do
         export CURRENT_TARGET_NODE="$node"
-        ssh_cmd "$node" "sudo pkill -f omniedge || true; sudo pkill -f iperf3 || true" 2>/dev/null || true
+        ssh_cmd "$node" "sudo systemctl stop omniedge 2>/dev/null || true; \
+                         sudo pkill -9 -f 'omniedge.*--daemon' || true; \
+                         sleep 1; \
+                         sudo pkill -f omniedge || true; \
+                         sudo pkill -f iperf3 || true" 2>/dev/null || true
         unset CURRENT_TARGET_NODE
     done
 }
@@ -1356,6 +1393,7 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --node-a) NODE_A="$2"; shift 2 ;;
         --node-b) NODE_B="$2"; shift 2 ;;
+        --nucleus) NUCLEUS="$2"; shift 2 ;;
         --ssh-key) SSH_KEY="$2"; shift 2 ;;
         --ssh-user) SSH_USER="$2"; shift 2 ;;
         --network) NETWORK_ID="$2"; shift 2 ;;
@@ -1398,6 +1436,9 @@ fi
 print_header "OmniEdge 2-Node Cloud Test"
 echo "Edge A:    $NODE_A"
 echo "Edge B:    $NODE_B"
+if [[ -n "$NUCLEUS" ]]; then
+    echo "Nucleus:   $NUCLEUS"
+fi
 echo "Network:   $NETWORK_ID"
 
 preflight_check
