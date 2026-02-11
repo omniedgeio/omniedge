@@ -1378,6 +1378,23 @@ impl ConnectionManager {
         let relay_client = self.relay_client.clone();
         let relay_sessions = self.relay_sessions.clone();
 
+        // Track WireGuard mode and listen port for kernel mode support
+        // In kernel mode, we need to tell peers which port to send WG packets to
+        // and use transparent relay (no RELAY_DATA header encapsulation)
+        let is_kernel_wg = tun.is_kernel_mode();
+        let wg_listen_port: Option<u16> = if is_kernel_wg {
+            // In kernel mode, WG listens on the same port as our signaling socket
+            socket.local_addr().ok().map(|a| a.port())
+        } else {
+            None // Userspace mode - same port for everything, no need to specify
+        };
+        if is_kernel_wg {
+            info!(
+                "Kernel WireGuard mode active, WG listen port: {:?}",
+                wg_listen_port
+            );
+        }
+
         // Get relay server address: prefer custom relay_server from config, fall back to nucleus
         let relay_server_addr: Option<std::net::SocketAddr> = self
             .network_config
@@ -1518,12 +1535,13 @@ impl ConnectionManager {
                                         );
 
                                         // Create and send pong response
+                                        // In kernel mode, include wg_port so peer knows where to send WG packets
                                         let pong = DiscoPong {
                                             tx_id: ping.tx_id,
                                             observed_addr: src.to_string(),
                                             responder_key: our_public_key,
                                             responder_vip_v6: our_vip_v6,
-                                            wg_port: None, // userspace mode - same port for signaling and WG
+                                            wg_port: wg_listen_port,
                                         };
 
                                         if let Ok(pong_data) = encode_disco_pong(&pong) {
@@ -1898,7 +1916,7 @@ impl ConnectionManager {
                                                             sender_key: our_public_key,
                                                             sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
                                                             sender_vip_v6: our_vip_v6,
-                                                            wg_port: None,
+                                                            wg_port: wg_listen_port,
                                                         };
 
                                                         if let Ok(ping_data) = encode_disco_ping(&ping) {
@@ -1959,7 +1977,7 @@ impl ConnectionManager {
                                                             sender_key: our_public_key,
                                                             sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
                                                             sender_vip_v6: our_vip_v6,
-                                                            wg_port: None, // userspace mode - same port for signaling and WG
+                                                            wg_port: wg_listen_port,
                                                         };
 
                                                         if let Ok(ping_data) = encode_disco_ping(&ping) {
@@ -2039,7 +2057,7 @@ impl ConnectionManager {
                                                             sender_key: our_public_key,
                                                             sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
                                                             sender_vip_v6: our_vip_v6,
-                                                            wg_port: None, // userspace mode - same port for signaling and WG
+                                                            wg_port: wg_listen_port,
                                                         };
 
                                                             if let Ok(ping_data) = encode_disco_ping(&ping) {
@@ -2116,7 +2134,7 @@ impl ConnectionManager {
                                         sender_key: our_public_key,
                                         sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
                                         sender_vip_v6: our_vip_v6,
-                                        wg_port: None, // userspace mode - same port for signaling and WG
+                                        wg_port: wg_listen_port,
                                     };
 
                                     if let Ok(ping_data) = encode_disco_ping(&ping) {
@@ -2208,15 +2226,31 @@ impl ConnectionManager {
                                 let mut relay = relay_client.write().await;
                                 if let Some(client) = relay.as_mut() {
                                     for (target_vip, target_key) in peers_needing_relay {
-                                        let bind_req = client.create_bind_request(target_key, target_vip);
+                                        // Use transparent relay for kernel WireGuard mode
+                                        // Transparent relay forwards raw WG packets without RELAY_DATA header
+                                        // which is required since kernel WG can't add/strip headers
+                                        let bind_req = if is_kernel_wg {
+                                            info!(
+                                                "Requesting TRANSPARENT relay for peer {} (kernel WG mode, port: {:?})",
+                                                target_vip, wg_listen_port
+                                            );
+                                            client.create_bind_request_with_mode(
+                                                target_key,
+                                                target_vip,
+                                                true,  // transparent mode
+                                                wg_listen_port,
+                                            )
+                                        } else {
+                                            client.create_bind_request(target_key, target_vip)
+                                        };
 
                                         if let Ok(bind_data) = encode_relay_bind(&bind_req) {
                                             if let Err(e) = socket_for_disco.send_to(&bind_data, relay_addr).await {
                                                 warn!("Failed to send RELAY_BIND for {} to {}: {}", target_vip, relay_addr, e);
                                             } else {
                                                 info!(
-                                                    "Sent RELAY_BIND for peer {} to relay server {}",
-                                                    target_vip, relay_addr
+                                                    "Sent RELAY_BIND for peer {} to relay server {} (transparent: {})",
+                                                    target_vip, relay_addr, is_kernel_wg
                                                 );
                                             }
                                         }
