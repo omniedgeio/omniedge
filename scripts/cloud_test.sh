@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# OmniEdge Cloud-to-Cloud Test Orchestrator (v2.6.0)
+# OmniEdge Cloud-to-Cloud Test Orchestrator (v2.7.0)
 # Run from LOCAL machine, orchestrates tests between cloud instances
 # Architecture: 2-Node P2P (Edge A + Edge B via OmniEdge Backend)
 #
@@ -117,11 +117,15 @@ Localhost Execution Modes:
   --local-docker  (default) Run localhost in Docker container
                   - Isolated environment, won't affect host system
                   - Requires Docker installed
+                  - WARNING: Docker NAT may drop UDP responses from Nucleus,
+                    causing peer discovery to fail (known_peer_count=0).
+                    Use --use-local-cli if this happens.
                   
-  --use-local-cli Run localhost natively on host system
+  --use-local-cli Run localhost natively on host system (RECOMMENDED)
                   - Uses cargo to build CLI from local source
                   - Runs OmniEdge directly on host (requires sudo)
-                  - Good for testing local code changes quickly
+                  - Best for testing local code changes
+                  - No Docker NAT issues with UDP
 
 Environment Variables:
   SSH_USER                SSH username
@@ -601,6 +605,9 @@ ensure_local_docker() {
         docker rm -f "$LOCAL_DOCKER_NAME" 2>/dev/null || true
         
         # Use a lightweight ubuntu image with necessary tools
+        # NOTE: Docker NAT can cause issues with UDP responses from Nucleus.
+        # If peer discovery fails (known_peer_count=0), try --use-local-cli instead.
+        # Using --network=host would bypass NAT but shares host networking (not ideal).
         docker run -d --name "$LOCAL_DOCKER_NAME" \
             --privileged \
             --cap-add=NET_ADMIN \
@@ -937,6 +944,41 @@ deploy_omniedge() {
     fi
     
     echo -e "\n${GREEN}OmniEdge installation complete!${NC}"
+    
+    # Verify both nodes have the same version
+    verify_versions
+}
+
+# Verify both nodes are running the same OmniEdge version
+verify_versions() {
+    print_step "Verifying binary versions match on both nodes..."
+    
+    export CURRENT_TARGET_NODE="$NODE_A"
+    local ver_a
+    ver_a=$(ssh_cmd "$NODE_A" "omniedge --version 2>/dev/null | head -1" | tr -d '\r\n' || echo "unknown")
+    unset CURRENT_TARGET_NODE
+    
+    export CURRENT_TARGET_NODE="$NODE_B"
+    local ver_b
+    ver_b=$(ssh_cmd "$NODE_B" "omniedge --version 2>/dev/null | head -1" | tr -d '\r\n' || echo "unknown")
+    unset CURRENT_TARGET_NODE
+    
+    echo "  Edge A version: $ver_a"
+    echo "  Edge B version: $ver_b"
+    
+    if [[ "$ver_a" == "unknown" || "$ver_b" == "unknown" ]]; then
+        print_error "Could not determine version on one or both nodes"
+        exit 1
+    fi
+    
+    if [[ "$ver_a" != "$ver_b" ]]; then
+        print_error "Version MISMATCH! Edge A='$ver_a' vs Edge B='$ver_b'"
+        echo -e "  ${YELLOW}Both nodes must run the same version for valid test results.${NC}"
+        echo -e "  ${YELLOW}Re-run without --skip-deploy or manually update the outdated node.${NC}"
+        exit 1
+    fi
+    
+    echo -e "  ✅ ${GREEN}Versions match: $ver_a${NC}"
 }
 
 # =============================================================================
@@ -991,9 +1033,21 @@ run_test() {
         unset CURRENT_TARGET_NODE
     done
     
-    # Give it time to release sockets
+    # Give it time to release sockets and let stale VIP registrations expire
     echo "   Waiting for resource release..."
-    sleep 5
+    if [[ "$LOCAL_DOCKER" == "true" ]]; then
+        echo "   Docker mode: extra stabilization delay for stale VIP cleanup..."
+        sleep 10
+    else
+        sleep 5
+    fi
+    
+    # Clean stale OmniEdge state (config/device files that cause VIP churn)
+    for node in "$NODE_A" "$NODE_B"; do
+        export CURRENT_TARGET_NODE="$node"
+        ssh_cmd "$node" "sudo rm -rf /root/.omniedge/device_id 2>/dev/null || true" || true
+        unset CURRENT_TARGET_NODE
+    done
     
     # Start Edge A
     print_step "Starting Edge A on $NODE_A..."
@@ -1015,10 +1069,71 @@ run_test() {
     unset CURRENT_TARGET_NODE
     sleep 3
     
-    # Wait for VPN tunnel establishment
-    print_step "Waiting for VPN tunnel establishment (60s for peer discovery)..."
-    echo "   This includes authentication, peer discovery, and WireGuard configuration."
-    sleep 60
+    # Wait for VPN tunnel establishment with active polling
+    print_step "Waiting for VPN tunnel establishment (active polling)..."
+    echo "   Polling for peer discovery, VIP assignment, and WireGuard handshake."
+    
+    local max_wait=120  # max seconds to wait
+    local poll_interval=5
+    local elapsed=0
+    local a_ready=false
+    local b_ready=false
+    
+    # Give initial time for auth and registration
+    sleep 10
+    elapsed=10
+    
+    while [[ $elapsed -lt $max_wait ]]; do
+        # Check Edge A: look for known_peer_count > 0 in daemon log
+        if [[ "$a_ready" == "false" ]]; then
+            export CURRENT_TARGET_NODE="$NODE_A"
+            local a_peers
+            a_peers=$(ssh_cmd "$NODE_A" "grep -o 'known_peer_count=[0-9]*' /tmp/omni-edge-a.log 2>/dev/null | tail -1 | grep -o '[0-9]*'" 2>/dev/null || echo "0")
+            # Also check daemon log location
+            if [[ "$a_peers" == "0" || -z "$a_peers" ]]; then
+                a_peers=$(ssh_cmd "$NODE_A" "sudo grep -o 'known_peer_count=[0-9]*' /root/.omniedge/logs/omniedge.log 2>/dev/null | tail -1 | grep -o '[0-9]*'" 2>/dev/null || echo "0")
+            fi
+            if [[ -n "$a_peers" && "$a_peers" -gt 0 ]] 2>/dev/null; then
+                echo "   [${elapsed}s] Edge A: peer discovered (known_peer_count=$a_peers)"
+                a_ready=true
+            fi
+            unset CURRENT_TARGET_NODE
+        fi
+        
+        # Check Edge B: look for known_peer_count > 0
+        if [[ "$b_ready" == "false" ]]; then
+            export CURRENT_TARGET_NODE="$NODE_B"
+            local b_peers
+            b_peers=$(ssh_cmd "$NODE_B" "grep -o 'known_peer_count=[0-9]*' /tmp/omni-edge-b.log 2>/dev/null | tail -1 | grep -o '[0-9]*'" 2>/dev/null || echo "0")
+            if [[ "$b_peers" == "0" || -z "$b_peers" ]]; then
+                b_peers=$(ssh_cmd "$NODE_B" "sudo grep -o 'known_peer_count=[0-9]*' /root/.omniedge/logs/omniedge.log 2>/dev/null | tail -1 | grep -o '[0-9]*'" 2>/dev/null || echo "0")
+            fi
+            if [[ -n "$b_peers" && "$b_peers" -gt 0 ]] 2>/dev/null; then
+                echo "   [${elapsed}s] Edge B: peer discovered (known_peer_count=$b_peers)"
+                b_ready=true
+            fi
+            unset CURRENT_TARGET_NODE
+        fi
+        
+        # Both ready?
+        if [[ "$a_ready" == "true" && "$b_ready" == "true" ]]; then
+            echo -e "   ${GREEN}Both edges have discovered peers! Waiting 15s for WireGuard handshake...${NC}"
+            sleep 15
+            break
+        fi
+        
+        # Progress indicator
+        echo "   [${elapsed}s] Waiting... (A: ${a_ready}, B: ${b_ready})"
+        sleep $poll_interval
+        elapsed=$((elapsed + poll_interval))
+    done
+    
+    if [[ "$a_ready" == "false" || "$b_ready" == "false" ]]; then
+        echo -e "   ${YELLOW}WARNING: Peer discovery incomplete after ${max_wait}s (A: ${a_ready}, B: ${b_ready})${NC}"
+        echo -e "   ${YELLOW}Proceeding with tests anyway, but results may show 0 Mbps.${NC}"
+        # Still wait a bit more in case discovery is in progress
+        sleep 10
+    fi
     
     # Check if daemons are running
     print_step "Checking daemon processes..."
@@ -1188,6 +1303,44 @@ run_test() {
     local ping_success=false
     
     if [[ -n "$VIP_A" && -n "$VIP_B" ]]; then
+        # Pre-test tunnel connectivity check with extended retries
+        print_step "Verifying tunnel connectivity before throughput test..."
+        export CURRENT_TARGET_NODE="$NODE_A"
+        local tunnel_verified=false
+        for attempt in 1 2 3 4 5; do
+            echo "   Connectivity check $attempt/5: ping $VIP_B from Edge A..."
+            local check_output=$(ssh_cmd "$NODE_A" "ping -c 3 -W 5 $VIP_B 2>&1" || echo "PING_FAILED")
+            if ping_successful "$check_output"; then
+                tunnel_verified=true
+                echo -e "   ${GREEN}Tunnel is UP and reachable!${NC}"
+                break
+            else
+                echo "   Tunnel not ready yet, waiting 10s..."
+                sleep 10
+            fi
+        done
+        unset CURRENT_TARGET_NODE
+        
+        if [[ "$tunnel_verified" == "false" ]]; then
+            echo -e "   ${RED}TUNNEL CONNECTIVITY FAILED after 5 attempts!${NC}"
+            echo -e "   ${YELLOW}Dumping diagnostic info:${NC}"
+            
+            # Show routing tables and WireGuard status for debugging
+            echo "--- Edge A routing/WG status ---"
+            export CURRENT_TARGET_NODE="$NODE_A"
+            ssh_cmd "$NODE_A" "ip route show table all 2>/dev/null | grep -E 'omniedge|omni|100\\.64' || echo 'No OmniEdge routes'" || true
+            ssh_cmd "$NODE_A" "sudo wg show 2>/dev/null || echo 'No WireGuard interfaces'" || true
+            unset CURRENT_TARGET_NODE
+            
+            echo "--- Edge B routing/WG status ---"
+            export CURRENT_TARGET_NODE="$NODE_B"
+            ssh_cmd "$NODE_B" "ip route show table all 2>/dev/null | grep -E 'omniedge|omni|100\\.64' || echo 'No OmniEdge routes'" || true
+            ssh_cmd "$NODE_B" "sudo wg show 2>/dev/null || echo 'No WireGuard interfaces'" || true
+            unset CURRENT_TARGET_NODE
+            
+            echo -e "   ${YELLOW}Proceeding with tests anyway (will likely show 0 Mbps).${NC}"
+        fi
+        
         print_step "Ping over tunnel ($VIP_A → $VIP_B) with retries..."
         export CURRENT_TARGET_NODE="$NODE_A"
         for attempt in 1 2 3; do
@@ -1443,7 +1596,7 @@ echo "Network:   $NETWORK_ID"
 
 preflight_check
 install_dependencies
-if ! $SKIP_DEPLOY; then deploy_omniedge; fi
+if ! $SKIP_DEPLOY; then deploy_omniedge; else verify_versions; fi
 run_test
 
 echo -e "\n${GREEN}✅ 2-Node OmniEdge cloud test completed!${NC}"
