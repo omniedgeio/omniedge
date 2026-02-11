@@ -713,15 +713,14 @@ install_dependencies() {
 # =============================================================================
 
 deploy_omniedge() {
-    print_header "Deploying OmniEdge to Edge Nodes"
+    print_header "Deploying OmniEdge to All Nodes"
     
-    # Note: Nucleus should already be running omniedge in dual mode
-    # We only deploy to edge nodes A and B
+    local nodes_to_deploy=("$NODE_A" "$NODE_B" "$NUCLEUS")
     
     if [[ "$USE_LOCAL_CLI" == "true" || "$USE_LOCAL_BIN" == "true" ]]; then
         echo -e "📦 Deploying OmniEdge CLI from local source/binaries..."
         
-        for node in "$NODE_A" "$NODE_B"; do
+        for node in "${nodes_to_deploy[@]}"; do
             print_step "Deploying CLI to $node..."
             
             local bin_path
@@ -750,7 +749,7 @@ deploy_omniedge() {
         local INSTALLER_URL="https://raw.githubusercontent.com/omniedgeio/omniedge/main/scripts/omniedge-install.sh"
         echo -e "📦 Installing OmniEdge via installer script..."
         
-        for node in "$NODE_A" "$NODE_B"; do
+        for node in "${nodes_to_deploy[@]}"; do
             print_step "Installing OmniEdge on $node..."
             
             if ssh_cmd "$node" "which omniedge" &>/dev/null; then
@@ -801,9 +800,9 @@ run_test() {
     echo -e "🔑 Security Key: ${SECURITY_KEY:0:10}..."
     echo -e "🌐 Nucleus: $NUCLEUS:$NUCLEUS_PORT"
 
-    # Clean up old processes on edge nodes (not nucleus - it should keep running)
-    print_step "Cleaning up old processes on edge nodes..."
-    for node in "$NODE_A" "$NODE_B"; do
+    # Clean up old processes on all nodes
+    print_step "Cleaning up old processes..."
+    for node in "$NODE_A" "$NODE_B" "$NUCLEUS"; do
         ssh_cmd "$node" "sudo pkill -9 -f 'omniedge.*--daemon' || true; \
                          sleep 1; \
                          sudo pkill -9 -f omniedge || true; \
@@ -816,21 +815,22 @@ run_test() {
     
     sleep 3
     
-    # Check if Nucleus is running in dual mode
-    print_step "Checking Nucleus status ($NUCLEUS)..."
-    local nucleus_running=false
-    if ssh_cmd "$NUCLEUS" "pgrep -a omniedge" &>/dev/null; then
-        echo -e "  ✅ Nucleus daemon is running"
-        nucleus_running=true
-        
-        # Get Nucleus VIP
-        VIP_NUCLEUS=$(get_vip_with_retry "$NUCLEUS" "4")
-        echo -e "  📍 Nucleus VIP: ${VIP_NUCLEUS:-'(not assigned yet)'}"
-    else
-        print_error "Nucleus is not running. Please start omniedge in dual mode on $NUCLEUS"
-        echo -e "  Example: omniedge start -v -n $NETWORK_ID -s $SECURITY_KEY --nucleus"
+    # Start Nucleus in dual mode
+    print_step "Starting Nucleus in dual mode on $NUCLEUS..."
+    ssh_cmd "$NUCLEUS" "sudo touch /tmp/omni-nucleus-cli.log && sudo chmod 666 /tmp/omni-nucleus-cli.log"
+    # Note: Using --nucleus flag for dual mode (signaling + edge)
+    ssh_cmd "$NUCLEUS" "sudo RUST_LOG=debug nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} --nucleus > /tmp/omni-nucleus-cli.log 2>&1 &"
+    sleep 5
+    
+    # Get Nucleus VIP
+    VIP_NUCLEUS=$(get_vip_with_retry "$NUCLEUS" "4")
+    if [[ -z "$VIP_NUCLEUS" ]]; then
+        print_error "Failed to start Nucleus or get VIP"
+        # Try to show logs
+        ssh_cmd "$NUCLEUS" "tail -20 /tmp/omni-nucleus-cli.log"
         exit 1
     fi
+    echo -e "  📍 Nucleus VIP: ${VIP_NUCLEUS}"
     
     # Start Edge A
     # Note: RUST_LOG is inherited by the daemon process (see service.rs)
@@ -1019,18 +1019,21 @@ run_test() {
     
     # Collect logs (CLI stdout + daemon file logs separately, then merge)
     print_step "Collecting logs..."
-    # Edge A: CLI output (nohup capture) + daemon log file
+    # Edge A: CLI output (nohup capture) + daemon log file + journal
     ssh_cmd "$NODE_A" "cat /tmp/omni-edge-a.log" > "$RESULTS_DIR/edge_a_cli.log" 2>/dev/null || true
     ssh_cmd "$NODE_A" "sudo cat /root/.omniedge/logs/omniedge*.log 2>/dev/null" > "$RESULTS_DIR/edge_a_daemon.log" 2>/dev/null || true
+    ssh_cmd "$NODE_A" "sudo journalctl -u omniedge -n 500 --no-pager 2>/dev/null" >> "$RESULTS_DIR/edge_a_daemon.log" || true
     { echo "=== CLI OUTPUT ==="; cat "$RESULTS_DIR/edge_a_cli.log" 2>/dev/null; echo ""; echo "=== DAEMON LOG ==="; cat "$RESULTS_DIR/edge_a_daemon.log" 2>/dev/null; } > "$RESULTS_DIR/edge_a.log" 2>/dev/null || true
     
-    # Edge B: CLI output + daemon log file
+    # Edge B: CLI output + daemon log file + journal
     ssh_cmd "$NODE_B" "cat /tmp/omni-edge-b.log" > "$RESULTS_DIR/edge_b_cli.log" 2>/dev/null || true
     ssh_cmd "$NODE_B" "sudo cat /root/.omniedge/logs/omniedge*.log 2>/dev/null" > "$RESULTS_DIR/edge_b_daemon.log" 2>/dev/null || true
+    ssh_cmd "$NODE_B" "sudo journalctl -u omniedge -n 500 --no-pager 2>/dev/null" >> "$RESULTS_DIR/edge_b_daemon.log" || true
     { echo "=== CLI OUTPUT ==="; cat "$RESULTS_DIR/edge_b_cli.log" 2>/dev/null; echo ""; echo "=== DAEMON LOG ==="; cat "$RESULTS_DIR/edge_b_daemon.log" 2>/dev/null; } > "$RESULTS_DIR/edge_b.log" 2>/dev/null || true
     
-    # Nucleus: daemon log file
+    # Nucleus: daemon log file + journal
     ssh_cmd "$NUCLEUS" "sudo cat /root/.omniedge/logs/omniedge*.log 2>/dev/null || tail -100 /tmp/omni-nucleus.log 2>/dev/null" > "$RESULTS_DIR/nucleus.log" 2>/dev/null || true
+    ssh_cmd "$NUCLEUS" "sudo journalctl -u omniedge -n 500 --no-pager 2>/dev/null" >> "$RESULTS_DIR/nucleus.log" || true
     
     # Report log sizes for debugging
     echo "  Log sizes:"

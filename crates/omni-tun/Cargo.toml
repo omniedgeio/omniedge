@@ -14,7 +14,7 @@ l2-vpn = []
 # For development: use local OmniNervous
 # omninervous = { path = "../../../OmniNervous/crates/daemon", package = "omninervous" }
 # For release: use git tag
-omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "omninervous", tag = "v0.9.6" }
+omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "omninervous", tag = "v0.9.7" }
 anyhow = "1.0"
 tokio = { version = "1.0", features = ["full"] }
 log = "0.4"
