@@ -305,6 +305,12 @@ pub async fn run_nucleus_only(port: u16, secret: &str) -> Result<()> {
                             continue;
                         }
 
+                        let msg_type = pkt[0];
+                        log::debug!(
+                            "Nucleus recv: type=0x{:02x}, len={}, from={}",
+                            msg_type, len, src
+                        );
+
                         let mut state = nucleus_state.lock().await;
                         let result = handle_nucleus_message(
                             &mut state,
@@ -313,8 +319,40 @@ pub async fn run_nucleus_only(port: u16, secret: &str) -> Result<()> {
                             secret.as_deref(),
                         );
                         if let Some(response) = result.response {
-                            if let Err(e) = socket.send_to(&response, src).await {
-                                log::warn!("Failed to send nucleus response to {}: {}", src, e);
+                            log::debug!(
+                                "Nucleus sending response: len={}, to={}, type=0x{:02x}",
+                                response.len(), src,
+                                response.first().copied().unwrap_or(0)
+                            );
+                            match socket.send_to(&response, src).await {
+                                Ok(bytes_sent) => {
+                                    log::debug!(
+                                        "Nucleus response sent: {} bytes to {}",
+                                        bytes_sent, src
+                                    );
+                                }
+                                Err(e) => {
+                                    log::warn!("Failed to send nucleus response to {}: {}", src, e);
+                                }
+                            }
+                        } else {
+                            log::debug!(
+                                "Nucleus: no response for msg 0x{:02x} from {}",
+                                msg_type, src
+                            );
+                        }
+
+                        // Send PEER_NOTIFY notifications to existing peers
+                        for (peer_addr, notification) in result.notifications {
+                            log::debug!(
+                                "Nucleus sending PEER_NOTIFY: len={}, to={}",
+                                notification.len(), peer_addr
+                            );
+                            if let Err(e) = socket.send_to(&notification, peer_addr).await {
+                                log::warn!(
+                                    "Failed to send PEER_NOTIFY to {}: {}",
+                                    peer_addr, e
+                                );
                             }
                         }
                     }
