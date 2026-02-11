@@ -4414,7 +4414,7 @@ dependencies = [
 [[package]]
 name = "omninervous"
 version = "0.9.3"
-source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.9.8#904b0f51ca7ddd14d9a83daa5e01ad4472cc6b9a"
+source = "git+https://github.com/omniedgeio/OmniNervous?tag=v0.9.9#8568bb61715830bf32c3ae191ed78c61ed031f48"
 dependencies = [
  "anyhow",
  "base64 0.21.7",

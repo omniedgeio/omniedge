@@ -20,8 +20,8 @@ omni-proto = { path = "../omni-proto" }
 omni-tun = { path = "../omni-tun" }
 # For development: use local OmniNervous
 # omninervous = { path = "../../../OmniNervous/crates/daemon", package = "omninervous" }
-# For release: use git tag
-omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "omninervous", tag = "v0.9.8" }
+
+omninervous = { git = "https://github.com/omniedgeio/OmniNervous", package = "omninervous", tag = "v0.9.9" }
 anyhow = "1.0"
 tokio = { version = "1.0", features = ["full"] }
 log = "0.4"
