@@ -1456,6 +1456,11 @@ impl ConnectionManager {
                                         }
 
                                         // Handle nucleus signaling request
+                                        let msg_type = pkt[0];
+                                        debug!(
+                                            "Nucleus recv: type=0x{:02x}, len={}, from={}",
+                                            msg_type, len, src
+                                        );
                                         let mut state = nucleus_state.lock().await;
                                         let result = handle_nucleus_message(
                                             &mut state,
@@ -1464,8 +1469,41 @@ impl ConnectionManager {
                                             secret_clone.as_deref(),
                                         );
                                         if let Some(response) = result.response {
-                                            if let Err(e) = nucleus_socket.send_to(&response, src).await {
-                                                warn!("Failed to send nucleus response to {}: {}", src, e);
+                                            debug!(
+                                                "Nucleus sending response: len={}, to={}, type=0x{:02x}",
+                                                response.len(), src,
+                                                response.first().copied().unwrap_or(0)
+                                            );
+                                            match nucleus_socket.send_to(&response, src).await {
+                                                Ok(bytes_sent) => {
+                                                    debug!(
+                                                        "Nucleus response sent: {} bytes to {}",
+                                                        bytes_sent, src
+                                                    );
+                                                }
+                                                Err(e) => {
+                                                    warn!("Failed to send nucleus response to {}: {}", src, e);
+                                                }
+                                            }
+                                        } else {
+                                            debug!(
+                                                "Nucleus: no response for msg 0x{:02x} from {}",
+                                                msg_type, src
+                                            );
+                                        }
+
+                                        // Send PEER_NOTIFY notifications to existing peers
+                                        // (e.g., when a new peer registers, notify existing peers)
+                                        for (peer_addr, notification) in result.notifications {
+                                            debug!(
+                                                "Nucleus sending PEER_NOTIFY: len={}, to={}",
+                                                notification.len(), peer_addr
+                                            );
+                                            if let Err(e) = nucleus_socket.send_to(&notification, peer_addr).await {
+                                                warn!(
+                                                    "Failed to send PEER_NOTIFY to {}: {}",
+                                                    peer_addr, e
+                                                );
                                             }
                                         }
                                     }
@@ -1794,6 +1832,10 @@ impl ConnectionManager {
 
                                 // Handle other signaling messages (0x11-0x1F, excluding disco)
                                 if first_byte >= 0x11 && first_byte != SIGNALING_DISCO_PING && first_byte != SIGNALING_DISCO_PONG {
+                                    debug!(
+                                        "Edge recv signaling: type=0x{:02x}, len={}, from={}",
+                                        first_byte, len, src
+                                    );
                                     match proto_ctrl.handle_packet(pkt, secret.as_deref()).await {
                                         Ok(Some(update)) => {
                                             // Get our NAT type for strategy selection

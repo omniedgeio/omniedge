@@ -818,8 +818,8 @@ run_test() {
     # Start Nucleus in dual mode
     print_step "Starting Nucleus in dual mode on $NUCLEUS..."
     ssh_cmd "$NUCLEUS" "sudo touch /tmp/omni-nucleus-cli.log && sudo chmod 666 /tmp/omni-nucleus-cli.log"
-    # Note: Using --nucleus flag for dual mode (signaling + edge)
-    ssh_cmd "$NUCLEUS" "sudo RUST_LOG=debug nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} --nucleus > /tmp/omni-nucleus-cli.log 2>&1 &"
+    # Note: Using --mode dual for dual mode (signaling + edge), --port for nucleus port
+    ssh_cmd "$NUCLEUS" "sudo RUST_LOG=debug nohup omniedge start -v -n ${NETWORK_ID} -s ${SECURITY_KEY} --mode dual --port ${NUCLEUS_PORT} > /tmp/omni-nucleus-cli.log 2>&1 &"
     sleep 5
     
     # Get Nucleus VIP
