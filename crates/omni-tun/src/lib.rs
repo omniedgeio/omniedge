@@ -609,12 +609,14 @@ impl OmniTun {
 
         #[cfg(target_os = "linux")]
         {
-            // Linux: ip -6 addr add <ipv6>/<prefix> dev <ifname>
+            // Linux: ip -6 addr replace <ipv6>/<prefix> dev <ifname>
+            // Use 'replace' instead of 'add' to handle stale addresses gracefully
+            // (avoids "address already assigned" errors on interface reuse)
             let output = std::process::Command::new("ip")
                 .args([
                     "-6",
                     "addr",
-                    "add",
+                    "replace",
                     &format!("{}/{}", ipv6, prefix_len),
                     "dev",
                     &ifname,
@@ -624,12 +626,9 @@ impl OmniTun {
 
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                // Ignore "already exists" error
-                if !stderr.contains("File exists") {
-                    return Err(anyhow::anyhow!("ip -6 addr add failed: {}", stderr));
-                }
+                return Err(anyhow::anyhow!("ip -6 addr replace failed: {}", stderr));
             }
-            debug!("Added IPv6 address {}/{} to {}", ipv6, prefix_len, ifname);
+            debug!("Configured IPv6 address {}/{} on {}", ipv6, prefix_len, ifname);
         }
 
         #[cfg(target_os = "macos")]
