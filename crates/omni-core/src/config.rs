@@ -282,14 +282,29 @@ impl NetworkConfig {
 /// Detect if the system is running behind an existing VPN
 ///
 /// Checks for common VPN interface prefixes:
-/// - Linux: tun, wg, tap, ppp in /sys/class/net
+/// - Linux: tun, wg, tap, ppp in /sys/class/net (excluding known non-VPN interfaces)
 /// - macOS: utun, ppp via ifconfig
 fn detect_vpn_active() -> bool {
     #[cfg(target_os = "linux")]
     {
+        // Known non-VPN interfaces that match VPN-like prefixes:
+        // - tunl0, tunl*: IPIP tunnel interfaces (common in Docker/Kubernetes)
+        // - omniedge*: Our own TUN interface
+        // - sit0, sit*: IPv6-in-IPv4 tunnel (common in containers)
+        let is_excluded = |name: &str| -> bool {
+            name.starts_with("tunl")     // IPIP tunnel (Docker, k8s)
+                || name.starts_with("omniedge") // Our own interface
+                || name.starts_with("sit") // IPv6-in-IPv4 tunnel
+        };
+
         if let Ok(entries) = std::fs::read_dir("/sys/class/net") {
             for entry in entries.flatten() {
                 if let Ok(name) = entry.file_name().into_string() {
+                    // Skip known non-VPN interfaces
+                    if is_excluded(&name) {
+                        log::debug!("Auto-MTU: Skipping non-VPN interface: {}", name);
+                        continue;
+                    }
                     // Detect common VPN interface prefixes
                     if name.starts_with("tun")
                         || name.starts_with("wg")

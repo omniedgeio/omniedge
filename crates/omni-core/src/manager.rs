@@ -1,7 +1,7 @@
 use crate::config::{CliConfig, NetworkConfig};
 use crate::state::ConnectionState;
 use anyhow::{Context, Result};
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use omni_api::{types::*, ApiClient, AuthService, DeviceService, NetworkService};
 use omni_proto::{
     encode_disco_ping,
@@ -1524,7 +1524,7 @@ impl ConnectionManager {
                                 }
 
                                 let first_byte = pkt[0];
-                                debug!("UDP packet received: len={}, from={}, first_byte=0x{:02x}", len, src, first_byte);
+                                trace!("UDP packet received: len={}, from={}, first_byte=0x{:02x}", len, src, first_byte);
 
                                 // Handle DISCO_PING (0x1B)
                                 if first_byte == SIGNALING_DISCO_PING {
@@ -2130,7 +2130,7 @@ impl ConnectionManager {
                                         0x01 => info!("[WG-RX] HandshakeInit ({} bytes) from {}", pkt_len, src),
                                         0x02 => info!("[WG-RX] HandshakeResponse ({} bytes) from {}", pkt_len, src),
                                         0x03 => debug!("[WG-RX] CookieReply ({} bytes) from {}", pkt_len, src),
-                                        0x04 => debug!("[WG-RX] Data ({} bytes) from {}", pkt_len, src),
+                                        0x04 => trace!("[WG-RX] Data ({} bytes) from {}", pkt_len, src),
                                         _ => {}
                                     }
                                     let _ = tun_ctrl.handle_packet(pkt, src, &socket_inner).await;
