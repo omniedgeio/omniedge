@@ -1590,7 +1590,7 @@ impl ConnectionManager {
                                             }
                                         }
 
-                                        // Update peer endpoint if we know this peer
+                                        // Update peer endpoint if we know this peer, or add new peer from disco ping
                                         let mut peers = peer_states.write().await;
                                         if let Some(peer_state) = peers.get_mut(&ping.sender_vip) {
                                             // SECURITY: Verify sender's public key matches expected peer
@@ -1625,6 +1625,87 @@ impl ConnectionManager {
                                                 let _ = tun_ctrl
                                                     .add_peer(&pubkey, Some(best_ep), &allowed_ips)
                                                     .await;
+                                            }
+                                        } else {
+                                            // NEW PEER DISCOVERY: We received a disco ping from a peer we don't know yet
+                                            // This happens when:
+                                            // 1. The peer discovered us via Nucleus before we got their info
+                                            // 2. There's a race condition in peer discovery
+                                            // 3. Nucleus hasn't sent us the peer info yet (heartbeat timing)
+                                            //
+                                            // The disco ping contains all the information we need:
+                                            // - sender_key: Peer's WireGuard public key
+                                            // - sender_vip: Peer's VIP
+                                            // - sender_vip_v6: Peer's IPv6 VIP (optional)
+                                            // - src: The endpoint they're actually reachable at
+                                            //
+                                            // By adding them now, we can:
+                                            // 1. Complete the WireGuard handshake immediately
+                                            // 2. Avoid waiting for Nucleus heartbeat (30-60 seconds)
+                                            // 3. Enable bidirectional connectivity much faster
+                                            info!(
+                                                "Discovered new peer {} from disco ping (pubkey: {:02x?}..., endpoint: {})",
+                                                ping.sender_vip, &ping.sender_key[..8], src
+                                            );
+                                            
+                                            // Create peer state with endpoint learned from disco ping
+                                            let mut peer_state = PeerState::new(
+                                                ping.sender_vip,
+                                                ping.sender_vip_v6,
+                                                ping.sender_key,
+                                                Some(src),
+                                            );
+                                            // Mark as learned from direct probe (highest quality source)
+                                            peer_state.add_endpoint(src, EndpointSource::DirectProbe);
+                                            peer_state.last_seen = Some(Instant::now());
+                                            peer_state.state = PeerConnectionState::DirectTry;
+                                            
+                                            // Configure WireGuard peer immediately so handshakes can complete
+                                            let pubkey = ::hex::encode(ping.sender_key);
+                                            let mut allowed_ips = vec![format!("{}/32", ping.sender_vip)];
+                                            if let Some(v6) = ping.sender_vip_v6 {
+                                                allowed_ips.push(format!("{}/128", v6));
+                                            }
+                                            info!(
+                                                "Adding WireGuard peer {} at {} (discovered via disco ping)",
+                                                ping.sender_vip, src
+                                            );
+                                            let _ = tun_ctrl
+                                                .add_peer(&pubkey, Some(src), &allowed_ips)
+                                                .await;
+                                            
+                                            // Store peer state
+                                            peers.insert(ping.sender_vip, peer_state);
+                                            
+                                            // Send a disco ping back to confirm bidirectional connectivity
+                                            // This helps the peer update their best endpoint if needed
+                                            let tx_id: [u8; 12] = rand::random();
+                                            let ping_back = DiscoPing {
+                                                tx_id,
+                                                sender_key: our_public_key,
+                                                sender_vip: our_vip.unwrap_or(Ipv4Addr::UNSPECIFIED),
+                                                sender_vip_v6: our_vip_v6,
+                                                wg_port: wg_listen_port,
+                                            };
+                                            if let Ok(ping_data) = encode_disco_ping(&ping_back) {
+                                                if let Err(e) = socket_inner.send_to(&ping_data, src).await {
+                                                    warn!("Failed to send disco ping back to {}: {}", src, e);
+                                                } else {
+                                                    debug!(
+                                                        "Sent disco ping back to {} (VIP: {}) tx: {:02x?}",
+                                                        src, ping.sender_vip, &tx_id[..4]
+                                                    );
+                                                    // Track the pending ping for RTT measurement
+                                                    let pending = PendingDiscoPing {
+                                                        tx_id,
+                                                        target: src,
+                                                        target_vip: ping.sender_vip,
+                                                        sent_at: Instant::now(),
+                                                        retries: 0,
+                                                        max_retries: disco_config.max_retries,
+                                                    };
+                                                    pending_pings.write().await.insert(tx_id, pending);
+                                                }
                                             }
                                         }
                                     }
