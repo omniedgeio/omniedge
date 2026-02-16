@@ -38,13 +38,47 @@ use omni_proto::{
 use omni_tun::{OmniTun, WgMode};
 use omninervous::Identity;
 use std::collections::HashMap;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tokio::task::JoinHandle;
+
+// ============================================================================
+// IPv4-Mapped IPv6 Address Normalization
+// ============================================================================
+//
+// When using a dual-stack UDP socket (IPv6 with IPV6_V6ONLY=false), the OS
+// presents IPv4 peers as IPv4-mapped IPv6 addresses: [::ffff:1.2.3.4]:port.
+// Meanwhile, Nucleus reports endpoints as plain IPv4: 1.2.3.4:port.
+//
+// Rust's SocketAddr considers V4(1.2.3.4:p) != V6([::ffff:1.2.3.4]:p), so
+// without normalization, every heartbeat falsely detects an "endpoint change",
+// triggering connection resets and re-disco in an infinite loop.
+//
+// This function canonicalizes IPv4-mapped IPv6 addresses to plain IPv4.
+
+/// Normalize a SocketAddr by converting IPv4-mapped IPv6 addresses to plain IPv4.
+///
+/// Examples:
+/// - `[::ffff:1.2.3.4]:51820` → `1.2.3.4:51820`
+/// - `1.2.3.4:51820` → `1.2.3.4:51820` (no change)
+/// - `[2001:db8::1]:51820` → `[2001:db8::1]:51820` (no change, real IPv6)
+fn normalize_addr(addr: SocketAddr) -> SocketAddr {
+    match addr {
+        SocketAddr::V6(v6) => {
+            // to_ipv4_mapped() returns Some(v4) for ::ffff:x.x.x.x addresses
+            if let Some(v4) = v6.ip().to_ipv4_mapped() {
+                SocketAddr::new(IpAddr::V4(v4), v6.port())
+            } else {
+                addr
+            }
+        }
+        SocketAddr::V4(_) => addr,
+    }
+}
 
 // ============================================================================
 // P2P Connection State Tracking (NAT Traversal Fix v0.3.2)
@@ -1457,7 +1491,8 @@ impl ConnectionManager {
                         tokio::select! {
                             res = nucleus_socket.recv_from(&mut buf) => {
                                 match res {
-                                    Ok((len, src)) => {
+                                    Ok((len, raw_src)) => {
+                                        let src = normalize_addr(raw_src);
                                         let pkt = &buf[..len];
                                         if pkt.is_empty() || pkt[0] < 0x11 {
                                             continue;
@@ -1578,7 +1613,14 @@ impl ConnectionManager {
                 tokio::select! {
                     res = socket_inner.recv_from(&mut buf) => {
                          match res {
-                            Ok((len, src)) => {
+                            Ok((len, raw_src)) => {
+                                // Normalize IPv4-mapped IPv6 addresses to plain IPv4.
+                                // The dual-stack socket presents IPv4 peers as [::ffff:x.x.x.x]:port,
+                                // but Nucleus and other code paths use plain x.x.x.x:port.
+                                // Without this normalization, endpoint comparisons fail and cause
+                                // false "endpoint changed" detection on every heartbeat cycle.
+                                let src = normalize_addr(raw_src);
+
                                 let pkt = &buf[..len];
                                 if pkt.is_empty() {
                                     continue;
