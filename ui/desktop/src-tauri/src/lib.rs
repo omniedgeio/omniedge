@@ -783,7 +783,21 @@ async fn connect(
     exit_node_v6: Option<String>,
 ) -> Result<(), String> {
     ensure_wintun_dll(&app);
-    let mut config = CliConfig::load().map_err(|e| e.to_string())?;
+    let mut config = CliConfig::load().map_err(|e| {
+        let err_str = e.to_string();
+        // Provide actionable guidance for permission errors (e.g., config owned by root
+        // after running CLI with sudo)
+        if err_str.contains("Permission denied") || err_str.contains("os error 13") {
+            format!(
+                "Cannot read config file (permission denied). This can happen if the CLI \
+                 was run with sudo. Fix with: sudo chown $USER ~/.omniedge/auth.json\n\
+                 Original error: {}",
+                err_str
+            )
+        } else {
+            err_str
+        }
+    })?;
     if config.auth_response.is_none() {
         return Err("Not authenticated".to_string());
     }
@@ -834,8 +848,64 @@ async fn connect(
         }
     }
 
-    update_tray_icon(&app, ConnectionState::Connected);
-    Ok(())
+    // The helper now starts VPN connection asynchronously.
+    // Poll the helper's status until we reach Connected, Failed, or timeout.
+    use tokio::time::{sleep, Duration, Instant};
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let poll_interval = Duration::from_millis(500);
+
+    loop {
+        sleep(poll_interval).await;
+
+        let status_req = HelperRequest {
+            command: "status".to_string(),
+            args: serde_json::json!({}),
+        };
+
+        match call_helper(&status_req).await {
+            Ok(resp) if resp.success => {
+                if let Some(data) = resp.data {
+                    if let Ok(st) =
+                        serde_json::from_value::<ConnectionState>(data["state"].clone())
+                    {
+                        match st {
+                            ConnectionState::Connected => {
+                                update_tray_icon(&app, ConnectionState::Connected);
+                                return Ok(());
+                            }
+                            ConnectionState::Error(msg) => {
+                                update_tray_icon(&app, ConnectionState::Error(msg.clone()));
+                                return Err(format!(
+                                    "VPN connection failed: {}", msg
+                                ));
+                            }
+                            ConnectionState::Disconnected => {
+                                // Could mean connect_with_token hasn't started yet,
+                                // or it failed and reset to Disconnected
+                                if Instant::now() > deadline {
+                                    return Err(
+                                        "VPN connection timed out (still disconnected)".to_string()
+                                    );
+                                }
+                            }
+                            _ => {
+                                // Connecting or other transitional state — keep polling
+                                if Instant::now() > deadline {
+                                    return Err("VPN connection timed out".to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                // Helper communication error during polling
+                if Instant::now() > deadline {
+                    return Err("Lost communication with helper during connection".to_string());
+                }
+            }
+        }
+    }
 }
 
 #[tauri::command]

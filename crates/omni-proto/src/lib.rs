@@ -153,6 +153,14 @@ impl OmniProto {
         self.client.read().await.heartbeat(socket, known_peer_count).await
     }
 
+    /// Query Nucleus for a specific peer by VIP.
+    /// The response (PEER_INFO) will arrive asynchronously on the signaling socket
+    /// and be handled by `handle_packet()`.
+    pub async fn query_peer(&self, socket: &UdpSocket, target_vip: Ipv4Addr) -> Result<()> {
+        info!("Sending QUERY_PEER to Nucleus for VIP {}", target_vip);
+        self.client.read().await.query_peer(socket, target_vip).await
+    }
+
     pub async fn handle_packet(&self, buf: &[u8], secret: Option<&str>) -> Result<Option<PeerUpdate>> {
         use omninervous::signaling::{
             get_signaling_type, parse_heartbeat_ack, parse_register_ack, parse_peer_info,

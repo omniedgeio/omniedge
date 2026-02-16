@@ -688,9 +688,65 @@ impl CliConfig {
             let mut perms = fs::metadata(&path)?.permissions();
             perms.set_mode(0o600);
             fs::set_permissions(&path, perms)?;
+
+            // When running as root (e.g., via sudo or helper service), chown the
+            // config file back to the real user so the desktop app can read it.
+            // Without this, auth.json becomes root-owned and the desktop app gets
+            // "permission denied (os error 13)" when trying to connect.
+            Self::chown_to_real_user(&path);
         }
 
         Ok(())
+    }
+
+    /// Chown a file (and its parent directory) to the real user when running as root.
+    /// This handles the case where sudo or the helper service creates config files
+    /// that need to be readable by the unprivileged desktop app.
+    #[cfg(unix)]
+    fn chown_to_real_user(path: &std::path::Path) {
+        use std::os::unix::fs::MetadataExt;
+
+        // Only needed when running as root (uid 0)
+        if unsafe { libc::getuid() } != 0 {
+            return;
+        }
+
+        // Try to find the real user from SUDO_USER environment variable
+        let sudo_user = match std::env::var("SUDO_USER") {
+            Ok(user) if !user.is_empty() && user != "root" => user,
+            _ => return, // Not running under sudo, or sudo user is root
+        };
+
+        // Resolve username to uid/gid via getpwnam
+        let c_user = match std::ffi::CString::new(sudo_user.as_str()) {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+        let pw = unsafe { libc::getpwnam(c_user.as_ptr()) };
+        if pw.is_null() {
+            return;
+        }
+        let uid = unsafe { (*pw).pw_uid };
+        let gid = unsafe { (*pw).pw_gid };
+
+        // Chown the file itself
+        if let Ok(c_path) = std::ffi::CString::new(path.to_string_lossy().as_bytes()) {
+            unsafe { libc::chown(c_path.as_ptr(), uid, gid) };
+        }
+
+        // Also chown the parent directory (e.g., ~/.omniedge/)
+        if let Some(parent) = path.parent() {
+            if let Ok(meta) = fs::metadata(parent) {
+                // Only chown if currently owned by root
+                if meta.uid() == 0 {
+                    if let Ok(c_parent) =
+                        std::ffi::CString::new(parent.to_string_lossy().as_bytes())
+                    {
+                        unsafe { libc::chown(c_parent.as_ptr(), uid, gid) };
+                    }
+                }
+            }
+        }
     }
 
     pub fn config_path() -> Result<PathBuf> {

@@ -80,6 +80,31 @@ fn normalize_addr(addr: SocketAddr) -> SocketAddr {
     }
 }
 
+/// Convert a SocketAddr for sending on a dual-stack IPv6 socket.
+///
+/// On macOS, a dual-stack socket bound to `[::]:port` cannot send to a plain IPv4
+/// `SocketAddr` — it returns EINVAL. The address must be mapped to its IPv4-mapped
+/// IPv6 form `[::ffff:x.x.x.x]:port`. On Linux (and Windows), the kernel handles
+/// this transparently, so no conversion is needed.
+///
+/// This is the inverse of `normalize_addr`.
+#[cfg(target_os = "macos")]
+fn to_mapped_v6(addr: SocketAddr) -> SocketAddr {
+    match addr {
+        SocketAddr::V4(v4) => {
+            let v6_mapped = v4.ip().to_ipv6_mapped();
+            SocketAddr::new(IpAddr::V6(v6_mapped), v4.port())
+        }
+        SocketAddr::V6(_) => addr,
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[inline]
+fn to_mapped_v6(addr: SocketAddr) -> SocketAddr {
+    addr
+}
+
 // ============================================================================
 // P2P Connection State Tracking (NAT Traversal Fix v0.3.2)
 // ============================================================================
@@ -1648,7 +1673,7 @@ impl ConnectionManager {
                                         };
 
                                         if let Ok(pong_data) = encode_disco_pong(&pong) {
-                                            if let Err(e) = socket_inner.send_to(&pong_data, src).await {
+                                            if let Err(e) = socket_inner.send_to(&pong_data, to_mapped_v6(src)).await {
                                                 warn!("Failed to send disco pong to {}: {}", src, e);
                                             } else {
                                                 info!("Sent disco pong to {} (VIP: {}, tx: {:02x?})", src, ping.sender_vip, &pong.tx_id[..4]);
@@ -1753,7 +1778,7 @@ impl ConnectionManager {
                                                 wg_port: wg_listen_port,
                                             };
                                             if let Ok(ping_data) = encode_disco_ping(&ping_back) {
-                                                if let Err(e) = socket_inner.send_to(&ping_data, src).await {
+                                                if let Err(e) = socket_inner.send_to(&ping_data, to_mapped_v6(src)).await {
                                                     warn!("Failed to send disco ping back to {}: {}", src, e);
                                                 } else {
                                                     debug!(
@@ -2163,7 +2188,7 @@ impl ConnectionManager {
                                                         };
 
                                                         if let Ok(ping_data) = encode_disco_ping(&ping) {
-                                                            if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
+                                                            if let Err(e) = socket_for_disco.send_to(&ping_data, to_mapped_v6(endpoint)).await {
                                                                 warn!("Failed to send disco ping to {}: {}", endpoint, e);
                                                             } else {
                                                                 info!(
@@ -2224,7 +2249,7 @@ impl ConnectionManager {
                                                         };
 
                                                         if let Ok(ping_data) = encode_disco_ping(&ping) {
-                                                            if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
+                                                            if let Err(e) = socket_for_disco.send_to(&ping_data, to_mapped_v6(endpoint)).await {
                                                                 warn!("Failed to send disco ping to {}: {}", endpoint, e);
                                                             } else {
                                                                 info!(
@@ -2304,7 +2329,7 @@ impl ConnectionManager {
                                                         };
 
                                                             if let Ok(ping_data) = encode_disco_ping(&ping) {
-                                                                if let Err(e) = socket_for_disco.send_to(&ping_data, endpoint).await {
+                                                                if let Err(e) = socket_for_disco.send_to(&ping_data, to_mapped_v6(endpoint)).await {
                                                                     warn!("Failed to send disco ping to {}: {}", endpoint, e);
                                                                 } else {
                                                                     info!(
@@ -2407,7 +2432,7 @@ impl ConnectionManager {
                                     };
 
                                     if let Ok(ping_data) = encode_disco_ping(&ping) {
-                                        if let Err(e) = socket_for_disco.try_send_to(&ping_data, pending.target) {
+                                        if let Err(e) = socket_for_disco.try_send_to(&ping_data, to_mapped_v6(pending.target)) {
                                             warn!("Failed to retry disco ping to {}: {}", pending.target, e);
                                         } else {
                                             info!(
@@ -2512,7 +2537,7 @@ impl ConnectionManager {
                                         );
 
                                         if let Ok(bind_data) = encode_relay_bind(&bind_req) {
-                                            if let Err(e) = socket_for_disco.send_to(&bind_data, relay_addr).await {
+                                            if let Err(e) = socket_for_disco.send_to(&bind_data, to_mapped_v6(relay_addr)).await {
                                                 warn!("Failed to send RELAY_BIND for {} to {}: {}", target_vip, relay_addr, e);
                                             } else {
                                                 info!(
@@ -2595,6 +2620,83 @@ impl ConnectionManager {
         });
         self.task_handles.push(heartbeat_handle);
 
+        // ====================================================================
+        // API-Seeded Peer Discovery (one-shot + periodic)
+        // ====================================================================
+        // Nucleus only returns "recent" peers in REGISTER_ACK/HEARTBEAT_ACK.
+        // If other peers were online before us, we won't learn about them.
+        // Fix: Fetch device list from API and send QUERY_PEER to Nucleus for
+        // each online peer we don't already know about.
+        {
+            let api_client_pd = self.api_client.as_ref().cloned();
+            let proto_pd = proto.clone();
+            let socket_pd = socket.clone();
+            let peer_states_pd = self.peer_states.clone();
+            let network_id_pd = self.current_network_id.clone();
+            let our_vip_pd = our_vip;
+            let mut shutdown_rx_pd = shutdown_tx.subscribe();
+
+            let peer_discovery_handle = tokio::spawn(async move {
+                // Wait briefly to let initial REGISTER_ACK arrive first
+                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
+                // Run peer discovery: initial + every 60 seconds
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+                interval.tick().await; // consume first tick (we already waited 3s)
+
+                loop {
+                    // Do API-seeded peer discovery
+                    if let Some(ref client) = api_client_pd {
+                        let net_id = network_id_pd.read().await.clone();
+                        if let Some(net_id) = net_id {
+                            let net_service = NetworkService::new(client);
+                            match net_service.get_devices(&net_id).await {
+                                Ok(devices) => {
+                                    let known_peers = peer_states_pd.read().await;
+                                    let mut queried = 0u32;
+                                    for dev in &devices {
+                                        // Skip ourselves
+                                        if let Some(our_vip) = our_vip_pd {
+                                            if dev.virtual_ip == our_vip.to_string() {
+                                                continue;
+                                            }
+                                        }
+                                        // Only query online devices we don't know about yet
+                                        if dev.online {
+                                            if let Ok(vip) = dev.virtual_ip.parse::<Ipv4Addr>() {
+                                                if !known_peers.contains_key(&vip) {
+                                                    if let Err(e) = proto_pd.query_peer(&socket_pd, vip).await {
+                                                        warn!("Failed to send QUERY_PEER for {}: {}", vip, e);
+                                                    } else {
+                                                        queried += 1;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if queried > 0 {
+                                        info!("API-seeded peer discovery: sent QUERY_PEER for {} unknown online peers", queried);
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("API-seeded peer discovery failed to fetch devices: {}", e);
+                                }
+                            }
+                        }
+                    }
+
+                    // Wait for next interval or shutdown
+                    tokio::select! {
+                        _ = interval.tick() => {}
+                        _ = shutdown_rx_pd.recv() => {
+                            info!("API-seeded Peer Discovery Loop shutting down");
+                            break;
+                        }
+                    }
+                }
+            });
+            self.task_handles.push(peer_discovery_handle);
+        }
         // ====================================================================
         // Port Mapping Refresh Loop (NAT Traversal Fix v0.3.4)
         // ====================================================================

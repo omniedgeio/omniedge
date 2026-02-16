@@ -29,6 +29,7 @@
 /// Version from git tag (set by build.rs), falls back to Cargo.toml version
 const VERSION: &str = env!("GIT_VERSION");
 
+use log::{error, info};
 use omni_core::{state::ConnectionState, ConnectionManager};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -136,30 +137,63 @@ impl HelperServer {
                     }
                 };
 
-                let mut manager = self.manager.lock().await;
-                match manager
-                    .connect_with_token(
-                        args.token,
-                        &args.network_id,
-                        &args.device_id,
-                        &args.hardware_id,
-                        args.nucleus,
-                        args.as_exit_node,
-                        args.exit_node_ip,
-                        args.exit_node_ip_v6,
-                    )
-                    .await
+                // Check if already connecting/connected
                 {
-                    Ok(_) => HelperResponse {
-                        success: true,
-                        message: "VPN start initiated".to_string(),
-                        data: None,
-                    },
-                    Err(e) => HelperResponse {
-                        success: false,
-                        message: format!("Failed to start VPN: {}", e),
-                        data: None,
-                    },
+                    let current_state = self.state.read().await.clone();
+                    match current_state {
+                        ConnectionState::Connected => {
+                            return HelperResponse {
+                                success: true,
+                                message: "Already connected".to_string(),
+                                data: None,
+                            };
+                        }
+                        ConnectionState::Connecting => {
+                            return HelperResponse {
+                                success: true,
+                                message: "Connection already in progress".to_string(),
+                                data: None,
+                            };
+                        }
+                        _ => {}
+                    }
+                }
+
+                // Spawn connect_with_token in a background task so we can
+                // return immediately. This prevents the IPC socket from timing
+                // out / breaking while the slow API + TUN setup runs.
+                // The caller should poll the "status" command to track progress.
+                let manager = Arc::clone(&self.manager);
+                tokio::spawn(async move {
+                    let mut mgr = manager.lock().await;
+                    info!("start_vpn: beginning connect_with_token in background task");
+                    match mgr
+                        .connect_with_token(
+                            args.token,
+                            &args.network_id,
+                            &args.device_id,
+                            &args.hardware_id,
+                            args.nucleus,
+                            args.as_exit_node,
+                            args.exit_node_ip,
+                            args.exit_node_ip_v6,
+                        )
+                        .await
+                    {
+                        Ok(_) => {
+                            info!("start_vpn: connect_with_token completed successfully");
+                        }
+                        Err(e) => {
+                            error!("start_vpn: connect_with_token failed: {}", e);
+                            // State is already updated to Failed by ConnectionManager
+                        }
+                    }
+                });
+
+                HelperResponse {
+                    success: true,
+                    message: "VPN connection initiated".to_string(),
+                    data: None,
                 }
             }
             "set_as_exit_node" => {
