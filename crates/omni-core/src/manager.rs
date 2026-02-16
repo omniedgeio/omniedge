@@ -663,7 +663,13 @@ impl ConnectionManager {
         );
 
         let mut mapper = PortMapper::new(internal_port);
-        let caps = mapper.probe().await?;
+        let caps = tokio::time::timeout(
+            tokio::time::Duration::from_secs(20),
+            mapper.probe(),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Port mapping probe timed out after 20 seconds"))?
+        .map_err(|e| anyhow::anyhow!("Port mapping probe failed: {}", e))?;
 
         info!(
             "Port mapping capabilities: NAT-PMP={}, UPnP={}, PCP={}, gateway={:?}, external={:?}",
@@ -992,16 +998,18 @@ impl ConnectionManager {
         // ====================================================================
         // Create dual-stack UDP socket for IPv6 support
         // Try binding to [::]:0 first (dual-stack), fall back to 0.0.0.0:0 (IPv4-only)
-        let socket: Arc<UdpSocket> =
-            Arc::new(Self::create_dual_stack_socket().await.unwrap_or_else(|e| {
+        let socket: Arc<UdpSocket> = Arc::new(match Self::create_dual_stack_socket().await {
+            Ok(s) => s,
+            Err(e) => {
                 warn!(
                     "Failed to create dual-stack socket: {}. Falling back to IPv4-only.",
                     e
                 );
-                // This should not fail, but handle it gracefully
-                futures::executor::block_on(UdpSocket::bind("0.0.0.0:0"))
+                UdpSocket::bind("0.0.0.0:0")
+                    .await
                     .expect("Failed to bind IPv4 socket")
-            }));
+            }
+        });
         let port = socket.local_addr()?.port();
         debug!("Bound UDP socket to port: {}", port);
 
@@ -1528,6 +1536,21 @@ impl ConnectionManager {
             }
         }
 
+        // Initialize TUN loop BEFORE the dispatcher to ensure the tun_writer channel
+        // is ready to receive decrypted packets when WireGuard handshakes complete.
+        // start_loop() spawns internal tasks and returns quickly - it does NOT block.
+        // This eliminates the race condition where incoming WG data packets could arrive
+        // and be silently dropped because tun_writer was still None.
+        if !skip_tun_loop {
+            let socket_tun_init = socket.clone();
+            let mut tun_init = tun.clone();
+            if let Err(e) = tun_init.start_loop(socket_tun_init).await {
+                error!("Failed to initialize TUN loop: {}. Data forwarding may not work.", e);
+            } else {
+                info!("TUN loop initialized - tun_writer channel is ready for incoming packets");
+            }
+        }
+
         // Master Dispatcher Loop - handles signaling, disco, relay, and WireGuard packets
         let mut shutdown_rx1 = shutdown_tx.subscribe();
         let socket_for_disco = socket_inner.clone();
@@ -1969,11 +1992,43 @@ impl ConnectionManager {
 
                                             // Update peer info if already exists - add endpoint from signaling
                                             if let Some(endpoint) = peer.endpoint {
+                                                // Detect endpoint change: if the peer re-registered with
+                                                // a different endpoint (e.g., after restart with new NAT port),
+                                                // reset connection state to force re-disco. Without this,
+                                                // the peer would appear to have a "working" connection to
+                                                // the old (now-dead) endpoint and disco would never restart.
+                                                let previous_best = peer_state.best_endpoint();
+                                                let endpoint_changed = previous_best
+                                                    .map(|prev| prev != endpoint)
+                                                    .unwrap_or(false);
+
+                                                if endpoint_changed && peer_state.has_working_connection() {
+                                                    warn!(
+                                                        "Peer {} endpoint changed: {:?} -> {} (likely restarted). Resetting connection state to trigger re-disco.",
+                                                        vip, previous_best, endpoint
+                                                    );
+                                                    // Mark all old endpoints as failed so has_working_connection()
+                                                    // returns false and the disco logic below will fire.
+                                                    let old_addrs: Vec<_> = peer_state.endpoints.endpoints
+                                                        .iter()
+                                                        .map(|e| e.addr)
+                                                        .collect();
+                                                    for addr in old_addrs {
+                                                        peer_state.mark_endpoint_failed(addr);
+                                                    }
+                                                    peer_state.state = PeerConnectionState::Init;
+                                                    peer_state.using_relay = false;
+                                                    peer_state.last_seen = None;
+                                                }
+
                                                 peer_state.add_endpoint(endpoint, EndpointSource::Nucleus);
-                                                info!(
-                                                    "Added Nucleus endpoint {} for peer {} (total: {} endpoints)",
-                                                    endpoint, vip, peer_state.endpoint_count()
-                                                );
+
+                                                if !endpoint_changed {
+                                                    info!(
+                                                        "Added Nucleus endpoint {} for peer {} (total: {} endpoints)",
+                                                        endpoint, vip, peer_state.endpoint_count()
+                                                    );
+                                                }
                                             } else {
                                                 warn!(
                                                     "No endpoint received from Nucleus for peer {} - cannot send disco pings",
@@ -2432,22 +2487,11 @@ impl ConnectionManager {
         });
         self.task_handles.push(dispatcher_handle);
 
-        // TUN Transmission Loop (TUN -> network) remains necessary for outgoing traffic
-        // Skip if the TUN loop is already active from a previous connection (Windows reconnect)
-        if !skip_tun_loop {
-            let mut tun_tx = tun.clone();
-            let socket_tx = socket.clone();
-            let mut shutdown_rx2 = shutdown_tx.subscribe();
-            let tun_handle = tokio::spawn(async move {
-                tokio::select! {
-                    _ = tun_tx.start_loop(socket_tx) => {}
-                    _ = shutdown_rx2.recv() => {
-                        info!("TUN Transmission Loop shutting down");
-                    }
-                }
-            });
-            self.task_handles.push(tun_handle);
-        } else {
+        // TUN loop was already initialized above (before the dispatcher) to ensure
+        // tun_writer is ready. The internal tasks (reader, writer, timer) are already running.
+        // We no longer need to spawn start_loop here — calling it again would fail because
+        // the TUN device has already been taken.
+        if skip_tun_loop {
             info!("Skipping TUN loop spawn - already active from previous connection");
         }
 
