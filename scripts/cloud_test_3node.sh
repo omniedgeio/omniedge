@@ -57,8 +57,9 @@ SSH_USER_NUCLEUS=""
 SSH_USER_A=""
 SSH_USER_B=""
 NETWORK_ID=""
-SECURITY_KEY=""
-TEST_DURATION=${TEST_DURATION:-10}
+SECURITY_KEY="" # Test configuration
+TEST_DURATION=${TEST_DURATION:-15}
+OMNIEDGE_VERSION=${OMNIEDGE_VERSION:-"latest"}
 RESULTS_DIR="./test_results"
 
 # Virtual IPs are assigned by the network
@@ -118,7 +119,8 @@ Options:
   --ssh-user-nucleus  SSH username for Nucleus node (overrides --ssh-user)
   --ssh-user-a    SSH username for Edge A (overrides --ssh-user)
   --ssh-user-b    SSH username for Edge B (overrides --ssh-user)
-  --duration      iperf3 test duration in seconds (default: 10)
+  --duration      iperf3 test duration in seconds (default: 15)
+  --version       Specify OmniEdge version to install (default: latest)
   --no-ipv6       Skip IPv6 tests
   --skip-deploy   Skip OmniEdge installation (use existing)
   --use-local-bin Deploy pre-built binaries from ./scripts/ folder
@@ -747,7 +749,7 @@ deploy_omniedge() {
     else
         # Use installer script
         local INSTALLER_URL="https://raw.githubusercontent.com/omniedgeio/omniedge/main/scripts/omniedge-install.sh"
-        echo -e "📦 Installing OmniEdge via installer script..."
+        echo -e "📦 Installing OmniEdge via installer script (version: $OMNIEDGE_VERSION)..."
         
         for node in "${nodes_to_deploy[@]}"; do
             print_step "Installing OmniEdge on $node..."
@@ -758,7 +760,8 @@ deploy_omniedge() {
                 echo -e "  ℹ️ OmniEdge already installed: $existing_version"
             fi
             
-            ssh_cmd "$node" "curl -fsSL $INSTALLER_URL | sudo bash"
+            # Pass OMNIEDGE_VERSION to the installer script
+            ssh_cmd "$node" "curl -fsSL $INSTALLER_URL | OMNIEDGE_VERSION=$OMNIEDGE_VERSION bash"
             
             if ssh_cmd "$node" "which omniedge" &>/dev/null; then
                 local version
@@ -1135,6 +1138,7 @@ while [[ $# -gt 0 ]]; do
         --network) NETWORK_ID="$2"; shift 2 ;;
         --key) SECURITY_KEY="$2"; shift 2 ;;
         --duration) TEST_DURATION="$2"; shift 2 ;;
+        --version) OMNIEDGE_VERSION="$2"; shift 2 ;;
         --skip-deploy) SKIP_DEPLOY=true; shift ;;
         --use-local-bin) USE_LOCAL_BIN=true; shift ;;
         --use-local-cli) USE_LOCAL_CLI=true; shift ;;

@@ -192,9 +192,32 @@ impl OmniProto {
         let mut peers = Vec::new();
         let mut removed_vips = Vec::new();
 
+        // Helper: try parsing with HMAC verification first; if it fails due to HMAC
+        // mismatch (e.g., Nucleus running without a cluster secret), retry without
+        // HMAC verification and warn. This makes the edge tolerant of Nucleus
+        // misconfiguration while still logging the security degradation.
+        macro_rules! parse_with_hmac_fallback {
+            ($parse_fn:ident, $buf:expr, $secret:expr, $msg_name:expr) => {{
+                match $parse_fn($buf, $secret) {
+                    Ok(result) => Ok(result),
+                    Err(e) if $secret.is_some() && e.to_string().contains("HMAC verification failed") => {
+                        // HMAC failed - Nucleus likely running without cluster secret.
+                        // Retry without HMAC check so signaling still works.
+                        warn!(
+                            "HMAC verification failed for {} - Nucleus may not have cluster secret configured. \
+                             Accepting unsigned message (SECURITY WARNING: configure Nucleus with --secret for production)",
+                            $msg_name
+                        );
+                        $parse_fn($buf, None)
+                    }
+                    Err(e) => Err(e),
+                }
+            }};
+        }
+
         match msg_type {
             SIGNALING_REGISTER_ACK => {
-                let ack = parse_register_ack(effective_buf, secret)?;
+                let ack = parse_with_hmac_fallback!(parse_register_ack, effective_buf, secret, "REGISTER_ACK")?;
                 info!(
                     "Received REGISTER_ACK from Nucleus: success={}, {} recent peers",
                     ack.success, ack.recent_peers.len()
@@ -215,7 +238,7 @@ impl OmniProto {
                 }
             }
             SIGNALING_HEARTBEAT_ACK => {
-                let ack = parse_heartbeat_ack(effective_buf, secret)?;
+                let ack = parse_with_hmac_fallback!(parse_heartbeat_ack, effective_buf, secret, "HEARTBEAT_ACK")?;
                 if !ack.new_peers.is_empty() || !ack.removed_vips.is_empty() {
                     info!(
                         "Received HEARTBEAT_ACK: {} new peers, {} removed",
@@ -242,7 +265,7 @@ impl OmniProto {
                 removed_vips.extend(ack.removed_vips.iter().copied());
             }
             SIGNALING_PEER_INFO => {
-                let info = parse_peer_info(effective_buf, secret)?;
+                let info = parse_with_hmac_fallback!(parse_peer_info, effective_buf, secret, "PEER_INFO")?;
                 if info.found {
                     if let Some(p) = info.peer {
                         info!(
@@ -261,7 +284,7 @@ impl OmniProto {
                 }
             }
             SIGNALING_PEER_NOTIFY => {
-                match parse_peer_notify(effective_buf, secret) {
+                match parse_with_hmac_fallback!(parse_peer_notify, effective_buf, secret, "PEER_NOTIFY") {
                     Ok(notify) => {
                         info!(
                             "Received PEER_NOTIFY from Nucleus: new peer vip={}, endpoint={}, mapped_endpoint={:?}, nat_type={:?}",

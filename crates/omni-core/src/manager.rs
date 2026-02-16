@@ -2390,6 +2390,14 @@ impl ConnectionManager {
                                     pending.retries += 1;
                                     pending.sent_at = now;
 
+                                    // Increment probe_count on the endpoint so needs_relay()
+                                    // can correctly determine when enough probes have been sent.
+                                    // Without this, probe_count stays at 1 (from initial ping)
+                                    // and needs_relay() never returns true (requires >= 3).
+                                    if let Some(peer_state) = peers.get_mut(&pending.target_vip) {
+                                        peer_state.mark_probing(pending.target);
+                                    }
+
                                     let ping = DiscoPing {
                                         tx_id: *tx_id,
                                         sender_key: our_public_key,

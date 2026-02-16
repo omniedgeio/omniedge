@@ -3,6 +3,7 @@ use log::{debug, info, warn};
 #[cfg(target_os = "linux")]
 use omninervous::wg::CliWgControl;
 use omninervous::wg::{UserspaceWgControl, WgInterface};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::UdpSocket;
@@ -32,6 +33,19 @@ impl WgMode {
     }
 }
 
+/// Maximum time since last handshake before we consider a WireGuard tunnel expired.
+/// BoringTun fires ConnectionExpired after ~9 minutes of no handshake response.
+/// After that, the Tunn instance is in a dead state and set_peer() only updates
+/// the endpoint without recreating it. We detect this and force a tunnel reset.
+const WG_TUNNEL_EXPIRY_SECS: u64 = 300; // 5 minutes
+
+/// Stored peer configuration for re-adding after tunnel reset
+#[derive(Clone, Debug)]
+struct PeerConfig {
+    endpoint: Option<SocketAddr>,
+    allowed_ips: Vec<String>,
+}
+
 #[derive(Clone)]
 pub struct OmniTun {
     interface: WgInterface,
@@ -44,6 +58,11 @@ pub struct OmniTun {
     vip: Option<String>,
     /// WireGuard mode being used
     wg_mode: WgMode,
+    /// Track configured peers for tunnel reset recovery.
+    /// When a peer's BoringTun tunnel expires (ConnectionExpired), set_peer()
+    /// only updates the endpoint without recreating the Tunn. We work around
+    /// this by doing soft_shutdown + re-add of all peers when expiry is detected.
+    known_peers: HashMap<String, PeerConfig>,
 }
 
 impl OmniTun {
@@ -55,6 +74,7 @@ impl OmniTun {
             actual_ifname: None,
             vip: None,
             wg_mode: WgMode::Userspace,
+            known_peers: HashMap::new(),
         }
     }
 
@@ -101,6 +121,7 @@ impl OmniTun {
             actual_ifname: None,
             vip: None,
             wg_mode: effective_mode,
+            known_peers: HashMap::new(),
         }
     }
 
@@ -779,6 +800,60 @@ impl OmniTun {
         endpoint: Option<SocketAddr>,
         allowed_ips: &[String],
     ) -> anyhow::Result<()> {
+        // Check if this peer's tunnel might be expired (BoringTun ConnectionExpired).
+        // When a tunnel expires, set_peer() only updates the endpoint without recreating
+        // the Tunn instance, leaving the peer in a permanently broken state.
+        // Workaround: detect via get_peer_stats and force reset if needed.
+        if let Some(stats) = self.interface.get_peer_stats(public_key).await {
+            let is_expired = match stats.last_handshake {
+                Some(handshake_time) => {
+                    // Check if last handshake was too long ago
+                    match handshake_time.elapsed() {
+                        Ok(elapsed) => elapsed.as_secs() > WG_TUNNEL_EXPIRY_SECS,
+                        Err(_) => false, // Clock went backwards, not expired
+                    }
+                }
+                None => false, // No handshake yet — peer may be newly added, don't reset
+            };
+
+            if is_expired {
+                warn!(
+                    "WireGuard tunnel for peer {} appears expired (last handshake: {:?}). \
+                     Resetting all peer tunnels to recover from BoringTun ConnectionExpired state.",
+                    public_key, stats.last_handshake
+                );
+
+                // soft_shutdown clears all peers from the internal HashMap,
+                // forcing fresh Tunn creation on subsequent set_peer calls.
+                self.interface.soft_shutdown().await;
+
+                // Re-add all previously known peers (except the current one,
+                // which we'll add below with the new endpoint)
+                for (pk, config) in &self.known_peers {
+                    if pk != public_key {
+                        let res: Result<(), String> = self
+                            .interface
+                            .set_peer(pk, config.endpoint, &config.allowed_ips, Some(25))
+                            .await;
+                        if let Err(e) = res {
+                            warn!("Failed to re-add peer {} after tunnel reset: {}", pk, e);
+                        } else {
+                            info!("Re-added peer {} after tunnel reset", pk);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Track this peer's config for future reset recovery
+        self.known_peers.insert(
+            public_key.to_string(),
+            PeerConfig {
+                endpoint,
+                allowed_ips: allowed_ips.to_vec(),
+            },
+        );
+
         let res: Result<(), String> = self
             .interface
             .set_peer(public_key, endpoint, allowed_ips, Some(25))
