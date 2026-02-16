@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/github/license/omniedgeio/omniedge?style=flat-square)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![Tauri](https://img.shields.io/badge/tauri-v2-blue?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
-[![OmniNervous](https://img.shields.io/badge/OmniNervous-v0.5.0-green?style=flat-square)](https://github.com/omniedgeio/OmniNervous)
+[![OmniNervous](https://img.shields.io/badge/OmniNervous-v1.0.0-green?style=flat-square)](https://github.com/omniedgeio/OmniNervous)
 <br/>
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-blue?style=flat-square)](#supported-platforms)
 [![Discord](https://img.shields.io/discord/1234567890?color=5865F2&label=discord&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/d4faRPYj)
@@ -95,10 +95,10 @@ When running `omniedge start --mode nucleus` or `--mode dual`, the CLI can auto-
 
 ```bash
 # Download the package for your architecture (example: aarch64, OpenWrt 24.10)
-wget https://github.com/omniedgeio/omniedge/releases/download/v2.6.0/omniedge_2.6.0_aarch64_generic.ipk
+wget https://github.com/omniedgeio/omniedge/releases/download/v2.9.0/omniedge_2.9.0_aarch64_generic.ipk
 
 # Install the package
-opkg install omniedge_2.6.0_aarch64_generic.ipk
+opkg install omniedge_2.9.0_aarch64_generic.ipk
 
 # Configure via UCI
 uci set omniedge.main.enabled='1'
