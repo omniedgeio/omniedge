@@ -62,3 +62,4 @@ docs/
 
 # --- Scripts / Downloaded binaries ---
 scripts/omniedge-cli-*
+scripts/cloud_test_tailscale.sh
