@@ -4,6 +4,7 @@
 
 [![Release](https://img.shields.io/github/v/release/omniedgeio/omniedge?style=flat-square)](https://github.com/omniedgeio/omniedge/releases)
 [![Build](https://img.shields.io/github/actions/workflow/status/omniedgeio/omniedge/release.yml?label=Build&style=flat-square)](https://github.com/omniedgeio/omniedge/actions/workflows/release.yml)
+[![GitHub Downloads](https://img.shields.io/github/downloads/omniedgeio/omniedge/total?label=github%20downloads)](https://github.com/omniedgeio/omniedge/releases)
 [![E2E Tests](https://img.shields.io/github/actions/workflow/status/omniedgeio/omniedge/e2e.yml?label=E2E%20Tests&style=flat-square)](https://github.com/omniedgeio/omniedge/actions/workflows/e2e.yml)
 [![License](https://img.shields.io/github/license/omniedgeio/omniedge?style=flat-square)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
